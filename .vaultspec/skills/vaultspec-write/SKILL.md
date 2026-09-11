@@ -1,41 +1,157 @@
 ---
 name: vaultspec-write
-description: Write a proportionate implementation plan when scope or progress needs durable sequencing, after assessing decision coverage.
+description: Write an implementation plan of waves, phases, and steps. Use only after the authorizing ADR - or the cluster of ADRs a roll-up plan executes - is approved.
 ---
 
-# Plan (vaultspec-write)
+# Plan writing skill (vaultspec-write)
 
-Produces the sequence execution can resume across sessions. Apply the vaultspec system
-section's routing and approval contract. A plan may reuse governing ADRs or have none
-when no costly decision is involved. Drafting does not authorize execution.
+Use this skill:
 
-## Steps
+- To write the required implementation plan grounded with research and ADRs.
+- To plan **non-trivial work, such as new features, complex auditing, or refactoring**.
+- When the user explicitly asked to "write plan" or "draft Steps".
 
-- Discover governing decisions across features and read the relevant ADRs and evidence.
-  Reuse accepted decisions unchanged. Route uncovered costly choices to `vaultspec-adr`;
-  a draft may link proposed decisions, but dependent execution waits for acceptance.
-- Discover the affected code and exact paths. Expected new files are identified as
-  creation work. Record the coverage assessment and authorized scope in the Description,
-  particularly when no ADR governs.
-- Scaffold:
-  `vaultspec-core vault add plan --feature {feature} --tier <L1..L4> [--related <adr-stem> ...]`
-  (or `create`). Link each governing ADR; inherit its evidence transitively. Optional
-  direct evidence links do not replace governing ADRs.
-- Read `.vaultspec/templates/plan.md` for tiers, identifiers, row syntax, and cohesive
-  granularity. Build structure with `plan_edit` or the `vaultspec-core vault plan`
-  verbs. Author Description, Parallelization, and Verification through body editing.
-- Draft locally or dispatch `vaultspec-writer` with the scaffolded plan, assessed
-  coverage, scoped work, and governing documents, if any.
-- Verify with `vaultspec-core vault check all` and `vaultspec-core vault plan check`.
-- Present the plan. Persist existing scoped authorization with `Approved yyyy-mm-dd` as
-  the first Description line and its basis. Ask only when authorization is missing.
-  Gather missing evidence with the appropriate evidence skill, not an automatic new ADR.
+This skill **MUST always** be called after `vaultspec-adr` concludes with architectural
+approval.
+
+**Announce at start:** "I'm using the `vaultspec-write` skill to write the
+implementation plan."
+
+## Important
+
+- If part of the `vaultspec-research` -> `vaultspec-adr` flow, this skill **MUST** be
+  provided with the relevant Research and ADR documents.
+
+- If invoked standalone, you must locate or request relevant context.
+
+## CLI usage mandate
+
+Plan documents authored by this skill MUST be manipulated via the
+`vaultspec-core vault plan` CLI rather than by hand-editing the markdown body. The CLI
+is the canonical surface for every identifier-affecting change. The verbs are:
+
+- `vaultspec-core vault plan step add | insert | edit | move | remove`
+- `vaultspec-core vault plan step check | uncheck | toggle` (state)
+- `vaultspec-core vault plan phase add | insert | edit | move | renumber | remove`
+- `vaultspec-core vault plan wave add | insert | edit | move | remove`
+- `vaultspec-core vault plan epic intent show | edit` (L4 only)
+- `vaultspec-core vault plan tier show | promote | demote`
+
+The CLI guarantees canonical-identifier preservation, gap-no-reuse via a hidden
+retirement ledger, and display-path consistency that hand edits cannot. Run
+`vaultspec-core vault plan --help` for the full subcommand surface and
+`vaultspec-core vault plan check` for the validator that backs it.
+
+## Hierarchy and tiers
+
+The plan hierarchy is `Epic > Wave > Phase > Step`. Plans declare their complexity tier
+(`L1`, `L2`, `L3`, or `L4`) in frontmatter; the tier determines which structural
+containers exist:
+
+- `L1`: Steps only.
+- `L2`: Phases above Steps.
+- `L3`: Waves above Phases above Steps.
+- `L4`: Epic above Waves above Phases above Steps; an external project-management
+  association is declared in the Epic intent block.
+
+Full criteria, the row contract, identifier rules, and ordering rules are embedded as
+markdown-comment hint blocks in `.vaultspec/templates/plan.md`. The skill defers to
+those canonical sources rather than restating them.
+
+## ADR cardinality
+
+A plan executes one ADR or a cluster of them; both are normal. Multi-component work - a
+frontend or backend spanning several components, elements, or libraries, each with its
+own decision record - rolls up into a single epic plan (typically `L3`/`L4`) as the
+tracking document. Every governing ADR is listed in `related:` (`--related` repeats at
+scaffold time), and when several feed the plan, the Description section states which
+Wave or Phase each ADR governs. The inverse is not sanctioned: one ADR spread across
+several concurrent plans fragments tracking - prefer one plan per decision cluster.
 
 ## Rules
 
-- Select the smallest useful tier; promote only when containers clarify dependencies.
-- A Step is one cohesive, verifiable commit. Related changes across several files may
-  share a Step with bounded scope; unrelated outcomes need separate Steps.
-- Every governing ADR goes once in `related:`. When several govern different parts, map
-  them in the Description to Steps at L1 or the relevant containers at higher tiers.
-- Wiki-links belong only in `related:`.
+- **Ground the plan in real code first.** Map the implementation surface the plan will
+  touch before writing Steps - it is what lets Steps name real files and real symbols
+  rather than assumed paths. Lead with `vaultspec-rag search "<intent>" --type code` to
+  locate the sites (read the epicenter or nearest existing analogue in full, then
+  confirm exact symbols and insertion points with grep),
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr` to confirm the governing
+  decisions, and `vaultspec-core status` and `vaultspec-core vault list` - first-class
+  for orientation - to map plans and records. Where `vaultspec-rag` is not installed,
+  the `vaultspec-core` discovery verbs and grep carry the same sequence.
+
+- **Must reference research and ADRs**. Read these in full prior to writing the plan.
+
+- Ensure no knowledge gap remains prior to writing the plan. Call the
+  `vaultspec-research` skill if more information is needed.
+
+- **Granularity:** Every Step is one Markdown bulleted checkbox row naming exactly one
+  file or one cohesive area in inline backticks per the Step row contract embedded in
+  the plan template. No per-row reference footers; authorizing documents go once in the
+  plan's `related:` frontmatter.
+
+- **Persistence:**
+
+  - Plans: scaffold via
+    `vaultspec-core vault add plan --feature {feature} --tier <L1..L4> --related <adr-stem> [--related <adr-stem> ...]`
+    (one `--related` per authorizing ADR); the CLI owns the filename
+    (`.vault/plan/yyyy-mm-dd-{feature}-plan.md`) and the frontmatter; never hand-write
+    either. Build the structure with the `vaultspec-core vault plan` verbs above, then
+    author the prose sections (Description, Parallelization, Verification) as body
+    edits.
+
+  - Phase Summaries: tier-conditional `.vault/exec/yyyy-mm-dd-{feature}/...-summary.md`
+    filenames (`yyyy-mm-dd-{feature}-{phase}-summary.md` at L2;
+    `yyyy-mm-dd-{feature}-{wave}-{phase}-summary.md` at L3/L4).
+
+  - Step Records: tier-conditional `.vault/exec/yyyy-mm-dd-{feature}/...md` filenames
+    (`yyyy-mm-dd-{feature}-{step}.md` at L1; `yyyy-mm-dd-{feature}-{phase}-{step}.md` at
+    L2; `yyyy-mm-dd-{feature}-{wave}-{phase}-{step}.md` at L3/L4).
+
+## Frontmatter
+
+The scaffold owns the frontmatter; the full schema is defined in the `vaultspec` rule.
+Plan-specific requirements on top of the shared schema:
+
+- **`related`** carries the AUTHORIZING documents (ADR, research, reference, prior plan)
+  for every Step in the plan. Steps inherit this chain; per-row reference footers do not
+  exist. `related` is required when the plan contains at least one Step row.
+
+- **`tier`** is an unquoted scalar with value `L1`, `L2`, `L3`, or `L4`, set via the
+  `--tier` flag at scaffold time and changed only through
+  `vaultspec-core vault plan tier promote | demote`. Pre-existing plans without the
+  field default to `L2`.
+
+Verify after scaffolding with `vaultspec-core vault check all` rather than hand-editing
+frontmatter.
+
+## Workflow
+
+- **Research**: Ensure vaultspec research agents have answered questions.
+
+- **Linking**: Ensure the Plan uses `[[wiki-links]]` only in the `related:` frontmatter
+  field. The plan body must remain free of wiki-links and markdown links per the
+  embedded LINK RULES in the plan template.
+
+- **Drafting**: If working with sub-agents, load the `vaultspec-writer` agent persona.
+  Instruct it to "Create an implementation plan for `{feature}` based on the authorizing
+  ADR(s) `[[...-adr.md]]`. Use the template at `.vaultspec/templates/plan.md` and
+  conform to the embedded HIERARCHY AND TIERS, IDENTIFIERS AND ROW CONTRACT, and NO
+  COMPRESSION hint blocks. The plan's tier (`L1`/`L2`/`L3`/`L4`) is already set in
+  frontmatter by the `--tier` flag at scaffold time."
+
+- **Review**: Present the saved Plan summary to the user before executing.
+
+- **Provide an absolute link** and prompt the user:
+
+  ```markdown
+  The Plan is ready:
+  [[yyyy-mm-dd-{feature}-plan.md]]
+
+  Do you want to approve the Plan, or request changes?
+  ```
+
+- **Approval loop**: The user must explicitly approve the Plan. If changes are
+  requested, load the `vaultspec-writer` agent persona again to make changes. If more
+  research and grounding is required, use the appropriate vaultspec research skills and
+  agents. Instruct them to "Revise the plan based on user feedback: `{feedback}`."

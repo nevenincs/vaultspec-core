@@ -12,7 +12,7 @@ related:
 <!-- FRONTMATTER RULES:
      tags: one directory tag (hardcoded #audit) and one feature tag.
      Replace {feature} with a kebab-case feature tag, e.g. #foo-bar.
-     Exactly these two tags are allowed; do not append additional tags.
+     Additional tags may be appended below the required pair.
 
      Related: use wiki-links as '[[yyyy-mm-dd-foo-bar]]'.
 
@@ -25,8 +25,8 @@ related:
 <!-- LINK RULES:
      - [[wiki-links]] are ONLY for .vault/ documents in the related: field above.
      - NEVER use [[wiki-links]] or markdown links in the document body.
-     - Cite code as inline backtick locators: `src/module.py:42`; never as a
-       markdown link. -->
+     - NEVER reference file paths in the body. If you must name a source file,
+       class, or function, use inline backtick code: `src/module.py`. -->
 
 # `{feature}` audit: `{title}`
 

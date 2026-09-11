@@ -1,19 +1,21 @@
 ---
 name: vaultspec-documentation
-description: Create or substantially rewrite one user-facing README, guide, or feature document. Focused maintenance edits use a direct evidence-and-review pass.
+description: Write one polished user-facing document through a structured pipeline. Use to create or rewrite a README, guide, or feature doc.
 ---
 
 # Documentation Pipeline
 
-Produce one user-facing document grounded in its sources. For creation or substantial
-rewriting, use the pipeline below. For focused maintenance, inspect the affected claims,
-edit within the established structure, and verify technical accuracy and readability; do
-not restart the full pipeline.
+**Announce at start:** "I'm using the `vaultspec-documentation` skill to write
+`{document description}`."
 
-The system's approval contract applies throughout. Reuse supplied scope and audience;
-ask only for material missing choices. Explicit prior authorization can cover a
-wireframe and final delivery within that scope. These document stages are not plan
-Phases and do not create additional framework review gates.
+You are an agent-driven documentation writer. Your job is to produce a single, polished,
+user-facing document through a structured multi-stage pipeline with quality gates at
+each phase.
+
+The pipeline exists because good documentation is not written - it is assembled. Each
+stage has a distinct purpose and a distinct reviewer. Mixing concerns (e.g., drafting
+while still figuring out structure) produces mediocre docs. Separating them produces
+excellent ones.
 
 ## The Pipeline
 
@@ -21,9 +23,8 @@ Phases and do not create additional framework review gates.
 Phase 1: Wireframe -> Phase 2: Refinement -> Phase 3: User Approval -> Phase 4: Context Gathering -> Phase 5: Drafting -> Phase 6: Technical Review -> Phase 7: Editorial Review -> Phase 8: User Approval
 ```
 
-For the full pipeline, complete each stage's purpose before the next. If delegation is
-unavailable, perform the passes sequentially and state that review was not independent.
-Section-level passes feed a cohesive whole-document review.
+Every phase must complete before the next begins. There are no shortcuts - skipping a
+phase compromises the final output in ways that are hard to recover from later.
 
 ______________________________________________________________________
 
@@ -51,16 +52,17 @@ location. The wireframe is the document's table of promises.
 
 ### How to build the wireframe
 
-- Establish what to document and its audience from the request; ask if materially
-  unclear.
+- Ask the user what they want documented (project, feature, tool, etc.)
+- Ask who the audience is (new users, developers, operators, etc.)
 - **Classify the document using the Diataxis framework** (see
   `references/diataxis-rules.md`): Tutorial, How-to Guide, Reference, or Explanation.
   For documents that span types (e.g. a README combining How-to and Reference sections),
   state the primary and secondary types explicitly. This classification governs
   structural decisions throughout the pipeline.
 - Draft the wireframe with `<Title>` and `<Section>` tags
-- Confirm any unresolved scope, audience, or classification choice before refinement.
-  Reuse the user's established direction without an additional approval turn.
+- Confirm the general direction with the user (scope, audience, classification) before
+  entering refinement. This is a lightweight alignment check, not a full wireframe
+  review - the polished wireframe is presented after Phase 2.
 
 Keep tags descriptive but concise. A tag like
 `<Section: How to configure the retry policy for failed webhook deliveries>` is better
@@ -99,7 +101,7 @@ Read the subagent's feedback and categorize each point:
 
 - **Minor** (wording tweaks, reordering, small additions): Apply automatically.
 - **Substantial** (missing sections, structural changes, scope questions): Present to
-  the user when they exceed the authorized scope or require a missing choice.
+  the user with the feedback and your proposed changes. Let them decide.
 
 After applying changes, re-run the refinement subagent on the updated wireframe. Repeat
 until the refinement reviewer has no "I would NOT understand" responses on any of the 8
@@ -116,8 +118,12 @@ ______________________________________________________________________
 
 ## Phase 3: User Approval (Wireframe)
 
-Present the refined wireframe. Establish its authorization under the system contract:
-record the basis when prior scoped approval covers it, or ask before proceeding.
+Present the final, refinement-approved wireframe to the user. The user must explicitly
+approve the wireframe before you proceed to Phase 4: Context Gathering.
+
+Do not advance without explicit user approval. The wireframe is the foundation
+everything else builds on - if the structure is wrong, no amount of good writing in
+later phases will compensate.
 
 If the user requests changes, apply them and return to Phase 2: Refinement to
 re-validate the updated wireframe before seeking approval again.
@@ -207,10 +213,6 @@ reviewer should:
 Apply all corrections to the document. If a correction changes the meaning of a section
 significantly, flag it - the section may need partial redrafting.
 
-Then verify the assembled document end to end: terminology, prerequisites, sequence, and
-cross-section claims must describe one usable workflow. Section reviews alone do not
-satisfy technical review.
-
 ______________________________________________________________________
 
 ## Phase 7: Editorial Review
@@ -245,8 +247,8 @@ Present the finished document to the user. Include a brief summary of:
 - What the technical reviewer corrected
 - What the editorial reviewer improved
 
-Deliver within the established authorization; ask for acceptance only where it remains
-an explicit gate. If changes are requested, determine which pipeline phase they affect:
+The user reviews the document and either approves it or requests changes. If changes are
+requested, determine which pipeline phase they affect:
 
 - Structural changes - return to Phase 1: Wireframe
 - Content gaps - return to Phase 4: Context Gathering
@@ -266,5 +268,5 @@ Throughout the pipeline, keep the user informed at natural milestones:
 - "Technical review found 3 corrections. Editorial review suggested 5 improvements.
   Here's the final document."
 
-Ask for missing choices that materially affect the authorized scope or audience. Resolve
-ordinary content and structure details within that scope.
+The user's time is valuable. Don't ask for input on things you can decide yourself. Do
+ask for input on things that affect what the document says or how it's structured.

@@ -1,8 +1,9 @@
 # ADR reconciliation playbook
 
 The detailed Ground -> Reconcile -> Act -> Verify loop the curator runs. It applies the
-`vaultspec-discovery` rule to architecture decisions. Read `adr-status-taxonomy.md`
-first; this playbook assumes the canonical status set.
+validated discovery sequence - locate by meaning, read the epicenter whole, confirm with
+grep - to architecture decisions. Read `adr-status-taxonomy.md` first; this playbook
+assumes the canonical status set.
 
 ## Ground: build the decision inventory
 
@@ -24,8 +25,8 @@ first; this playbook assumes the canonical status set.
 For each cluster of decisions on a shared concept:
 
 - Surface the cluster by meaning:
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Semantic recall finds
-  same-topic ADRs that share no obvious filename or feature tag.
+  `vaultspec-rag search "<decision intent and domain nouns>" --type vault --doc-type adr`.
+  Semantic recall finds same-topic ADRs that share no obvious filename or feature tag.
 - Read the candidate ADRs whole. Judge them against each other for the conflict classes
   below. Do not rely on titles; two ADRs can agree in title and contradict in Rationale.
 - Walk each feature's supersession chain end to end. A chain whose links are refinements
@@ -40,8 +41,8 @@ For each `accepted` decision (and each `superseded` / `deprecated` one, inverted
   `vaultspec-rag search "<concept and domain nouns>" --type code` (narrow with
   `--language`, `--path`, `--include-path`, `--function-name`, `--class-name`,
   `--prefer production`).
-- Read the epicenter file whole. Confirm the decision is actually implemented as the ADR
-  describes.
+- Read the epicenter file whole - the breakthrough step. Confirm the decision is
+  actually implemented as the ADR describes.
 - Confirm exact symbols and insertion points with a targeted grep.
 - For `superseded` or `deprecated` decisions, invert the test: confirm the retired
   approach no longer dominates the code. A retired decision still governing the codebase
@@ -98,14 +99,11 @@ Classify every finding into one of these, because the action differs by class:
   encoding. Prefer `vaultspec-core vault set-frontmatter` / `vaultspec-core vault edit`
   for frontmatter and the CLI mutators over raw edits so stamps and the contract stay
   canonical.
-- **Unpropagated supersession.** Read both records and confirm the existing
-  `superseded_by` / `supersedes` edges agree. Use `vaultspec-core vault set-body` or
-  `vaultspec-core vault edit` to normalize the predecessor's H1 to `superseded` and
-  remove any duplicate legacy status declaration without changing decision content. Its
-  immediate successor may itself now be superseded. This repairs body encoding, not the
-  relationship. If the edges or authority are ambiguous, record the conflict for
-  resolution. New supersession requires an accepted successor under the system contract;
-  never rewrite historical chains to make intermediate records accepted.
+- **Unpropagated supersession.** Re-run
+  `vaultspec-core vault adr supersede OLD --by NEW` (use `--dry-run` first) so the
+  frontmatter and body status converge. For legacy `## Status` ADRs the tool cannot
+  rewrite, correct the body status to match via `vaultspec-core vault set-body` /
+  `vaultspec-core vault edit`.
 - **Contradiction, duplication.** Do not silently rewrite. Record the conflicting ADRs,
   the nature of the contradiction, and a recommended resolution in the audit for human
   approval. Apply the chosen resolution only once approved.
@@ -144,7 +142,6 @@ Classify every finding into one of these, because the action differs by class:
   document that carries the cited substance, and no decision changed.
 - Loop until the mechanical classes are clean and every judgment-class finding is
   recorded.
-- Persist the audit via
-  `vaultspec-core vault add audit --feature <feature> --topic reconciliation`, then
+- Persist the audit via `vaultspec-core vault add audit --feature <feature>`, then
   author the inventory, the findings by class, the actions applied, and the
   recommendations.
