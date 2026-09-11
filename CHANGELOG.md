@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.2](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.1...vaultspec-core-v0.2.2) (2026-09-11)
+
+
+### Features
+
+* **release:** package binaries as target bundles ([aaf9f90](https://github.com/nevenincs/vaultspec-core/commit/aaf9f901c9fa374703b8c7a29008e9c9db5cd0a6))
+
+
+### Bug Fixes
+
+* register release bundle recipe exception ([b3ecc33](https://github.com/nevenincs/vaultspec-core/commit/b3ecc33b5e1f47c7e64dd36a7462ed76eadb5d37))
+* satisfy strict bundle CLI typing ([ce84978](https://github.com/nevenincs/vaultspec-core/commit/ce84978d382cb5d3c7ca9763b42667a399602ef8))
+
 ## [0.2.1](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.0...vaultspec-core-v0.2.1) (2026-09-10)
 
 
