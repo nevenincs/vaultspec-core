@@ -46,6 +46,39 @@ brew tap nevenincs/tap https://github.com/nevenincs/homebrew-tap
 brew install vaultspec-core
 ```
 
+## Direct release downloads
+
+The release page publishes one archive per target. The archive name carries the product,
+version, and Rust target; its extracted command names do not vary by platform.
+
+| Target         | Release asset                                                |
+| -------------- | ------------------------------------------------------------ |
+| Windows x86-64 | `vaultspec-core-v<version>-x86_64-pc-windows-msvc.zip`       |
+| macOS arm64    | `vaultspec-core-v<version>-aarch64-apple-darwin.tar.gz`      |
+| macOS x86-64   | Not published; use the Python install                        |
+| Linux x86-64   | `vaultspec-core-v<version>-x86_64-unknown-linux-gnu.tar.gz`  |
+| Linux arm64    | `vaultspec-core-v<version>-aarch64-unknown-linux-gnu.tar.gz` |
+
+Each archive contains `vaultspec-core`, `vaultspec-mcp`, `LICENSE`, `README.txt`, and
+`manifest.json`. On Windows the executables end in `.exe`. The manifest records the
+archive contract, target, runtime, platform floor, and SHA-256 for each member.
+
+Extract the asset for your target, then run the stable command name:
+
+```powershell
+Expand-Archive .\vaultspec-core-v<version>-x86_64-pc-windows-msvc.zip -DestinationPath .\vaultspec-core
+.\vaultspec-core\vaultspec-core.exe --version
+```
+
+```sh
+tar -xzf vaultspec-core-v<version>-aarch64-apple-darwin.tar.gz
+chmod +x ./vaultspec-core
+./vaultspec-core --version
+```
+
+The target-qualified executable filenames used during the build are staging names, not
+the direct-download contract. Download the archive and its matching `SHA256SUMS` entry.
+
 ## Binaries are not code-signed
 
 Core's binaries carry no publisher signature, and they won't get one. Code signing needs
@@ -73,11 +106,12 @@ binary is then refused with `cannot be opened because the developer cannot be ve
 **Install with Homebrew and you never meet it** - `brew` fetches without setting the
 quarantine attribute. That's the supported path on macOS and the reason to prefer it.
 
-For a binary you did download directly, clear the attribute and mark it executable:
+For an executable extracted from a bundle you downloaded directly, clear the attribute
+and mark it executable:
 
 ```sh
-xattr -d com.apple.quarantine ./vaultspec-core-aarch64-apple-darwin
-chmod +x ./vaultspec-core-aarch64-apple-darwin
+xattr -d com.apple.quarantine ./vaultspec-core
+chmod +x ./vaultspec-core
 ```
 
 Verify the download first - the checks below are what tells you the file is the one this
@@ -85,18 +119,18 @@ repository published, and clearing quarantine tells macOS to stop asking.
 
 ## Verifying what you downloaded
 
-Download `SHA256SUMS` from the same release as your asset. Compute the asset's SHA-256
-hash with the command for your platform, replacing `./asset` with its path:
+Download `SHA256SUMS` from the same release as your bundle. Compute the archive's
+SHA-256 hash with the command for your platform, replacing `./bundle` with its path:
 
-| Platform             | Command                                                 |
-| -------------------- | ------------------------------------------------------- |
-| Windows (PowerShell) | `Get-FileHash -Algorithm SHA256 -LiteralPath './asset'` |
-| macOS                | `shasum -a 256 './asset'`                               |
-| Linux                | `sha256sum './asset'`                                   |
+| Platform             | Command                                                  |
+| -------------------- | -------------------------------------------------------- |
+| Windows (PowerShell) | `Get-FileHash -Algorithm SHA256 -LiteralPath './bundle'` |
+| macOS                | `shasum -a 256 './bundle'`                               |
+| Linux                | `sha256sum './bundle'`                                   |
 
-Compare the result with the hash beside that asset's filename in `SHA256SUMS`; letter
-case doesn't matter. If they differ, don't run the asset. Download it again from the
-same release and recheck.
+Compare the result with the hash beside that bundle's filename in `SHA256SUMS`; letter
+case doesn't matter. If they differ, don't extract or run the bundle. Download it again
+from the same release and recheck.
 
 A matching checksum confirms agreement with the release manifest. It doesn't establish
 where the asset came from: whoever can replace a binary on a release page can replace

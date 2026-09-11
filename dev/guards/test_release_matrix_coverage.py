@@ -17,7 +17,7 @@ silently loses that platform. A target in ``offline`` and absent from ``build``
 fails its download and reds the release for nothing.
 
 *Acquisition coverage.* A published binary nobody executes is an untested
-binary, and the acquisition check is the only thing that starts a release asset
+binary, and the acquisition check is the only thing that starts a release bundle
 on a machine with no checkout and no toolchain. v0.1.71 attached
 ``vaultspec-core-aarch64-unknown-linux-gnu`` while the acquisition matrix still
 fetched only the x86_64 file; the release guards stayed green because they
@@ -49,9 +49,8 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
 #: The suffix identifying a Linux target triple. Acquisition covers macOS and
-#: Windows in jobs of their own, whose assets are named by different rules
-#: (``.exe``, a universal-binary fallback), so the derivation here is scoped to
-#: the one family whose asset name is exactly ``vaultspec-core-<triple>``.
+#: Windows in jobs of their own, but the build and acquisition matrices still
+#: use the same target key for every bundle.
 LINUX_SUFFIX = "-linux-gnu"
 
 
@@ -105,10 +104,30 @@ def test_every_built_linux_target_is_acquired() -> None:
         "no Linux targets in the build matrix; the acquisition-coverage "
         "assertion cannot run"
     )
-    acquired = _matrix_values("acquisition.yml", "acquire", "asset")
-    missing = {target for target in built if f"vaultspec-core-{target}" not in acquired}
+    acquired = _matrix_values("acquisition.yml", "acquire", "target")
+    missing = built - acquired
     assert not missing, (
-        f"acquisition.yml fetches no asset for: {sorted(missing)}. A target "
+        f"acquisition.yml fetches no bundle for: {sorted(missing)}. A target "
         "that is built and published must also be executed from the published "
         "release, on a machine with no checkout and no toolchain."
     )
+
+
+def test_linux_offline_gate_runs_the_extracted_bundle() -> None:
+    """The no-network gate executes extracted stable names, not archive files."""
+    workflow = (WORKFLOWS / "binaries.yml").read_text(encoding="utf-8")
+    assert '"${PWD}/offline-bundle:/artifacts:ro"' in workflow
+    assert 'ARTIFACTS="${PWD}/offline-bundle"' in workflow
+    assert '"${ARTIFACTS}"/vaultspec-core --version' in workflow
+
+
+def test_release_holds_latest_until_target_bundles_are_complete() -> None:
+    """The release state is held and the completeness gate precedes upload."""
+    workflow = (WORKFLOWS / "binaries.yml").read_text(encoding="utf-8")
+    hold = workflow.index("name: Hold release out of latest during validation")
+    complete = workflow.index("name: Assert every declared target attached")
+    upload = workflow.index("name: Upload to release")
+    assert hold < upload
+    assert complete < upload
+    verification = workflow.index("verify-release-assets:")
+    assert "runs-on: ubuntu-latest" in workflow[verification:]

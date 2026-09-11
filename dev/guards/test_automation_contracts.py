@@ -68,6 +68,9 @@ _WorkflowStep = TypedDict(
 #: are published and therefore how they are pinned in a workflow.
 _SHA256_HEX_LENGTH = 64
 
+#: Actionlint is pinned by a concrete release version, not a floating label.
+_ACTIONLINT_VERSION = re.compile(r"^\d+\.\d+\.\d+$")
+
 
 class _WorkflowJob(TypedDict):
     """One job in a GitHub Actions workflow."""
@@ -900,7 +903,9 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
     # what let an amd64 archive pass its own check on an ARM runner.
     from dev import actionlint
 
-    assert actionlint.VERSION, "actionlint must be pinned to a version"
+    assert _ACTIONLINT_VERSION.fullmatch(actionlint.VERSION), (
+        "actionlint must be pinned to a concrete release version"
+    )
     assert actionlint.ARCHIVES, "actionlint must pin at least one platform"
     # The architecture token upstream uses, per machine this fleet runs on.
     # Named here rather than derived from the entry being checked: deriving it

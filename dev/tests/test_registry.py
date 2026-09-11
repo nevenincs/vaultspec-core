@@ -25,7 +25,7 @@ JUSTFILE = Path(__file__).resolve().parents[2] / "justfile"
 #: family must work before a virtual environment exists, and the rest wrap a
 #: single external entry point that has no target dispatch to model.
 NON_REGISTRY_RECIPES = frozenset(
-    # `binaries` and `channels` are release-path recipes: each invokes a
+    # `binaries`, `bundle`, and `channels` are release-path recipes: each invokes a
     # `dev/` script directly under a bare `--no-project` interpreter, exactly
     # as the release workflow does, so a local reproduction and CI run the
     # same command. Routing them through the dev runner would put a project
@@ -46,6 +46,7 @@ NON_REGISTRY_RECIPES = frozenset(
         "init-check",
         "analytics",
         "release-binaries",
+        "release-bundle",
         "release-channels",
         "release-verify-surface",
         "ci",

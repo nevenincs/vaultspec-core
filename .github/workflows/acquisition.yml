@@ -54,8 +54,8 @@ jobs:
         # container pin stops working, and one above it in the range a user is
         # most likely to be running.
         #
-        # BOTH Linux architectures, because a published asset nobody executes
-        # is an untested asset. aarch64 was built, attached and shipped in
+        # BOTH Linux architectures, because a published bundle nobody executes
+        # is an untested bundle. aarch64 was built, attached and shipped in
         # v0.1.71 while this matrix still fetched only the x86_64 file, so that
         # binary reached users having never been started anywhere. The coverage
         # assertion in ci.yml is what stops this recurring silently.
@@ -83,34 +83,34 @@ jobs:
             setup: dnf install -y -q curl git
             arch: x86_64
             runner: [self-hosted, Linux, X64, build]
-            asset: vaultspec-core-x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-gnu
           - image: almalinux:8
             setup: dnf install -y -q curl git
             arch: aarch64
             runner: ubuntu-24.04-arm
-            asset: vaultspec-core-aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-gnu
           # Above the floor and below the build host, which is the band a user
           # is most likely to be in. bookworm is 2.36, jammy is 2.35.
           - image: debian:bookworm-slim
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: x86_64
             runner: [self-hosted, Linux, X64, build]
-            asset: vaultspec-core-x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-gnu
           - image: ubuntu:22.04
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: x86_64
             runner: [self-hosted, Linux, X64, build]
-            asset: vaultspec-core-x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-gnu
           - image: debian:bookworm-slim
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
             runner: ubuntu-24.04-arm
-            asset: vaultspec-core-aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-gnu
           - image: ubuntu:22.04
             setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
             arch: aarch64
             runner: ubuntu-24.04-arm
-            asset: vaultspec-core-aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.image }}
     steps:
@@ -124,7 +124,7 @@ jobs:
           REPO: ${{ github.repository }}
           EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
-          ASSET: ${{ matrix.asset }}
+          TARGET: ${{ matrix.target }}
         run: |
           set -eux
           tag="${EVENT_TAG:-${INPUT_TAG:-}}"
@@ -133,11 +133,14 @@ jobs:
                   | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
           fi
           [ -n "${tag}" ] || { echo "::error::could not resolve a release tag"; exit 1; }
-          echo "TAG=${tag}" >> "$GITHUB_ENV"
+          version="${tag#vaultspec-core-v}"
+          archive="vaultspec-core-v${version}-${TARGET}.tar.gz"
           mkdir -p /opt/acq
-          curl -fsSL -o /opt/acq/vaultspec-core \
-            "https://github.com/${REPO}/releases/download/${tag}/${ASSET}"
-          chmod +x /opt/acq/vaultspec-core
+          curl -fsSL -o "/opt/acq/${archive}" \
+            "https://github.com/${REPO}/releases/download/${tag}/${archive}"
+          mkdir -p /opt/acq/bundle
+          tar -xzf "/opt/acq/${archive}" -C /opt/acq/bundle
+          chmod +x /opt/acq/bundle/vaultspec-core
 
       # A COLD START, once, with no retry, and the retry's absence is the
       # assertion rather than a tidy-up.
@@ -165,7 +168,7 @@ jobs:
           set -eu
           export HOME=/tmp/bootstrap-probe
           rm -rf "$HOME"; mkdir -p "$HOME"
-          /opt/acq/vaultspec-core --version
+          /opt/acq/bundle/vaultspec-core --version
 
       - name: Use it the way a new user would
         run: |
@@ -177,14 +180,14 @@ jobs:
           rm -rf "$HOME" /tmp/proj
           mkdir -p "$HOME" /tmp/proj
 
-          /opt/acq/vaultspec-core --version
+          /opt/acq/bundle/vaultspec-core --version
 
           cd /tmp/proj
           git init -q
           git config user.email acquisition@example.invalid
           git config user.name "Acquisition Check"
 
-          /opt/acq/vaultspec-core install
+          /opt/acq/bundle/vaultspec-core install
 
           # Behaviour, not exit codes: the install has to leave a vault behind,
           # and the tool has to be able to read back what it just wrote.
@@ -230,9 +233,14 @@ jobs:
           acq="${RUNNER_TEMP}/acq"
           rm -rf "${acq}"; mkdir -p "${acq}"
           echo "ACQ=${acq}" >> "$GITHUB_ENV"
-          curl -fsSL -o "${acq}/vaultspec-core" \
-            "https://github.com/${REPO}/releases/download/${tag}/vaultspec-core-aarch64-apple-darwin"
-          chmod +x "${acq}/vaultspec-core"
+          version="${tag#vaultspec-core-v}"
+          archive="vaultspec-core-v${version}-aarch64-apple-darwin.tar.gz"
+          curl -fsSL -o "${acq}/${archive}" \
+            "https://github.com/${REPO}/releases/download/${tag}/${archive}"
+          mkdir -p "${acq}/bundle"
+          tar -xzf "${acq}/${archive}" -C "${acq}/bundle"
+          chmod +x "${acq}/bundle/vaultspec-core"
+          mv "${acq}/bundle/vaultspec-core" "${acq}/vaultspec-core"
 
           # Gatekeeper quarantines a curl-downloaded executable. A user gets the
           # same treatment from a browser download and clears it the same way;
@@ -339,8 +347,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path $acq | Out-Null
           "ACQ=$acq" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-          $url = "https://github.com/$env:REPO/releases/download/$tag/vaultspec-core-x86_64-pc-windows-msvc.exe"
-          Invoke-WebRequest -Uri $url -OutFile (Join-Path $acq 'vaultspec-core.exe')
+          $version = $tag.Substring('vaultspec-core-v'.Length)
+          $archive = "vaultspec-core-v$version-x86_64-pc-windows-msvc.zip"
+          $url = "https://github.com/$env:REPO/releases/download/$tag/$archive"
+          $archivePath = Join-Path $acq $archive
+          Invoke-WebRequest -Uri $url -OutFile $archivePath
+          Expand-Archive -LiteralPath $archivePath -DestinationPath $acq -Force
 
           # Windows marks a downloaded file with a Zone.Identifier stream, which
           # is what a user gets from a browser too. Scoop clears it for them.

@@ -88,7 +88,8 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from dev.binaries.windows_icon import stamp_icon
+from dev.binaries.windows_icon import VersionInfo, stamp_icon, stamp_version_info
+from dev.packaging import products
 
 # Pinned PyApp crate version. Bumping this changes the bootstrapper and the
 # embedded python-build-standalone distributions it selects, so it is an
@@ -606,8 +607,24 @@ def build_one(
 
 
 def asset_name(binary: Binary, target: str) -> str:
-    suffix = ".exe" if target.endswith("windows-msvc") else ""
-    return f"{binary.name}-{target}{suffix}"
+    return products.raw_asset_name(binary.name, target)
+
+
+def binary_version_info(binary: Binary, version: str, target: str) -> VersionInfo:
+    """Return the Windows metadata for one finalized release executable."""
+    executable = next(
+        item for item in products.VAULTSPEC_CORE.executables if item.name == binary.name
+    )
+    product = products.VAULTSPEC_CORE
+    return VersionInfo(
+        file_version=version,
+        product_version=version,
+        product_name=product.display_name or product.name,
+        file_description=executable.summary,
+        original_filename=products.executable_filename(binary.name, target),
+        company_name=product.publisher,
+        legal_copyright=product.legal_copyright,
+    )
 
 
 def write_checksum(asset: Path) -> Path:
@@ -734,11 +751,14 @@ def check_platform_floor(asset: Path, target: str) -> None:
         )
 
 
-def publish_asset(raw: Path, asset: Path, target: str) -> Path:
+def publish_asset(
+    raw: Path, asset: Path, target: str, binary: Binary, version: str
+) -> Path:
     """Copy, finalize, verify, and checksum one release executable."""
     shutil.copy2(raw, asset)
     if target.endswith("windows-msvc"):
         stamp_icon(asset, APPLICATION_ICON)
+        stamp_version_info(asset, binary_version_info(binary, version, target))
     else:
         asset.chmod(0o755)
     check_platform_floor(asset, target)
@@ -808,7 +828,7 @@ def main() -> int:
         for binary in BINARIES:
             raw = build_one(binary, version, target, distribution, workdir)
             asset = outdir / asset_name(binary, target)
-            checksum = publish_asset(raw, asset, target)
+            checksum = publish_asset(raw, asset, target, binary, version)
             produced.extend((asset, checksum))
             print(f"built {asset} ({asset.stat().st_size} bytes)", flush=True)
 

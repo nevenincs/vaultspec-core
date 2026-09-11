@@ -33,7 +33,6 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from dev.binaries.build_pyapp import BINARIES, asset_name
 from dev.packaging import products
 from dev.packaging.generate import formula_path, scoop_path
 from dev.packaging.pointer import existing_homebrew_version, existing_scoop_version
@@ -85,11 +84,9 @@ def buildable_targets(repo_root: Path) -> tuple[str, ...]:
     return targets
 
 
-def _buildable_asset_names(repo_root: Path) -> set[str]:
+def _buildable_asset_names(repo_root: Path, product: Product, version: str) -> set[str]:
     return {
-        asset_name(binary, target)
-        for binary in BINARIES
-        for target in buildable_targets(repo_root)
+        product.bundle_name(version, target) for target in buildable_targets(repo_root)
     }
 
 
@@ -194,8 +191,9 @@ def validate(root: Path, product: Product, repo_root: Path | None = None) -> lis
     #     404 at install time and nowhere earlier.
     referenced = {url.rsplit("/", 1)[-1] for url in urls}
     referenced |= set(re.findall(r'url "[^"]*/([^"/]+)"', formula))
+    version = scoop_version or brew_version or ""
     try:
-        buildable = _buildable_asset_names(repo_root)
+        buildable = _buildable_asset_names(repo_root, product, version)
     except UnknownTargetsError as exc:
         # Not "assume everything is fine". An unreadable matrix means the
         # question cannot be answered, and answering it anyway - in either

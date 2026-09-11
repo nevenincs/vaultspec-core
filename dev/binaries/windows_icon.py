@@ -19,7 +19,9 @@ if TYPE_CHECKING:
 
 RT_ICON = 3
 RT_GROUP_ICON = 14
+RT_VERSION = 16
 PRIMARY_ICON_GROUP = 1
+VERSION_RESOURCE_ID = 1
 LANG_NEUTRAL = 0
 LOAD_LIBRARY_AS_DATAFILE = 0x00000002
 LOAD_LIBRARY_AS_IMAGE_RESOURCE = 0x00000020
@@ -39,6 +41,23 @@ class IconImage:
     planes: int
     bit_count: int
     payload: bytes
+
+
+@dataclass(frozen=True)
+class VersionInfo:
+    """The user-visible string fields carried by a Windows PE version resource."""
+
+    file_version: str
+    product_version: str
+    product_name: str
+    file_description: str
+    original_filename: str
+    company_name: str
+    legal_copyright: str
+
+
+class VersionResourceError(RuntimeError):
+    """A PE version resource is invalid or could not be stamped exactly."""
 
 
 def parse_ico(path: Path) -> tuple[IconImage, ...]:
@@ -166,6 +185,111 @@ def _group_data(images: tuple[IconImage, ...]) -> bytes:
     return header + entries
 
 
+def _pad(data: bytearray) -> None:
+    """Pad a version-resource block to the DWORD boundary Win32 requires."""
+    data.extend(b"\x00" * (-len(data) % 4))
+
+
+def _utf16(value: str) -> bytes:
+    """Encode a NUL-terminated UTF-16LE resource string."""
+    return value.encode("utf-16le") + b"\x00\x00"
+
+
+def _version_block(
+    key: str,
+    value: bytes,
+    value_length: int,
+    value_type: int,
+    children: tuple[bytes, ...] = (),
+) -> bytes:
+    """Build one aligned VERSIONINFO block."""
+    data = bytearray(struct.pack("<HHH", 0, value_length, value_type))
+    data.extend(_utf16(key))
+    _pad(data)
+    data.extend(value)
+    _pad(data)
+    for child in children:
+        data.extend(child)
+        _pad(data)
+    struct.pack_into("<H", data, 0, len(data))
+    return bytes(data)
+
+
+def _version_parts(version: str) -> tuple[int, int, int, int]:
+    """Return a four-word VERSIONINFO version tuple."""
+    parts = version.split(".")
+    if not 1 <= len(parts) <= 4 or not all(part.isdigit() for part in parts):
+        raise VersionResourceError(f"invalid Windows file version: {version!r}")
+    numbers = tuple(int(part) for part in parts)
+    if any(number > 0xFFFF for number in numbers):
+        raise VersionResourceError(
+            f"Windows file version word is too large: {version!r}"
+        )
+    padded = (*numbers, *(0 for _ in range(4 - len(numbers))))
+    return padded[0], padded[1], padded[2], padded[3]
+
+
+def _fixed_version(value: tuple[int, int, int, int]) -> int:
+    """Pack the first two words of a four-part version into one DWORD."""
+    return value[0] << 16 | value[1]
+
+
+def version_resource(info: VersionInfo) -> bytes:
+    """Build a Windows VERSIONINFO resource for *info*."""
+    file_version = _version_parts(info.file_version)
+    product_version = _version_parts(info.product_version)
+    fixed = struct.pack(
+        "<13I",
+        0xFEEF04BD,
+        0x00010000,
+        _fixed_version(file_version),
+        file_version[2] << 16 | file_version[3],
+        _fixed_version(product_version),
+        product_version[2] << 16 | product_version[3],
+        0x3F,
+        0,
+        0x00000004,
+        1,
+        0,
+        0,
+        0,
+    )
+    strings = tuple(
+        _version_block(
+            key,
+            _utf16(value),
+            len(value) + 1,
+            1,
+        )
+        for key, value in (
+            ("CompanyName", info.company_name),
+            ("FileDescription", info.file_description),
+            ("FileVersion", info.file_version),
+            ("InternalName", info.original_filename),
+            ("OriginalFilename", info.original_filename),
+            ("ProductName", info.product_name),
+            ("ProductVersion", info.product_version),
+            ("LegalCopyright", info.legal_copyright),
+        )
+    )
+    table = _version_block("040904B0", b"", 0, 1, strings)
+    string_file_info = _version_block("StringFileInfo", b"", 0, 1, (table,))
+    translation = _version_block(
+        "Translation",
+        struct.pack("<HH", 0x0409, 1200),
+        2,
+        0,
+    )
+    var_file_info = _version_block("VarFileInfo", b"", 0, 1, (translation,))
+    return _version_block(
+        "VS_VERSION_INFO",
+        fixed,
+        len(fixed),
+        0,
+        (string_file_info, var_file_info),
+    )
+
+
 def _update_resource(
     kernel32: Any,
     handle: int,
@@ -219,6 +343,34 @@ def stamp_icon(executable: Path, icon: Path) -> None:
     verify_icon(executable, icon)
 
 
+def stamp_version_info(executable: Path, info: VersionInfo) -> None:
+    """Replace the primary PE version resource with *info* and verify it."""
+    if not executable.is_file():
+        raise VersionResourceError(f"Windows executable does not exist: {executable}")
+    payload = version_resource(info)
+    kernel32 = _kernel32()
+    handle = kernel32.BeginUpdateResourceW(os.fspath(executable), False)
+    if not handle:
+        _raise_win32("opening resources in", executable)
+    committed = False
+    try:
+        _update_resource(
+            kernel32,
+            handle,
+            RT_VERSION,
+            VERSION_RESOURCE_ID,
+            payload,
+            executable,
+        )
+        if not kernel32.EndUpdateResourceW(handle, False):
+            _raise_win32("committing resources in", executable)
+        committed = True
+    finally:
+        if not committed:
+            kernel32.EndUpdateResourceW(handle, True)
+    verify_version_info(executable, info)
+
+
 def _read_resource(
     kernel32: Any, module: int, kind: int, resource_id: int, executable: Path
 ) -> bytes:
@@ -261,5 +413,28 @@ def verify_icon(executable: Path, icon: Path) -> None:
                 raise IconResourceError(
                     f"icon frame {resource_id} in {executable} does not match {icon}"
                 )
+    finally:
+        kernel32.FreeLibrary(module)
+
+
+def verify_version_info(executable: Path, info: VersionInfo) -> None:
+    """Require the primary PE version resource to match *info* exactly."""
+    expected = version_resource(info)
+    kernel32 = _kernel32()
+    module = kernel32.LoadLibraryExW(
+        os.fspath(executable),
+        None,
+        LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE,
+    )
+    if not module:
+        _raise_win32("loading resources from", executable)
+    try:
+        actual = _read_resource(
+            kernel32, module, RT_VERSION, VERSION_RESOURCE_ID, executable
+        )
+        if actual != expected:
+            raise VersionResourceError(
+                f"version resource in {executable} does not match expected metadata"
+            )
     finally:
         kernel32.FreeLibrary(module)

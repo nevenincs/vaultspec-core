@@ -73,6 +73,14 @@ binaries.yml:Run it with the network denied to the process
 binaries.yml:Run it with every route to an index black-holed
 binaries.yml:A check actually ran
 
+# Bundle extraction is platform-native bookkeeping: TAR/GZ is unpacked by the
+# Unix runner and ZIP by PowerShell on Windows before the same offline command
+# surface is exercised. These are not product policy or a second packaging
+# implementation, so they stay local until the offline harness is promoted to
+# a recipe.
+binaries.yml:Extract the Unix release bundle
+binaries.yml:Extract the Windows release bundle
+
 # Release-plane: checksum aggregation with an inherited-SHA merge (vaultspec-rag
 # carries the same algorithm twice), attestation enumeration and verification,
 # the channel-pointer generate/validate pair, and the tap commit with its

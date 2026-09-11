@@ -52,23 +52,21 @@ def formula_path(root: Path, product: Product) -> Path:
     return root / "Formula" / f"{product.name}.rb"
 
 
-def available_targets(product: Product, digests: dict[str, str]) -> tuple[str, ...]:
+def available_targets(
+    product: Product, version: str, digests: dict[str, str]
+) -> tuple[str, ...]:
     """Return the Homebrew triples this release actually attached.
 
-    A triple counts as available only when the product supports it AND every
-    executable was published for it. A half-built target would otherwise
-    render a formula whose primary download resolves and whose resource 404s
+    A triple counts as available only when the product supports it AND its
+    complete target bundle was published. The archive owns the executable set,
+    so a half-built target cannot render a pointer whose second download 404s
     at install time; an unsupported one would offer an install that raises at
     startup.
     """
     return tuple(
         target
         for target in products.HOMEBREW_TARGETS
-        if product.serves(target)
-        and all(
-            product.asset_name(executable, target) in digests
-            for executable in product.executables
-        )
+        if product.serves(target) and product.bundle_name(version, target) in digests
     )
 
 
@@ -90,7 +88,7 @@ def generate(root: Path, product: Product, tag: str, checksums: Path) -> list[Pa
     check_forward(existing_scoop_version(manifest), version)
     check_forward(existing_homebrew_version(formula), version)
 
-    targets = available_targets(product, digests)
+    targets = available_targets(product, version, digests)
     if not targets:
         raise SystemExit(
             f"release {tag} attached no complete Homebrew target; "

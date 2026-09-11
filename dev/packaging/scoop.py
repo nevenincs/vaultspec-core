@@ -36,7 +36,7 @@ def render_manifest(
     version: str,
     digests: dict[str, str],
 ) -> dict[str, object]:
-    """Return one Scoop manifest pinned to this release's exact assets."""
+    """Return one Scoop manifest pinned to this release's exact bundle."""
     # Scoop serves exactly one target, so the manifest needs no `architecture`
     # split; unpacking asserts that rather than assuming it silently.
     (target,) = products.SCOOP_TARGETS
@@ -44,25 +44,25 @@ def render_manifest(
     autoupdate_base = (
         f"{product.homepage}/releases/download/{product.tag_prefix}$version"
     )
-    entries = [
-        (product.asset_name(executable, target), executable.name)
+    asset = product.bundle_name(version, target)
+    stable_names = [
+        product.executable_name(executable, target)
         for executable in product.executables
     ]
-    assets = [asset for asset, _ in entries]
     return {
         "version": version,
         "description": product.description,
         "homepage": product.homepage,
         "license": product.license,
-        "url": [f"{base}/{asset}" for asset in assets],
-        "hash": [require(digests, asset) for asset in assets],
-        "bin": [[asset, name] for asset, name in entries],
+        "url": [f"{base}/{asset}"],
+        "hash": [require(digests, asset)],
+        "bin": [[name, name.removesuffix(".exe")] for name in stable_names],
         "checkver": {
             "github": product.homepage,
             "regex": f"{product.tag_prefix}([\\d.]+)",
         },
         "autoupdate": {
-            "url": [f"{autoupdate_base}/{asset}" for asset in assets],
+            "url": [f"{autoupdate_base}/{product.bundle_name('$version', target)}"],
             "hash": {
                 "url": f"{autoupdate_base}/SHA256SUMS",
                 "regex": "$sha256\\s+$basename",

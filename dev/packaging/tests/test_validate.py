@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dev.binaries.build_pyapp import BINARIES, asset_name
 from dev.packaging import products
 from dev.packaging.generate import formula_path, generate, scoop_path
 from dev.packaging.products import VAULTSPEC_CORE
@@ -47,11 +46,11 @@ def channel_root(tmp_path: Path) -> Path:
     keeps these tests from restating whichever legs main happens to carry.
     """
     built = set(buildable_targets(REPO_ROOT))
+    version = VAULTSPEC_CORE.version_from_tag(TAG)
     lines = [
-        f"{_DIGEST}  {asset_name(binary, target)}"
+        f"{_DIGEST}  {VAULTSPEC_CORE.bundle_name(version, target)}"
         for target in (*products.HOMEBREW_TARGETS, products.WINDOWS_X86_64)
         if VAULTSPEC_CORE.serves(target) and target in built
-        for binary in BINARIES
     ]
     assert lines, "the matrix builds nothing this product serves"
     checksums = tmp_path / "SHA256SUMS"
@@ -143,7 +142,7 @@ def test_an_asset_no_build_produces_is_refused(channel_root: Path) -> None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     manifest["url"][0] = (
         "https://github.com/nevenincs/vaultspec-core/releases/download/"
-        f"{TAG}/vaultspec-core-0.1.2-x86_64-pc-windows-msvc.msi"
+        f"{TAG}/vaultspec-core-v0.1.2-x86_64-pc-windows-msvc.zip"
     )
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
@@ -207,7 +206,7 @@ def test_an_asset_for_a_target_the_matrix_dropped_is_refused(
     manifest = json.loads(path.read_text(encoding="utf-8"))
     manifest["url"][0] = (
         f"https://github.com/nevenincs/vaultspec-core/releases/download/{TAG}/"
-        f"{asset_name(BINARIES[0], dropped)}"
+        f"{VAULTSPEC_CORE.bundle_name(VAULTSPEC_CORE.version_from_tag(TAG), dropped)}"
     )
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
