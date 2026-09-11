@@ -434,7 +434,7 @@ def main() -> int:
         version = (
             args.version
             if args.version is not None
-            else VAULTSPEC_CORE.version_from_tag(args.tag)
+            else VAULTSPEC_CORE.version_from_tag(cast("str", args.tag))
         )
         verify_bundle(args.verify, VAULTSPEC_CORE, version, args.target)
         print(f"verified {args.verify}")
@@ -446,7 +446,7 @@ def main() -> int:
     version = (
         args.version
         if args.version is not None
-        else VAULTSPEC_CORE.version_from_tag(args.tag)
+        else VAULTSPEC_CORE.version_from_tag(cast("str", args.tag))
     )
     archive = build_bundle(
         VAULTSPEC_CORE,
