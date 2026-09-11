@@ -2,69 +2,36 @@
 name: vaultspec-cli
 ---
 
-# Vaultspec Core CLI
+# Vaultspec tools
 
-This project is vaultspec-managed. See `vaultspec.builtin.md` for framework rules and
-workflow concepts.
+Every `.vault/` mutation, listing, and repair goes through the owning verbs: MCP tools
+when connected, else the `vaultspec-core` CLI. Bypassing them produces drift that
+`check` flags. A record's body is read as a file.
 
-## Mandate
+## Tools
 
-All `.vault/` reads, mutations, audits, and repairs route through `vaultspec-core`
-owning-verb logic; never hand-write frontmatter, filenames, plan structure, or new
-`.vault/` documents (editing scaffolded body prose is permitted, see "Allowed manual
-edits"). The vaultspec MCP tools are the primary transport where the server is
-connected, the `vaultspec-core` CLI verbs otherwise; both terminate in the same
-owning-verb logic that enforces templates, taxonomy, wiki-links, and schema, so
-bypassing it produces drift the `check` tool and `vaultspec-core spec doctor` will flag.
+The MCP server exposes `status` (in-flight plans and next open Step), `find` (documents
+and features), `create` (scaffold, batchable), `edit` (body prose, batchable),
+`plan_progress` (check or uncheck Steps), `plan_edit` (author and restructure Step
+rows), `log` (append a Step's ledger rows), `check` (validate and repair), and the
+`discover`/`invoke` gateway to every other verb. `invoke` asks for host confirmation on
+every call, so the above-Step plan verbs (`tier`, `wave`, `phase`, `epic intent`) and
+`vaultspec-core sync` are better run through the CLI even when connected.
+`vaultspec-core vault feature index`, `vaultspec-core spec mcps`, and `uninstall` are
+CLI-only.
 
-## Orientation
+The bundled CLI reference, `.vaultspec/reference/cli.md`, catalogues every command,
+flag, and exit code. Run `vaultspec-core <cmd>`, or
+`uv run --no-sync vaultspec-core <cmd>` in uv environments; `--dry-run`, `--json`, and
+`<cmd> --help` preview and explain. Sync-shaped commands report created, updated,
+unchanged, removed, restored, skipped, or failed; only `failed` stops.
 
-Orient before working in a project you have no session context for: the `status` tool
-reports the in-flight plans and their next open Step, and the `find` tool locates the
-documents and features behind them (CLI: `vaultspec-core status [TARGET]`). Orientation
-is descriptive, read-only, and the zeroth move, not a pipeline phase.
+## Manual edits
 
-## Tools and operations
-
-The nine MCP tools cover the hot path by capability: `status` (orientation), `find`
-(document and feature discovery), `create` (scaffold documents, batchable), `edit`
-(body-prose edits, batchable), `plan_progress` (mark Steps checked or unchecked),
-`plan_edit` (author and restructure Step rows), `check` (validate and repair), and the
-`discover`/`invoke` gateway that reaches every remaining verb.
-
-Operations without a first-class hot tool fall into two honest bands:
-
-- **Gateway-only, CLI-first:** `vaultspec-core sync`,
-  `vaultspec-core spec <resource> sync`, and the above-Step plan verbs
-  (`tier promote/demote`, `wave`, `phase`, `epic intent`). The `discover`/`invoke`
-  gateway also reaches these, but `invoke`'s destructive annotation forces host
-  confirmation on every call, so the CLI is the better default even when connected.
-- **CLI-only:** `vaultspec-core vault feature index`,
-  `vaultspec-core spec mcps add/remove/sync`, and `vaultspec-core uninstall` have no MCP
-  path at all; run them through the CLI.
-
-For anything else, the `discover` tool and the bundled CLI reference
-(`.vaultspec/reference/cli.md`, locally resident) are the catalogs of every command,
-option, argument, and exit code.
-
-Where the vaultspec MCP server is not connected, the `vaultspec-core` CLI verbs carry
-every operation; the bundled CLI reference is the catalog.
-
-## CLI fallback
-
-- Run `vaultspec-core <cmd>`, or `uv run --no-sync vaultspec-core <cmd>` in uv
-  environments; `--target DIR`, `--dry-run`, `--json`, `--force`, and `<cmd> --help`
-  cover targeting, previewing, and the full flag and exit-code reference.
-- Sync-shaped results (`vaultspec-core install`, `vaultspec-core sync`,
-  `vaultspec-core spec <resource> sync`, `vaultspec-core migrations run`) read with one
-  vocabulary - `created`, `updated`, `unchanged`, `removed`, `restored`, `skipped`,
-  `failed`; `unchanged` is a successful no-op, `skipped` carries a reason, only `failed`
-  stops the pipeline.
-
-## Allowed manual edits
-
-Permitted: editing body prose of a document scaffolded through the `create` tool or
-`vaultspec-core vault add`, and editing sources under `.vaultspec/rules/`, `skills/`,
-`agents/`, `hooks/`, or `mcps/` followed by `vaultspec-core sync`. Forbidden:
-hand-writing frontmatter, filenames, or new `.vault/` documents, and editing files
-inside generated provider directories (`vaultspec-core sync` regenerates them).
+Permitted: body prose of a scaffolded record, including the `proposed`, `accepted`,
+`rejected`, or `deprecated` token in an ADR's heading (`superseded` is set by
+`vaultspec-core vault adr supersede`). Policy sources under `.vaultspec/rules/`,
+`skills/`, `agents/`, `hooks/`, and `mcps/` are the user's: propose changes, apply them
+only on request, then run `vaultspec-core sync`. Forbidden: frontmatter, filenames, plan
+structure, Step checkboxes, new `.vault/` files, and anything inside generated provider
+directories.
