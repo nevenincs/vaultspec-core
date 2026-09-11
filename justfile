@@ -551,6 +551,12 @@ docs-all:
 release-binaries tag rust_target outdir='dist-bin' wheel_dir='dist':
     uv run --no-project --python 3.13 --with-requirements dev/binaries/zig-requirements.txt -- python -m dev.binaries.build_pyapp --tag {{tag}} --target {{rust_target}} --outdir {{outdir}} --wheel-dir {{wheel_dir}}
 
+# Package finalized target binaries as the public archive consumed by release
+# publication and the distribution channels.
+[group('release')]
+release-bundle tag rust_target raw_dir='dist-bin' outdir='dist-bundles':
+    uv run --no-project --python 3.13 -- python -m dev.packaging.bundles --tag {{tag}} --target {{rust_target}} --raw-dir {{raw_dir}} --outdir {{outdir}}
+
 # Asked of the artifact rather than the source, because only the artifact can
 # answer. The generated references are rendered against a snapshot refreshed on
 # the release branch, so between that refresh and the tag the documents could

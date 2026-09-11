@@ -408,16 +408,19 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: just release-binaries "${TAG}" "${TARGET}" dist-bin dist
 
+      - name: Package and verify the release bundle
+        run: just release-bundle "${{ inputs.tag || github.ref_name }}" "${{ matrix.target }}" dist-bin dist-bundles
+
       # UNVERIFIED, deliberately, and the name is the contract. Nothing
       # downstream attaches an artifact under this name; the offline gate below
-      # is what renames it to `binaries-*`, so an artifact that has not been run
-      # with the network taken away cannot reach a release by any path that
-      # skips a step. `binaries-*` means "proved offline", not "compiled".
+      # is what renames it to `binaries-*`, so an archive that has not been
+      # extracted and run cannot reach a release by any path that skips a step.
+      # `binaries-*` means "proved offline", not "compiled".
       - name: Upload binaries
         uses: actions/upload-artifact@v7
         with:
           name: unverified-${{ matrix.name }}
-          path: dist-bin/
+          path: dist-bundles/
           if-no-files-found: error
           retention-days: 1
 
@@ -549,17 +552,44 @@ jobs:
           name: unverified-${{ matrix.name }}
           path: dist-bin
 
+      - name: Extract the Unix release bundle
+        if: ${{ matrix.isolation != 'proxy' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf offline-bundle
+          mkdir offline-bundle
+          archive=(dist-bin/*.tar.gz)
+          if [ "${#archive[@]}" -ne 1 ]; then
+            echo "::error::expected one Unix release bundle"
+            exit 1
+          fi
+          tar -xzf "${archive[0]}" -C offline-bundle
+
+      - name: Extract the Windows release bundle
+        if: ${{ matrix.isolation == 'proxy' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = @(Get-ChildItem -LiteralPath dist-bin -Filter '*.zip' -File)
+          if ($archive.Count -ne 1) { throw "expected one Windows release bundle" }
+          $destination = Join-Path $PWD 'offline-bundle'
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          Expand-Archive -LiteralPath $archive[0].FullName -DestinationPath $destination -Force
+
       # `actions/download-artifact` does not carry the execute bit. Without
       # this the run below fails as "permission denied" on every Unix leg,
       # which looks exactly like a broken artifact.
       - name: Restore the execute bit
         if: ${{ matrix.isolation != 'proxy' }}
         shell: bash
-        run: chmod +x dist-bin/vaultspec-core-* dist-bin/vaultspec-mcp-*
+        run: chmod +x offline-bundle/vaultspec-core offline-bundle/vaultspec-mcp
 
       # One script for both Linux isolations, so they assert the same things.
-      # The artifact directory differs - mounted at /artifacts in a container,
-      # the workspace itself under `unshare` - and is passed in as ARTIFACTS.
+      # The extracted bundle directory differs - mounted at /artifacts in a
+      # container, the workspace path under `unshare` - and is passed in as
+      # ARTIFACTS. `dist-bin` retains the archive and checksum for release
+      # bookkeeping; it is not the executable surface the gate runs.
       - name: Write the Linux offline check
         if: ${{ matrix.isolation == 'netns' || matrix.isolation == 'unshare' }}
         shell: bash
@@ -583,7 +613,7 @@ jobs:
           export HOME=/tmp/fresh-home
           rm -rf "$HOME"; mkdir -p "$HOME"
 
-          "${ARTIFACTS}"/vaultspec-core-"${TARGET}" --version
+          "${ARTIFACTS}"/vaultspec-core --version
 
           # Behaviour, not exit codes. `--version` can be answered without
           # importing much; `install` and `vault check` pull in the dependency
@@ -593,9 +623,9 @@ jobs:
           git init -q
           git config user.email offline@example.invalid
           git config user.name "Offline Gate"
-          "${ARTIFACTS}"/vaultspec-core-"${TARGET}" install
+          "${ARTIFACTS}"/vaultspec-core install
           [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
-          "${ARTIFACTS}"/vaultspec-core-"${TARGET}" vault check all
+          "${ARTIFACTS}"/vaultspec-core vault check all
 
           # #340's symptom by name: the first launch fetched `uv` before it
           # fetched anything else. Nothing should have appeared.
@@ -618,7 +648,7 @@ jobs:
           docker pull "${IMAGE}"
           docker run --rm --network none \
             --env "TARGET=${TARGET}" --env "ARTIFACTS=/artifacts" \
-            -v "${PWD}/dist-bin:/artifacts:ro" \
+            -v "${PWD}/offline-bundle:/artifacts:ro" \
             -v "${PWD}/offline-check.sh:/offline-check.sh:ro" \
             "${IMAGE}" bash /offline-check.sh
           echo "netns" > offline-verified
@@ -635,7 +665,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          ARTIFACTS="${PWD}/dist-bin" TARGET="${TARGET}" \
+          ARTIFACTS="${PWD}/offline-bundle" TARGET="${TARGET}" \
             unshare --user --map-root-user --net bash offline-check.sh
           echo "unshare" > offline-verified
 
@@ -661,7 +691,7 @@ jobs:
           project="${RUNNER_TEMP}/offline-project"
           rm -rf "${home}" "${project}"
           mkdir -p "${home}" "${project}"
-          binary="${PWD}/dist-bin/vaultspec-core-${TARGET}"
+          binary="${PWD}/offline-bundle/vaultspec-core"
 
           HOME="${home}" sandbox-exec -p "${profile}" "${binary}" --version
 
@@ -727,7 +757,7 @@ jobs:
           $env:LOCALAPPDATA = $home_dir
           $env:APPDATA = $home_dir
 
-          $binary = Join-Path $PWD "dist-bin/vaultspec-core-$env:TARGET.exe"
+          $binary = Join-Path $PWD "offline-bundle/vaultspec-core.exe"
           & $binary --version
           if ($LASTEXITCODE -ne 0) { throw "the artifact could not report its version with no index reachable" }
 
@@ -1037,6 +1067,17 @@ jobs:
         with:
           ref: main
 
+      # A release-please release exists before this workflow starts. Hold it
+      # out of `latest` while the target archive set is being checked; the
+      # independent verification job promotes a complete stable release after
+      # this job succeeds.
+      - name: Hold release out of latest during validation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh release edit "${TAG}" --repo "$GITHUB_REPOSITORY" --prerelease
+
       # The ORG-WIDE distribution repository, which is where Scoop manifests
       # and Homebrew formulae belong. `nevenincs/homebrew-tap` serves both
       # package managers for every product under the account, so a user taps or
@@ -1090,8 +1131,9 @@ jobs:
             exit 1
           fi
           cd dist-bin
-          # Per-asset .sha256 files are produced by build_pyapp.py; fold them
-          # into one sha256sum-compatible manifest and drop the fragments.
+          # Per-bundle .sha256 files are produced by dev/packaging/bundles.py;
+          # fold them into one sha256sum-compatible manifest and drop the
+          # fragments.
           cat ./*.sha256 > SHA256SUMS
           rm -f ./*.sha256
           # The generator raises on a CR, but SHA256SUMS is published as an
@@ -1108,6 +1150,13 @@ jobs:
           # the manifest and the artifacts are both in hand.
           for asset in *; do
             [ "$asset" = "SHA256SUMS" ] && continue
+            case "$asset" in
+              *.zip|*.tar.gz) ;;
+              *)
+                echo "::error::unexpected non-archive release artifact: ${asset}"
+                exit 1
+                ;;
+            esac
             if ! awk -v a="$asset" '$2 == a { found = 1 } END { exit !found }' SHA256SUMS; then
               echo "::error::${asset} is being uploaded with no SHA256SUMS entry"
               exit 1
@@ -1171,6 +1220,40 @@ jobs:
             exit 1
           fi
           echo "gh can verify attestations and pin a signer workflow"
+
+      # The target matrix is complete before the first release mutation. A
+      # partial archive set must remain out of the release; the independent
+      # verification job below still demotes a pre-existing release if this
+      # job fails before reaching this gate.
+      - name: Assert every declared target attached
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/binaries.yml
+          mapfile -t expected < <(awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${workflow}" | sort -u)
+          if [ ${#expected[@]} -eq 0 ]; then
+            echo "::error::No build targets found in ${workflow}; the completeness assertion cannot run"
+            exit 1
+          fi
+          missing=()
+          for triple in "${expected[@]}"; do
+            found=0
+            for asset in dist-bin/*"${triple}"*.zip dist-bin/*"${triple}"*.tar.gz; do
+              [ -e "${asset}" ] || continue
+              found=1
+              break
+            done
+            [ "${found}" -eq 1 ] || missing+=("${triple}")
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::${TAG} is incomplete; refusing to upload missing target bundles: ${missing[*]}"
+            echo "### Incomplete release" >> "$GITHUB_STEP_SUMMARY"
+            echo "Missing target bundles: \`${missing[*]}\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "all ${#expected[@]} declared target bundles are ready for ${TAG}"
 
       - name: Upload to release
         shell: bash
@@ -1379,60 +1462,6 @@ jobs:
             git rebase origin/main
             attempt=$((attempt + 1))
           done
-      # The matrix is only complete when every declared target attached. This
-      # runs LAST on purpose. The binaries that built are more useful on the
-      # release than withheld, and the channel generator already omits an
-      # unbuilt platform rather than pinning an asset that was never made - so
-      # letting the pointers regenerate first leaves them truthful about a
-      # partial release instead of stale about a whole one. The red run is what
-      # says the set is short; silence would let partial read as complete.
-      - name: Assert every declared target attached
-        shell: bash
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          # The triples the matrix in this same file actually builds, read
-          # from the workflow rather than repeated here. A hand-kept copy is
-          # what made vaultspec-core-v0.1.62 report a PARTIAL release: the
-          # aarch64-unknown-linux-gnu leg was dropped from the matrix and its
-          # expectation was left behind, so the assertion failed on a target
-          # nothing was building any more.
-          #
-          # That target is back in the matrix, on the fleet's ARM64 host. That
-          # leg cannot pass until the host is re-enrolled with a bind-mounted
-          # runner home - see the note under the build job's `runs-on` - so
-          # this assertion is expected to name it as missing until then.
-          # Deriving is what makes a matrix change cost one edit instead of two.
-          workflow=.github/workflows/binaries.yml
-          mapfile -t expected < <(awk '/^[[:space:]]+target:[[:space:]]/ {print $2}' "${workflow}" | sort -u)
-          # A derivation that yields nothing would turn this guard into a no-op
-          # that passes every release. Refuse to run rather than pass vacuously.
-          if [ ${#expected[@]} -eq 0 ]; then
-            echo "::error::No build targets found in ${workflow}; the partial-release assertion cannot run"
-            exit 1
-          fi
-          echo "Derived ${#expected[@]} target(s) from ${workflow}: ${expected[*]}"
-          missing=()
-          for triple in "${expected[@]}"; do
-            # Glob rather than `ls | grep`: shellcheck SC2010, and the glob is
-            # also correct for filenames a word-split `ls` would mangle.
-            found=0
-            for asset in dist-bin/*"${triple}"*; do
-              [ -e "${asset}" ] || continue
-              found=1
-              break
-            done
-            [ "${found}" -eq 1 ] || missing+=("${triple}")
-          done
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::${TAG} is a PARTIAL release. Attached what built; missing: ${missing[*]}"
-            echo "### Partial release" >> "$GITHUB_STEP_SUMMARY"
-            echo "Missing targets: \`${missing[*]}\`" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "all ${#expected[@]} declared targets attached to ${TAG}"
-
   # A release with no artifacts must not serve as `latest`.
   #
   # This is the fault that cost two releases today. vaultspec-core-v0.1.61 was
@@ -1453,24 +1482,10 @@ jobs:
     name: Verify the release carries artifacts
     needs: release
     if: ${{ always() }}
-    # On the fleet. Every job in this repository runs there except the two
-    # `ci-fleet` declares as hosted cells - binaries.yml's linux-aarch64 build
-    # and offline legs - and the wheel build, which needs no fleet capability.
-    #
-    # Accept what that costs: this job demotes a release whose build just
-    # failed, and a build fails most often when the fleet is congested or
-    # down - exactly when this job will not be scheduled either. It is not
-    # hypothetical: vaultspec-dashboard v0.1.7 failed every Compose leg, and
-    # its guard then sat QUEUED for over an hour behind the one Linux/X64
-    # runner it shares with the build, while the empty release went on serving
-    # as `latest` and had to be demoted by hand. That failure mode is live
-    # again here; a release left serving as `latest` after a failed build is
-    # demoted by hand until the fleet drains.
-    #
-    # Nothing here needs a fleet capability - `gh release view`, `gh release
-    # edit`, `gh workflow run`, and awk over the workflow file - so the only
-    # cost is contending with the build for the same Linux/X64 machine.
-    runs-on: [self-hosted, Linux, X64, build]
+    # This is release bookkeeping only, so keep it independent of the
+    # constrained build fleet. It must be able to demote an incomplete release
+    # even when a build runner is offline or queued.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       # Dispatching the acquisition check is a write to the Actions API.

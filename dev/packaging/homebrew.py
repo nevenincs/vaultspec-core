@@ -8,7 +8,7 @@ a per-product tap is one `brew tap` per product::
     brew tap nevenincs/tap https://github.com/nevenincs/homebrew-tap
     brew install vaultspec-core
 
-This is a BINARY formula - it places the pre-built PyApp assets attached to
+This is a BINARY formula - it places the pre-built target archives attached to
 the GitHub Release. That is a deliberate divergence from cadrumo, whose
 formula builds a Python virtualenv from a locked sdist cohort: cadrumo has no
 binary channel, so its formula has to be the thing that assembles the
@@ -19,8 +19,9 @@ release". The shared idiom across the family is the generation discipline -
 one pointer, generated from the release's own SHA256SUMS, guarded against
 backward bumps - not the formula's internal strategy.
 
-A formula has exactly one primary ``url``, so the first executable is the
-download and every other executable becomes a ``resource``.
+A formula has exactly one primary ``url`` per platform branch. The target bundle
+contains every executable, so installation only needs the stable names from the
+extracted archive.
 """
 
 from __future__ import annotations
@@ -43,16 +44,6 @@ _PLATFORMS = (
 )
 
 
-def _resource_block(name: str, url: str, digest: str, indent: str) -> list[str]:
-    """Return the lines of one nested ``resource`` declaration."""
-    return [
-        f'{indent}resource "{name}" do',
-        f'{indent}  url "{url}"',
-        f'{indent}  sha256 "{digest}"',
-        f"{indent}end",
-    ]
-
-
 def _cpu_block(
     product: Product,
     cpu: str,
@@ -61,25 +52,13 @@ def _cpu_block(
     digests: dict[str, str],
 ) -> list[str]:
     """Return the lines of one ``on_arm``/``on_intel`` block."""
-    primary, *rest = product.executables
     base = product.release_base_url(version)
-    asset = product.asset_name(primary, target)
+    asset = product.bundle_name(version, target)
     lines = [
         f"    {cpu} do",
         f'      url "{base}/{asset}"',
         f'      sha256 "{require(digests, asset)}"',
     ]
-    for executable in rest:
-        extra = product.asset_name(executable, target)
-        lines.append("")
-        lines.extend(
-            _resource_block(
-                executable.name,
-                f"{base}/{extra}",
-                require(digests, extra),
-                "      ",
-            ),
-        )
     lines.append("    end")
     return lines
 
@@ -112,30 +91,11 @@ def _os_blocks(
 
 
 def _install_body(product: Product) -> list[str]:
-    """Return the ``install`` method, which renames the triple-suffixed assets."""
-    primary, *rest = product.executables
+    """Return the ``install`` method for the bundle's stable names."""
     lines = [
         "  def install",
-        # Composed from two ternaries rather than a multi-line `if` assignment:
-        # the assets are named by Rust target triple, and this shape states the
-        # OS and CPU halves separately without tripping `brew style`'s end
-        # alignment rules on an assignment whose right side is a block.
-        '    vendor = OS.mac? ? "apple-darwin" : "unknown-linux-gnu"',
-        '    arch = Hardware::CPU.arm? ? "aarch64" : "x86_64"',
-        '    triple = "#{arch}-#{vendor}"',
-        "",
-        f'    bin.install "{primary.name}-#{{triple}}" => "{primary.name}"',
+        *(f'    bin.install "{executable.name}"' for executable in product.executables),
     ]
-    for executable in rest:
-        lines.extend(
-            [
-                "",
-                f'    resource("{executable.name}").stage do',
-                f'      bin.install "{executable.name}-#{{triple}}" '
-                f'=> "{executable.name}"',
-                "    end",
-            ],
-        )
     lines.append("  end")
     return lines
 

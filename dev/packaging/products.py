@@ -32,7 +32,7 @@ HOMEBREW_TARGETS = (MACOS_ARM64, MACOS_X86_64, LINUX_X86_64, LINUX_ARM64)
 
 @dataclass(frozen=True)
 class Executable:
-    """One console entry point published as a standalone binary asset."""
+    """One console entry point carried by a target release bundle."""
 
     #: The name the binary is installed as, and the stem of its release asset.
     name: str
@@ -53,9 +53,7 @@ class Product:
     license: str
     #: Release tags are ``<tag_prefix><version>``.
     tag_prefix: str
-    #: The binaries the release attaches, in installation order. The first is
-    #: the formula's primary ``url``; the rest become Homebrew ``resource``
-    #: blocks, because a formula has exactly one primary download.
+    #: The executables carried by each target bundle, in installation order.
     executables: tuple[Executable, ...]
     #: Channel-specific caveats surfaced to whoever installs from a manifest.
     notes: tuple[str, ...] = ()
@@ -64,6 +62,12 @@ class Product:
     #: product cannot, and offering an install there ships a binary that
     #: raises at startup. Empty means "every target the channel serves".
     supported_targets: tuple[str, ...] = ()
+    #: Human-readable identity used by release metadata.
+    display_name: str = ""
+    #: Human-readable publisher identity used by release metadata.
+    publisher: str = ""
+    #: Copyright string used by release metadata.
+    legal_copyright: str = ""
 
     def serves(self, target: str) -> bool:
         """Return whether this product may be offered on ``target``."""
@@ -86,18 +90,44 @@ class Product:
         return f"{self.tag_prefix}{version}"
 
     def asset_name(self, executable: Executable, target: str) -> str:
-        """Return the release asset filename for one binary on one target.
+        """Return the private staging filename for one binary on one target.
 
-        Must agree byte-for-byte with ``dev.binaries.build_pyapp.asset_name``;
-        a channel manifest that names an asset the build never produced is a
-        404 the user meets, not a build failure the maintainer meets.
+        This target-qualified name disambiguates matrix outputs before the
+        bundle boundary. Public consumers use :meth:`bundle_name` instead.
         """
-        suffix = ".exe" if target.endswith("windows-msvc") else ""
-        return f"{executable.name}-{target}{suffix}"
+        return raw_asset_name(executable.name, target)
+
+    def executable_name(self, executable: Executable, target: str) -> str:
+        """Return the stable name of *executable* inside a target bundle."""
+        return executable_filename(executable.name, target)
+
+    def bundle_name(self, version: str, target: str) -> str:
+        """Return the public archive filename for one product target."""
+        return f"{self.name}-v{version}-{target}{archive_suffix(target)}"
 
     def release_base_url(self, version: str) -> str:
         """Return the immutable download base for one release."""
         return f"{self.homepage}/releases/download/{self.tag_for(version)}"
+
+
+def is_windows_target(target: str) -> bool:
+    """Return whether *target* is the Windows MSVC release target."""
+    return target.endswith("windows-msvc")
+
+
+def executable_filename(name: str, target: str) -> str:
+    """Return the stable extracted filename for a binary name and target."""
+    return f"{name}{'.exe' if is_windows_target(target) else ''}"
+
+
+def raw_asset_name(name: str, target: str) -> str:
+    """Return the target-qualified staging filename for one executable."""
+    return f"{name}-{target}{'.exe' if is_windows_target(target) else ''}"
+
+
+def archive_suffix(target: str) -> str:
+    """Return the archive suffix used for a target platform."""
+    return ".zip" if is_windows_target(target) else ".tar.gz"
 
 
 VAULTSPEC_CORE = Product(
@@ -121,6 +151,9 @@ VAULTSPEC_CORE = Product(
         "Upgrade through this channel: the binaries do not update themselves.",
         "Verify with: vaultspec-core --version",
     ),
+    display_name="Vaultspec Core",
+    publisher="Gergely Wootsch",
+    legal_copyright="Copyright (c) Gergely Wootsch",
 )
 
 #: Every product this checkout generates channel manifests for, keyed by name.

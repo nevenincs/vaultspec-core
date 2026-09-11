@@ -10,11 +10,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dev.binaries.build_pyapp import APPLICATION_ICON, publish_asset
+from dev.binaries.build_pyapp import (
+    APPLICATION_ICON,
+    BINARIES,
+    binary_version_info,
+    publish_asset,
+)
 from dev.binaries.windows_icon import (
     IconResourceError,
     parse_ico,
     verify_icon,
+    verify_version_info,
 )
 
 if TYPE_CHECKING:
@@ -62,13 +68,29 @@ def test_real_pe_stamp_is_exact_and_precedes_checksum(tmp_path: Path) -> None:
 
     if sys.platform != "win32":
         with pytest.raises(IconResourceError, match="Windows PE resources"):
-            publish_asset(source, executable, "x86_64-pc-windows-msvc")
+            publish_asset(
+                source,
+                executable,
+                "x86_64-pc-windows-msvc",
+                BINARIES[0],
+                "0.2.1",
+            )
         return
 
-    checksum = publish_asset(source, executable, "x86_64-pc-windows-msvc")
+    checksum = publish_asset(
+        source,
+        executable,
+        "x86_64-pc-windows-msvc",
+        BINARIES[0],
+        "0.2.1",
+    )
     stamped = executable.read_bytes()
 
     verify_icon(executable, APPLICATION_ICON)
+    verify_version_info(
+        executable,
+        binary_version_info(BINARIES[0], "0.2.1", "x86_64-pc-windows-msvc"),
+    )
     assert stamped != source.read_bytes()
     assert (
         checksum.read_text(encoding="utf-8").split()[0]
