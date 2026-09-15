@@ -10,10 +10,10 @@ on:
       cache_mode:
         description: "uv cache mode for controlled CI measurement"
         required: true
-        default: warm
+        default: normal
         type: choice
         options:
-          - warm
+          - normal
           - cold
 
 permissions:
@@ -76,7 +76,10 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: ${{ inputs.cache_mode != 'cold' }}
+          # This persistent runner's native uv cache is the hot path. A
+          # same-SHA cold run proved that transferring the multi-GB Actions
+          # cache increased occupied time, so cloud restore/save stays off.
+          enable-cache: false
 
       - name: Install lychee
         uses: taiki-e/install-action@v2

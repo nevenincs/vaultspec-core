@@ -176,9 +176,10 @@ def test_ci_keeps_each_recipe_and_single_provisioning_cycle() -> None:
         assert len(_uses(job, "actions/setup-python@")) == 1
         uv_steps = _uses(job, "astral-sh/setup-uv@")
         assert len(uv_steps) == 1
-        assert uv_steps[0].get("with", {}).get("enable-cache") == (
-            "${{ inputs.cache_mode != 'cold' }}"
+        expected_cache = (
+            False if job_id == LINUX_JOB else "${{ inputs.cache_mode != 'cold' }}"
         )
+        assert uv_steps[0].get("with", {}).get("enable-cache") == expected_cache
         cold_steps = [
             step
             for step in job.get("steps", [])
