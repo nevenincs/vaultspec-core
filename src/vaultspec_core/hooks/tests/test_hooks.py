@@ -339,6 +339,7 @@ class TestDeduplication:
         assert len(hooks) == 2
 
 
+@pytest.mark.serial
 class TestReentrantGuard:
     """Test that a concurrent trigger() of an in-flight event is blocked, and
     that the guard is released once the in-flight call completes.
