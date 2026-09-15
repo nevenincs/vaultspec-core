@@ -46,13 +46,14 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
+      - name: Install Python 3.14
+        run: uv python install 3.14
 
-      - name: Build and smoke test the wheel on Python 3.14
-        run: just test-python-314
+      - name: Build the wheel
+        run: uv build --wheel --out-dir dist
+
+      - name: Smoke test the built wheel on Python 3.14
+        run: uv run --python 3.14 --isolated --no-project --with dist/*.whl dev/smoke/smoke_check.py
 
   report:
     timeout-minutes: 45
