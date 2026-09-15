@@ -197,6 +197,8 @@ def test_ci_keeps_each_recipe_and_single_provisioning_cycle() -> None:
         step.get("with", {}).get("tool") == "taplo-cli" for step in linux["steps"]
     )
 
+    assert jobs[WINDOWS_JOB].get("env", {}).get("PYTEST_XDIST_AUTO_NUM_WORKERS") == "4"
+
 
 def test_linux_gates_run_after_failures_without_erasing_failure() -> None:
     """Independent Linux gates always run and no step is allowed to mask red."""
