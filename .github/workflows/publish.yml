@@ -1,14 +1,9 @@
 name: Publish
 
 on:
-  # Tag-triggered, matching vaultspec-rag. Dispatch-only is what let 0.1.58 and
-  # 0.1.59 tag while PyPI stayed on 0.1.57: publishing depended on a human
-  # remembering, and nothing went red when they did not. The comment in this
-  # file already says a release must not depend on a laptop being plugged in;
-  # it should not depend on someone recalling a second dispatch either.
-  push:
-    tags:
-      - "vaultspec-core-v*"
+  # release-please is the single release authority. It dispatches this workflow
+  # with the immutable tag after creating the release; retaining a tag-push
+  # trigger would race a second publication of the same bytes.
   workflow_dispatch:
     inputs:
       tag:
@@ -244,10 +239,10 @@ jobs:
           fi
 
       - name: Ensure the GitHub Release exists
-        # release-please normally creates it before this runs, but the tag-push
-        # trigger can fire against a tag with no Release yet. --verify-tag
-        # refuses to invent one for an unpushed tag; the only failure left once
-        # the tag verifies is "already exists", which is the no-op we want.
+        # release-please creates it before dispatching this workflow. Keep this
+        # idempotent guard for repair dispatches: --verify-tag refuses to invent
+        # a release for an unpushed tag, while "already exists" is the no-op we
+        # want.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}

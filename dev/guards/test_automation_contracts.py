@@ -1486,3 +1486,38 @@ def test_the_harness_carries_no_second_duration_reporter() -> None:
         "a standing --durations prints its header even when nothing is slow; "
         "type it on a specific run instead"
     )
+
+
+def test_release_please_is_the_single_release_authority() -> None:
+    """A release creates exactly one publish run and one binary build run.
+
+    release-please dispatches both consumers after it creates the immutable tag.
+    If either consumer also listens for the tag push, the same release can race
+    two independently authorized runs through publication and asset attachment.
+    """
+    for consumer in ("publish.yml", "binaries.yml"):
+        workflow = cast(
+            "dict[str, object]",
+            yaml.load(_read(f".github/workflows/{consumer}"), Loader=yaml.BaseLoader),
+        )
+        triggers = cast("dict[str, object]", workflow["on"])
+        assert set(triggers) == {"workflow_dispatch"}, (
+            f"{consumer} must be dispatch-only; release-please owns release "
+            f"initiation, but it also declares {sorted(triggers)}"
+        )
+        dispatch = cast("dict[str, object]", triggers["workflow_dispatch"])
+        inputs = cast("dict[str, object]", dispatch["inputs"])
+        tag = cast("dict[str, str]", inputs["tag"])
+        assert tag.get("required") == "true", (
+            f"{consumer} must require the immutable release tag"
+        )
+
+    authority = _read(".github/workflows/release-please.yml")
+    for consumer in ("publish.yml", "binaries.yml"):
+        endpoint = f"actions/workflows/{consumer}/dispatches"
+        assert endpoint in authority, (
+            f"release-please no longer dispatches its {consumer} consumer"
+        )
+    assert authority.count('-f "inputs[tag]=${TAG}"') == 2, (
+        "both release consumers must receive release-please's immutable tag"
+    )
