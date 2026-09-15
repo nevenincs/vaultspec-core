@@ -6,15 +6,6 @@ on:
       - main
   pull_request:
   workflow_dispatch:
-    inputs:
-      cache_mode:
-        description: "uv cache mode for controlled CI measurement"
-        required: true
-        default: normal
-        type: choice
-        options:
-          - normal
-          - cold
 
 permissions:
   contents: read
@@ -67,11 +58,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
-
-      - name: Isolate the cold uv cache
-        if: inputs.cache_mode == 'cold'
-        shell: bash
-        run: echo "UV_CACHE_DIR=${RUNNER_TEMP}/vaultspec-core-uv-${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -186,15 +172,13 @@ jobs:
         with:
           python-version-file: .python-version
 
-      - name: Isolate the cold uv cache
-        if: inputs.cache_mode == 'cold'
-        shell: bash
-        run: echo "UV_CACHE_DIR=${RUNNER_TEMP}/vaultspec-core-uv-${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
-
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: ${{ inputs.cache_mode != 'cold' }}
+          # This persistent runner's native uv cache is the hot path. Same-SHA
+          # controlled runs showed that the cloud archive costs more to restore
+          # and publish than an isolated dependency rebuild.
+          enable-cache: false
 
       - name: Set up just
         uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2

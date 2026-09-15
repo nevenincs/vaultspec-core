@@ -176,18 +176,13 @@ def test_ci_keeps_each_recipe_and_single_provisioning_cycle() -> None:
         assert len(_uses(job, "actions/setup-python@")) == 1
         uv_steps = _uses(job, "astral-sh/setup-uv@")
         assert len(uv_steps) == 1
-        expected_cache = (
-            False if job_id == LINUX_JOB else "${{ inputs.cache_mode != 'cold' }}"
-        )
-        assert uv_steps[0].get("with", {}).get("enable-cache") == expected_cache
+        assert uv_steps[0].get("with", {}).get("enable-cache") is False
         cold_steps = [
             step
             for step in job.get("steps", [])
             if step.get("name") == "Isolate the cold uv cache"
         ]
-        assert len(cold_steps) == 1
-        assert cold_steps[0].get("if") == "inputs.cache_mode == 'cold'"
-        assert "UV_CACHE_DIR=${RUNNER_TEMP}" in cold_steps[0].get("run", "")
+        assert not cold_steps, "audit-only cold-cache instrumentation must not ship"
         assert len(_uses(job, "taiki-e/install-action@")) == (
             3 if job_id == LINUX_JOB else 1
         )
