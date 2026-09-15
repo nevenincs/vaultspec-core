@@ -1,21 +1,10 @@
 name: Binaries
 
-# BUILDS ON A TAG, not only on dispatch.
-#
-# Dispatch-only is what let vaultspec-rag-v0.4.12 become `latest` carrying the
-# Python distribution and no platform binaries at all: cutting a release simply
-# did not build them, and nobody was going to remember. The artifact-less-release
-# guard could not catch it either - that guard lives in THIS workflow, and a
-# workflow that never runs cannot demote anything. It was unreachable, not
-# broken.
-#
-# vaultspec-dashboard has never had this problem because its release workflow
-# runs on tag push. This brings core to the same shape. Dispatch is kept for
-# repairing a tag whose build failed.
+# release-please is the single release authority. It dispatches this workflow
+# with the immutable tag after creating the release. Manual dispatch remains
+# available for repairing a failed build; a tag-push trigger would race a second
+# build and attachment of the same release assets.
 on:
-  push:
-    tags:
-      - "vaultspec-core-v*"
   workflow_dispatch:
     inputs:
       tag:

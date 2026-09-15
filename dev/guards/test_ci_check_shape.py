@@ -1,34 +1,19 @@
-"""Contracts on the SHAPE of the pull-request check set: names, and no repeats.
+"""Contracts on the two-job pull-request check set.
 
-Two properties, both about the merge box rather than about any one gate.
+The self-hosted fleet has one Linux runner and one Windows runner. The CI
+workflow therefore has exactly one complete Linux validation job and one
+independent Windows broad-suite job. This guard pins that topology, every
+recipe in the old Linux lanes, and the failure semantics that keep independent
+diagnostics visible after an earlier gate fails.
 
-*Nothing runs twice.* This fleet has one Linux runner and one Windows runner,
-so every job in ``ci.yml`` executes serially on one of two machines. Work
-repeated between two jobs is not redundancy, it is latency, and it had
-accumulated in four places at once: a unit lane that was a marker-scoped subset
-of the broad lane, a Windows vault-repair job whose two files the Windows broad
-leg already collected, a host-platform ``ty`` pass that is the Linux third of
-the all-platforms pass, and a dependency audit composed into the advisory
-dashboard while also holding a gating job of its own.
-
-Two shapes of repeat, so two checks. An aggregate that composes a leaf another
-job names directly runs the SAME command twice, and is caught by expanding
-every recipe down to the commands it finally runs. A subset lane runs
-DIFFERENT commands over a population another lane already covers - ``-m "unit
-and ..."`` against ``-m "..."``, ``--python-platform linux`` against no flag on
-a Linux runner - where the argv differ and only the relationship is the defect.
-Those are named.
-
-*Names say what they cover.* ``broad`` named a pytest marker, and
-``Dependency Audit (uv audit)`` named a tool that can change. Neither told a
-reader looking at a red merge box what had failed. Every check is now
-``<Kind>: <Subject>`` with an optional ``(Platform)``, where the kind is one of
-the three the justfile already groups recipes under.
+The recipe checks intentionally complement the older duplicate-work checks:
+``test-broad`` is expected once per operating system, while every other Linux
+validation recipe occurs once in the Linux job only.
 """
 
 from __future__ import annotations
 
-import re
+from collections import Counter
 from pathlib import Path
 from typing import Any, cast
 
@@ -51,15 +36,35 @@ CI = ROOT / ".github" / "workflows" / "ci.yml"
 #: one workflow: a job that hangs holds a machine the whole estate shares.
 WORKFLOWS = ROOT / ".github" / "workflows"
 
-#: ``<Kind>: <Subject>`` with an optional ``(Platform)``. The kinds are the
-#: justfile's own recipe groups, so ``just --list`` and the merge box use one
-#: vocabulary: Lint reads the tree, Test executes something, Audit asks a third
-#: party for a verdict.
-CHECK_NAME = re.compile(
-    r"^(?P<kind>Lint|Test|Audit): "
-    r"(?P<subject>[A-Z][A-Za-z]*(?:(?:, | & | )[A-Za-z][A-Za-z]*)*)"
-    r"(?: \((?P<platform>[A-Za-z${}. ]+)\))?$"
+LINUX_JOB = "full-suite-linux"
+WINDOWS_JOB = "library-windows"
+EXPECTED_JOBS = frozenset({LINUX_JOB, WINDOWS_JOB})
+EXPECTED_CHECK_NAMES = frozenset({"Full Suite (Linux)", "Library (Windows)"})
+
+# The five former Linux executions contributed these gating recipes. Comparing
+# counters makes an accidental omission or extra invocation fail while leaving
+# harmless step reordering possible.
+LINUX_RECIPES = (
+    "init",
+    "deps-check",
+    "check-workflow",
+    "check-python",
+    "check-type-platforms",
+    "check-toml",
+    "check-links",
+    "check-markdown",
+    "check-complexity",
+    "check-nesting",
+    "check-size",
+    "check-type-strict",
+    "test-harness",
+    "test-repo",
+    "test-broad",
+    "framework-install",
+    "vault-check",
+    "audit-deps",
 )
+WINDOWS_RECIPES = ("init", "test-broad")
 
 #: How a recipe prefix is spelled in the registry. The gating verb is ``lint``
 #: in the table and ``check`` at the recipe, because a contributor reaches for
@@ -75,6 +80,145 @@ PROVISIONING = frozenset({"just init", "just framework-install"})
 def _ci() -> dict[str, Any]:
     """Parse the pull-request workflow."""
     return cast("dict[str, Any]", yaml.safe_load(CI.read_text(encoding="utf-8")))
+
+
+def _jobs() -> dict[str, dict[str, Any]]:
+    """Return the CI jobs with a useful type for topology assertions."""
+    return cast("dict[str, dict[str, Any]]", _ci().get("jobs") or {})
+
+
+def _events(document: dict[str, Any]) -> dict[str, Any]:
+    """Read workflow triggers under both YAML 1.1 and YAML 1.2 parsers."""
+    mapping = cast("dict[object, object]", document)
+    raw = mapping.get("on")
+    if raw is None:
+        # PyYAML's YAML 1.1 loader parses the GitHub key ``on`` as ``True``.
+        raw = mapping.get(True, {})
+    return cast("dict[str, Any]", raw or {})
+
+
+def _just_recipes(job: dict[str, Any]) -> list[str]:
+    """List the simple ``just <recipe>`` commands in one job."""
+    recipes: list[str] = []
+    for step in job.get("steps", []):
+        command = step.get("run")
+        if not isinstance(command, str) or not command.strip().startswith("just "):
+            continue
+        recipes.append(command.strip().removeprefix("just ").split()[0])
+    return recipes
+
+
+def _uses(job: dict[str, Any], action: str) -> list[dict[str, Any]]:
+    """Return steps whose ``uses`` value starts with ``action``."""
+    return [
+        step
+        for step in job.get("steps", [])
+        if isinstance(step.get("uses"), str) and step["uses"].startswith(action)
+    ]
+
+
+def test_ci_has_exactly_two_independent_jobs() -> None:
+    """The PR check set has only the fixed Linux and Windows jobs."""
+    document = _ci()
+    jobs = _jobs()
+
+    assert set(jobs) == EXPECTED_JOBS, (
+        "ci.yml must contain exactly the Linux full suite and the independent "
+        f"Windows library job; found {sorted(jobs)}"
+    )
+    assert {job.get("name") for job in jobs.values()} == EXPECTED_CHECK_NAMES
+    assert jobs[LINUX_JOB]["name"] == "Full Suite (Linux)"
+    assert jobs[WINDOWS_JOB]["name"] == "Library (Windows)"
+
+    # A matrix or a needs edge would make the status set dynamic or allow one
+    # platform to disappear behind the other. Neither is part of this shape.
+    for job_id, job in jobs.items():
+        assert "strategy" not in job, f"`{job_id}` must not be a matrix job"
+        assert "needs" not in job, f"`{job_id}` must not depend on another CI job"
+        assert "if" not in job, f"`{job_id}` must not be conditionally skipped"
+
+    assert not set(jobs) & {
+        "lint",
+        "test-harness-repo",
+        "test-library",
+        "test-vault",
+        "audit-dependencies",
+    }, "obsolete jobs must be deleted, not left as skipped placeholders"
+
+    events = _events(document)
+    assert "pull_request" in events, "ci.yml must retain its pull-request trigger"
+    assert "release" not in events, "ci.yml must not have a release-only trigger"
+    assert "workflow_call" not in events, "ci.yml must not retain audit-only jobs"
+    for job_id, job in jobs.items():
+        for step in job.get("steps", []):
+            condition = str(step.get("if", ""))
+            assert "workflow_call" not in condition, (
+                f"`{job_id}` contains a workflow_call-only step"
+            )
+            assert "release" not in condition.lower(), (
+                f"`{job_id}` contains a release-only step"
+            )
+            command = str(step.get("run", "")).lower()
+            assert "inactive" not in command and "placeholder" not in command, (
+                f"`{job_id}` contains a skipped/placeholder command"
+            )
+
+
+def test_ci_keeps_each_recipe_and_single_provisioning_cycle() -> None:
+    """Linux keeps each former validation once; Windows keeps broad once."""
+    jobs = _jobs()
+    assert Counter(_just_recipes(jobs[LINUX_JOB])) == Counter(LINUX_RECIPES)
+    assert Counter(_just_recipes(jobs[WINDOWS_JOB])) == Counter(WINDOWS_RECIPES)
+
+    for job_id in EXPECTED_JOBS:
+        job = jobs[job_id]
+        assert len(_uses(job, "actions/checkout@")) == 1
+        assert len(_uses(job, "actions/setup-python@")) == 1
+        uv_steps = _uses(job, "astral-sh/setup-uv@")
+        assert len(uv_steps) == 1
+        assert uv_steps[0].get("with", {}).get("enable-cache") is False
+        cold_steps = [
+            step
+            for step in job.get("steps", [])
+            if step.get("name") == "Isolate the cold uv cache"
+        ]
+        assert not cold_steps, "audit-only cold-cache instrumentation must not ship"
+        assert len(_uses(job, "taiki-e/install-action@")) == (
+            3 if job_id == LINUX_JOB else 1
+        )
+        assert not any("matrix." in str(step) for step in job.get("steps", [])), (
+            f"`{job_id}` must not use matrix expressions"
+        )
+
+    linux = jobs[LINUX_JOB]
+    assert len(_uses(linux, "taiki-e/install-action@")) == 3
+    assert any(step.get("with", {}).get("tool") == "lychee" for step in linux["steps"])
+    assert any(
+        step.get("with", {}).get("tool") == "taplo-cli" for step in linux["steps"]
+    )
+
+
+def test_linux_gates_run_after_failures_without_erasing_failure() -> None:
+    """Independent Linux gates always run and no step is allowed to mask red."""
+    jobs = _jobs()
+    for step in jobs[LINUX_JOB]["steps"]:
+        command = step.get("run", "")
+        if not isinstance(command, str) or not command.strip().startswith("just "):
+            continue
+        recipe = command.strip().removeprefix("just ").split()[0]
+        if recipe == "init":
+            continue
+        assert step.get("if") == "always()", (
+            f"Linux gate `{recipe}` must run after earlier validation failures"
+        )
+        assert not step.get("continue-on-error", False), (
+            f"Linux gate `{recipe}` must preserve the final failure state"
+        )
+
+    for job in jobs.values():
+        assert not any(
+            step.get("continue-on-error", False) for step in job.get("steps", [])
+        ), "CI gates must not turn a failed command into a passing job"
 
 
 def _check_names(job: dict[str, Any], job_id: str) -> list[str]:
@@ -129,17 +273,11 @@ def _leaf_commands(recipe: str) -> set[tuple[str, ...]]:
 
 
 def test_every_check_name_follows_the_scheme() -> None:
-    """Each status check is ``<Kind>: <Subject>`` with an optional platform."""
-    jobs = _ci()["jobs"]
-    assert jobs, "ci.yml declares no jobs"
-    for job_id, job in jobs.items():
-        for name in _check_names(job, job_id):
-            assert CHECK_NAME.match(name), (
-                f"check name {name!r} (job `{job_id}`) does not follow "
-                "`<Kind>: <Subject>` with an optional ` (Platform)`, where "
-                "Kind is Lint, Test or Audit. A reader of a red merge box has "
-                "the name and nothing else."
-            )
+    """The two required status checks have stable, exact names."""
+    jobs = _jobs()
+    names = [name for job_id, job in jobs.items() for name in _check_names(job, job_id)]
+    assert set(names) == EXPECTED_CHECK_NAMES
+    assert len(names) == len(EXPECTED_CHECK_NAMES)
 
 
 def test_no_check_name_is_spelled_by_the_tool_that_implements_it() -> None:
@@ -188,6 +326,11 @@ def test_no_job_repeats_work_another_job_already_does() -> None:
     overlaps: list[str] = []
     for first, second in ((a, b) for a in by_job for b in by_job if a < b):
         shared = by_job[first] & by_job[second]
+        # The broad library suite is deliberately run once on each operating
+        # system. It is the only expected cross-job overlap; every other
+        # overlap remains a duplicate-work regression.
+        if {first, second} == {LINUX_JOB, WINDOWS_JOB}:
+            shared -= _leaf_commands("test-broad")
         for argv in sorted(shared):
             overlaps.append(f"`{first}` and `{second}` both run: {' '.join(argv)}")
     assert not overlaps, (
@@ -363,4 +506,12 @@ def test_a_main_run_can_never_supersede_another_main_run() -> None:
     assert "refs/heads/main" in cancel and cancel.startswith("${{"), (
         "cancellation must stay disabled on the default branch; a per-SHA "
         f"group does not by itself stop an in-flight run being cancelled: {cancel!r}"
+    )
+    assert "github.ref != 'refs/heads/main'" in cancel, (
+        "non-main runs must cancel in-progress superseded work while main runs "
+        f"remain uncancelled: {cancel!r}"
+    )
+    assert "format('-{0}', github.sha)" in group, (
+        "main's concurrency group must append the commit SHA, rather than only "
+        f"mentioning it in an unrelated expression: {group!r}"
     )

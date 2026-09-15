@@ -24,6 +24,20 @@ acquisition.yml:Return the workspace to the runner's user
 acquisition.yml:Clean up
 
 # --- CI-plane bookkeeping ---------------------------------------------------
+# The cache experiment redirects uv through GitHub's per-run environment file.
+# It has no local product meaning: outside Actions a caller sets UV_CACHE_DIR
+# directly. Keeping this visible here prevents workflow-only plumbing from
+# being mistaken for a second implementation of a product command.
+ci.yml:Isolate the cold uv cache
+
+# This scheduled compatibility lane deliberately exposes interpreter install,
+# artifact build, and installed-wheel execution as separately timed evidence.
+# It does not duplicate the canonical release build recipe: it builds only the
+# universal wheel, under the newest declared runtime, and never publishes it.
+code-health.yml:Install Python 3.14
+code-health.yml:Build the wheel
+code-health.yml:Smoke test the built wheel on Python 3.14
+
 # Project-board and sentinel automation. It reads and writes GitHub state and
 # has no local meaning at all; `gh` is already permitted, and these differ only
 # in reaching it through a shell conditional.

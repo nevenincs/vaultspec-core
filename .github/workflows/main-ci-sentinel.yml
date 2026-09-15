@@ -1,7 +1,8 @@
 # Asserts that main's tip commit actually received a CI verdict.
 #
-# The `Protect Main` ruleset lists ten required status checks, but required
-# checks gate PULL REQUEST MERGES only - they do not gate a direct push, and
+# The `Protect Main` ruleset requires `Full Suite (Linux)` and
+# `Library (Windows)`, but required checks gate PULL REQUEST MERGES only -
+# they do not gate a direct push, and
 # admin and deploy-key pushes bypass the PR requirement outright. Most commits
 # reach main here by direct push, so the push-triggered CI run is the only
 # thing between such a push and an unvalidated main.

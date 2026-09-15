@@ -747,14 +747,8 @@ def test_the_running_interpreter_matches_the_pin() -> None:
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
-    required_jobs = {
-        "lint",
-        "test-harness-repo",
-        "test-library",
-        "test-vault",
-        "audit-dependencies",
-    }
-    assert required_jobs.issubset(jobs), "CI workflow is missing required jobs"
+    required_jobs = {"full-suite-linux", "library-windows"}
+    assert set(jobs) == required_jobs, "CI workflow must contain exactly two jobs"
 
     expected_runs = {
         # The four dimensions below `markdown` are pinned for the same reason
@@ -763,7 +757,7 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # away from being silently undone. `type-strict` in particular was
         # promoted by removing its `continue-on-error` key; nothing but this
         # list stops the step itself from being removed next.
-        "lint": {
+        "full-suite-linux": {
             "just init",
             # Folded in from jobs of their own. On a fleet of one Linux runner
             # every job is serial, so a fifteen-second check in its own job
@@ -784,31 +778,14 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just check-nesting",
             "just check-size",
             "just check-type-strict",
-        },
-        # `harness` and `repo` are pinned because the lesson that produced
-        # them was a lane no CI job named: the guards it ran went unobserved
-        # and one of them had been failing undetected. Naming both here means
-        # removing a CI step fails this guard rather than silently shrinking
-        # what "green" covers.
-        #
-        # `unit` and `vault-repair` are deliberately NOT pinned here. Both are
-        # subsets of what `broad-tests` selects - `unit` by marker over the
-        # same path, `vault-repair` as two `unit`-marked files under it - so a
-        # step naming either re-ran work the broad legs had already done. The
-        # coverage they stood for is pinned below, on the job that actually
-        # provides it.
-        "test-harness-repo": {
-            "just init",
             "just test-harness",
             "just test-repo",
-        },
-        "test-library": {"just init", "just test-broad"},
-        "test-vault": {
-            "just init",
+            "just test-broad",
             "just framework-install",
             "just vault-check",
+            "just audit-deps",
         },
-        "audit-dependencies": {"just init", "just audit-deps"},
+        "library-windows": {"just init", "just test-broad"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -873,10 +850,10 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
     different tool arriving under the same name.
     """
     ci = _load_workflow(".github/workflows/ci.yml")
-    # The gate is a STEP of `lint-and-type` now, not a job. What this guard
-    # holds is unchanged - the dispatch is by recipe and the pin lives in
-    # `dev/` - but a job of its own bought nothing on a one-runner fleet.
-    steps = ci["jobs"]["lint"]["steps"]
+    # The gate is a step of the consolidated Linux suite. What this guard
+    # holds is unchanged: dispatch stays behind the recipe and the pin stays
+    # in ``dev/``.
+    steps = ci["jobs"]["full-suite-linux"]["steps"]
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
     assert "just check-workflow" in run_commands, (
@@ -938,7 +915,7 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
 def test_ci_workflow_installs_native_lint_tools() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
-    steps = jobs["lint"]["steps"]
+    steps = jobs["full-suite-linux"]["steps"]
     used_actions = {step["uses"] for step in steps if "uses" in step}
     assert "taiki-e/install-action@v2" in used_actions
     # Node.js is no longer required - taplo and pymarkdown are native
@@ -1508,4 +1485,39 @@ def test_the_harness_carries_no_second_duration_reporter() -> None:
     assert "--durations" not in pyproject, (
         "a standing --durations prints its header even when nothing is slow; "
         "type it on a specific run instead"
+    )
+
+
+def test_release_please_is_the_single_release_authority() -> None:
+    """A release creates exactly one publish run and one binary build run.
+
+    release-please dispatches both consumers after it creates the immutable tag.
+    If either consumer also listens for the tag push, the same release can race
+    two independently authorized runs through publication and asset attachment.
+    """
+    for consumer in ("publish.yml", "binaries.yml"):
+        workflow = cast(
+            "dict[str, object]",
+            yaml.load(_read(f".github/workflows/{consumer}"), Loader=yaml.BaseLoader),
+        )
+        triggers = cast("dict[str, object]", workflow["on"])
+        assert set(triggers) == {"workflow_dispatch"}, (
+            f"{consumer} must be dispatch-only; release-please owns release "
+            f"initiation, but it also declares {sorted(triggers)}"
+        )
+        dispatch = cast("dict[str, object]", triggers["workflow_dispatch"])
+        inputs = cast("dict[str, object]", dispatch["inputs"])
+        tag = cast("dict[str, str]", inputs["tag"])
+        assert tag.get("required") == "true", (
+            f"{consumer} must require the immutable release tag"
+        )
+
+    authority = _read(".github/workflows/release-please.yml")
+    for consumer in ("publish.yml", "binaries.yml"):
+        endpoint = f"actions/workflows/{consumer}/dispatches"
+        assert endpoint in authority, (
+            f"release-please no longer dispatches its {consumer} consumer"
+        )
+    assert authority.count('-f "inputs[tag]=${TAG}"') == 2, (
+        "both release consumers must receive release-please's immutable tag"
     )

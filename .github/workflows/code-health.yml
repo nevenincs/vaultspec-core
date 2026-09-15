@@ -2,11 +2,10 @@ name: Code Health
 
 # PERIODIC, and deliberately not a pull-request check.
 #
-# Everything below is measurement: every target exits 0, and nothing here can
-# fail a merge. What it produces is the ranked offender list per dimension -
-# the instrument the baseline ratchets in pyproject.toml are calibrated from -
-# which is a thing you read when you are deciding where to spend effort, not a
-# thing you read on a pull request.
+# Nothing here can fail a merge. The report job is measurement: every target
+# exits 0 and produces a ranked offender list per dimension. The Python 3.14
+# job is a scheduled compatibility verdict against the built wheel, kept off
+# the ordinary pull-request path.
 #
 # It ran on every pull request until it was moved here, and the cost was
 # duplicate work on a fleet that has none to spare: `health-fast` composes the
@@ -25,11 +24,37 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: code-health-scheduled
+  cancel-in-progress: false
+
 env:
   NO_COLOR: "1"
   FORCE_COLOR: "0"
 
 jobs:
+  python-314:
+    timeout-minutes: 20
+    name: "Compatibility: Python 3.14"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.14
+        run: uv python install 3.14
+
+      - name: Build the wheel
+        run: uv build --wheel --out-dir dist
+
+      - name: Smoke test the built wheel on Python 3.14
+        run: uv run --python 3.14 --isolated --no-project --with dist/*.whl dev/smoke/smoke_check.py
+
   report:
     timeout-minutes: 45
     name: "Audit: Code Health"
@@ -46,7 +71,10 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: true
+          # The persistent runner's native uv cache is the hot path. The
+          # controlled cold comparison found the 3 GB cloud restore added
+          # 242.632 seconds of occupied time after accounting for setup.
+          enable-cache: false
 
       - name: Set up just
         uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
