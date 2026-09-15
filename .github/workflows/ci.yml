@@ -201,6 +201,13 @@ jobs:
         with:
           tool: just@1.38.0
 
+      # install-action's MSYS path conversion drops the drive prefix when a
+      # self-hosted Windows profile lives outside the system drive. Publish the
+      # capability-neutral install directory in native Windows form.
+      - name: Expose just to Bash
+        shell: pwsh
+        run: Add-Content -LiteralPath $env:GITHUB_PATH -Value "$env:USERPROFILE\.install-action\bin"
+
       - name: Initialize the worktree
         shell: bash
         run: just init
