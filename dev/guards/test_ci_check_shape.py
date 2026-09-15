@@ -89,10 +89,11 @@ def _jobs() -> dict[str, dict[str, Any]]:
 
 def _events(document: dict[str, Any]) -> dict[str, Any]:
     """Read workflow triggers under both YAML 1.1 and YAML 1.2 parsers."""
-    raw: object = document.get("on")
+    mapping = cast("dict[object, object]", document)
+    raw = mapping.get("on")
     if raw is None:
         # PyYAML's YAML 1.1 loader parses the GitHub key ``on`` as ``True``.
-        raw = document.get(True, {})
+        raw = mapping.get(True, {})
     return cast("dict[str, Any]", raw or {})
 
 

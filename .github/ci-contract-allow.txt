@@ -24,6 +24,12 @@ acquisition.yml:Return the workspace to the runner's user
 acquisition.yml:Clean up
 
 # --- CI-plane bookkeeping ---------------------------------------------------
+# The cache experiment redirects uv through GitHub's per-run environment file.
+# It has no local product meaning: outside Actions a caller sets UV_CACHE_DIR
+# directly. Keeping this visible here prevents workflow-only plumbing from
+# being mistaken for a second implementation of a product command.
+ci.yml:Isolate the cold uv cache
+
 # Project-board and sentinel automation. It reads and writes GitHub state and
 # has no local meaning at all; `gh` is already permitted, and these differ only
 # in reaching it through a shell conditional.
