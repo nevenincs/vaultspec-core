@@ -392,6 +392,15 @@ test-all:
 build-python:
     {{dev}} build python
 
+# Build the universal wheel and execute its installed surface on the newest
+# declared Python runtime. Kept out of ordinary PR CI; code-health runs it as a
+# scheduled compatibility verdict.
+[group('test')]
+test-python-314:
+    uv python install 3.14
+    uv build --wheel --out-dir dist
+    uv run --python 3.14 --isolated --no-project --with dist/*.whl dev/smoke/smoke_check.py
+
 # Build every artifact producible from a plain checkout.
 [group('build')]
 build-all:
