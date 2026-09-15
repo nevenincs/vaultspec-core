@@ -747,14 +747,8 @@ def test_the_running_interpreter_matches_the_pin() -> None:
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
-    required_jobs = {
-        "lint",
-        "test-harness-repo",
-        "test-library",
-        "test-vault",
-        "audit-dependencies",
-    }
-    assert required_jobs.issubset(jobs), "CI workflow is missing required jobs"
+    required_jobs = {"full-suite-linux", "library-windows"}
+    assert set(jobs) == required_jobs, "CI workflow must contain exactly two jobs"
 
     expected_runs = {
         # The four dimensions below `markdown` are pinned for the same reason
@@ -763,7 +757,7 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # away from being silently undone. `type-strict` in particular was
         # promoted by removing its `continue-on-error` key; nothing but this
         # list stops the step itself from being removed next.
-        "lint": {
+        "full-suite-linux": {
             "just init",
             # Folded in from jobs of their own. On a fleet of one Linux runner
             # every job is serial, so a fifteen-second check in its own job
@@ -784,31 +778,14 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just check-nesting",
             "just check-size",
             "just check-type-strict",
-        },
-        # `harness` and `repo` are pinned because the lesson that produced
-        # them was a lane no CI job named: the guards it ran went unobserved
-        # and one of them had been failing undetected. Naming both here means
-        # removing a CI step fails this guard rather than silently shrinking
-        # what "green" covers.
-        #
-        # `unit` and `vault-repair` are deliberately NOT pinned here. Both are
-        # subsets of what `broad-tests` selects - `unit` by marker over the
-        # same path, `vault-repair` as two `unit`-marked files under it - so a
-        # step naming either re-ran work the broad legs had already done. The
-        # coverage they stood for is pinned below, on the job that actually
-        # provides it.
-        "test-harness-repo": {
-            "just init",
             "just test-harness",
             "just test-repo",
-        },
-        "test-library": {"just init", "just test-broad"},
-        "test-vault": {
-            "just init",
+            "just test-broad",
             "just framework-install",
             "just vault-check",
+            "just audit-deps",
         },
-        "audit-dependencies": {"just init", "just audit-deps"},
+        "library-windows": {"just init", "just test-broad"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -873,10 +850,10 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
     different tool arriving under the same name.
     """
     ci = _load_workflow(".github/workflows/ci.yml")
-    # The gate is a STEP of `lint-and-type` now, not a job. What this guard
-    # holds is unchanged - the dispatch is by recipe and the pin lives in
-    # `dev/` - but a job of its own bought nothing on a one-runner fleet.
-    steps = ci["jobs"]["lint"]["steps"]
+    # The gate is a step of the consolidated Linux suite. What this guard
+    # holds is unchanged: dispatch stays behind the recipe and the pin stays
+    # in ``dev/``.
+    steps = ci["jobs"]["full-suite-linux"]["steps"]
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
     assert "just check-workflow" in run_commands, (
@@ -938,7 +915,7 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
 def test_ci_workflow_installs_native_lint_tools() -> None:
     ci = _load_workflow(".github/workflows/ci.yml")
     jobs = ci["jobs"]
-    steps = jobs["lint"]["steps"]
+    steps = jobs["full-suite-linux"]["steps"]
     used_actions = {step["uses"] for step in steps if "uses" in step}
     assert "taiki-e/install-action@v2" in used_actions
     # Node.js is no longer required - taplo and pymarkdown are native

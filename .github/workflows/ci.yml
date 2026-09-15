@@ -6,6 +6,15 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      cache_mode:
+        description: "uv cache mode for controlled CI measurement"
+        required: true
+        default: warm
+        type: choice
+        options:
+          - warm
+          - cold
 
 permissions:
   contents: read
@@ -42,34 +51,13 @@ env:
   FORCE_COLOR: "0"
 
 jobs:
-  # HOW THESE CHECKS ARE NAMED. Every job's name is
-  # `<Kind>: <Subject>[ (<Platform>)]`, and the three kinds are the three the
-  # justfile already groups its recipes under, so a reader who knows
-  # `just --list` knows what a red check means without opening it:
-  #
-  #   Lint   - reads the tree; executes none of it.
-  #   Test   - executes something and asserts what it did.
-  #   Audit  - asks a third party (an advisory database) for a verdict.
-  #
-  # The subject says WHAT is covered, never which tool covers it: a name like
-  # `Dependency Audit (uv audit)` goes stale the day the tool changes, and
-  # `broad` named a pytest marker that meant nothing to anyone reading the
-  # merge box. `dev/guards/test_automation_contracts.py` holds the scheme.
-  #
-  # These jobs are deliberately few. The fleet this runs on has ONE Linux
-  # runner and ONE Windows runner, so every job in this workflow executes
-  # SERIALLY on one of two machines and each one re-pays checkout, tool setup
-  # and `just init`. Job granularity buys parallelism on a wide fleet and buys
-  # nothing here, so a check earns a job of its own only when it needs a
-  # different runner or a different OS - never merely to read as its own line
-  # in the status list.
-  #
-  # Three former jobs are steps below for that reason: `Lockfile In Sync`,
-  # `Interpreter Matches Pin`, and `Workflow Lint`. Each took roughly fifteen
-  # seconds of work and a full provisioning cycle to reach it.
-  lint:
-    timeout-minutes: 45
-    name: "Lint: Code, Docs & Workflows"
+  # The fleet has one Linux runner and one Windows runner. Keep every Linux
+  # validation in one provisioned job so the runner pays for checkout, tool
+  # setup, and `just init` only once. The individual gates retain their own
+  # steps and always conditions, so a red gate does not hide later diagnostics.
+  full-suite-linux:
+    name: Full Suite (Linux)
+    timeout-minutes: 120
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
@@ -80,10 +68,15 @@ jobs:
         with:
           python-version-file: .python-version
 
+      - name: Isolate the cold uv cache
+        if: inputs.cache_mode == 'cold'
+        shell: bash
+        run: echo "UV_CACHE_DIR=${RUNNER_TEMP}/vaultspec-core-uv-${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: true
+          enable-cache: ${{ inputs.cache_mode != 'cold' }}
 
       - name: Install lychee
         uses: taiki-e/install-action@v2
@@ -103,59 +96,38 @@ jobs:
       - name: Initialize the worktree
         run: just init
 
-      # First, and named, so lockfile drift reads as itself. Every job in this
-      # workflow provisions with `just init`, which installs `--locked`, so a
-      # lockfile that has drifted from pyproject.toml fails all of them at once
-      # inside a provisioning step where the cause is easy to miss. Answering
-      # the question here, as its own step, keeps that diagnosis without
-      # spending a job and a provisioning cycle on it.
+      # These are separate gates so the merge box says which validation
+      # dimension failed. Every gate is independent after provisioning: the
+      # `always()` condition makes later diagnostics run after an earlier
+      # failure, while an unhandled non-zero exit still fails this job.
       - name: The lockfile agrees with pyproject.toml
+        if: always()
         run: just deps-check
 
-      # actionlint AND the CI/justfile contract, both through the recipe, and
-      # NOT through `docker://rhysd/actionlint`: a container action needs the
-      # runner account to reach the docker socket, which this fleet's service
-      # account cannot, so every run of it died in `Pull down action image`
-      # before linting a workflow. The pin lives in `dev/actionlint.py`, per
-      # architecture, so a laptop runs the same gate as CI.
       - name: Workflow lint and CI contract
+        if: always()
         run: just check-workflow
 
       - name: Ruff
+        if: always()
         run: just check-python
 
-      # `just check-type` is NOT a step beside this one. It runs `ty` against
-      # the HOST platform, and this runner's host platform is Linux, so on
-      # this job it is `--python-platform linux` under another name - the
-      # first of the three passes below, run twice. The recipe stays for local
-      # use, where the host-only check is the fast one; here it is duplicate
-      # work, and the tree needs all three passes regardless: it carries both
-      # Windows (`msvcrt`, `ctypes.WinDLL`) and POSIX (`fcntl`) branches, so a
-      # contributor on either OS can be green locally while the other platform
-      # is broken.
       - name: Ty (all target platforms)
         if: always()
         run: just check-type-platforms
 
       - name: Taplo
+        if: always()
         run: just check-toml
 
       - name: Lychee
+        if: always()
         run: just check-links
 
       - name: pymarkdown
+        if: always()
         run: just check-markdown
 
-      # Baseline-ratcheted gates. Each threshold sits at this tree's worst
-      # current offender (see the census comments in pyproject.toml), so these
-      # are green today and fail only on a NEW record-breaking offender. They
-      # run after the cheap checks because they are the slow ones.
-      #
-      # `if: always()` on every gate below is deliberate. These steps
-      # previously did not exist, and the failure mode they guard against is
-      # real: a gate placed behind a red step never runs at all, so a
-      # regression it would have caught reaches the default branch unseen. Each
-      # gate must report its own verdict independently of its neighbours.
       - name: Cognitive complexity
         if: always()
         run: just check-complexity
@@ -168,90 +140,40 @@ jobs:
         if: always()
         run: just check-size
 
-      # Strict typing's burndown reached zero, so this step is a real gate:
-      # a regression fails the job like every other lint dimension here.
       - name: Strict types
         if: always()
         run: just check-type-strict
 
-  # `just test-unit` is NOT here, and its absence is the point. That lane is
-  # `pytest src/vaultspec_core -m "unit and not repo and not claude"`, and
-  # `broad (linux)` below runs `-m "not repo and not claude"` over the same
-  # path - a strict superset. Every unit test therefore ran twice on the one
-  # Linux runner, once here and once there, for six minutes of serial time
-  # that proved nothing the broad leg did not. What is left is what only this
-  # job runs: the development-instrument guards and the repository-health
-  # guards, neither of which any other lane selects.
-  test-harness-repo:
-    timeout-minutes: 60
-    name: "Test: Harness & Repo"
-    runs-on: [self-hosted, Linux, X64, build]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
-
-      - name: Initialize the worktree
-        run: just init
-
       - name: Run development harness guards
+        if: always()
         run: just test-harness
 
-      # The repository-health guards - the automation contracts, the packaging
-      # metadata, the shipped templates, the typings/ stubs, the suite-quality
-      # checks. They are selected by the `repo` MARKER rather than by path, so
-      # this step gates them wherever they are filed, including the ones the
-      # package-boundary audit is still finding inside src/. It exists because
-      # the equivalent lane once had no CI step at all and the doubles guard
-      # inside it failed unobserved: a guard nothing runs is not a guard.
       - name: Run repository-health guards
+        if: always()
         run: just test-repo
 
-  test-library:
+      - name: Run broad test suite
+        if: always()
+        run: just test-broad
+
+      - name: Bootstrap framework
+        if: always()
+        run: just framework-install
+
+      - name: Verify vault structure and links
+        if: always()
+        run: just vault-check
+
+      - name: Python dependency vulnerability audit
+        if: always()
+        run: just audit-deps
+
+  # The Windows leg is intentionally independent: it must start even when the
+  # Linux validation job fails, and it has no matrix-generated suffix.
+  library-windows:
+    name: Library (Windows)
     timeout-minutes: 90
-    name: "Test: Library (${{ matrix.name }})"
-    # THE library gate, and the only one: this job runs the whole package suite
-    # (excluding only the `claude` marker, which needs that CLI installed) on
-    # BOTH Linux and Windows, so "green" means green on every platform rather
-    # than green for whichever slice one OS happened to select. Both fleet
-    # runners are symlink-capable, so the symlink-requiring filesystem tests run
-    # in full. Required on both legs: a failure on either OS blocks the merge.
-    #
-    # It also subsumes two lanes that used to have jobs of their own. `unit` is
-    # a marker-scoped slice of this same selection over this same path. The
-    # `vault-repair` cohort is two files - `tests/cli/test_vault_repair.py` and
-    # `vaultcore/checks/tests/test_structure_case_rename.py` - both marked
-    # `unit` and both under `src/vaultspec_core`, so the Windows leg here has
-    # always collected them. The dedicated `Windows Vault Repair Tests` job
-    # re-ran them on the one Windows runner this leg was already occupying,
-    # which on a serial fleet is not redundancy but delay.
-    #
-    # The leg carries its own display name because `runs-on` is now a label
-    # SET rather than a single image string, and a joined label array reads
-    # badly as a status-check name.
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Linux
-            runner: [self-hosted, Linux, X64, build]
-          - name: Windows
-            runner: [self-hosted, Windows, X64]
-    runs-on: ${{ matrix.runner }}
+    runs-on: [self-hosted, Windows, X64]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -261,10 +183,15 @@ jobs:
         with:
           python-version-file: .python-version
 
+      - name: Isolate the cold uv cache
+        if: inputs.cache_mode == 'cold'
+        shell: bash
+        run: echo "UV_CACHE_DIR=${RUNNER_TEMP}/vaultspec-core-uv-${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: true
+          enable-cache: ${{ inputs.cache_mode != 'cold' }}
 
       - name: Set up just
         uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
@@ -272,79 +199,9 @@ jobs:
           tool: just@1.38.0
 
       - name: Initialize the worktree
-        # bash is available on the Windows fleet runner via Git Bash; using it
-        # on both OSes keeps the just invocation and argument quoting identical.
         shell: bash
         run: just init
 
       - name: Run broad test suite
         shell: bash
         run: just test-broad
-
-  test-vault:
-    timeout-minutes: 60
-    name: "Test: Vault Corpus"
-    runs-on: [self-hosted, Linux, X64, build]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
-
-      - name: Initialize the worktree
-        run: just init
-
-      - name: Bootstrap framework
-        # The source repo tracks .vaultspec/ framework config, but the install
-        # manifest (.vaultspec/providers.json) stays gitignored. A fresh
-        # checkout therefore has the framework dir without a manifest, which
-        # the diagnosis engine classifies as CORRUPTED. Run install with
-        # --force to repair/create the manifest from the tracked config and
-        # scaffold provider outputs, the way a consumer recovering a missing
-        # manifest would.
-        run: just framework-install
-
-      - name: Verify vault structure and links
-        run: just vault-check
-
-  audit-dependencies:
-    timeout-minutes: 30
-    name: "Audit: Dependencies"
-    runs-on: [self-hosted, Linux, X64, build]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-
-      - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
-        with:
-          tool: just@1.38.0
-
-      - name: Initialize the worktree
-        run: just init
-
-      - name: Python dependency vulnerability audit
-        run: just audit-deps
