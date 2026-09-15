@@ -234,7 +234,13 @@ def lane(name: str, *argv: str) -> Cmd:
         The command, with the record flag appended.
     """
     report = testing.report_path(name).as_posix()
-    return uv_run("pytest", *argv, f"{testing.REPORT_FLAG}={report}")
+    basetemp = (testing.REPORT_DIR / f"tmp-{name}").as_posix()
+    return uv_run(
+        "pytest",
+        *argv,
+        f"--basetemp={basetemp}",
+        f"{testing.REPORT_FLAG}={report}",
+    )
 
 
 def gate(

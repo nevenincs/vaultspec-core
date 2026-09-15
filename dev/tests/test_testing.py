@@ -131,6 +131,14 @@ def test_a_lane_is_named_by_its_record() -> None:
     assert testing.lane_name(argv) == "unit-serial"
 
 
+def test_each_lane_uses_a_capability_neutral_disjoint_basetemp() -> None:
+    from dev.toolchain import lane
+
+    command = lane("unit-parallel", "src", "-q")
+
+    assert "--basetemp=.pytest-tmp/tmp-unit-parallel" in command.argv
+
+
 def test_a_step_that_is_not_a_lane_declares_nothing() -> None:
     """Only a test lane reports a population; nothing else is guessed at."""
     argv = ("uv", "run", "ruff", "check", "src")
