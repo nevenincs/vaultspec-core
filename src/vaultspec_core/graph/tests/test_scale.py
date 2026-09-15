@@ -9,7 +9,9 @@ completes and that a warm cache load is no slower than the cold build.
 
 Marked :data:`pytest.mark.benchmark` so the default ``pytest`` run (which
 deselects ``benchmark`` via the ``addopts`` marker expression) skips them;
-run them explicitly with ``pytest -m benchmark``.
+run them explicitly with ``pytest -m benchmark``.  They are also marked
+``serial`` because their wall-clock comparisons must measure the graph paths,
+not unrelated filesystem contention from the broad lane's xdist workers.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from ..api import VaultGraph
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = [pytest.mark.benchmark]
+pytestmark = [pytest.mark.benchmark, pytest.mark.serial]
 
 # Generous ceilings: a healthy build at this scale is well under these.  The
 # point is to fail loudly on a structural regression, not to police seconds.
