@@ -20,6 +20,15 @@ on:
     # Monday morning, so the week starts with a current burndown queue.
     - cron: "0 6 * * 1"
   workflow_dispatch:
+    inputs:
+      cache_mode:
+        description: "uv cache mode for controlled Code Health measurement"
+        required: true
+        default: normal
+        type: choice
+        options:
+          - normal
+          - cold
 
 permissions:
   contents: read
@@ -68,10 +77,14 @@ jobs:
         with:
           python-version-file: .python-version
 
+      - name: Isolate the cold uv cache
+        if: inputs.cache_mode == 'cold'
+        run: echo "UV_CACHE_DIR=${RUNNER_TEMP}/vaultspec-core-health-uv-${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: true
+          enable-cache: ${{ inputs.cache_mode != 'cold' }}
 
       - name: Set up just
         uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
