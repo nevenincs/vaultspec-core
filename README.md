@@ -11,7 +11,7 @@ development.
 
 The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
 
-[![build](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/ci.yml?branch=main&style=flat&label=build&logo=githubactions&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/release.yml?style=flat&label=release&logo=githubactions&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/actions/workflows/release.yml)
 [![release](https://img.shields.io/pypi/v/vaultspec-core?style=flat&label=release&logo=pypi&logoColor=white&labelColor=24292f&color=57606a)](https://pypi.org/project/vaultspec-core/)
 [![runtime](https://img.shields.io/badge/runtime-Python%203.13%20%7C%203.14-57606a?style=flat&logo=python&logoColor=white&labelColor=24292f)](https://www.python.org/downloads/)
 [![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=flat&label=license&logo=opensourceinitiative&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)

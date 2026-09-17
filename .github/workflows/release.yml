@@ -1,0 +1,75 @@
+name: Core Release
+
+# The release lane, in the only order that composes: the merge gate proves the
+# tagged tree first, and only a proven tree is published or built into
+# binaries. release-please.yml dispatches this with the immutable tag once the
+# release exists.
+#
+# Dispatched at `ref=main`, never at the tag. The dispatch ref decides which
+# WORKFLOW runs - the build matrix and the release policy are this
+# repository's current ones - while every job checks out `inputs.tag` for the
+# SOURCE. A repair dispatch for an older tag therefore picks up any
+# workflow-level fix merged since, and still builds exactly the released tree.
+#
+# publish.yml and binaries.yml are DISPATCHED, not called. PyPI trusted
+# publishing matches the top-level workflow of the run, and `gh attestation
+# verify --signer-workflow` pins the workflow that signed; both name those two
+# files, and a call from here would make this file the top-level workflow of
+# the publication. Each stays dispatchable on its own to repair one lane.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to prove and publish (e.g. vaultspec-core-v0.2.2)"
+        required: true
+        type: string
+      allow_queue:
+        description: "Build binaries even if a leg's runner is offline (the job will queue, not fail)."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# Keyed by tag and never cancelled: a cancelled release reports `cancelled`,
+# not `failed`, and nothing downstream reacts to it. Distinct from the called
+# merge gate's group, which a shared group would deadlock.
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: "Check: Release health (Linux, Windows)"
+    uses: ./.github/workflows/merge-gate.yml
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: write
+    with:
+      ref: ${{ inputs.tag }}
+
+  # Reached only when the gate passed: a job's default condition is the
+  # success of everything it needs, and a called workflow's result is its
+  # gate job's.
+  dispatch:
+    name: "Build: Release publication (Linux)"
+    needs: health
+    timeout-minutes: 10
+    runs-on: [self-hosted, Linux, X64, build]
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      ALLOW_QUEUE: ${{ inputs.allow_queue }}
+    steps:
+      - name: Dispatch PyPI publish workflow
+        run: gh workflow run publish.yml --repo "${GITHUB_REPOSITORY}" --ref "${TAG}" -f "tag=${TAG}"
+
+      # `--ref main` resolves the build matrix from current policy, while
+      # binaries.yml checks out `inputs.tag` for the source.
+      - name: Dispatch binaries build workflow
+        run: gh workflow run binaries.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}" -f "allow_queue=${ALLOW_QUEUE}"

@@ -8,9 +8,8 @@
 # --- runner-plane -----------------------------------------------------------
 # Acts on the MACHINE, not the product, so there is no local recipe it could be
 # hiding. `Every matrix selector has an online runner` is the one that matters:
-# ci-fleet OWNS that check (`runners/ci/preflight.sh`, rendered by
-# `fleetctl ci-preflight`), vaultspec-rag and vaultspec-dashboard carry the
-# rendered copy with its BEGIN/END markers, and this is the fleet's last
+# the runner fleet owns that check and renders it into consumers, which carry
+# the rendered copy between its BEGIN/END markers, and this is the last
 # hand-written re-implementation of it. Replacing it with the render is a
 # one-commit change and is the next thing to do here.
 binaries.yml:Every matrix selector has an online runner
@@ -24,12 +23,6 @@ acquisition.yml:Return the workspace to the runner's user
 acquisition.yml:Clean up
 
 # --- CI-plane bookkeeping ---------------------------------------------------
-# The cache experiment redirects uv through GitHub's per-run environment file.
-# It has no local product meaning: outside Actions a caller sets UV_CACHE_DIR
-# directly. Keeping this visible here prevents workflow-only plumbing from
-# being mistaken for a second implementation of a product command.
-ci.yml:Isolate the cold uv cache
-
 # This scheduled compatibility lane deliberately exposes interpreter install,
 # artifact build, and installed-wheel execution as separately timed evidence.
 # It does not duplicate the canonical release build recipe: it builds only the
@@ -38,16 +31,14 @@ code-health.yml:Install Python 3.14
 code-health.yml:Build the wheel
 code-health.yml:Smoke test the built wheel on Python 3.14
 
-# Project-board and sentinel automation. It reads and writes GitHub state and
-# has no local meaning at all; `gh` is already permitted, and these differ only
-# in reaching it through a shell conditional.
-main-ci-sentinel.yml:Judge main's tip
-main-ci-sentinel.yml:Open an issue and fail
-main-ci-sentinel.yml:Close the sentinel issue once main is validated again
+# GitHub-state bookkeeping. It reads and writes GitHub state and has no local
+# meaning at all; `gh` is already permitted, and these differ only in reaching
+# it through a shell conditional. The merge gate's verdict reads the results of
+# the jobs it needs and the check runs already recorded on the commit, neither
+# of which exists outside a workflow run.
+merge-gate.yml:Judge the merge readiness
 release-please.yml:Regenerate and push uv.lock onto the release branch
 release-please.yml:Open a reconciling pull request when the lockfile drifted
-release-please.yml:Dispatch PyPI publish workflow
-release-please.yml:Dispatch binaries build workflow
 binaries.yml:Ask the acquisition check to try this release
 binaries.yml:Promote a repaired release back to latest
 binaries.yml:Require artifacts on the published release
@@ -126,7 +117,7 @@ acquisition.yml:The published binary starts on a machine that has never run it
 acquisition.yml:Use it the way a new user would
 
 # --- discharged -------------------------------------------------------------
-# `ci.yml` no longer appears above, and needed no recipe to get there. All
+# The pull-request workflow needed no recipe to leave this list. All
 # three of its entries were shell steps asserting facts about committed files -
 # the resolved interpreter against `.python-version`, and the build matrix
 # against the offline gate and the acquisition matrix - so each became a guard

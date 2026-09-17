@@ -1,7 +1,8 @@
 """THE canonical actionlint provisioner. One implementation, five repos.
 
-Deployed, not called: same constraint as `ci_contract.py` and `preflight.sh`
-beside it - ci-fleet is private, every consumer is public.
+Deployed, not called: same constraint as the CI contract checker and the
+runner preflight - their source repository is private, every consumer is
+public.
 
 WHY THIS EXISTS. The fleet acquired actionlint four different ways, one per
 repo, and each way was wrong in its own direction:

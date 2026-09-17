@@ -1,4 +1,4 @@
-name: Release Please
+name: Core Release Please
 
 on:
   push:
@@ -17,36 +17,39 @@ concurrency:
 jobs:
   release-please:
     timeout-minutes: 30
-    name: Release Please
+    name: "Build: Release proposal (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Run release-please
         id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
       - name: Check out the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the lockfile and surface commits to the release branch
         with:
           ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
 
       - name: Set up uv for the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          # A release lane must not restore a cache any branch could have written.
+          enable-cache: false
 
       # `just`, and `just init` below, because the snapshot refresh runs the
       # project's own verbs rather than uv alone: `spec reference generate`
       # shells out to the same `mdformat` the pre-commit hooks run, so that the
       # committed artifact and fresh output can never disagree on whitespace.
       # `just init` is this repository's one provisioning entry point, and a
-      # second guess at what a job needs is the drift `ci.yml` is guarded
+      # second guess at what a job needs is the drift `merge-gate.yml` is guarded
       # against.
       - name: Set up just for the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
         with:
           tool: just@1.38.0
 
@@ -103,13 +106,16 @@ jobs:
       # window was never hit.
       - name: Check out main to verify the released lockfile
         if: steps.release.outputs.release_created == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the reconciling lockfile branch
         with:
           ref: main
 
       - name: Set up uv for the lockfile verification
         if: steps.release.outputs.release_created == 'true'
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          # A release lane must not restore a cache any branch could have written.
+          enable-cache: false
 
       - name: Open a reconciling pull request when the lockfile drifted
         if: steps.release.outputs.release_created == 'true'
@@ -135,69 +141,31 @@ jobs:
             --body "The release for \`${TAG}\` was merged before the lockfile update reached its branch, so main carries the previous version's \`uv.lock\`. Every job installing with \`--locked\` fails until this merges."
           echo "Opened a lockfile reconciliation pull request for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Dispatch PyPI publish workflow
-        if: steps.release.outputs.release_created == 'true'
+      # The default token's pushes and pull requests start no workflow runs,
+      # so the release pull request would never report the required merge
+      # gate. A dispatch is exempt from that rule, and its check run lands on
+      # the branch head the pull request is waiting on. Last, so it validates
+      # the lockfile and surface commits pushed above.
+      - name: Dispatch the merge gate for the release pull request
+        if: steps.release.outputs.pr && !steps.release.outputs.release_created
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release.outputs.tag_name }}
-        run: |
-          if [ -z "${TAG}" ]; then
-            echo "::error::release-please reported release_created=true but tag_name output is empty"
-            exit 1
-          fi
-          echo "Dispatching publish.yml for tag: ${TAG}"
-          gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/publish.yml/dispatches" \
-            -f "ref=${TAG}" \
-            -f "inputs[tag]=${TAG}"
-          echo "Dispatched publish.yml for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+          HEAD_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+        run: gh workflow run merge-gate.yml --repo "${GITHUB_REPOSITORY}" --ref "${HEAD_BRANCH}" -f "ref=${HEAD_BRANCH}"
 
-      # DISPATCHED ALONGSIDE publish.yml, and no longer merely tolerated as a
-      # race. The binaries used to install the package from PyPI on first run,
-      # so the release had to reach the index before an end user could launch
-      # one - the pairing worked, but only because the gap was short.
+      # ONE consumer. release.yml proves the tagged tree with the full merge
+      # gate and only then dispatches the PyPI publication and the binary
+      # build, so nothing is published from a tree that has not passed.
       #
-      # binaries.yml now builds the wheel it bakes into every artifact from
-      # the tag itself, and the artifacts install nothing at launch. PyPI is
-      # not on their path at build time or at run time, so the two dispatches
-      # are genuinely independent rather than ordered by luck.
-      - name: Dispatch binaries build workflow
+      # `ref=main`, NOT `ref=${TAG}`: the dispatch ref resolves the WORKFLOW -
+      # the matrix and release policy stay current - while release.yml and
+      # everything it dispatches check out the tag for the SOURCE.
+      # vaultspec-core-v0.1.66 is why: dispatched at its tag, it built the
+      # macos-x86_64 leg #372 had just removed, and the tap moved onto a binary
+      # that cannot start.
+      - name: Dispatch the release workflow
         if: steps.release.outputs.release_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release.outputs.tag_name }}
-        run: |
-          if [ -z "${TAG}" ]; then
-            echo "::error::release-please reported release_created=true but tag_name output is empty"
-            exit 1
-          fi
-          echo "Dispatching binaries.yml for tag: ${TAG}"
-          # `ref=main`, NOT `ref=${TAG}`, and that distinction is the point.
-          #
-          # A dispatch resolves the WORKFLOW from `ref`, while binaries.yml's
-          # build job checks out `inputs.tag` for the SOURCE. Those answer two
-          # different questions:
-          #
-          #   what to build    the matrix - repository policy, current
-          #   what to compile  the tag's tree - the released source
-          #
-          # Dispatching at the tag freezes BOTH, so a change to the matrix can
-          # never reach a release and a repair dispatch rebuilds exactly what
-          # failed. vaultspec-core-v0.1.66 is the demonstration: #372 removes
-          # the macos-x86_64 leg because that binary exits 1 on launch, and
-          # 0.1.66 built and attached it anyway from the tag's four-leg matrix.
-          # generate.py then saw complete digests for the triple, emitted the
-          # `on_intel` block, and moved the tap onto a binary that cannot start.
-          #
-          # With `ref=main` the source stays the tag's and the matrix is whatever
-          # this repository currently says it builds. It also makes repair work:
-          # dispatching again for an older tag picks up any workflow-level fix
-          # merged since.
-          #
-          # vaultspec-rag already does this (its release-please.yml uses
-          # `--ref main`). The two disagreed, and this was the brittle half.
-          gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/binaries.yml/dispatches" \
-            -f "ref=main" \
-            -f "inputs[tag]=${TAG}"
-          echo "Dispatched binaries.yml for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+        run: gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"

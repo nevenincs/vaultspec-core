@@ -1,4 +1,4 @@
-name: Code Health
+name: Core Code Health Report
 
 # PERIODIC, and deliberately not a pull-request check.
 #
@@ -35,11 +35,13 @@ env:
 jobs:
   python-314:
     timeout-minutes: 20
-    name: "Compatibility: Python 3.14"
+    name: "Test: Python 3.14 compatibility (Linux)"
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -57,14 +59,16 @@ jobs:
 
   report:
     timeout-minutes: 45
-    name: "Audit: Code Health"
+    name: "Check: Code health (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version-file: .python-version
 
@@ -77,7 +81,7 @@ jobs:
           enable-cache: false
 
       - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
         with:
           tool: just@1.38.0
 
@@ -87,7 +91,7 @@ jobs:
       # `audit-advisory`, NOT `audit-all`. The aggregate composes `deps`,
       # which resolves the committed lockfiles and queries OSV - the slowest
       # dimension by a wide margin, and the one dimension here that returns a
-      # verdict rather than a lead. It has a gating job of its own in `ci.yml`,
+      # verdict rather than a lead. It gates in `merge-gate.yml`'s full suite,
       # so composing it here ran it a second time against the same commit.
       - name: Advisory audit dimensions
         run: just audit-advisory

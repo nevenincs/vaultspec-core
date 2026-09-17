@@ -1,0 +1,295 @@
+name: Core Merge Gate
+
+# The one workflow a pull request runs, and the only one whose verdict main
+# requires. It has two tiers, and the tier is chosen by the event:
+#
+#   every push to a pull request   `Check: Lint (Linux)` only - minutes, not
+#                                  the better part of an hour, on a fleet with
+#                                  one runner per platform.
+#   the `ci:full` label            the lint, plus both full suites.
+#   a call or a dispatch           the lint, plus both full suites, always.
+#
+# `Check: Merge gate (Linux)` is the sole required status check. It passes only
+# when the lint passed AND the full suites passed on this commit - in this run,
+# or in an earlier run of this workflow on the same SHA. A push therefore
+# resets the verdict: the label must be applied again before the merge, which
+# is the point at which the full suite is worth its runner time.
+#
+# `push: main` is deliberately absent. main is ruleset-protected, so every
+# commit reaching it passed this gate on its pull request; a direct push is an
+# administrator override and is not re-litigated here. release.yml calls this
+# workflow against the release tag before anything is built, and
+# release-please.yml dispatches it on the release branch, whose pull request
+# the default token cannot trigger a run for.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled]
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to validate
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to validate (defaults to the dispatched ref)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# One group per pull request AND per trigger. Adding an unrelated label must
+# not cancel a full run in flight, and a new push must supersede the lint of
+# the push before it. A call or a dispatch never cancels: it is a release.
+concurrency:
+  group: merge-gate-${{ github.event.pull_request.number || inputs.ref || github.ref }}-${{ github.event.label.name || github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NO_COLOR: "1"
+  FORCE_COLOR: "0"
+
+jobs:
+  # Fork pull requests never reach the self-hosted fleet: every job below is
+  # skipped for them, and the gate then refuses the commit as unproven.
+  lint:
+    name: "Check: Lint (Linux)"
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' || github.event.label.name == 'ci:full')) }}
+    timeout-minutes: 30
+    runs-on: [self-hosted, Linux, X64, build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          # This persistent runner's native uv cache is the hot path. A
+          # same-SHA cold run proved that transferring the multi-GB Actions
+          # cache increased occupied time, so cloud restore/save stays off.
+          enable-cache: false
+
+      - name: Install taplo
+        uses: taiki-e/install-action@76c2e6406e52637deed7160d77bded76bd83e06e # v2
+        with:
+          tool: taplo-cli
+
+      - name: Set up just
+        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
+        with:
+          tool: just@1.38.0
+
+      - name: Initialize the worktree
+        run: just init
+
+      # Separate steps so the check says which dimension failed. `always()`
+      # runs every later dimension after an earlier failure, while an
+      # unhandled non-zero exit still fails the job.
+      - name: The lockfile agrees with pyproject.toml
+        if: always()
+        run: just deps-check
+
+      - name: Workflow lint and CI contract
+        if: always()
+        run: just check-workflow
+
+      - name: Python lint and format
+        if: always()
+        run: just check-python
+
+      - name: Types on every target platform
+        if: always()
+        run: just check-type-platforms
+
+      - name: TOML format
+        if: always()
+        run: just check-toml
+
+      - name: Markdown format
+        if: always()
+        run: just check-markdown
+
+  test-linux:
+    name: "Test: Full suite (Linux)"
+    if: ${{ github.event_name != 'pull_request' || (github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    timeout-minutes: 120
+    runs-on: [self-hosted, Linux, X64, build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+
+      - name: Install lychee
+        uses: taiki-e/install-action@76c2e6406e52637deed7160d77bded76bd83e06e # v2
+        with:
+          tool: lychee
+
+      - name: Set up just
+        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
+        with:
+          tool: just@1.38.0
+
+      - name: Initialize the worktree
+        run: just init
+
+      - name: Documentation links
+        if: always()
+        run: just check-links
+
+      - name: Cognitive complexity
+        if: always()
+        run: just check-complexity
+
+      - name: Nesting depth
+        if: always()
+        run: just check-nesting
+
+      - name: Module and class size
+        if: always()
+        run: just check-size
+
+      - name: Strict types
+        if: always()
+        run: just check-type-strict
+
+      - name: Run development harness guards
+        if: always()
+        run: just test-harness
+
+      - name: Run repository-health guards
+        if: always()
+        run: just test-repo
+
+      - name: Run broad test suite
+        if: always()
+        run: just test-broad
+
+      - name: Bootstrap framework
+        if: always()
+        run: just framework-install
+
+      - name: Verify vault structure and links
+        if: always()
+        run: just vault-check
+
+      - name: Python dependency vulnerability audit
+        if: always()
+        run: just audit-deps
+
+  # Independent of the Linux suite: it must start even when that one fails.
+  test-windows:
+    name: "Test: Library suite (Windows)"
+    if: ${{ github.event_name != 'pull_request' || (github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    timeout-minutes: 90
+    runs-on: [self-hosted, Windows, X64]
+    env:
+      # Native filesystem/process contention made eight auto-selected xdist
+      # workers intermittently miss subprocess and file-release deadlines.
+      PYTEST_XDIST_AUTO_NUM_WORKERS: "4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+
+      - name: Set up just
+        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
+        with:
+          tool: just@1.38.0
+
+      - name: Initialize the worktree
+        shell: bash
+        run: just init
+
+      - name: Run broad test suite
+        shell: bash
+        run: just test-broad
+
+  # Never skipped: a required check whose job is skipped counts as PASSED, so
+  # every run - an unrelated label included - must end in a real verdict.
+  gate:
+    name: "Check: Merge gate (Linux)"
+    needs: [lint, test-linux, test-windows]
+    if: ${{ !cancelled() }}
+    timeout-minutes: 10
+    runs-on: [self-hosted, Linux, X64, build]
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      EVENT: ${{ github.event_name }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      LINT: ${{ needs.lint.result }}
+      LINUX: ${{ needs.test-linux.result }}
+      WINDOWS: ${{ needs.test-windows.result }}
+    steps:
+      # The label asks for ONE full run. Released first, so the next push is
+      # lint-only again; a label another run already removed is not an error.
+      - name: Release the ci:full label
+        if: ${{ github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'ci:full' }}
+        run: gh api --method DELETE "repos/${GITHUB_REPOSITORY}/issues/${PR}/labels/ci:full" --silent || true
+
+      - name: Judge the merge readiness
+        run: |
+          set -euo pipefail
+          echo "lint=${LINT} linux=${LINUX} windows=${WINDOWS}"
+          if [ "${LINT}" = "success" ] && [ "${LINUX}" = "success" ] && [ "${WINDOWS}" = "success" ]; then
+            echo "lint and both full suites passed"
+            exit 0
+          fi
+          # Anything but a lint pass or an unrelated label's skipped lint is red.
+          case "${LINT}" in success | skipped) ;; *)
+            echo "::error::Check: Lint (Linux) ended '${LINT}'"
+            exit 1 ;;
+          esac
+          if [ "${EVENT}" != "pull_request" ] || [ "${LINUX}" != "skipped" ] || [ "${WINDOWS}" != "skipped" ]; then
+            echo "::error::the full suites did not both pass (linux=${LINUX}, windows=${WINDOWS})"
+            exit 1
+          fi
+          # Partial run: the full verdict must already exist on this commit.
+          passed=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs?check_name=Check:%20Merge%20gate%20(Linux)&filter=all&per_page=100" \
+            --jq '[.check_runs[] | select(.conclusion == "success")] | length')
+          if [ "${passed}" -gt 0 ]; then
+            echo "the full suites already passed on ${HEAD_SHA}"
+            exit 0
+          fi
+          echo "::error::the full suites have not run on ${HEAD_SHA}; add the ci:full label to run them before merging"
+          exit 1

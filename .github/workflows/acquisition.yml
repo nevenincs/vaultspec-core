@@ -1,4 +1,4 @@
-name: Acquisition check
+name: Core Acquisition
 
 # Everything else in this repository tests what is IN the tree. This tests what
 # a user actually receives: it installs from the published release only, on a
@@ -43,7 +43,7 @@ concurrency:
 jobs:
   acquire:
     timeout-minutes: 60
-    name: acquire ${{ matrix.arch }} on ${{ matrix.image }}
+    name: "Test: Release acquisition (Linux ${{ matrix.arch }}, ${{ matrix.image }})"
     strategy:
       fail-fast: false
       matrix:
@@ -58,7 +58,7 @@ jobs:
         # is an untested bundle. aarch64 was built, attached and shipped in
         # v0.1.71 while this matrix still fetched only the x86_64 file, so that
         # binary reached users having never been started anywhere. The coverage
-        # assertion in ci.yml is what stops this recurring silently.
+        # guard in dev/guards is what stops this recurring silently.
         #
         # The arm64 legs run on the SAME hosted runner class that BUILDS that
         # target, so their availability is already proven by the build rather
@@ -200,7 +200,7 @@ jobs:
 
   acquire-macos:
     timeout-minutes: 60
-    name: acquire on macOS (Apple Silicon)
+    name: "Test: Release acquisition (macOS)"
     # NATIVE, no container - macOS runners cannot host one, and none is needed:
     # the point of a container on the Linux legs is to supply an OLDER libc than
     # the build host. macOS has no equivalent knob here; what this leg adds is
@@ -309,7 +309,7 @@ jobs:
 
   acquire-windows:
     timeout-minutes: 60
-    name: acquire on Windows
+    name: "Test: Release acquisition (Windows)"
     # NATIVE, like the macOS leg and for the same reason: the container on the
     # Linux legs exists to supply an OLDER libc than the build host, and Windows
     # has no equivalent knob. What this adds is that the artifact is EXECUTED.

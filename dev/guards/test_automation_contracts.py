@@ -14,7 +14,7 @@ import re
 import sys
 import tomllib
 from pathlib import Path
-from typing import TypedDict, cast, get_args
+from typing import TypedDict, cast
 
 import pytest
 import yaml
@@ -23,11 +23,6 @@ pytestmark = [pytest.mark.repo]
 
 #: Repository root (``dev/guards/`` -> ``dev/`` -> repo).
 ROOT = Path(__file__).resolve().parents[2]
-
-#: A sentinel step condition of the form ``outputs.state == 'healthy'``.
-_SENTINEL_STATE_CONDITION = re.compile(
-    r"steps\.judge\.outputs\.state\s*[=!]=\s*'(?P<state>[a-z-]+)'"
-)
 
 
 class _PreCommitHook(TypedDict):
@@ -745,10 +740,10 @@ def test_the_running_interpreter_matches_the_pin() -> None:
 
 
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
-    ci = _load_workflow(".github/workflows/ci.yml")
-    jobs = ci["jobs"]
-    required_jobs = {"full-suite-linux", "library-windows"}
-    assert set(jobs) == required_jobs, "CI workflow must contain exactly two jobs"
+    gate = _load_workflow(".github/workflows/merge-gate.yml")
+    jobs = gate["jobs"]
+    required_jobs = {"lint", "test-linux", "test-windows", "gate"}
+    assert set(jobs) == required_jobs, "the merge gate must contain exactly four jobs"
 
     expected_runs = {
         # The four dimensions below `markdown` are pinned for the same reason
@@ -757,23 +752,23 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
         # away from being silently undone. `type-strict` in particular was
         # promoted by removing its `continue-on-error` key; nothing but this
         # list stops the step itself from being removed next.
-        "full-suite-linux": {
+        # The lint tier runs on every push. Each check is pinned so folding it
+        # into a tier cannot become dropping it.
+        "lint": {
             "just init",
-            # Folded in from jobs of their own. On a fleet of one Linux runner
-            # every job is serial, so a fifteen-second check in its own job
-            # costs a whole provisioning cycle to reach. They are pinned here
-            # so folding them in cannot become dropping them.
             "just deps-check",
             "just check-workflow",
             "just check-python",
-            # `just check-type` is deliberately absent - see the comment on the
-            # step in `ci.yml`. `check-type-platforms` runs `--python-platform`
-            # linux, darwin and win32; this runner's host platform is Linux, so
-            # naming both ran the Linux pass twice.
+            # `just check-type` is deliberately absent. `check-type-platforms`
+            # runs `--python-platform` linux, darwin and win32; this runner's
+            # host platform is Linux, so naming both ran the Linux pass twice.
             "just check-type-platforms",
             "just check-toml",
-            "just check-links",
             "just check-markdown",
+        },
+        "test-linux": {
+            "just init",
+            "just check-links",
             "just check-complexity",
             "just check-nesting",
             "just check-size",
@@ -785,7 +780,7 @@ def test_ci_workflow_calls_just_for_quality_gates() -> None:
             "just vault-check",
             "just audit-deps",
         },
-        "library-windows": {"just init", "just test-broad"},
+        "test-windows": {"just init", "just test-broad"},
     }
 
     for job_name, expected in expected_runs.items():
@@ -849,11 +844,11 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
     a Go binary and that action falls back to cargo-binstall for it, which is a
     different tool arriving under the same name.
     """
-    ci = _load_workflow(".github/workflows/ci.yml")
-    # The gate is a step of the consolidated Linux suite. What this guard
-    # holds is unchanged: dispatch stays behind the recipe and the pin stays
-    # in ``dev/``.
-    steps = ci["jobs"]["full-suite-linux"]["steps"]
+    gate = _load_workflow(".github/workflows/merge-gate.yml")
+    # The gate is a step of the lint tier, which every push runs. What this
+    # guard holds is unchanged: dispatch stays behind the recipe and the pin
+    # stays in ``dev/``.
+    steps = gate["jobs"]["lint"]["steps"]
 
     run_commands = {step["run"].strip() for step in steps if "run" in step}
     assert "just check-workflow" in run_commands, (
@@ -913,11 +908,14 @@ def test_ci_workflow_lints_workflows_through_the_pinned_recipe() -> None:
 
 
 def test_ci_workflow_installs_native_lint_tools() -> None:
-    ci = _load_workflow(".github/workflows/ci.yml")
-    jobs = ci["jobs"]
-    steps = jobs["full-suite-linux"]["steps"]
+    gate = _load_workflow(".github/workflows/merge-gate.yml")
+    jobs = gate["jobs"]
+    steps = jobs["lint"]["steps"] + jobs["test-linux"]["steps"]
     used_actions = {step["uses"] for step in steps if "uses" in step}
-    assert "taiki-e/install-action@v2" in used_actions
+    assert any(action.startswith("taiki-e/install-action@") for action in used_actions)
+    assert all(
+        "@" in action and len(action.split("@", 1)[1]) == 40 for action in used_actions
+    ), "every action must be pinned by commit, not by a movable tag"
     # Node.js is no longer required - taplo and pymarkdown are native
     assert "actions/setup-node@v4" not in used_actions
 
@@ -1151,121 +1149,6 @@ def _guard_module_texts() -> list[tuple[str, str]]:
     ]
 
 
-def _sentinel_workflow() -> _Workflow:
-    """The main-branch CI sentinel, parsed."""
-    text = (ROOT / ".github" / "workflows" / "main-ci-sentinel.yml").read_text(
-        encoding="utf-8"
-    )
-    return cast("_Workflow", yaml.safe_load(text))
-
-
-def _sentinel_step(name_fragment: str) -> _WorkflowStep:
-    """The one sentinel step whose name contains *name_fragment*."""
-    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
-    matches = [step for step in steps if name_fragment in step.get("name", "")]
-    assert len(matches) == 1, (
-        f"expected exactly one sentinel step named like {name_fragment!r}, "
-        f"found {[step.get('name') for step in matches]}"
-    )
-    return matches[0]
-
-
-def test_the_sentinel_closes_its_issue_only_on_a_healthy_verdict() -> None:
-    """`pending` must not close the sentinel issue.
-
-    ``Verdict.exit_code`` is 0 for ``healthy`` and for ``pending`` alike,
-    because neither should fail the sentinel job. A workflow that derives
-    health from that exit code therefore cannot tell "main is green" from "no
-    verdict yet" - and closes on both. That is exactly what happened at
-    17:25 UTC on 2026-09-04: the judge logged ``pending: 1 CI run(s) still in
-    flight``, the close step ran anyway, and issue #398 was closed as
-    "validated again" while main's tip was red and its CI still running.
-
-    The condition is asserted literally rather than by behaviour because the
-    failure mode is a silent one: a condition that never matches - a typo, or
-    a negation such as ``!= 'unhealthy'`` that readmits ``pending`` - leaves
-    the step skipped and the job green, which is indistinguishable from
-    working.
-    """
-    step = _sentinel_step("Close the sentinel issue")
-
-    assert step.get("if") == "${{ steps.judge.outputs.state == 'healthy' }}"
-
-
-def test_the_sentinel_opens_its_issue_only_on_an_unhealthy_verdict() -> None:
-    """The other half of the same contract: `pending` must not report a fault.
-
-    A sentinel that files an issue while a run is still in flight fires on
-    every push and gets muted, which leaves main less protected than if it did
-    not exist.
-    """
-    step = _sentinel_step("Open an issue")
-
-    assert step.get("if") == "${{ steps.judge.outputs.state == 'unhealthy' }}"
-
-
-def test_the_sentinel_branches_only_on_states_the_judge_can_return() -> None:
-    """Every state named in a condition must be one the module can produce.
-
-    A misspelled state is the worst shape this workflow can take: the
-    condition is valid YAML, the expression evaluates to false forever, the
-    step is skipped, and the job passes. Nothing reports it.
-    """
-    from dev.ci_sentinel.main_ci_health import State
-
-    known = set(get_args(State))
-    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
-    referenced = {
-        match.group("state")
-        for step in steps
-        for match in _SENTINEL_STATE_CONDITION.finditer(str(step.get("if", "")))
-    }
-
-    assert referenced, "no sentinel step branches on the judge's state"
-    assert referenced <= known, (
-        f"these sentinel conditions name states the judge never returns: "
-        f"{sorted(referenced - known)}; it returns {sorted(known)}"
-    )
-
-
-def test_the_sentinel_does_not_derive_health_from_the_judge_exit_code() -> None:
-    """No step may branch on a boolean distilled from the module's exit code.
-
-    Keeping the states apart in the judge step is worth nothing if a later
-    step collapses them again, so the collapsed output is banned by name: the
-    `healthy` output that carried this bug must not come back.
-    """
-    steps = _sentinel_workflow()["jobs"]["assert-main-was-validated"]["steps"]
-
-    offenders = [
-        step.get("name")
-        for step in steps
-        if "outputs.healthy" in str(step.get("if", ""))
-        or "outputs.healthy" in str(step.get("run", ""))
-        or "healthy=$(" in str(step.get("run", ""))
-    ]
-
-    assert not offenders, (
-        f"these sentinel steps read health from the judge's exit code rather "
-        f"than its state: {offenders}. The exit code answers 'should this job "
-        f"fail?', which is 0 for both `healthy` and `pending`."
-    )
-
-
-def test_the_sentinel_fails_when_the_judge_returns_no_verdict() -> None:
-    """A judge that crashed must not read as a quiet pass.
-
-    With the state absent, every condition below evaluates false, no step
-    runs, and the sentinel reports success having judged nothing - the same
-    class of silent skip the sentinel itself exists to catch.
-    """
-    run = _sentinel_step("Judge main's tip").get("run", "")
-
-    assert "the sentinel produced no verdict" in run, (
-        "the judge step must fail loudly when it produces no parseable state"
-    )
-
-
 #: The marker the pre-commit hook selects with, and the flag that selects it.
 _PRECOMMIT_MARKER = "precommit"
 _MARKER_SELECTOR = f"-m {_PRECOMMIT_MARKER}"
@@ -1489,35 +1372,68 @@ def test_the_harness_carries_no_second_duration_reporter() -> None:
 
 
 def test_release_please_is_the_single_release_authority() -> None:
-    """A release creates exactly one publish run and one binary build run.
+    """A release creates exactly one proof, one publish run and one build run.
 
-    release-please dispatches both consumers after it creates the immutable tag.
-    If either consumer also listens for the tag push, the same release can race
-    two independently authorized runs through publication and asset attachment.
+    release-please dispatches release.yml once it creates the immutable tag;
+    release.yml proves the tagged tree with the merge gate and only then
+    dispatches both consumers. If a consumer also listened for the tag push,
+    the same release could race an unproven run through publication.
     """
-    for consumer in ("publish.yml", "binaries.yml"):
+    for name in ("release.yml", "publish.yml", "binaries.yml"):
         workflow = cast(
             "dict[str, object]",
-            yaml.load(_read(f".github/workflows/{consumer}"), Loader=yaml.BaseLoader),
+            yaml.load(_read(f".github/workflows/{name}"), Loader=yaml.BaseLoader),
         )
         triggers = cast("dict[str, object]", workflow["on"])
         assert set(triggers) == {"workflow_dispatch"}, (
-            f"{consumer} must be dispatch-only; release-please owns release "
+            f"{name} must be dispatch-only; release-please owns release "
             f"initiation, but it also declares {sorted(triggers)}"
         )
         dispatch = cast("dict[str, object]", triggers["workflow_dispatch"])
         inputs = cast("dict[str, object]", dispatch["inputs"])
         tag = cast("dict[str, str]", inputs["tag"])
         assert tag.get("required") == "true", (
-            f"{consumer} must require the immutable release tag"
+            f"{name} must require the immutable release tag"
         )
 
     authority = _read(".github/workflows/release-please.yml")
-    for consumer in ("publish.yml", "binaries.yml"):
-        endpoint = f"actions/workflows/{consumer}/dispatches"
-        assert endpoint in authority, (
-            f"release-please no longer dispatches its {consumer} consumer"
-        )
-    assert authority.count('-f "inputs[tag]=${TAG}"') == 2, (
-        "both release consumers must receive release-please's immutable tag"
+    assert "gh workflow run release.yml" in authority, (
+        "release-please no longer dispatches the release workflow"
     )
+    assert '-f "tag=${TAG}"' in authority, (
+        "the release workflow must receive release-please's immutable tag"
+    )
+    for consumer in ("publish.yml", "binaries.yml"):
+        assert consumer not in authority, (
+            f"release-please dispatches {consumer} directly, skipping the "
+            "release workflow's merge gate"
+        )
+
+
+def test_the_release_is_proven_before_anything_is_published() -> None:
+    """The consumers are dispatched only after the merge gate passed the tag."""
+    release = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        yaml.safe_load(_read(".github/workflows/release.yml")),
+    )
+    jobs = release["jobs"]
+    assert jobs["health"]["uses"] == "./.github/workflows/merge-gate.yml"
+    health_inputs = cast("dict[str, str]", jobs["health"]["with"])
+    assert health_inputs["ref"] == "${{ inputs.tag }}", (
+        "the release gate must prove the tag, not the dispatch ref"
+    )
+
+    dispatch = jobs["dispatch"]
+    assert dispatch["needs"] == "health", "the consumers must wait on the release gate"
+    assert "if" not in dispatch, (
+        "a condition on the dispatch job would override the default success "
+        "check and let a failed gate publish"
+    )
+    runs = " ".join(
+        str(step.get("run", ""))
+        for step in cast("list[dict[str, object]]", dispatch["steps"])
+    )
+    for consumer in ("publish.yml", "binaries.yml"):
+        assert f"gh workflow run {consumer}" in runs, (
+            f"the release workflow no longer dispatches {consumer}"
+        )
