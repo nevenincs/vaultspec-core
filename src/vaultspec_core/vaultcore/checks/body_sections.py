@@ -59,7 +59,7 @@ _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 #: Content consisting only of ``{placeholder}`` tokens and whitespace, treated
 #: as empty so an unauthored scaffold section does not satisfy the contract.
-_PLACEHOLDER_ONLY_RE = re.compile(r"^(?:\s*\{[^{}]*\}\s*)+$")
+_PLACEHOLDER_ONLY_RE = re.compile(r"^\s*(?:\{[^{}]*\}\s*)+$")
 
 #: Level-two headings that continue the section they follow instead of opening
 #: a new one. The plan template mandates ``## Wave`` blocks at L3 and L4 - and
