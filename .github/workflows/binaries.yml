@@ -1,4 +1,4 @@
-name: Binaries
+name: Core Binaries
 
 # release-please is the single release authority. It dispatches this workflow
 # with the immutable tag after creating the release. Manual dispatch remains
@@ -38,7 +38,7 @@ jobs:
   # discovering it. Dispatch again once the host is on AC, or set
   # `allow_queue` to wait deliberately.
   #
-  # Runs on the fleet, like all but the hosted cells ci-fleet declares. That
+  # Runs on the fleet, like all but the hosted cells the fleet declares. That
   # costs this preflight its independence - if the
   # Linux/X64 runner is itself down, this job QUEUES rather than reporting the
   # outage, and the guard is silent exactly when the fleet is worst. It still
@@ -46,7 +46,7 @@ jobs:
   # the selector a build leg asks for. Set `allow_queue` to wait deliberately.
   preflight:
     timeout-minutes: 15
-    name: Preflight runners
+    name: "Check: Preflight runners (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       # Only this commit: the step below reads the matrix out of this file to
@@ -56,8 +56,9 @@ jobs:
       # later `sparse-checkout disable` writes the override to config.worktree
       # and then unsets `extensions.worktreeConfig`, so the override is never
       # read. Every subsequent job then checks out `.github/` alone and dies.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       # NOT `set -e`. An unobservable preflight must not refuse a build: the
@@ -164,16 +165,17 @@ jobs:
   # weighting, not a job that opts out of the rule.
   wheel:
     timeout-minutes: 60
-    name: Build the wheel the binaries carry
+    name: "Build: Wheel (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
 
       - name: Build the wheel
         shell: bash
@@ -199,7 +201,7 @@ jobs:
           echo "wheel ${expected} matches ${TAG}"
 
       - name: Upload the wheel
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: project-wheel
           path: dist/
@@ -209,7 +211,7 @@ jobs:
   build:
     timeout-minutes: 90
     needs: [preflight, wheel]
-    name: Build ${{ matrix.name }}
+    name: "Build: Binaries (${{ matrix.os }})"
     strategy:
       fail-fast: false
       matrix:
@@ -221,6 +223,7 @@ jobs:
           # against the floor it declares instead, then re-reads the floor off
           # the artifact and fails the job if it is exceeded.
           - name: linux-x86_64
+            os: Linux x64
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
             container: ""
@@ -228,25 +231,18 @@ jobs:
           # so a mutable tag is not an acceptable input.
           #
           # HOSTED, and the only build leg that is. This is not an oversight
-          # in the migration below - it is the selector `ci-fleet` declares for
-          # this cell, verbatim:
+          # in the migration below - the runner fleet declares this target's
+          # selector as the hosted `ubuntu-24.04-arm`, deliberately not a label
+          # set the fleet serves, named verbatim so the declaration and the
+          # workflow can be compared by eye.
           #
-          #   vaultspec-core.targets.linux-aarch64
-          #     role: build-and-prove
-          #     selector: hosted-ubuntu-24.04-arm
-          #
-          # and `fleet.yml` says of that value, in terms: "deliberately not a
-          # label set this fleet serves, and names the hosted runner verbatim so
-          # the declaration and the workflow can be diffed by eye."
-          #
-          # The fleet's ARM64 host cannot serve it. `macbook-neo-linux-arm-core`
+          # The fleet's ARM64 host cannot serve it. Its containerised runner
           # mounts /home/runner from a NAMED VOLUME, so a job container it
-          # creates is a sibling on the colima VM and every path the runner
+          # creates is a sibling on the container VM and every path the runner
           # passes - `/home/runner/externals` as `/__e` - resolves against a
-          # filesystem where those paths do not exist. Measured, with a path
-          # probe, in ci-fleet's docs/arm64-linux.md. The leg dies in
-          # `Initialize containers` before checkout, which is how
-          # vaultspec-core-v0.1.61 published zero assets.
+          # filesystem where those paths do not exist. Measured with a path
+          # probe. The leg dies in `Initialize containers` before checkout,
+          # which is how vaultspec-core-v0.1.61 published zero assets.
           #
           # Note this is NOT the reason this file used to give. "The
           # colima-hosted ARM64 runner has no reachable docker daemon" was never
@@ -257,14 +253,17 @@ jobs:
           # to the container path. That is an operator action on that host and
           # is not blocked by anything in this file.
           - name: linux-aarch64
+            os: Linux ARM64
             runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
           - name: windows-x86_64
+            os: Windows x64
             runner: [self-hosted, Windows, X64]
             target: x86_64-pc-windows-msvc
             container: ""
           - name: macos-aarch64
+            os: macOS ARM64
             runner: [self-hosted, macOS, ARM64]
             target: aarch64-apple-darwin
             container: ""
@@ -295,13 +294,9 @@ jobs:
           #
           # Restore this leg in the same change that settles the dependency -
           # not before, or it ships a binary that exits 1 again.
-          # Linux ARM64 runs in a colima container on macbook neo, registered
-          # as `macbook-neo-linux-arm-core` and provisioned by
-          # ~/action-runners/containers/vaultspec-core-linux-arm/runner-entry.sh
-          # on that host. It is enrolled in the host's two fleet scripts, which
-          # is what makes it a fleet member rather than a stray runner:
-          # runner-powergate.sh (AC-only policy) and runner-deploy-hooks.sh
-          # (post-job disk hygiene).
+          # The fleet's Linux ARM64 runner is a container on the power-gated
+          # laptop, enrolled in that host's AC-only power policy and post-job
+          # disk hygiene like every other runner there.
           #
           # THE FLEET SERVES ONLY ON AC POWER. On battery the gate stops every
           # runner on this host once it is idle - it never kills a running job -
@@ -325,8 +320,8 @@ jobs:
           # served by a host that can run the pinned image". That host is
           # `ubuntu-24.04-arm`, free for public repositories, and this leg uses
           # it. It is the one exception to the fleet-only rule below, and it is
-          # the exception `ci-fleet` DECLARES rather than one this file takes:
-          # the cell's selector is `hosted-ubuntu-24.04-arm`, and v0.1.73's
+          # the exception the fleet DECLARES rather than one this file takes:
+          # the target's selector is the hosted runner, and v0.1.73's
           # published aarch64 asset measures GLIBC_2.28 against the declared
           # floor - the proof recorded beside that declaration.
           #
@@ -337,20 +332,18 @@ jobs:
           # disagree and that is a real defect, not a leftover.
     # Every artifact build runs on the shared self-hosted fleet, with ONE
     # exception: linux-aarch64, which builds on `ubuntu-24.04-arm`. That is not
-    # a fallback this file chose. `ci-fleet` declares the cell's selector as
-    # `hosted-ubuntu-24.04-arm` and says of it, in terms, "deliberately not a
-    # label set this fleet serves" - so a self-hosted leg here would put the
-    # workflow out of conformance with the manifest that governs it.
+    # a fallback this file chose. The runner fleet declares this target's
+    # selector as the hosted runner, deliberately not a label set it serves -
+    # so a self-hosted leg here would put the workflow out of conformance with
+    # the declaration that governs it.
     #
     # It is also the only shape that works today. That leg asks for a
     # `container:`, and the fleet's ARM64 host is itself a container on colima
     # whose `/home/runner` is a NAMED VOLUME with no matching path in the VM;
     # the sibling job container mounts an empty directory and the leg dies in
     # `Initialize containers` before checkout. Re-enrolling that runner with a
-    # bind-mounted home would fix it, and ci-fleet records that runner as a
-    # RETIRE candidate instead - it has never served a selector and the leg it
-    # was enrolled for builds elsewhere. Whichever way that goes, it is decided
-    # in ci-fleet and not here.
+    # bind-mounted home would fix it. Whether that happens is decided with the
+    # runner fleet, not here.
     #
     # acquisition.yml's three aarch64 legs are hosted for the same reason.
     runs-on: ${{ matrix.runner }}
@@ -359,29 +352,30 @@ jobs:
     container: ${{ matrix.container }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           targets: ${{ matrix.target }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
 
       - name: Install Python
         run: uv python install 3.13
 
       - name: Download the wheel the binaries carry
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: project-wheel
           path: dist
 
       - name: Set up just
-        uses: taiki-e/install-action@d56249f532886d210664917b882ad7e152e17d68 # v2
+        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
         with:
           tool: just@1.38.0
 
@@ -398,7 +392,11 @@ jobs:
         run: just release-binaries "${TAG}" "${TARGET}" dist-bin dist
 
       - name: Package and verify the release bundle
-        run: just release-bundle "${{ inputs.tag || github.ref_name }}" "${{ matrix.target }}" dist-bin dist-bundles
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          TARGET: ${{ matrix.target }}
+        run: just release-bundle "${TAG}" "${TARGET}" dist-bin dist-bundles
 
       # UNVERIFIED, deliberately, and the name is the contract. Nothing
       # downstream attaches an artifact under this name; the offline gate below
@@ -406,7 +404,7 @@ jobs:
       # extracted and run cannot reach a release by any path that skips a step.
       # `binaries-*` means "proved offline", not "compiled".
       - name: Upload binaries
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: unverified-${{ matrix.name }}
           path: dist-bundles/
@@ -444,13 +442,13 @@ jobs:
   #
   # The matrix repeats the build matrix's `name`/`runner`/`target`, which this
   # repository has been bitten by twice (#361/#364, and the preflight selector
-  # list). ci.yml asserts on every pull request that the two agree, so a target
+  # list). A repository guard asserts on every full merge gate that the two agree, so a target
   # added to one and not the other goes red on the branch that adds it rather
   # than at release time.
   offline:
     timeout-minutes: 45
     needs: build
-    name: Offline ${{ matrix.name }}
+    name: "Test: Offline start (${{ matrix.os }})"
     # `!cancelled()` rather than the default, so one leg failing to compile
     # does not skip the gate for the three that did. The cost is that a leg
     # whose build failed also goes red HERE, on a missing `unverified-*`
@@ -487,11 +485,13 @@ jobs:
           # held by the build's link step and its floor check, not exercised
           # here.
           - name: linux-x86_64
+            os: Linux x64
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
             isolation: unshare
             image: ""
           - name: linux-aarch64
+            os: Linux ARM64
             runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             isolation: netns
@@ -503,6 +503,7 @@ jobs:
           # fails rather than silently stopping isolating, which is the correct
           # direction to fail in.
           - name: macos-aarch64
+            os: macOS ARM64
             runner: [self-hosted, macOS, ARM64]
             target: aarch64-apple-darwin
             isolation: sandbox
@@ -521,6 +522,7 @@ jobs:
           # dev/binaries/tests - so what is missing here is a second measurement
           # of a property already measured, not the only measurement of it.
           - name: windows-x86_64
+            os: Windows x64
             runner: [self-hosted, Windows, X64]
             target: x86_64-pc-windows-msvc
             isolation: proxy
@@ -536,7 +538,7 @@ jobs:
         run: rm -rf offline-verified offline-check.sh dist-bin
 
       - name: Download the built artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: unverified-${{ matrix.name }}
           path: dist-bin
@@ -801,7 +803,7 @@ jobs:
       # ONLY reached when every step above passed, because nothing here is
       # `if: always()`. This rename is the gate's whole enforcement mechanism.
       - name: Publish the verified artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: binaries-${{ matrix.name }}
           path: dist-bin/
@@ -868,7 +870,7 @@ jobs:
   # anything is signed.
   attest:
     timeout-minutes: 30
-    name: Attest the built binaries
+    name: "Build: Release provenance (Linux)"
     # `offline`, NOT `build`, and that edge is load-bearing twice over.
     #
     # Mechanically: this job downloads `binaries-*`, and that name is produced
@@ -944,7 +946,7 @@ jobs:
         run: rm -rf dist-bin
 
       - name: Download binaries
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: binaries-*
           path: dist-bin/
@@ -984,7 +986,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Attest the release binaries
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: ${{ steps.subjects.outputs.paths }}
 
@@ -999,7 +1001,7 @@ jobs:
 
   release:
     timeout-minutes: 30
-    name: Attach to release
+    name: "Build: Release assets (Linux)"
     # `offline` and `attest`, not `build`. This job attaches `binaries-*`, and
     # that name is produced by the offline gate rather than by the compile, so
     # depending on `build` would let a release attach an artifact whose gate had
@@ -1052,8 +1054,9 @@ jobs:
       # This repo, for the generator itself. No deploy key and no push: the
       # channel pointers no longer live here.
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           ref: main
 
       # A release-please release exists before this workflow starts. Hold it
@@ -1080,7 +1083,7 @@ jobs:
       # requires a `homebrew-` prefix, and Scoop constrains nothing, so one
       # repository satisfies both.
       - name: Checkout the distribution repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the channel pointers with the deploy key
         with:
           repository: ${{ github.repository_owner }}/homebrew-tap
           ref: main
@@ -1090,13 +1093,13 @@ jobs:
       # The channel generator runs in this job, so it needs an interpreter
       # here too; previously only the build matrix installed one.
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
 
       - name: Install Python
         run: uv python install 3.13
 
       - name: Download binaries
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: binaries-*
           path: dist-bin/
@@ -1468,7 +1471,7 @@ jobs:
   # `latest`. Re-dispatch after fixing the build and the promote step undoes it.
   verify-release-assets:
     timeout-minutes: 30
-    name: Verify the release carries artifacts
+    name: "Check: Release proven (Linux)"
     needs: release
     if: ${{ always() }}
     # This is release bookkeeping only, so keep it independent of the
@@ -1488,8 +1491,9 @@ jobs:
       # it needs the file. Checked out explicitly rather than relying on
       # whatever tree a previous job happened to leave on this runner. Not
       # sparse, for the reason given on the preflight's checkout.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       # EVERY DECLARED TARGET, not "any asset at all". v0.1.64 had two failed

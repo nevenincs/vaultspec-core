@@ -1,11 +1,11 @@
 """THE canonical CI/justfile coupling contract. One implementation, five repos.
 
-WHY THIS IS A DEPLOYED COPY AND NOT A REUSABLE ACTION. Same reason as
-`preflight.sh` beside it: ci-fleet is PRIVATE and every consuming repo is
-PUBLIC, and a public repository cannot resolve an action or a reusable
-workflow out of a private one. So the sharing model is DEPLOYMENT - this file
-is the source, `fleetctl ci contract` renders it into a consumer's `dev/`, and
-`tests/test_ci_contract_parity.py` fails when a deployed copy drifts.
+WHY THIS IS A DEPLOYED COPY AND NOT A REUSABLE ACTION. Same reason as the
+runner preflight: the source lives in a PRIVATE repository and every consuming
+repo is PUBLIC, and a public repository cannot resolve an action or a reusable
+workflow out of a private one. So the sharing model is DEPLOYMENT - one source
+is rendered into each consumer's `dev/`, and a parity check fails when a
+deployed copy drifts from it.
 
 WHAT IT ASSERTS, AND WHY EACH RULE EARNS ITS PLACE.
 
@@ -54,7 +54,9 @@ JUST_VERSION = "1.38.0"
 #: The one action, pinned by commit. taiki-e/install-action fetches the
 #: upstream release for every runner OS, which is what retires the bespoke
 #: Windows paths (a hand-rolled pwsh download, and an unpinned `scoop install`).
-JUST_ACTION_SHA = "d56249f532886d210664917b882ad7e152e17d68"
+#: The commit is the one the action's `just` tag points at; a `# v2` comment
+#: beside it would name a tag this commit is not on.
+JUST_ACTION_SHA = "6012bba2f8e3e666a2b212f8823c06831704ce92"
 JUST_INSTALL_USES = f"taiki-e/install-action@{JUST_ACTION_SHA}"
 JUST_INSTALL_TOOL = f"just@{JUST_VERSION}"
 
