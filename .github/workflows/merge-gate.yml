@@ -257,6 +257,7 @@ jobs:
       EVENT: ${{ github.event_name }}
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
       LINT: ${{ needs.lint.result }}
       LINUX: ${{ needs.test-linux.result }}
       WINDOWS: ${{ needs.test-windows.result }}
@@ -270,6 +271,11 @@ jobs:
       - name: Judge the merge readiness
         run: |
           set -euo pipefail
+          # Fork pull requests are refused outright, whatever ran before.
+          if [ "${EVENT}" = "pull_request" ] && [ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]; then
+            echo "::error::pull requests from forks are refused; re-open the change from a branch of ${GITHUB_REPOSITORY}"
+            exit 1
+          fi
           echo "lint=${LINT} linux=${LINUX} windows=${WINDOWS}"
           if [ "${LINT}" = "success" ] && [ "${LINUX}" = "success" ] && [ "${WINDOWS}" = "success" ]; then
             echo "lint and both full suites passed"

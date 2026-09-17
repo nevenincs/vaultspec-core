@@ -336,6 +336,13 @@ def test_the_gate_always_reaches_a_verdict() -> None:
         "required check's exact name"
     )
     assert "HEAD_SHA" in script, "the earlier verdict must be on the same commit"
+    assert (
+        env.get("HEAD_REPO") == "${{ github.event.pull_request.head.repo.full_name }}"
+    )
+    refusal = script.index('[ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]')
+    assert refusal < script.index("exit 0"), (
+        "a fork pull request must be refused before any path can pass the gate"
+    )
 
     release = steps["Release the ci:full label"]
     assert "|| true" in str(release["run"]), (
@@ -587,6 +594,21 @@ def test_every_self_hosted_job_declares_a_timeout() -> None:
         "these self-hosted jobs declare no `timeout-minutes`, so each can hold "
         "a fleet runner for GitHub's six-hour default: " + ", ".join(missing)
     )
+
+
+def test_no_workflow_runs_a_fork_on_any_runner() -> None:
+    """Fork pull requests always fail: no job may fall back to a hosted runner.
+
+    A `runs-on` that switches on the head repository would run a fork's code
+    somewhere and let its checks report; the rule is refusal, everywhere.
+    """
+    offenders = [
+        f"{path.name}:{job_id}"
+        for path in _workflow_paths()
+        for job_id, job in _workflow_jobs(_load(path)).items()
+        if "head.repo" in str(job.get("runs-on", ""))
+    ]
+    assert not offenders, f"these jobs pick a runner by head repository: {offenders}"
 
 
 def test_a_release_run_of_the_gate_is_never_superseded() -> None:
