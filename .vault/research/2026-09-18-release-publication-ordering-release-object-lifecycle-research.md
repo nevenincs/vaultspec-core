@@ -5,7 +5,7 @@ tags:
 date: '2026-09-18'
 modified: '2026-09-18'
 body_schema: 'body-v2'
-body_hash: 'sha256:a8142fdb0c00a2bfa9c5b3299fe8d0ffd8a69709e5e589bb16022efcda6ea3f8'
+body_hash: 'sha256:bcc203198c907573a5447607b01f97665f9a0f6a9aed6f25b5f4eadb4e03f624'
 related: []
 ---
 
@@ -89,8 +89,10 @@ That second description names the obstacle and removes it. A draft release does 
 create its tag, and every job in this pipeline checks out the tag for its source, so
 `draft` alone would strand the lane with nothing to build. `force-tag-creation` restores
 the tag while leaving the release unpublished, which is the combination the sequence
-needs. Neither option was exercised against a live run here; the evidence is the schema
-of the pinned version and the upstream feature request `googleapis/release-please#2627`.
+needs. The GitHub-side behaviour both options address is measured below; what remains
+unexercised is release-please's own handling of them, for which the evidence is the
+schema of the pinned version and the upstream feature request
+`googleapis/release-please#2627`.
 
 ### `skip-github-release` reaches the same ordering at a higher price
 
@@ -119,13 +121,26 @@ break the trusted-publisher grant and the signer pin together, which is why
 `release.yml:16-21` records that they are dispatched rather than called. Any new sequence
 has to keep both files as the top-level workflow of their own runs.
 
+### Every `gh` operation the lanes use works against a draft
+
+Measured against this repository on 2026-09-18 with a throwaway draft, since the answer
+decides whether the sequence is reachable at all. `gh release upload`, `gh release view --json assets`, and `gh release download --pattern` all succeeded against an unpublished
+draft, which covers every release operation `binaries.yml` and `publish.yml` perform.
+`gh release edit <tag> --draft=false` published it. `gh release view` also exposes
+`isDraft` and `isImmutable`, so both states are assertable from the lane.
+
+The probe confirmed the tag behaviour the schema describes: while the release was a
+draft, `GET /repos/{owner}/{repo}/git/ref/tags/{tag}` returned 404, and the tag appeared
+only on publication, pointing at the default branch head. That is the failure
+`force-tag-creation` exists to prevent - without it the tag arrives after the lane needed
+it, at the wrong commit. The probe release and its tag were deleted.
+
 ### Not investigated
 
-Whether a draft release is reachable by `gh release download` and `gh release view` from
-within the same lane, which the attach-and-verify steps depend on; whether
-`actions/attest` subjects behave identically against a draft; and whether the acquisition
-check can reach a draft. Each is a mechanical question the implementation answers on
-first run rather than a choice to weigh here.
+Whether `actions/attest` subjects behave identically against a draft, and whether the
+acquisition check can reach one. The first is a property of the attestation action rather
+than of the release object and the subjects are local files in any case; the second is
+moot while the acquisition dispatch stays behind publication.
 
 ## Sources
 
@@ -140,3 +155,4 @@ first run rather than a choice to weigh here.
 - https://github.com/googleapis/release-please-action/blob/5c625bfb5d1ff62eadeeb3772007f7f66fdcf071/package.json
 - https://github.com/googleapis/release-please/pull/2627
 - https://api.github.com/repos/nevenincs/vaultspec-core/releases/391505545
+- Draft-release probe against `nevenincs/vaultspec-core`, 2026-09-18, since deleted
