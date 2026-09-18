@@ -1,0 +1,37 @@
+# The red/green verdict on main's tip, and the only thing the README's CI pill
+# reads.
+#
+# The merge gate keeps `push: main` deliberately absent, and that stays true:
+# its job is to gate a pull request, and re-litigating the same verdict is not
+# what this workflow is for. This one exists because a badge needs a run it can
+# name. A pill can only point at a workflow file on a branch, and until this
+# file existed no workflow had ever run on main - so the pill had nothing to
+# read and reported whatever had most recently touched the branch instead.
+#
+# It calls the gate rather than restating it, so the suites the pill reports
+# are the suites a pull request had to pass. A call always runs the full tier.
+#
+# Superseded commits are cancelled: the pill answers for main's tip, not for
+# every commit that was briefly on it. `release-please` lands release commits
+# here too, and each one is a push like any other.
+name: Core Main Health
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: main-health
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: "Check: Main health (Linux, Windows)"
+    uses: ./.github/workflows/merge-gate.yml
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: write
+    with:
+      ref: ${{ github.sha }}
