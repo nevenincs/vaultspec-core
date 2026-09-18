@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.3](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.2...vaultspec-core-v0.2.3) (2026-09-18)
+
+
+### Features
+
+* **ci:** hold the release as a draft until the lane proves it ([117718f](https://github.com/nevenincs/vaultspec-core/commit/117718fd00167eaa022561af567931ba35ae8f57))
+* **ci:** publish the release last, and stop editing it into shape ([ebba618](https://github.com/nevenincs/vaultspec-core/commit/ebba6187aa0f541ff2f408b55d8db238f53953ca))
+
+
+### Bug Fixes
+
+* **binaries:** prove the Windows executable is free before stamping it ([dfcedbd](https://github.com/nevenincs/vaultspec-core/commit/dfcedbdd39b6db34311b4290913dc4b684930c40))
+* **binaries:** stop the Windows stamp racing the scanner it woke ([9bff622](https://github.com/nevenincs/vaultspec-core/commit/9bff6224b6496e0aa873e32e83ac7dec0610355b))
+* **ci:** admit the ARM64 trust step to the runner-plane contract ([310af83](https://github.com/nevenincs/vaultspec-core/commit/310af8352b1bc6806b6c6f29ef17b63043efc8eb))
+* **ci:** let the containerised ARM64 leg read its own git revision ([b175b58](https://github.com/nevenincs/vaultspec-core/commit/b175b5836257bd25b009901f9072e0e7d6cd4ccd))
+* **ci:** publish to PyPI only once the binaries are proven ([37572cb](https://github.com/nevenincs/vaultspec-core/commit/37572cb6bc229683cd6c5ea355727b4c7f338326))
+* **ci:** stop a skipped gate dispatch from stranding the release ([0a6db8a](https://github.com/nevenincs/vaultspec-core/commit/0a6db8ad043b738dff26d60c29748733c353c782))
+
 ## [0.2.2](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.1...vaultspec-core-v0.2.2) (2026-09-18)
 
 
