@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.2](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.1...vaultspec-core-v0.2.2) (2026-09-18)
+
+
+### Features
+
+* **release:** package binaries as target bundles ([aaf9f90](https://github.com/nevenincs/vaultspec-core/commit/aaf9f901c9fa374703b8c7a29008e9c9db5cd0a6))
+
+
+### Bug Fixes
+
+* **ci:** bound Windows test concurrency ([a7c2f0c](https://github.com/nevenincs/vaultspec-core/commit/a7c2f0c66ab0302db6b5f188238dafa66833a0ff))
+* **ci:** expose Windows just installation ([462e020](https://github.com/nevenincs/vaultspec-core/commit/462e0203b97efa1ee56cc0806fcbe1240f5555f2))
+* **ci:** keep Python compatibility steps explicit ([0a15e61](https://github.com/nevenincs/vaultspec-core/commit/0a15e612869bdb051207a7072e4347317059dc6b))
+* **ci:** satisfy consolidated workflow contracts ([6d60088](https://github.com/nevenincs/vaultspec-core/commit/6d6008869f3c68a80fe4334565a32432e387978c))
+* register release bundle recipe exception ([b3ecc33](https://github.com/nevenincs/vaultspec-core/commit/b3ecc33b5e1f47c7e64dd36a7462ed76eadb5d37))
+* satisfy strict bundle CLI typing ([ce84978](https://github.com/nevenincs/vaultspec-core/commit/ce84978d382cb5d3c7ca9763b42667a399602ef8))
+* **tests:** put pytest scratch trees outside the checkout ([dc3ff43](https://github.com/nevenincs/vaultspec-core/commit/dc3ff43b17633fd0d11ba4599f20da1800817bfb))
+
+
+### Performance
+
+* **ci:** keep Linux uv cache local ([eb59820](https://github.com/nevenincs/vaultspec-core/commit/eb5982092ee5abe66a4acf63054ded9f550cce3c))
+* **ci:** keep scheduled Linux uv cache local ([29793cb](https://github.com/nevenincs/vaultspec-core/commit/29793cba9a49fdfaf330c173ffe216daa743a73c))
+* **ci:** keep Windows uv cache runner-local ([8d783d8](https://github.com/nevenincs/vaultspec-core/commit/8d783d824cd2ae98f4abe027e9a6a86017561e6f))
+
 ## [0.2.1](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.0...vaultspec-core-v0.2.1) (2026-09-10)
 
 
