@@ -10,6 +10,7 @@ quietly stop covering the same trees.
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 import tomllib
@@ -1443,6 +1444,30 @@ def test_the_release_is_proven_before_anything_is_published() -> None:
         "index while the build that justifies it can still fail - which is how "
         "a release can exist on PyPI with no binaries behind it. The binaries "
         "lane dispatches the publication once every declared target is proven"
+    )
+
+
+def test_the_release_is_held_as_a_draft_until_the_lane_publishes_it() -> None:
+    """release-please must create the release unpublished, and its tag anyway.
+
+    A published release cannot be filled in afterwards once immutable releases
+    are on, so the release object is created as a draft and published by the
+    lane that has proved it. `force-tag-creation` is the other half: GitHub
+    does not create a git tag for a draft release, and every job in the lane
+    checks out the tag for its source, so without it the build has no ref.
+    """
+    config = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        json.loads(_read("release-please-config.json")),
+    )
+    package = config["packages"]["."]
+    assert package.get("draft") is True, (
+        "release-please must create the release as a draft; a published "
+        "release cannot receive the assets that justify it"
+    )
+    assert package.get("force-tag-creation") is True, (
+        "a draft release creates no git tag, and the whole lane builds from "
+        "the tag - release-please must force it into existence"
     )
 
 
