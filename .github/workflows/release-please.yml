@@ -150,7 +150,13 @@ jobs:
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HEAD_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          # Guarded, because a step's `env` is prepared before its `if` is
+          # weighed: on the run that CREATES the release there is no pull
+          # request, `pr` is empty, and a bare `fromJSON('')` fails the step
+          # that the condition was about to skip. That failure then skipped
+          # the release dispatch below, and v0.2.2 was tagged with nothing
+          # built or published behind it.
+          HEAD_BRANCH: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
         run: gh workflow run merge-gate.yml --repo "${GITHUB_REPOSITORY}" --ref "${HEAD_BRANCH}" -f "ref=${HEAD_BRANCH}"
 
       # ONE consumer. release.yml proves the tagged tree with the full merge
