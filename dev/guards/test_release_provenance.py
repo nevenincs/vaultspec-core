@@ -349,17 +349,17 @@ def test_the_channel_key_never_shares_a_job_with_a_token_grant() -> None:
     """
     holding: list[str] = []
     minting: list[str] = []
-    for path in sorted(WORKFLOWS.glob("*.yml")):
+    for path in _workflow_paths():
         workflow = _load(path)
         for job_name, job in (workflow.get("jobs") or {}).items():
             where = f"{path.name}:{job_name}"
-            rendered = yaml.safe_dump(job)
-            if "CHANNEL_ROOT_DEPLOY_KEY" in rendered:
+            if "CHANNEL_ROOT_DEPLOY_KEY" in _job_text(path, job_name):
                 holding.append(where)
             if (job.get("permissions") or {}).get("id-token") == "write":
                 minting.append(where)
 
     assert holding, "no job uses the channel deploy key; this guard is vacuous"
+    assert minting, "no job holds id-token: write; this guard is vacuous"
     overlap = sorted(set(holding) & set(minting))
     assert not overlap, (
         f"{overlap} hold the channel deploy key and can mint an OIDC token for "

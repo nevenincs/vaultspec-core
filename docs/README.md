@@ -31,7 +31,8 @@ attached to the draft with their checksums and provenance; only once all of them
 there does the wheel and sdist build, smoke-test, and publish to PyPI using OIDC trusted
 publishing.
 
-Publishing the draft is the last step. A release that is visible is therefore a release
+Publishing the draft is the last step, and the Scoop and Homebrew pointers are updated
+immediately after it, never before. A release that is visible is therefore a release
 that carries everything it claims to, and a failure anywhere in the lane leaves a draft
 nobody has been shown rather than a half-finished release to walk back. Fix the cause
 and re-dispatch `Core Release` for the same tag; the steps that already succeeded are

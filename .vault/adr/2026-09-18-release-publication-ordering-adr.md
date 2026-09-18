@@ -5,7 +5,7 @@ tags:
 date: '2026-09-18'
 modified: '2026-09-18'
 body_schema: 'body-v2'
-body_hash: 'sha256:d74fbbdf4758baf8ca616706bf474a879860bc2f58bd696a8f9b3391231c0645'
+body_hash: 'sha256:870cc7e017c848008355b55b9ad60a85ed23a4a266f6a802aa29972ad8318de0'
 related:
   - "[[2026-09-18-release-publication-ordering-release-object-lifecycle-research]]"
   - "[[2026-03-22-clci-release-adr]]"
@@ -65,6 +65,14 @@ when binaries, attestations and channel pointers did not yet exist.
   infrastructure, which this repository would then have to build and maintain, and the
   changelog body configured in `release-please-config.json` would have to be
   reconstructed. Kept in reserve if drafts prove unworkable.
+- **Channel pointers appended to the publication lane (rejected).** The smallest way
+  to put the pointers after the publication, and the reason it loses is credentials:
+  that job holds `id-token: write` for PyPI, which mints an OIDC token for any audience
+  a step names, and the channel deploy key has no business beside it. The binaries
+  workflow already separated those two capabilities deliberately.
+- **Channel pointers in a lane of their own (chosen).** Dispatched by the publication
+  lane after the flip, holding the deploy key and nothing else. Costs one file and one
+  dispatch, and keeps the separation the binaries workflow paid for.
 - **Publish as a prerelease and promote when complete (rejected).** The current
   behaviour of the repair path, proposed as the primary mechanism. A prerelease is
   published: it is visible, it is sealed under immutability, and it advertises an
@@ -90,8 +98,16 @@ workflows stay dispatched rather than called.
 
 The lanes attach to the draft exactly as they attach today. The release-proven gate in
 the binaries workflow keeps its existing judgment - every declared target present, its
-release job green - and gains one final act: publishing the draft. That publication is
-the last reversible step before PyPI, which the same gate already dispatches behind it.
+release job green - and hands the draft to the publication lane. Publishing is that
+lane's last act rather than the gate's, because the wheel and sdist are attached there:
+a release published by the gate could never receive them.
+
+Everything that ADVERTISES the release follows that publication, not merely the release
+object itself. The acquisition check and the Scoop and Homebrew pointers both address a
+release by its public URLs, so both run after the flip. The pointers move out of the
+binaries lane into a lane of their own, dispatched once the release is public, which
+also lets them be generated from the checksums read back off the published release
+rather than from the build directory that produced them.
 
 What the gate no longer needs is the path that demotes an incomplete release and
 promotes a repaired one. An unpublished draft is invisible to `latest` by construction,
@@ -134,6 +150,12 @@ the mechanics it has not proved: whether the attach, download, attestation and
 verification steps see a draft the way they see a published release. A failure there is
 discovered on a real release, and the mitigation is that it fails closed - an
 unpublished draft is the safe state, not a shipped defect.
+
+The pointer lane is a file and a dispatch where there used to be three steps, and it
+can fail on its own: a release can be published and complete while its package-manager
+pointers still name the previous version. That lag is visible, repairable by
+re-dispatching the lane for the same tag, and strictly better than the alternative it
+replaces, which was a pointer naming a version nobody could download.
 
 Two further edges stay open. A tag is created before the release that justifies it, so a
 release that never publishes leaves a permanent tag behind; the alternative, deferring
