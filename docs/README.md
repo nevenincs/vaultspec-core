@@ -25,8 +25,17 @@ Start with [the framework workflow](../README.md#start-a-feature), then
 
 Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
 maintains a release pull request with the next version and changelog. Merging it creates
-a GitHub release and starts publication: the workflow builds and smoke-tests the wheel
-and sdist, then publishes to PyPI using OIDC trusted publishing.
+the tag and an unpublished draft release, then starts the lane that fills it: the
+binaries are built for every supported target, proved to start with no network, and
+attached to the draft with their checksums and provenance; only once all of them are
+there does the wheel and sdist build, smoke-test, and publish to PyPI using OIDC trusted
+publishing.
+
+Publishing the draft is the last step. A release that is visible is therefore a release
+that carries everything it claims to, and a failure anywhere in the lane leaves a draft
+nobody has been shown rather than a half-finished release to walk back. Fix the cause
+and re-dispatch `Core Release` for the same tag; the steps that already succeeded are
+skipped or repeated harmlessly.
 
 The terminal renders and the demo GIF in `assets/` are produced by the renderers in
 `_render/`, which run `vaultspec-core` against a throwaway vault. Edit the renderer
