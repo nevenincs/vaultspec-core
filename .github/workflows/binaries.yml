@@ -357,6 +357,14 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.tag || github.ref_name }}
 
+      # A containerised leg runs as root over a workspace the runner's user
+      # owns, so git refuses the tree as dubious and `release-bundle` cannot
+      # read the source revision. Checkout survives it; the first command that
+      # asks git about the repository does not.
+      - name: Trust the runner's workspace
+        if: ${{ matrix.container != '' }}
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
