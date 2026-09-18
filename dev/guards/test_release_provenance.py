@@ -309,13 +309,12 @@ def test_the_attesting_job_checks_out_nothing_and_reads_no_secret() -> None:
 
 
 def test_the_uploading_job_cannot_mint_a_token() -> None:
-    """The job holding the deploy key must not also hold ``id-token``.
+    """The asset-uploading job must not also hold ``id-token``.
 
-    ``release`` checks out the shared distribution repository with
-    ``CHANNEL_ROOT_DEPLOY_KEY`` and runs ``dev/packaging`` tree code. The two
-    capabilities do not compose - an SSH key is not OIDC-federated - but a job
-    that both runs project code and can mint tokens for any audience is the
-    widest surface in this repository, and it no longer needs to be.
+    A job that both runs project code and can mint tokens for any audience is
+    the widest surface in this repository, and it does not need to be: the
+    release job attaches assets and reads attestations back, and neither needs
+    a token.
     """
     workflow = _load(WORKFLOWS / "binaries.yml")
     jobs = workflow.get("jobs") or {}
@@ -330,11 +329,42 @@ def test_the_uploading_job_cannot_mint_a_token() -> None:
 
     permissions = jobs["release"].get("permissions") or {}
     assert "id-token" not in permissions, (
-        "the release job can mint an OIDC token again; it holds the channel "
-        "deploy key and runs tree code, and needs neither to upload or verify"
+        "the release job can mint an OIDC token again; it needs one neither to "
+        "upload nor to verify"
     )
     assert "attestations" not in permissions, (
         "the release job can publish attestations again; it only reads them back"
+    )
+
+
+def test_the_channel_key_never_shares_a_job_with_a_token_grant() -> None:
+    """No job holds both ``CHANNEL_ROOT_DEPLOY_KEY`` and ``id-token: write``.
+
+    The two capabilities do not compose - an SSH key is not OIDC-federated -
+    but ``id-token`` is not scoped to Sigstore either: any step in a job that
+    has it can mint a token for any audience it names. Keeping the key out of
+    that job is why the channel pointers are their own lane rather than more
+    steps at the end of the publication, which is the shape that would
+    otherwise be obviously simpler.
+    """
+    holding: list[str] = []
+    minting: list[str] = []
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        workflow = _load(path)
+        for job_name, job in (workflow.get("jobs") or {}).items():
+            where = f"{path.name}:{job_name}"
+            rendered = yaml.safe_dump(job)
+            if "CHANNEL_ROOT_DEPLOY_KEY" in rendered:
+                holding.append(where)
+            if (job.get("permissions") or {}).get("id-token") == "write":
+                minting.append(where)
+
+    assert holding, "no job uses the channel deploy key; this guard is vacuous"
+    overlap = sorted(set(holding) & set(minting))
+    assert not overlap, (
+        f"{overlap} hold the channel deploy key and can mint an OIDC token for "
+        "any audience. Split the pointer push into its own lane rather than "
+        "widening the job that publishes to PyPI"
     )
 
 

@@ -347,6 +347,27 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: gh release edit "${TAG}" --repo "$GITHUB_REPOSITORY" --draft=false
 
+      # The package-manager pointers, now that there is something for them to
+      # point at. A Scoop manifest and a Homebrew formula address assets by
+      # release download URL, so they advertise the release rather than form
+      # part of it, and the binaries lane used to push them while the release
+      # was still a draft - sending `brew upgrade` at a URL that served
+      # nothing until the step above ran.
+      #
+      # Its own lane rather than more steps here: this job holds
+      # `id-token: write` for PyPI, that grant mints an OIDC token for any
+      # audience a step names, and the channel deploy key has no business
+      # beside it. channels.yml holds the key and nothing else.
+      #
+      # A failure there does not retract the release. It is published and
+      # verified by this point; the pointers lag by one dispatch, and
+      # re-dispatching channels.yml for the same tag repairs them.
+      - name: Point the release channels at this release
+        run: gh workflow run channels.yml --repo "$GITHUB_REPOSITORY" --ref main -f "tag=${TAG}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+
       # The acquisition check acquires the way a user does - unauthenticated
       # `curl` against the releases API - so it cannot see a draft and has to
       # be asked after the publication above, not before it.

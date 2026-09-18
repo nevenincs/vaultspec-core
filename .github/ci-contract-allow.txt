@@ -52,6 +52,7 @@ binaries.yml:Assert every declared target attached
 # CI builds when the workflow grew a `--wheel` argument the recipe never took.
 binaries.yml:Build the wheel
 binaries.yml:Install Python
+channels.yml:Install Python
 publish.yml:Install Python
 
 # Asserts the built wheel is the version the tag names. vaultspec-a2a asserts
@@ -96,9 +97,11 @@ binaries.yml:Aggregate checksums
 binaries.yml:Enumerate the assets to attest
 binaries.yml:Require a gh that can verify attestations
 binaries.yml:Verify the attested assets carry provenance
-binaries.yml:Generate release channel pointers
-binaries.yml:Refuse an uninstallable channel pointer
-binaries.yml:Commit the Scoop manifest and Homebrew formula
+channels.yml:Download the published checksums
+channels.yml:Refuse to point at an unpublished release
+channels.yml:Generate release channel pointers
+channels.yml:Refuse an uninstallable channel pointer
+channels.yml:Commit the Scoop manifest and Homebrew formula
 publish.yml:Enumerate the distribution to attest
 publish.yml:Publish to PyPI
 publish.yml:Generate checksums

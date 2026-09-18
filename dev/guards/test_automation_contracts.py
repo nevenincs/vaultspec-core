@@ -1447,6 +1447,12 @@ def test_the_release_is_proven_before_anything_is_published() -> None:
     )
 
 
+def _job_bodies(workflow: str) -> str:
+    """Return a workflow's job definitions as text, for credential greps."""
+    parsed = cast("dict[str, object]", yaml.safe_load(workflow))
+    return yaml.safe_dump(parsed.get("jobs"))
+
+
 def test_the_release_is_held_as_a_draft_until_the_lane_publishes_it() -> None:
     """release-please must create the release unpublished, and its tag anyway.
 
@@ -1541,6 +1547,66 @@ def test_the_release_is_published_last_and_only_once() -> None:
         f"the acquisition check ({names[acquisition]}) is asked to acquire a "
         "release that is still a draft; it acquires unauthenticated and cannot "
         "see one"
+    )
+
+
+def test_the_channel_pointers_are_written_only_after_publication() -> None:
+    """Nothing advertises a release before the release exists.
+
+    A Scoop manifest and a Homebrew formula address assets by release download
+    URL, so they are an advertisement rather than a part of the release. The
+    binaries lane used to write them, which was correct only while the release
+    was published before anything was attached to it - and stopped being
+    correct when publication moved to the end of the lane.
+    """
+    binaries = _read(".github/workflows/binaries.yml")
+    assert "dev.packaging.generate" not in binaries, (
+        "the binaries lane generates channel pointers again. It runs before "
+        "the release is published, so the pointers would address URLs that "
+        "serve nothing until the publication lane finishes"
+    )
+    assert "CHANNEL_ROOT_DEPLOY_KEY" not in _job_bodies(binaries), (
+        "the binaries lane can push to the channel root again"
+    )
+
+    channels = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        yaml.safe_load(_read(".github/workflows/channels.yml")),
+    )
+    steps = cast("list[dict[str, object]]", channels["jobs"]["channels"]["steps"])
+    runs = [str(step.get("run", "")) for step in steps]
+
+    refusing = next(
+        (i for i, run in enumerate(runs) if "isDraft" in run),
+        None,
+    )
+    assert refusing is not None, (
+        "the channels lane does not check whether the release is published. It "
+        "is dispatched by another workflow, so the one mistake that "
+        "reintroduces this defect is a dispatch aimed at a draft"
+    )
+    writing = next(i for i, run in enumerate(runs) if "dev.packaging.generate" in run)
+    assert refusing < writing, (
+        "the channels lane generates pointers before checking that the release "
+        "is published"
+    )
+
+    publish = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        yaml.safe_load(_read(".github/workflows/publish.yml")),
+    )
+    publish_runs = [
+        str(step.get("run", ""))
+        for step in cast(
+            "list[dict[str, object]]", publish["jobs"]["publish-pypi"]["steps"]
+        )
+    ]
+    published = next(i for i, run in enumerate(publish_runs) if "--draft=false" in run)
+    dispatched = next(
+        i for i, run in enumerate(publish_runs) if "gh workflow run channels.yml" in run
+    )
+    assert dispatched > published, (
+        "the channels lane is dispatched before the release is published"
     )
 
 
