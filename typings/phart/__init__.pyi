@@ -10,7 +10,6 @@ signature.
 from typing import Any
 
 import networkx as nx
-
 from phart.styles import LayoutOptions, NodeStyle
 
 class ASCIIRenderer:

@@ -1,7 +1,7 @@
 # vaultspec-core CLI reference (bundled)
 
 Machine-facing command reference for `vaultspec-core`, bundled into every consumer
-project on install and seeded to `.vaultspec/rules/reference/cli.md`. This is a
+project on install and seeded to `.vaultspec/reference/cli.md`. This is a
 locally-resident lookup for AI agents: command inventory, options, argument
 enumerations, exit codes, and environment variables. The human-facing prose reference is
 `docs/CLI.md` in the source repository.
@@ -34,6 +34,21 @@ exit (top-level only). | | `--help` | - | - | Show help for any command or group
 `--target` is accepted by workspace commands and by every `vaultspec-core vault`,
 `vaultspec-core spec`, and `vaultspec-core migrations` subcommand. `--json` is
 command-specific.
+
+## Surface provenance
+
+Which of the commands below you can install, as against which exist on the branch this
+was generated from. This block is generator-owned: run
+`vaultspec-core spec reference generate` to refresh it, and
+`vaultspec-core spec reference snapshot` to move the release it is measured against. Do
+not hand-edit between the markers.
+
+<!-- vaultspec:generated:begin unreleased-surface -->
+
+The latest published release is `0.2.1`, and every command, flag, and tool documented
+here is in it.
+
+<!-- vaultspec:generated:end unreleased-surface -->
 
 ## Command inventory
 
@@ -83,8 +98,8 @@ hand-edit between the markers.
 - `vaultspec-core vault check all` - Run all vault health checks.
 - `vaultspec-core vault check body-links` - Find wiki-links and markdown path links in
   document body text.
-- `vaultspec-core vault check exec-mapping` - Check execution records map to a live Step
-  in their parent plan.
+- `vaultspec-core vault check exec-mapping` - Pair ledger rows with plan Steps and flag
+  closed Steps without evidence.
 - `vaultspec-core vault check body-sections` - Check document bodies carry the sections
   their template mandates.
 - `vaultspec-core vault check annotations` - Find generated template annotations in
@@ -106,8 +121,8 @@ hand-edit between the markers.
   types.
 - `vaultspec-core vault check references` - Check for missing cross-references within
   features.
-- `vaultspec-core vault check schema` - Enforce schema rules: ADRs must ref research,
-  plans must ref ADRs.
+- `vaultspec-core vault check schema` - Check ADR evidence links and active plans'
+  linked decision status.
 - `vaultspec-core vault check adr-status` - Validate ADR status against the canonical
   taxonomy.
 - `vaultspec-core vault check code-boundary` - Scan source files for references to the
@@ -120,6 +135,8 @@ hand-edit between the markers.
   UTF-8 (detection only).
 - `vaultspec-core vault check feature-rename-integrity` - Surface exec folders whose
   feature disagrees with their records' tag.
+- `vaultspec-core vault check foreign` - Warn about files the framework did not place
+  inside managed roots.
 
 #### Sanitize
 
@@ -202,10 +219,9 @@ hand-edit between the markers.
   retired by its parent plan.
 - `vaultspec-core vault exec detach` - Remove a Step claim only when it resolves to
   neither a live nor retired Step.
-- `vaultspec-core vault exec log` - Append a Step's mechanical rows to its plan's
-  consolidated ledger.
+- `vaultspec-core vault exec log` - Append a Step's rows to its plan's ledger.
 - `vaultspec-core vault exec fold` - Fold a feature's per-Step execution records into
-  one consolidated ledger.
+  its plan's ledger.
 
 #### Archive
 
@@ -281,6 +297,8 @@ hand-edit between the markers.
 - `vaultspec-core spec hooks status` - Report declarative hooks parsing and taxonomy
   compliance status.
 - `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
+- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to run their shell
+  commands as you.
 
 #### Precommit
 
@@ -290,6 +308,20 @@ hand-edit between the markers.
   .pre-commit-config.yaml scaffolding.
 - `vaultspec-core spec precommit migrate` - Transplant the canonical vaultspec hooks
   into prek.toml.
+
+#### Gitignore
+
+- `vaultspec-core spec gitignore disable` - Decline the vaultspec-managed .gitignore
+  block for the whole project.
+- `vaultspec-core spec gitignore enable` - Restore the vaultspec-managed .gitignore
+  block for the whole project.
+
+#### Gitattributes
+
+- `vaultspec-core spec gitattributes disable` - Decline the vaultspec-managed
+  .gitattributes block for the whole project.
+- `vaultspec-core spec gitattributes enable` - Restore the vaultspec-managed
+  .gitattributes block for the whole project.
 
 #### Mcps
 
@@ -306,6 +338,8 @@ hand-edit between the markers.
 
 - `vaultspec-core spec reference generate` - Regenerate the generator-owned regions of
   the bundled CLI reference.
+- `vaultspec-core spec reference snapshot` - Record the published command and MCP tool
+  surface.
 
 ### Migrations
 
@@ -389,7 +423,8 @@ outcome (`mixed` when items disagree).
 
 Create a `.vault/` document from a template.
 
-`DOC_TYPE`: `adr`, `audit`, `exec`, `plan`, `reference`, `research`.
+`DOC_TYPE`: `adr`, `audit`, `plan`, `reference`, `research`. `exec` is refused:
+execution is logged with `vaultspec-core vault exec log`.
 
 | Option | Short | Default | Description | | --------------- | ----- | ------- |
 -------------------------------------------------------------------- | | `--feature TAG`
@@ -402,11 +437,26 @@ None | Additional freeform tags. Repeatable. | | `--force` | - | off | Overwrite
 existing document. | | `--dry-run` | - | off | Preview without writing. | | `--json` | -
 | off | Emit machine-readable output. | | `--no-hints` | - | off | Suppress next-step
 advisory hints. | | `--tier TIER` | - | `L1` | Plan tier (`L1`..`L4`). Ignored for
-non-plan document types. | | `--step ID` | - | None | Canonical ID or display path of
-the Step to scaffold (exec records). | | `--all-steps` | - | off | Scaffold execution
-records for all Steps in the parent plan. | | `--summary` | - | off | Scaffold a Phase
-summary instead of a Step record (exec only; requires `--phase`). | | `--phase ID` | - |
-None | Canonical Phase ID to summarise; used with `--summary`. |
+non-plan document types. |
+
+### vaultspec-core vault exec log
+
+Append one Step's rows to its plan's ledger, the only execution artifact, creating the
+ledger on first use. Append-only and idempotent; concurrent appends serialise on the
+docs-domain lock and the managed `.gitattributes` block declares `merge=union` on
+ledgers.
+
+| Option           | Default | Description                                                                         |
+| ---------------- | ------- | ----------------------------------------------------------------------------------- |
+| `--feature TAG`  | None    | Feature tag, with or without `#`. Required.                                         |
+| `--related STEM` | None    | Parent plan stem. Required.                                                         |
+| `--step ID`      | None    | Canonical Step id or display path. Required.                                        |
+| `--row SPEC`     | None    | `A:path`, `M:path`, `D:path`, or `R:old->new`; repeatable.                          |
+| `--verify SPEC`  | None    | A check that ran, `<command>=pass` or `<command>=fail`; written as a `verify:` row. |
+| `--by PERSONA`   | None    | The persona that closed the Step; written as a `by:` row.                           |
+| `--note TEXT`    | None    | Exception note under the Step id in `## Notes`; repeatable.                         |
+| `--dry-run`      | off     | Resolve the ledger without writing.                                                 |
+| `--json`         | off     | Emit machine-readable output.                                                       |
 
 ### vaultspec-core vault edit
 
@@ -448,17 +498,18 @@ it never writes and produces no artifact.
 
 **Rollup mode** (no `TARGET`): reports plans in flight, each with a one-line overview
 (tier, completed waves and phases, step completion, and the next open step); plans
-recently completed; recent changes grouped by type with execution records collapsed per
-feature; active features; and vault totals. Advisory hints point at the targeted mode
-and at `vaultspec-core spec doctor` for health checks.
+recently completed; recent changes grouped by type with ledgers collapsed per feature;
+active features; and vault totals. Advisory hints point at the targeted mode and at
+`vaultspec-core spec doctor` for health checks.
 
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace for that target - a plan-line header, then each step (display path,
-checkbox state, a cursor on the next open step) mapped to its execution-record stem, or
-`no record` for open steps without one, or `unlinked` for exec records that reference
-the plan without a resolvable `step_id:`. Grounding documents are grouped by type
-beneath the step list. A feature handle traces every plan under the feature. Advisory
-hints point at `vaultspec-core vault graph` for full graph exploration and at
+checkbox state, a cursor on the next open step) mapped to its evidence: `ledger N rows`
+plus the last `verify:` result, `no rows` for an open step without any, or `unlinked`
+for a closed step without any; exec documents that reference the plan but name no step
+are listed as unlinked records. Grounding documents are grouped by type beneath the step
+list. A feature handle traces every plan under the feature. Advisory hints point at
+`vaultspec-core vault graph` for full graph exploration and at
 `vaultspec-core vault plan status` for deep single-plan validation.
 
 `vaultspec-core status` is orientation, not auditing: it describes what exists without
@@ -469,8 +520,8 @@ judging conformance. Use `vaultspec-core vault check` to audit and
 ------------------------------------------------- | | `--limit N` | - | `10` | Recently
 modified documents to show, per type. | | `--since N` | - | None | Show documents
 modified within the last N days. | | `--paths` | - | off | Show each referenced
-document's path (targeted). | | `--verbose-exec` | - | off | List execution records
-instead of collapsing them.| | `--json` | - | off | Emit machine-readable output. | |
+document's path (targeted). | | `--verbose-exec` | - | off | List ledgers instead of
+collapsing them per feature.| | `--json` | - | off | Emit machine-readable output. | |
 `--no-hints` | - | off | Suppress next-step advisory hints. |
 
 `--limit` and `--since` apply only in rollup mode; in targeted mode they are accepted
@@ -766,10 +817,18 @@ enabled hooks; it takes `--path PATH`. Valid events: `vault.document.created`,
 `config.synced`, `audit.completed`.
 
 The group shares the resource CRUD shape (`list`, `add`, `show`, `edit`, `rename`,
-`remove`, `restore`, `sync`, `status`) plus `run`. `vaultspec-core spec hooks add NAME`
-takes `--event EVENT` (default `vault.document.created`) and `--command CMD` alongside
-the shared `--body`, `--from-file`, `--force`, and `--dry-run` flags; `edit` takes
-`--editor CMD`.
+`remove`, `restore`, `sync`, `status`) plus `run` and `trust`.
+`vaultspec-core spec hooks add NAME` takes `--event EVENT` (default
+`vault.document.created`) and `--command CMD` alongside the shared `--body`,
+`--from-file`, `--force`, and `--dry-run` flags; `edit` takes `--editor CMD`.
+
+A hook names a shell command, and `.vaultspec/hooks/` is shared through git, so a hook
+definition arrives with every clone. No hook runs until an operator approves it, and
+that approval is recorded outside the workspace, under the machine-global VaultSpec
+home, pinned to each file's contents. `vaultspec-core spec hooks trust [NAME]` records
+it and `--revoke` withdraws it; `run` and `sync` offer to record it at an interactive
+terminal and skip the hooks anywhere else. `list` reports each hook's trust state
+alongside its enabled state.
 
 ### vaultspec-core spec precommit
 
@@ -788,6 +847,18 @@ hooks are verifiably present in `prek.toml`, plus `--dry-run` and `--json`.
 reference and of the source-tree handbook from the live command tree. It takes `--check`
 to render in memory and diff against the committed files, exiting non-zero on mismatch
 without writing, plus `--json`.
+
+`vaultspec-core spec reference snapshot` maintains `reference/published-surface.json`,
+the record of the command and MCP tool surface of the latest published release. The
+generated unreleased-surface regions are the difference between that record and the live
+surface, which is why no version caveat in these documents is hand-written. Without a
+flag it refreshes the record from the live surface, and only when the tree declares a
+different version from the one recorded: the record belongs to a release, so the release
+candidate branch is the only place it may move. `--check` reports that state without
+writing. `--emit` prints this build's own surface, which is how a published distribution
+is read back inside an isolated install; `--verify FILE` compares such a document
+against the committed record and exits non-zero when they differ. `--json` applies
+throughout.
 
 ### vaultspec-core spec mcps
 
@@ -846,7 +917,8 @@ name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name.
 `VAULTSPEC_ANTIGRAVITY_DIR` | str | `.agents` | Antigravity directory name. | |
 `VAULTSPEC_IO_BUFFER_SIZE` | int | `8192` | I/O read buffer size in bytes. | |
 `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int | `1000000` | Subprocess stdout capture limit. |
-| `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log level for the CLI. | |
-`VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource editing. | |
-`VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
+| `VAULTSPEC_LOCK_TIMEOUT_SECONDS` | float | `120.0` | Advisory-lock acquisition budget
+in seconds, both layers combined. | | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log
+level for the CLI. | | `VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource
+editing. | | `VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
 `0`/`false`/`off`/`no` disables it (EOF-only exit). |
