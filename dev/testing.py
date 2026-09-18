@@ -23,6 +23,8 @@ a change to pytest's phrasing.
 
 from __future__ import annotations
 
+import hashlib
+import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,10 +43,46 @@ REPORT_DIR = Path(".pytest-tmp")
 #: wrote - there is no second place for the two to disagree.
 REPORT_FLAG = "--junit-xml"
 
+#: The flag that places pytest's scratch trees.
+BASETEMP_FLAG = "--basetemp"
+
+#: Where those scratch trees go. Deliberately NOT under `REPORT_DIR`: a record
+#: is an artefact to keep, but a scratch tree is a *workspace under test*, and
+#: one placed inside the checkout inherits this repository's `.git`. Discovery
+#: walks upwards, so every case that builds a directory and asserts no
+#: repository stands above it finds this one and disagrees. The system temp
+#: root is the nearest place that is writable on each runner and outside any
+#: checkout. The lane's directory sits DIRECTLY under it, in one flat name
+#: rather than a nested pair, because pytest creates the root it is given with
+#: a plain `mkdir` and fails on a missing intermediate.
+BASETEMP_ROOT = Path(tempfile.gettempdir())
+
 
 def report_path(lane: str) -> Path:
     """Return the record path for a named lane."""
     return REPORT_DIR / f"junit-{lane}.xml"
+
+
+def basetemp_path(lane: str, workspace: Path | None = None) -> Path:
+    """Return the scratch root for a named lane.
+
+    Two lanes must never share a root, or the one that finishes first clears
+    the other's fixtures mid-run. Two CHECKOUTS must not share one either: a
+    runner and a developer on the same host can run the same lane name at the
+    same time, and moving the root out of the tree gave up the isolation the
+    tree used to supply for free. The checkout's path buys it back.
+
+    Args:
+        lane: The lane's name, unique per step.
+        workspace: The checkout the lane runs in. Defaults to the working
+            directory, which the harness invokes every lane from.
+
+    Returns:
+        The scratch root, outside any checkout and unique to this pair.
+    """
+    root = (workspace or Path.cwd()).resolve()
+    token = hashlib.sha256(str(root).encode("utf-8")).hexdigest()[:12]
+    return BASETEMP_ROOT / f"vaultspec-pytest-{token}-{lane}"
 
 
 def declared_report(argv: Sequence[str]) -> Path | None:
@@ -57,6 +95,21 @@ def declared_report(argv: Sequence[str]) -> Path | None:
         The path, or ``None`` for any step that is not a reporting test lane.
     """
     prefix = f"{REPORT_FLAG}="
+    return next(
+        (Path(arg[len(prefix) :]) for arg in argv if arg.startswith(prefix)), None
+    )
+
+
+def declared_basetemp(argv: Sequence[str]) -> Path | None:
+    """Return the scratch root a command gave pytest, if it gave one.
+
+    Args:
+        argv: The command that ran.
+
+    Returns:
+        The path, or ``None`` for any step that is not a test lane.
+    """
+    prefix = f"{BASETEMP_FLAG}="
     return next(
         (Path(arg[len(prefix) :]) for arg in argv if arg.startswith(prefix)), None
     )

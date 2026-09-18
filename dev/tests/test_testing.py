@@ -8,14 +8,11 @@ there is nothing to read stay visible rather than reading as zero.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
 from dev import testing
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 pytestmark = pytest.mark.unit
 
@@ -132,11 +129,43 @@ def test_a_lane_is_named_by_its_record() -> None:
 
 
 def test_each_lane_uses_a_capability_neutral_disjoint_basetemp() -> None:
+    """Two lanes never share a scratch root, so neither clears the other's."""
     from dev.toolchain import lane
 
-    command = lane("unit-parallel", "src", "-q")
+    parallel = testing.declared_basetemp(lane("unit-parallel", "src", "-q").argv)
+    serial = testing.declared_basetemp(lane("unit-serial", "src", "-q").argv)
 
-    assert "--basetemp=.pytest-tmp/tmp-unit-parallel" in command.argv
+    assert parallel is not None
+    assert serial is not None
+    assert parallel != serial
+
+
+def test_a_lane_scratch_root_stands_outside_the_checkout() -> None:
+    """A scratch tree inside the checkout inherits the checkout's repository.
+
+    Git discovery walks upwards, so a workspace built under the working tree
+    reports this repository as its own. Every case asserting that a directory
+    has no repository above it then fails on the harness rather than on the
+    behaviour it was written to pin.
+    """
+    from dev.toolchain import lane
+
+    basetemp = testing.declared_basetemp(lane("unit-parallel", "src", "-q").argv)
+
+    assert basetemp is not None
+    assert not basetemp.is_relative_to(Path.cwd().resolve())
+
+
+def test_two_checkouts_running_one_lane_do_not_share_a_scratch_root() -> None:
+    """Moving the root out of the tree must not merge concurrent checkouts.
+
+    A runner and a developer on one host run the same lane names at the same
+    time; the tree used to keep them apart for free.
+    """
+    left = testing.basetemp_path("unit-parallel", Path.cwd())
+    right = testing.basetemp_path("unit-parallel", Path.cwd().parent)
+
+    assert left != right
 
 
 def test_a_step_that_is_not_a_lane_declares_nothing() -> None:

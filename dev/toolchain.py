@@ -231,14 +231,14 @@ def lane(name: str, *argv: str) -> Cmd:
         *argv: The pytest arguments, exactly as the lane selects them.
 
     Returns:
-        The command, with the record flag appended.
+        The command, with its scratch root and record flags appended.
     """
     report = testing.report_path(name).as_posix()
-    basetemp = (testing.REPORT_DIR / f"tmp-{name}").as_posix()
+    basetemp = testing.basetemp_path(name).as_posix()
     return uv_run(
         "pytest",
         *argv,
-        f"--basetemp={basetemp}",
+        f"{testing.BASETEMP_FLAG}={basetemp}",
         f"{testing.REPORT_FLAG}={report}",
     )
 
