@@ -5,7 +5,7 @@ tags:
 date: '2026-09-18'
 modified: '2026-09-18'
 body_schema: 'body-v2'
-body_hash: 'sha256:e3927d6c0b76bfac8dc5061518adafcc608919c21ef14c74caacd21c01b6f1b1'
+body_hash: 'sha256:16d56fc7f8d9e6465c36f9002c3bb0bab74860094db707a282b39e2fe4643d25'
 related:
   - '[[2026-09-18-release-publication-ordering-plan]]'
 ---
@@ -76,6 +76,51 @@ the change, recorded in
 holds for `upload`, `view --json assets`, `download --pattern` and `edit --draft=false`;
 it says nothing about operations the lanes do not currently use.
 
+### channel-pointers-resolved | high | Resolved by moving the pointers to their own lane, dispatched after publication
+
+Re-reviewed after the fix. The pointers are generated and pushed by
+`.github/workflows/channels.yml`, dispatched by `publish.yml` after the step that takes
+the release out of draft, so the advertisement can no longer precede the thing it
+advertises. The binaries lane no longer holds `CHANNEL_ROOT_DEPLOY_KEY`, no longer runs
+`dev/packaging` code, and is reduced to attaching assets and proving them.
+
+The decision the recommendation asked for was taken rather than deferred: the key lives
+in a lane of its own, not beside the `id-token: write` grant in the publication job. The
+reasoning is the same one `binaries.yml` already recorded when attestation moved into a
+job holding no key - `id-token` mints a token for any audience a step names, so a job
+holding both is the widest surface in the repository.
+
+Two properties were added that the original arrangement did not have. The pointers are
+generated from the `SHA256SUMS` read back off the published release rather than from the
+build directory that produced it, so they describe what a user downloads rather than
+what the upload was assumed to have delivered. And the lane refuses to run against a
+draft, which matters because it is now dispatched by another workflow: a dispatch aimed
+at an unpublished release is the one mistake that reinstates the defect.
+
+Guarded in both directions - the binaries lane may not generate pointers or hold the
+key, the channels lane must check for a draft before it writes, the dispatch must follow
+the publication, and no job in any workflow may hold the deploy key and a token grant at
+once.
+
+### adr-drift | low | The ADR described the gate publishing the draft, which execution corrected
+
+The decision record said the release-proven gate would publish the draft. It cannot: the
+distribution is attached by the publication lane, so a release published by the gate
+could never receive it. Corrected in the ADR when the pointer decision was appended.
+Recorded because the correction came from execution rather than from review, and the
+record was wrong in the interval.
+
+### release-0-2-3-blocked | low | The first release through the new lane is stuck on an offline runner, not on this work
+
+`vaultspec-core-v0.2.3` merged while this fix was being written. Its tag and draft
+release were created correctly - the first live proof that `draft` and
+`force-tag-creation` behave as the research measured - but `Core Binaries` was cancelled
+after preflight refused the build: `[self-hosted,macos,arm64]` matched one runner with
+none online, the power-gated host on battery. No binaries were built, no pointers were
+pushed, and nothing reached PyPI. The release needs a re-dispatch with that host on AC,
+or with `allow_queue`. Recorded so the empty draft is not later read as a defect of the
+ordering.
+
 ## Recommendations
 
 Resolve the channel-pointer finding before the next release reaches a package manager.
@@ -98,3 +143,9 @@ condition attached, and the third is a scope statement about the evidence.
 
 **REVISION REQUIRED** - one `high` finding. `S02` is the affected Step; the fix needs
 authorization for the secret-placement decision before it can be executed.
+
+**PASS** on re-review, after the channel-pointer finding was resolved in `S02` and the
+secret placement was authorized. No critical or high findings remain open. The three
+`low` findings from the first pass and the three added on re-review are recorded and
+need no action beyond being read; `release-0-2-3-blocked` names a live release waiting
+on a runner, not on this repository.

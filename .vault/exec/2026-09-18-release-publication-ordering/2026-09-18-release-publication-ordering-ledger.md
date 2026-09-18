@@ -5,7 +5,7 @@ tags:
 date: '2026-09-18'
 modified: '2026-09-18'
 body_schema: 'body-v2'
-body_hash: 'sha256:ec003082a272a8b0acaf3defa28d228123f6380e22791335724183009bcfe7bb'
+body_hash: 'sha256:b36c0d3bd6ba7d8fd582556db2d8c149b5e1c07bd8ce03d63b20c69d6cf02f7b'
 related:
   - "[[2026-09-18-release-publication-ordering-plan]]"
 ---
@@ -27,6 +27,10 @@ related:
 - `S03` `verify:` `pymarkdown scan` -> `pass`
 - `S04` `M` `.github/ci-contract-allow.txt`
 - `S05` `verify:` `pypi vaultspec-core 0.2.2 wheel and sdist present` -> `pass`
+- `S02` `A` `.github/workflows/channels.yml`
+- `S02` `M` `dev/guards/test_release_provenance.py`
+- `S02` `M` `docs/README.md`
+- `S02` `M` `.vault/adr/2026-09-18-release-publication-ordering-adr.md`
 
 ## Notes
 
