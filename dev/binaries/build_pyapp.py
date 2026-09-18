@@ -88,7 +88,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from dev.binaries.windows_icon import VersionInfo, stamp_icon, stamp_version_info
+from dev.binaries.windows_icon import VersionInfo, stamp_resources
 from dev.packaging import products
 
 # Pinned PyApp crate version. Bumping this changes the bootstrapper and the
@@ -757,8 +757,9 @@ def publish_asset(
     """Copy, finalize, verify, and checksum one release executable."""
     shutil.copy2(raw, asset)
     if target.endswith("windows-msvc"):
-        stamp_icon(asset, APPLICATION_ICON)
-        stamp_version_info(asset, binary_version_info(binary, version, target))
+        stamp_resources(
+            asset, APPLICATION_ICON, binary_version_info(binary, version, target)
+        )
     else:
         asset.chmod(0o755)
     check_platform_floor(asset, target)

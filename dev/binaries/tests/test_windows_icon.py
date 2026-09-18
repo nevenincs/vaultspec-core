@@ -17,7 +17,17 @@ from dev.binaries.build_pyapp import (
     publish_asset,
 )
 from dev.binaries.windows_icon import (
+    FILE_ATTRIBUTE_NORMAL,
+    GENERIC_READ,
+    GENERIC_WRITE,
+    OPEN_EXISTING,
+    RESOURCE_ATTEMPTS,
+    TRANSIENT_WIN32_ERRORS,
     IconResourceError,
+    Win32ResourceError,
+    _kernel32,
+    _require_exclusive_access,
+    _retry_transient,
     parse_ico,
     verify_icon,
     verify_version_info,
@@ -96,3 +106,121 @@ def test_real_pe_stamp_is_exact_and_precedes_checksum(tmp_path: Path) -> None:
         checksum.read_text(encoding="utf-8").split()[0]
         == hashlib.sha256(stamped).hexdigest()
     )
+
+
+def _no_wait(seconds: float) -> None:
+    """Spend no time on the backoff, so the policy is asserted, not the clock."""
+
+
+@pytest.mark.parametrize("code", sorted(TRANSIENT_WIN32_ERRORS))
+def test_a_held_executable_is_stamped_once_the_holder_lets_go(code: int) -> None:
+    """A scanner holding the image delays the commit, it does not fail it."""
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts < RESOURCE_ATTEMPTS:
+            raise Win32ResourceError(f"committing resources failed: [{code}]", code)
+
+    _retry_transient(commit, wait=_no_wait)
+
+    assert attempts == RESOURCE_ATTEMPTS
+
+
+def test_a_holder_that_never_lets_go_fails_the_build() -> None:
+    """Retrying is bounded: a permanent denial still stops the release."""
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise Win32ResourceError("committing resources failed: [5]", 5)
+
+    with pytest.raises(Win32ResourceError, match=r"\[5\]"):
+        _retry_transient(commit, wait=_no_wait)
+
+    assert attempts == RESOURCE_ATTEMPTS
+
+
+def test_a_permission_failure_is_not_retried() -> None:
+    """Only the codes that mean "someone else has it" are worth waiting out."""
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise Win32ResourceError("opening resources failed: [2]", 2)
+
+    with pytest.raises(Win32ResourceError, match=r"\[2\]"):
+        _retry_transient(commit)
+
+    assert attempts == 1
+
+
+def test_a_resource_mismatch_is_never_retried() -> None:
+    """A wrong stamp is a defect in the payload, not a collision to wait out."""
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise IconResourceError("primary icon group does not match")
+
+    with pytest.raises(IconResourceError):
+        _retry_transient(commit)
+
+    assert attempts == 1
+
+
+# The probe below is Win32 file-sharing behaviour, so the two cases assert
+# what the host they run on actually does rather than standing down on the
+# ones that are not Windows. Off Windows the loader refuses first, which is a
+# real guarantee of its own: nothing here silently does nothing.
+def test_an_unheld_executable_passes_the_access_probe(tmp_path: Path) -> None:
+    """The file the builder just wrote is its own, and the probe says so."""
+    executable = tmp_path / "unheld.exe"
+    shutil.copy2(sys.executable, executable)
+
+    if sys.platform != "win32":
+        with pytest.raises(IconResourceError, match="only be updated on Windows"):
+            _require_exclusive_access(executable)
+        return
+
+    _require_exclusive_access(executable)
+
+
+def test_a_held_executable_is_refused_before_any_resource_is_touched(
+    tmp_path: Path,
+) -> None:
+    """A holder is found by the probe, with a code the retry waits out."""
+    executable = tmp_path / "held.exe"
+    shutil.copy2(sys.executable, executable)
+    before = executable.read_bytes()
+
+    if sys.platform != "win32":
+        with pytest.raises(IconResourceError, match="only be updated on Windows"):
+            _require_exclusive_access(executable)
+        assert executable.read_bytes() == before
+        return
+
+    kernel32 = _kernel32()
+    handle = kernel32.CreateFileW(
+        str(executable),
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        None,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        None,
+    )
+    assert handle
+
+    try:
+        with pytest.raises(Win32ResourceError) as held:
+            _require_exclusive_access(executable)
+    finally:
+        kernel32.CloseHandle(handle)
+
+    assert held.value.code in TRANSIENT_WIN32_ERRORS
+    assert executable.read_bytes() == before

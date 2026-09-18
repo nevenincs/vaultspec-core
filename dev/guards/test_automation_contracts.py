@@ -1376,8 +1376,9 @@ def test_release_please_is_the_single_release_authority() -> None:
 
     release-please dispatches release.yml once it creates the immutable tag;
     release.yml proves the tagged tree with the merge gate and only then
-    dispatches both consumers. If a consumer also listened for the tag push,
-    the same release could race an unproven run through publication.
+    dispatches the binaries build, which dispatches the publication in turn. If
+    a consumer also listened for the tag push, the same release could race an
+    unproven run through publication.
     """
     for name in ("release.yml", "publish.yml", "binaries.yml"):
         workflow = cast(
@@ -1433,7 +1434,42 @@ def test_the_release_is_proven_before_anything_is_published() -> None:
         str(step.get("run", ""))
         for step in cast("list[dict[str, object]]", dispatch["steps"])
     )
-    for consumer in ("publish.yml", "binaries.yml"):
-        assert f"gh workflow run {consumer}" in runs, (
-            f"the release workflow no longer dispatches {consumer}"
-        )
+    assert "gh workflow run binaries.yml" in runs, (
+        "the release workflow no longer dispatches the binaries build"
+    )
+    assert "gh workflow run publish.yml" not in runs, (
+        "the release workflow dispatches the publication beside the binaries "
+        "build again. PyPI cannot be unpublished, so a version reaches the "
+        "index while the build that justifies it can still fail - which is how "
+        "a release can exist on PyPI with no binaries behind it. The binaries "
+        "lane dispatches the publication once every declared target is proven"
+    )
+
+
+def test_pypi_is_published_only_once_every_binary_is_proven() -> None:
+    """The publication is dispatched from the gate that judged the assets.
+
+    PyPI is the one irreversible step in the release: a version number is spent
+    the moment it lands on the index, and no re-dispatch takes it back. So it
+    is dispatched last, by the gate that has already found every declared
+    target attached and verified - not beside the build that produces them.
+    """
+    binaries = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        yaml.safe_load(_read(".github/workflows/binaries.yml")),
+    )
+    gate = binaries["jobs"]["verify-release-assets"]
+    steps = cast("list[dict[str, object]]", gate["steps"])
+    dispatching = [
+        step
+        for step in steps
+        if "gh workflow run publish.yml" in str(step.get("run", ""))
+    ]
+    assert len(dispatching) == 1, (
+        "exactly one step in the release-proven gate must dispatch the "
+        f"publication; found {len(dispatching)}"
+    )
+    assert dispatching[0].get("if") == "${{ success() }}", (
+        "the publication dispatch must be conditioned on the gate succeeding, "
+        "or an incomplete release publishes to PyPI anyway"
+    )
