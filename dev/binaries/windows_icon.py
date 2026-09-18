@@ -27,6 +27,11 @@ VERSION_RESOURCE_ID = 1
 LANG_NEUTRAL = 0
 LOAD_LIBRARY_AS_DATAFILE = 0x00000002
 LOAD_LIBRARY_AS_IMAGE_RESOURCE = 0x00000020
+GENERIC_READ = 0x80000000
+GENERIC_WRITE = 0x40000000
+OPEN_EXISTING = 3
+FILE_ATTRIBUTE_NORMAL = 0x00000080
+INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
 # Committing a resource update rewrites the executable in place, so anything
 # still holding the image - a real-time virus scanner walking the bytes the
@@ -183,6 +188,18 @@ def _kernel32() -> Any:
     kernel32.LockResource.restype = ctypes.wintypes.LPVOID
     kernel32.FreeLibrary.argtypes = [ctypes.wintypes.HMODULE]
     kernel32.FreeLibrary.restype = ctypes.wintypes.BOOL
+    kernel32.CreateFileW.argtypes = [
+        ctypes.wintypes.LPCWSTR,
+        ctypes.wintypes.DWORD,
+        ctypes.wintypes.DWORD,
+        ctypes.wintypes.LPVOID,
+        ctypes.wintypes.DWORD,
+        ctypes.wintypes.DWORD,
+        ctypes.wintypes.HANDLE,
+    ]
+    kernel32.CreateFileW.restype = ctypes.wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
+    kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
     return kernel32
 
 
@@ -210,6 +227,31 @@ def _retry_transient(operation: Callable[[], None]) -> None:
             delay *= 2
         else:
             return
+
+
+def _require_exclusive_access(executable: Path) -> None:
+    """Fail unless *executable* can be opened for writing with no other holder.
+
+    `BeginUpdateResourceW` reports a holder only once the commit has already
+    rewritten the image, which is the expensive moment to discover it. Asking
+    for the file with an empty share mode asks the same question first and for
+    nothing: a scanner or indexer still on the bytes answers with one of the
+    transient codes the retry above waits out, and a genuine denial answers
+    with its own code before any resource is touched.
+    """
+    kernel32 = _kernel32()
+    handle = kernel32.CreateFileW(
+        os.fspath(executable),
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        None,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        None,
+    )
+    if not handle or handle == INVALID_HANDLE_VALUE:
+        _raise_win32("opening for exclusive access", executable)
+    kernel32.CloseHandle(handle)
 
 
 def _group_data(images: tuple[IconImage, ...]) -> bytes:
@@ -399,12 +441,13 @@ def stamp_resources(executable: Path, icon: Path, info: VersionInfo) -> None:
     )
 
     def stamp() -> None:
+        _require_exclusive_access(executable)
         _commit_resources(executable, updates)
         verify_icon(executable, icon)
         verify_version_info(executable, info)
 
-    # Verification reads the image back, so it collides with a holder just as
-    # the commit does; both belong inside the same retry. Re-stamping is
+    # The access probe, the commit, and the read-back that verifies it all
+    # collide with a holder, so all three belong inside the same retry. Re-stamping is
     # idempotent, and a mismatch is not a Win32 failure and is never retried.
     _retry_transient(stamp)
 

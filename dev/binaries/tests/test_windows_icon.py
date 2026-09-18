@@ -18,10 +18,16 @@ from dev.binaries.build_pyapp import (
     publish_asset,
 )
 from dev.binaries.windows_icon import (
+    FILE_ATTRIBUTE_NORMAL,
+    GENERIC_READ,
+    GENERIC_WRITE,
+    OPEN_EXISTING,
     RESOURCE_ATTEMPTS,
     TRANSIENT_WIN32_ERRORS,
     IconResourceError,
     Win32ResourceError,
+    _kernel32,
+    _require_exclusive_access,
     _retry_transient,
     parse_ico,
     verify_icon,
@@ -172,3 +178,47 @@ def test_a_resource_mismatch_is_never_retried() -> None:
         _retry_transient(commit)
 
     assert attempts == 1
+
+
+windows_only = pytest.mark.skipif(
+    sys.platform != "win32", reason="Win32 file sharing semantics"
+)
+
+
+@windows_only
+def test_an_unheld_executable_passes_the_access_probe(tmp_path: Path) -> None:
+    """The file the builder just wrote is its own, and the probe says so."""
+    executable = tmp_path / "unheld.exe"
+    shutil.copy2(sys.executable, executable)
+
+    _require_exclusive_access(executable)
+
+
+@windows_only
+def test_a_held_executable_is_refused_before_any_resource_is_touched(
+    tmp_path: Path,
+) -> None:
+    """A holder is found by the probe, with a code the retry waits out."""
+    executable = tmp_path / "held.exe"
+    shutil.copy2(sys.executable, executable)
+    before = executable.read_bytes()
+    kernel32 = _kernel32()
+    handle = kernel32.CreateFileW(
+        str(executable),
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        None,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        None,
+    )
+    assert handle
+
+    try:
+        with pytest.raises(Win32ResourceError) as held:
+            _require_exclusive_access(executable)
+    finally:
+        kernel32.CloseHandle(handle)
+
+    assert held.value.code in TRANSIENT_WIN32_ERRORS
+    assert executable.read_bytes() == before
