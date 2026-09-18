@@ -16,6 +16,10 @@ name: Core Release
 # verify --signer-workflow` pins the workflow that signed; both name those two
 # files, and a call from here would make this file the top-level workflow of
 # the publication. Each stays dispatchable on its own to repair one lane.
+#
+# They are also dispatched IN SEQUENCE, not side by side. This file dispatches
+# the binaries build alone, and binaries.yml dispatches publish.yml once every
+# declared target has attached and verified. See the step below.
 
 on:
   workflow_dispatch:
@@ -66,9 +70,21 @@ jobs:
       TAG: ${{ inputs.tag }}
       ALLOW_QUEUE: ${{ inputs.allow_queue }}
     steps:
-      - name: Dispatch PyPI publish workflow
-        run: gh workflow run publish.yml --repo "${GITHUB_REPOSITORY}" --ref "${TAG}" -f "tag=${TAG}"
-
+      # ONE dispatch, where there used to be two side by side.
+      #
+      # PyPI publication is the only irreversible step in this lane: a version
+      # number is spent the moment it lands on the index, and no amount of
+      # re-dispatching takes it back. Dispatched beside the binaries build, it
+      # raced a build that could still fail - and did, which is how a version
+      # can reach PyPI with no binaries behind it. The reverse order is
+      # repairable: binaries without a PyPI release are one dispatch from
+      # whole.
+      #
+      # So publish.yml is now dispatched by binaries.yml, from the same gate
+      # that judges whether every declared target attached and verified. That
+      # gate is the first point at which publishing is known to be publishing
+      # something complete.
+      #
       # `--ref main` resolves the build matrix from current policy, while
       # binaries.yml checks out `inputs.tag` for the source.
       - name: Dispatch binaries build workflow

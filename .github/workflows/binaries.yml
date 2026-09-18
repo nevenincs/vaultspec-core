@@ -1593,6 +1593,25 @@ jobs:
             echo "::warning::could not dispatch the acquisition check for ${TAG}; its weekly run still covers this release"
           fi
 
+      # THE PUBLICATION GATE. release.yml used to dispatch publish.yml beside
+      # this whole workflow, so PyPI - the one step no re-dispatch can take
+      # back - raced a build that could still fail. Here it cannot: this step
+      # is reached only when the gate above found every declared target
+      # attached, and when the release job that attached them succeeded.
+      #
+      # `--ref "${TAG}"` deliberately, matching the dispatch it replaces. PyPI
+      # trusted publishing matches the top-level workflow of the run and
+      # `gh attestation verify --signer-workflow` pins the file that signed, so
+      # publish.yml must stay the top-level workflow of its own run and must be
+      # read from the released tree.
+      #
+      # Safe to re-dispatch. `uv publish --check-url` skips a file the index
+      # already carries, so repairing the binaries of an already-published
+      # version re-runs this without a duplicate-upload failure.
+      - name: Publish the distribution now the binaries are proven
+        if: ${{ success() }}
+        run: gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "${TAG}" -f "tag=${TAG}"
+
       - name: Promote a repaired release back to latest
         if: ${{ success() }}
         shell: bash
