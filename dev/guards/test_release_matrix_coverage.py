@@ -121,13 +121,22 @@ def test_linux_offline_gate_runs_the_extracted_bundle() -> None:
     assert '"${ARTIFACTS}"/vaultspec-core --version' in workflow
 
 
-def test_release_holds_latest_until_target_bundles_are_complete() -> None:
-    """The release state is held and the completeness gate precedes upload."""
+def test_release_withholds_publication_until_target_bundles_are_complete() -> None:
+    """The completeness gate precedes upload, and nothing publishes before it.
+
+    The release is held as a draft rather than held out of `latest`, so what
+    has to be true is no longer that a step demotes it - it is that no step in
+    this workflow publishes it at all. Publication is the publication lane's
+    last act, after the distribution it alone attaches.
+    """
     workflow = (WORKFLOWS / "binaries.yml").read_text(encoding="utf-8")
-    hold = workflow.index("name: Hold release out of latest during validation")
     complete = workflow.index("name: Assert every declared target attached")
     upload = workflow.index("name: Upload to release")
-    assert hold < upload
     assert complete < upload
+    assert "--draft=false" not in workflow, (
+        "the binaries lane publishes the release, but the distribution is "
+        "attached after it by the publication lane - publishing here would "
+        "seal the release without it"
+    )
     verification = workflow.index("verify-release-assets:")
     assert "runs-on: ubuntu-latest" in workflow[verification:]

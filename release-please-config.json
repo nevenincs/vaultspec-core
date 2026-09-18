@@ -4,6 +4,8 @@
     ".": {
       "release-type": "python",
       "package-name": "vaultspec-core",
+      "draft": true,
+      "force-tag-creation": true,
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
       "changelog-sections": [
