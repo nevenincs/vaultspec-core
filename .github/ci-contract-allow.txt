@@ -13,6 +13,7 @@
 # hand-written re-implementation of it. Replacing it with the render is a
 # one-commit change and is the next thing to do here.
 binaries.yml:Every matrix selector has an online runner
+binaries.yml:Trust the runner's workspace
 binaries.yml:Return the workspace to the runner's user
 binaries.yml:Clear evidence left by an earlier run on this machine
 binaries.yml:Restore the execute bit
