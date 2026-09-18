@@ -11,10 +11,12 @@ import ctypes.wintypes
 import os
 import struct
 import sys
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 RT_ICON = 3
@@ -26,9 +28,34 @@ LANG_NEUTRAL = 0
 LOAD_LIBRARY_AS_DATAFILE = 0x00000002
 LOAD_LIBRARY_AS_IMAGE_RESOURCE = 0x00000020
 
+# Committing a resource update rewrites the executable in place, so anything
+# still holding the image - a real-time virus scanner walking the bytes the
+# previous commit just wrote, an indexer, a sibling build - makes Win32 refuse
+# the replacement. The refusal is transient by nature: the holder is finishing
+# a scan, not claiming the file. These are the codes that mean "someone else
+# has it right now" rather than "you may not have it at all".
+TRANSIENT_WIN32_ERRORS = frozenset(
+    {
+        5,  # ERROR_ACCESS_DENIED
+        32,  # ERROR_SHARING_VIOLATION
+        33,  # ERROR_LOCK_VIOLATION
+        1224,  # ERROR_USER_MAPPED_FILE
+    }
+)
+RESOURCE_ATTEMPTS = 6
+RESOURCE_BACKOFF_SECONDS = 0.5
+
 
 class IconResourceError(RuntimeError):
     """An ICO is invalid or a PE icon could not be stamped exactly."""
+
+
+class Win32ResourceError(IconResourceError):
+    """A Win32 resource call failed, carrying the code it reported."""
+
+    def __init__(self, message: str, code: int) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -163,7 +190,26 @@ def _raise_win32(action: str, path: Path) -> None:
     windows_ctypes = cast("Any", ctypes)
     code = windows_ctypes.get_last_error()
     detail = windows_ctypes.FormatError(code).strip()
-    raise IconResourceError(f"{action} {path} failed: [{code}] {detail}")
+    raise Win32ResourceError(f"{action} {path} failed: [{code}] {detail}", code)
+
+
+def _retry_transient(operation: Callable[[], None]) -> None:
+    """Run *operation*, retrying while Win32 reports the file as held.
+
+    A scanner that has the executable open releases it on its own, so the only
+    thing the builder can do about the collision is stand back and ask again.
+    """
+    delay = RESOURCE_BACKOFF_SECONDS
+    for attempt in range(1, RESOURCE_ATTEMPTS + 1):
+        try:
+            operation()
+        except Win32ResourceError as error:
+            if error.code not in TRANSIENT_WIN32_ERRORS or attempt == RESOURCE_ATTEMPTS:
+                raise
+            time.sleep(delay)
+            delay *= 2
+        else:
+            return
 
 
 def _group_data(images: tuple[IconImage, ...]) -> bytes:
@@ -311,64 +357,56 @@ def _update_resource(
         _raise_win32(f"updating resource {kind}/{resource_id} in", executable)
 
 
-def stamp_icon(executable: Path, icon: Path) -> None:
-    """Replace the primary PE icon with *icon* and verify the committed bytes."""
+def _commit_resources(
+    executable: Path, updates: tuple[tuple[int, int, bytes], ...]
+) -> None:
+    """Apply every *update* to *executable* in one resource transaction."""
+    kernel32 = _kernel32()
+    handle = kernel32.BeginUpdateResourceW(os.fspath(executable), False)
+    if not handle:
+        _raise_win32("opening resources in", executable)
+    try:
+        for kind, resource_id, payload in updates:
+            _update_resource(kernel32, handle, kind, resource_id, payload, executable)
+    except BaseException:
+        kernel32.EndUpdateResourceW(handle, True)
+        raise
+    # A failed commit has already closed the handle, so discarding here would
+    # be a second close of a handle Win32 no longer owns.
+    if not kernel32.EndUpdateResourceW(handle, False):
+        _raise_win32("committing resources in", executable)
+
+
+def stamp_resources(executable: Path, icon: Path, info: VersionInfo) -> None:
+    """Stamp *icon* and *info* into *executable* and verify the committed bytes.
+
+    Both resources go in one transaction. Two transactions would publish the
+    executable twice, and the second commit would then be racing the scanner
+    the first commit woke - which is how the release builder used to fail with
+    an access denial on a file nobody had taken away from it.
+    """
     if not executable.is_file():
         raise IconResourceError(f"Windows executable does not exist: {executable}")
     images = parse_ico(icon)
-    kernel32 = _kernel32()
-    handle = kernel32.BeginUpdateResourceW(os.fspath(executable), False)
-    if not handle:
-        _raise_win32("opening resources in", executable)
-    committed = False
-    try:
-        for resource_id, image in enumerate(images, start=1):
-            _update_resource(
-                kernel32, handle, RT_ICON, resource_id, image.payload, executable
-            )
-        _update_resource(
-            kernel32,
-            handle,
-            RT_GROUP_ICON,
-            PRIMARY_ICON_GROUP,
-            _group_data(images),
-            executable,
-        )
-        if not kernel32.EndUpdateResourceW(handle, False):
-            _raise_win32("committing resources in", executable)
-        committed = True
-    finally:
-        if not committed:
-            kernel32.EndUpdateResourceW(handle, True)
-    verify_icon(executable, icon)
-
-
-def stamp_version_info(executable: Path, info: VersionInfo) -> None:
-    """Replace the primary PE version resource with *info* and verify it."""
-    if not executable.is_file():
-        raise VersionResourceError(f"Windows executable does not exist: {executable}")
     payload = version_resource(info)
-    kernel32 = _kernel32()
-    handle = kernel32.BeginUpdateResourceW(os.fspath(executable), False)
-    if not handle:
-        _raise_win32("opening resources in", executable)
-    committed = False
-    try:
-        _update_resource(
-            kernel32,
-            handle,
-            RT_VERSION,
-            VERSION_RESOURCE_ID,
-            payload,
-            executable,
-        )
-        if not kernel32.EndUpdateResourceW(handle, False):
-            _raise_win32("committing resources in", executable)
-        committed = True
-    finally:
-        if not committed:
-            kernel32.EndUpdateResourceW(handle, True)
-    verify_version_info(executable, info)
+    updates = (
+        *(
+            (RT_ICON, resource_id, image.payload)
+            for resource_id, image in enumerate(images, start=1)
+        ),
+        (RT_GROUP_ICON, PRIMARY_ICON_GROUP, _group_data(images)),
+        (RT_VERSION, VERSION_RESOURCE_ID, payload),
+    )
+
+    def stamp() -> None:
+        _commit_resources(executable, updates)
+        verify_icon(executable, icon)
+        verify_version_info(executable, info)
+
+    # Verification reads the image back, so it collides with a holder just as
+    # the commit does; both belong inside the same retry. Re-stamping is
+    # idempotent, and a mismatch is not a Win32 failure and is never retried.
+    _retry_transient(stamp)
 
 
 def _read_resource(

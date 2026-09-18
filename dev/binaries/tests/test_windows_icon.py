@@ -6,6 +6,7 @@ import hashlib
 import shutil
 import struct
 import sys
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,7 +18,11 @@ from dev.binaries.build_pyapp import (
     publish_asset,
 )
 from dev.binaries.windows_icon import (
+    RESOURCE_ATTEMPTS,
+    TRANSIENT_WIN32_ERRORS,
     IconResourceError,
+    Win32ResourceError,
+    _retry_transient,
     parse_ico,
     verify_icon,
     verify_version_info,
@@ -96,3 +101,74 @@ def test_real_pe_stamp_is_exact_and_precedes_checksum(tmp_path: Path) -> None:
         checksum.read_text(encoding="utf-8").split()[0]
         == hashlib.sha256(stamped).hexdigest()
     )
+
+
+def _no_wait(seconds: float) -> None:
+    """Stand in for the backoff so the retry policy is tested, not the clock."""
+
+
+@pytest.mark.parametrize("code", sorted(TRANSIENT_WIN32_ERRORS))
+def test_a_held_executable_is_stamped_once_the_holder_lets_go(
+    code: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A scanner holding the image delays the commit, it does not fail it."""
+    monkeypatch.setattr(time, "sleep", _no_wait)
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts < RESOURCE_ATTEMPTS:
+            raise Win32ResourceError(f"committing resources failed: [{code}]", code)
+
+    _retry_transient(commit)
+
+    assert attempts == RESOURCE_ATTEMPTS
+
+
+def test_a_holder_that_never_lets_go_fails_the_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Retrying is bounded: a permanent denial still stops the release."""
+    monkeypatch.setattr(time, "sleep", _no_wait)
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise Win32ResourceError("committing resources failed: [5]", 5)
+
+    with pytest.raises(Win32ResourceError, match=r"\[5\]"):
+        _retry_transient(commit)
+
+    assert attempts == RESOURCE_ATTEMPTS
+
+
+def test_a_permission_failure_is_not_retried() -> None:
+    """Only the codes that mean "someone else has it" are worth waiting out."""
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise Win32ResourceError("opening resources failed: [2]", 2)
+
+    with pytest.raises(Win32ResourceError, match=r"\[2\]"):
+        _retry_transient(commit)
+
+    assert attempts == 1
+
+
+def test_a_resource_mismatch_is_never_retried() -> None:
+    """A wrong stamp is a defect in the payload, not a collision to wait out."""
+    attempts = 0
+
+    def commit() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise IconResourceError("primary icon group does not match")
+
+    with pytest.raises(IconResourceError):
+        _retry_transient(commit)
+
+    assert attempts == 1
