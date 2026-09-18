@@ -6,7 +6,6 @@ import hashlib
 import shutil
 import struct
 import sys
-import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -110,15 +109,12 @@ def test_real_pe_stamp_is_exact_and_precedes_checksum(tmp_path: Path) -> None:
 
 
 def _no_wait(seconds: float) -> None:
-    """Stand in for the backoff so the retry policy is tested, not the clock."""
+    """Spend no time on the backoff, so the policy is asserted, not the clock."""
 
 
 @pytest.mark.parametrize("code", sorted(TRANSIENT_WIN32_ERRORS))
-def test_a_held_executable_is_stamped_once_the_holder_lets_go(
-    code: int, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_held_executable_is_stamped_once_the_holder_lets_go(code: int) -> None:
     """A scanner holding the image delays the commit, it does not fail it."""
-    monkeypatch.setattr(time, "sleep", _no_wait)
     attempts = 0
 
     def commit() -> None:
@@ -127,16 +123,13 @@ def test_a_held_executable_is_stamped_once_the_holder_lets_go(
         if attempts < RESOURCE_ATTEMPTS:
             raise Win32ResourceError(f"committing resources failed: [{code}]", code)
 
-    _retry_transient(commit)
+    _retry_transient(commit, wait=_no_wait)
 
     assert attempts == RESOURCE_ATTEMPTS
 
 
-def test_a_holder_that_never_lets_go_fails_the_build(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_a_holder_that_never_lets_go_fails_the_build() -> None:
     """Retrying is bounded: a permanent denial still stops the release."""
-    monkeypatch.setattr(time, "sleep", _no_wait)
     attempts = 0
 
     def commit() -> None:
@@ -145,7 +138,7 @@ def test_a_holder_that_never_lets_go_fails_the_build(
         raise Win32ResourceError("committing resources failed: [5]", 5)
 
     with pytest.raises(Win32ResourceError, match=r"\[5\]"):
-        _retry_transient(commit)
+        _retry_transient(commit, wait=_no_wait)
 
     assert attempts == RESOURCE_ATTEMPTS
 
@@ -180,21 +173,23 @@ def test_a_resource_mismatch_is_never_retried() -> None:
     assert attempts == 1
 
 
-windows_only = pytest.mark.skipif(
-    sys.platform != "win32", reason="Win32 file sharing semantics"
-)
-
-
-@windows_only
+# The probe below is Win32 file-sharing behaviour, so the two cases assert
+# what the host they run on actually does rather than standing down on the
+# ones that are not Windows. Off Windows the loader refuses first, which is a
+# real guarantee of its own: nothing here silently does nothing.
 def test_an_unheld_executable_passes_the_access_probe(tmp_path: Path) -> None:
     """The file the builder just wrote is its own, and the probe says so."""
     executable = tmp_path / "unheld.exe"
     shutil.copy2(sys.executable, executable)
 
+    if sys.platform != "win32":
+        with pytest.raises(IconResourceError, match="only be updated on Windows"):
+            _require_exclusive_access(executable)
+        return
+
     _require_exclusive_access(executable)
 
 
-@windows_only
 def test_a_held_executable_is_refused_before_any_resource_is_touched(
     tmp_path: Path,
 ) -> None:
@@ -202,6 +197,13 @@ def test_a_held_executable_is_refused_before_any_resource_is_touched(
     executable = tmp_path / "held.exe"
     shutil.copy2(sys.executable, executable)
     before = executable.read_bytes()
+
+    if sys.platform != "win32":
+        with pytest.raises(IconResourceError, match="only be updated on Windows"):
+            _require_exclusive_access(executable)
+        assert executable.read_bytes() == before
+        return
+
     kernel32 = _kernel32()
     handle = kernel32.CreateFileW(
         str(executable),

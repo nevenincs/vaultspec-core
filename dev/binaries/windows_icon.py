@@ -210,11 +210,17 @@ def _raise_win32(action: str, path: Path) -> None:
     raise Win32ResourceError(f"{action} {path} failed: [{code}] {detail}", code)
 
 
-def _retry_transient(operation: Callable[[], None]) -> None:
+def _retry_transient(
+    operation: Callable[[], None], wait: Callable[[float], None] = time.sleep
+) -> None:
     """Run *operation*, retrying while Win32 reports the file as held.
 
     A scanner that has the executable open releases it on its own, so the only
     thing the builder can do about the collision is stand back and ask again.
+
+    *wait* is the backoff, taken as an argument so the retry policy can be
+    asserted against a caller that does not spend the delay. The builder never
+    passes it.
     """
     delay = RESOURCE_BACKOFF_SECONDS
     for attempt in range(1, RESOURCE_ATTEMPTS + 1):
@@ -223,7 +229,7 @@ def _retry_transient(operation: Callable[[], None]) -> None:
         except Win32ResourceError as error:
             if error.code not in TRANSIENT_WIN32_ERRORS or attempt == RESOURCE_ATTEMPTS:
                 raise
-            time.sleep(delay)
+            wait(delay)
             delay *= 2
         else:
             return
