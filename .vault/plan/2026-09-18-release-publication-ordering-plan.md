@@ -8,7 +8,7 @@ related:
   - '[[2026-09-18-release-publication-ordering-adr]]'
 modified: '2026-09-18'
 body_schema: body-v2
-body_hash: 'sha256:250560320edb4ce8f5112cb56b30b8c9bb187700705ce7eacff0523a0b5151ba'
+body_hash: 'sha256:3736eaa9173f4f7ff800db010afa4642f707f4bc1ac0c1e5902931e000868828'
 ---
 
 # `release-publication-ordering` plan
@@ -43,10 +43,10 @@ dispatches it.
 
 ## Steps
 
-- [ ] `S01` - Hold the release as a draft with a forced tag; `release-please-config.json, dev/guards/test_automation_contracts.py`.
-- [ ] `S02` - Publish the proven draft and retire the demote-and-promote path; `.github/workflows/binaries.yml, dev/guards/test_automation_contracts.py`.
-- [ ] `S03` - Describe the release lane as it now runs; `docs/README.md`.
-- [ ] `S04` - Re-enable immutable releases on the repository; `GitHub repository setting, no tracked file`.
+- [x] `S01` - Hold the release as a draft with a forced tag; `release-please-config.json, dev/guards/test_automation_contracts.py`.
+- [x] `S02` - Publish the proven draft last and retire the prerelease holding path; `.github/workflows/binaries.yml, .github/workflows/publish.yml, dev/guards/test_automation_contracts.py`.
+- [x] `S03` - Describe the release lane as it now runs; `docs/README.md`.
+- [x] `S04` - Re-enable immutable releases on the repository; `GitHub repository setting, no tracked file`.
 - [ ] `S05` - Repair the empty v0.2.2 release; `GitHub release object, no tracked file`.
 
 ## Parallelization
