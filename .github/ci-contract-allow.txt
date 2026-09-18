@@ -40,9 +40,8 @@ code-health.yml:Smoke test the built wheel on Python 3.14
 merge-gate.yml:Judge the merge readiness
 release-please.yml:Regenerate and push uv.lock onto the release branch
 release-please.yml:Open a reconciling pull request when the lockfile drifted
-binaries.yml:Ask the acquisition check to try this release
-binaries.yml:Promote a repaired release back to latest
-binaries.yml:Require artifacts on the published release
+publish.yml:Ask the acquisition check to try this release
+binaries.yml:Require every declared target on the draft release
 binaries.yml:Assert every declared target attached
 
 # --- pending ----------------------------------------------------------------

@@ -1067,17 +1067,6 @@ jobs:
           persist-credentials: false
           ref: main
 
-      # A release-please release exists before this workflow starts. Hold it
-      # out of `latest` while the target archive set is being checked; the
-      # independent verification job promotes a complete stable release after
-      # this job succeeds.
-      - name: Hold release out of latest during validation
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: gh release edit "${TAG}" --repo "$GITHUB_REPOSITORY" --prerelease
-
       # The ORG-WIDE distribution repository, which is where Scoop manifests
       # and Homebrew formulae belong. `nevenincs/homebrew-tap` serves both
       # package managers for every product under the account, so a user taps or
@@ -1222,9 +1211,10 @@ jobs:
           echo "gh can verify attestations and pin a signer workflow"
 
       # The target matrix is complete before the first release mutation. A
-      # partial archive set must remain out of the release; the independent
-      # verification job below still demotes a pre-existing release if this
-      # job fails before reaching this gate.
+      # partial archive set must remain out of the release; if this job fails
+      # before reaching this gate, the independent verification job below
+      # refuses to hand the draft on to the publication lane, and the release
+      # is never published.
       - name: Assert every declared target attached
         shell: bash
         env:
@@ -1462,28 +1452,27 @@ jobs:
             git rebase origin/main
             attempt=$((attempt + 1))
           done
-  # A release with no artifacts must not serve as `latest`.
+  # A release with no artifacts must not exist.
   #
-  # This is the fault that cost two releases today. vaultspec-core-v0.1.61 was
-  # published by release-please, Binaries had not been dispatched for it, and the
-  # empty release immediately became `latest` - where the README badges, the
-  # install prose and the channel manifests all point. Nothing went red, because
-  # nothing was watching. vaultspec-rag-v0.4.11 did the same thing an hour later.
+  # This guard was written for a weaker claim - that such a release must not
+  # serve as `latest` - after vaultspec-core-v0.1.61 was published by
+  # release-please with Binaries never dispatched for it, and the empty release
+  # immediately became `latest`, where the README badges, the install prose and
+  # the channel manifests all point. Nothing went red, because nothing was
+  # watching. vaultspec-rag-v0.4.11 did the same thing an hour later.
   #
-  # Ported from vaultspec-dashboard, which already carries this guard, adapted to
-  # this repo's dispatch-driven shape: there is no `plan` job here, so the tag
-  # itself says whether a prerelease was intended.
-  #
-  # Demotion is reversible and lossless. A prerelease keeps the tag, the notes
-  # and the URL intact and reachable; it only stops that release answering as
-  # `latest`. Re-dispatch after fixing the build and the promote step undoes it.
+  # The release is created as a draft now, so this job judges something nobody
+  # can see yet and the verdict is simply whether the lane may go on to publish
+  # it. What used to demote an incomplete release and promote a repaired one is
+  # gone with the state it managed: a draft is already invisible to `latest`,
+  # and an incomplete one stays a draft.
   verify-release-assets:
     timeout-minutes: 30
     name: "Check: Release proven (Linux)"
     needs: release
     if: ${{ always() }}
     # This is release bookkeeping only, so keep it independent of the
-    # constrained build fleet. It must be able to demote an incomplete release
+    # constrained build fleet. It must be able to judge an incomplete release
     # even when a build runner is offline or queued.
     runs-on: ubuntu-latest
     permissions:
@@ -1512,13 +1501,19 @@ jobs:
       #
       # A complete asset set is not by itself a good release. The release job
       # also verifies provenance after attachment; `needs.release.result`
-      # therefore participates in the verdict so failed verification cannot
-      # be followed by promotion to `latest`.
+      # therefore participates in the verdict, so failed verification cannot be
+      # followed by a publication.
+      #
+      # THIS JUDGES A DRAFT. The release is unpublished until the publication
+      # lane flips it, so an incomplete one is not a live defect to be demoted
+      # and later promoted - it is a draft nobody can see, and this job simply
+      # refuses to let it go further. That is why nothing here edits the
+      # release's flags any more.
       #
       # Re-dispatch can repair this workflow because it resolves from the
       # dispatch ref, but build source remains the tag. Workflow-level repairs
       # can reach an older tag; source-level repairs require a new release.
-      - name: Require artifacts on the published release
+      - name: Require every declared target on the draft release
         shell: bash
         run: |
           set -euo pipefail
@@ -1542,12 +1537,7 @@ jobs:
           if [ ${#missing[@]} -eq 0 ]; then
             echo "all ${#expected[@]} declared target(s) present on ${TAG}"
             if [ "${RELEASE_RESULT}" != "success" ]; then
-              echo "::warning::${TAG} carries every declared target, but the release job ended '${RELEASE_RESULT}'"
-              if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
-                gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
-                echo "::notice::demoted ${TAG} to a prerelease so latest skips it"
-              fi
-              echo "::error::${TAG} has every declared asset but its release job ended '${RELEASE_RESULT}' - provenance verification or the channel pointers did not complete. Demoted so it cannot serve as latest. Read the release job's log, fix, and re-dispatch."
+              echo "::error::${TAG} has every declared asset but its release job ended '${RELEASE_RESULT}' - provenance verification or the channel pointers did not complete. The release stays a draft. Read the release job's log, fix, and re-dispatch."
               exit 1
             fi
             exit 0
@@ -1555,76 +1545,32 @@ jobs:
 
           echo "::warning::${TAG} is missing: ${missing[*]}"
           echo "::error::Re-dispatch repairs a fix to THIS FILE (use --ref main), not a fix to tracked source. A source-level build fix needs a new release."
-
-          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY"                   --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
-            echo "::notice::demoted ${TAG} to a prerelease so latest skips it"
-          fi
-
-          echo "::error::${TAG} is INCOMPLETE - missing ${missing[*]} (release job=${RELEASE_RESULT}). It has been demoted to a prerelease so it cannot serve as latest. Fix the build and re-dispatch this workflow for this tag; the next step promotes it back once every declared target attaches."
+          echo "::error::${TAG} is INCOMPLETE - missing ${missing[*]} (release job=${RELEASE_RESULT}). It stays a draft, so nothing has been advertised. Fix the build and re-dispatch this workflow for this tag."
           exit 1
 
-      # Undo an earlier demotion once a re-dispatch actually attaches something.
-      # Without this a repaired release stays invisible to `latest` forever.
+      # THE HANDOFF. release.yml used to dispatch publish.yml beside this whole
+      # workflow, so PyPI - the one step no re-dispatch can take back - raced a
+      # build that could still fail. Here it cannot: this step is reached only
+      # when the gate above found every declared target on the draft, and when
+      # the release job that attached them succeeded.
       #
-      # The tag decides whether promotion is wanted. release-please publishes
-      # full releases here, so anything carrying a prerelease marker in its name
-      # was meant to be one and must not be promoted into `latest` by a guard
-      # that only knows about assets.
-      # The acquisition check cannot see this release by itself. A release
-      # published with the default token raises no workflow events, so its
-      # `release: published` trigger never fires for anything this lane
-      # produces - only its weekly schedule does, which is days of blindness
-      # after every release. A dispatch is explicitly exempt from that rule,
-      # which is why the binaries build is dispatched rather than waiting on a
-      # tag push, and this is the same move for the same reason.
+      # publish.yml finishes the release. It attaches the wheel and sdist to
+      # the same draft, publishes to PyPI, verifies what it attached, and only
+      # then takes the release out of draft. That is why nothing here publishes
+      # the release or dispatches the acquisition check: at this point the
+      # release is still missing the distribution, and a release published
+      # before publish.yml has attached it could not receive it afterwards
+      # under immutable releases.
       #
-      # A failure to dispatch does not fail the release: the artifacts are
-      # already attached and verified by this point, and the weekly run still
-      # covers the release eventually. It warns rather than passing silently.
-      - name: Ask the acquisition check to try this release
-        if: ${{ success() }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh workflow run acquisition.yml --repo "$GITHUB_REPOSITORY"                --ref "${GITHUB_REF_NAME}" -f tag="$TAG"; then
-            echo "dispatched the acquisition check for ${TAG}"
-          else
-            echo "::warning::could not dispatch the acquisition check for ${TAG}; its weekly run still covers this release"
-          fi
-
-      # THE PUBLICATION GATE. release.yml used to dispatch publish.yml beside
-      # this whole workflow, so PyPI - the one step no re-dispatch can take
-      # back - raced a build that could still fail. Here it cannot: this step
-      # is reached only when the gate above found every declared target
-      # attached, and when the release job that attached them succeeded.
-      #
-      # `--ref "${TAG}"` deliberately, matching the dispatch it replaces. PyPI
-      # trusted publishing matches the top-level workflow of the run and
-      # `gh attestation verify --signer-workflow` pins the file that signed, so
-      # publish.yml must stay the top-level workflow of its own run and must be
-      # read from the released tree.
+      # `--ref "${TAG}"` deliberately. PyPI trusted publishing matches the
+      # top-level workflow of the run and `gh attestation verify
+      # --signer-workflow` pins the file that signed, so publish.yml must stay
+      # the top-level workflow of its own run and must be read from the
+      # released tree.
       #
       # Safe to re-dispatch. `uv publish --check-url` skips a file the index
       # already carries, so repairing the binaries of an already-published
       # version re-runs this without a duplicate-upload failure.
-      - name: Publish the distribution now the binaries are proven
+      - name: Hand the proven draft to the publication lane
         if: ${{ success() }}
         run: gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "${TAG}" -f "tag=${TAG}"
-
-      - name: Promote a repaired release back to latest
-        if: ${{ success() }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          case "${TAG}" in
-            *-rc*|*-alpha*|*-beta*|*-dev*)
-              echo "${TAG} names a prerelease; leaving its flag alone"
-              exit 0
-              ;;
-          esac
-          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
-                  --json isPrerelease --jq '.isPrerelease')" = "true" ]; then
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false
-            echo "::notice::promoted ${TAG} back to a full release"
-          fi

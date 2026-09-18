@@ -1498,3 +1498,64 @@ def test_pypi_is_published_only_once_every_binary_is_proven() -> None:
         "the publication dispatch must be conditioned on the gate succeeding, "
         "or an incomplete release publishes to PyPI anyway"
     )
+
+
+def test_the_release_is_published_last_and_only_once() -> None:
+    """One step takes the release out of draft, after everything that fills it.
+
+    The release is created unpublished and every lane attaches to that draft,
+    so the flip to published is the statement that the release is complete. It
+    belongs at the end of the publication lane - the last thing to attach is
+    the distribution - and nowhere else.
+    """
+    publish = cast(
+        "dict[str, dict[str, dict[str, object]]]",
+        yaml.safe_load(_read(".github/workflows/publish.yml")),
+    )
+    steps = cast("list[dict[str, object]]", publish["jobs"]["publish-pypi"]["steps"])
+    names = [str(step.get("name", "")) for step in steps]
+    runs = [str(step.get("run", "")) for step in steps]
+
+    publishing = [i for i, run in enumerate(runs) if "--draft=false" in run]
+    assert len(publishing) == 1, (
+        f"exactly one step must publish the release; found {len(publishing)}"
+    )
+
+    attaching = next(i for i, run in enumerate(runs) if "gh release upload" in run)
+    assert attaching < publishing[0], (
+        "the distribution is attached after the release is published, which "
+        "immutable releases forbid outright"
+    )
+
+    pypi = next(i for i, run in enumerate(runs) if "uv publish" in run)
+    assert pypi < publishing[0], (
+        "the release is published before PyPI. Both steps are one-way, but a "
+        "failed upload should leave an unpublished draft rather than a release "
+        "advertising a version the index does not carry"
+    )
+
+    acquisition = next(
+        i for i, run in enumerate(runs) if "gh workflow run acquisition.yml" in run
+    )
+    assert acquisition > publishing[0], (
+        f"the acquisition check ({names[acquisition]}) is asked to acquire a "
+        "release that is still a draft; it acquires unauthenticated and cannot "
+        "see one"
+    )
+
+
+def test_an_incomplete_release_is_never_edited_into_shape() -> None:
+    """No lane demotes, promotes, or holds a release with the prerelease flag.
+
+    That machinery existed because the release was published before its assets
+    and had to be walked back. A draft cannot reach those states, so the
+    mechanism has no domain left - and a dormant recovery path is
+    indistinguishable from a working one until the day it is needed.
+    """
+    for name in ("binaries.yml", "publish.yml", "release.yml"):
+        source = _read(f".github/workflows/{name}")
+        assert "--prerelease" not in source, (
+            f"{name} still edits a release's prerelease flag. The release is "
+            "held as a draft now; holding it out of `latest` as well publishes "
+            "it as a prerelease, because nothing promotes it back any more"
+        )
