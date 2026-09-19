@@ -126,8 +126,7 @@ class TestLoader:
         )
         # A CLI-lifecycle hook (non-canonical event) must be ignored here.
         (tmp_path / "lifecycle.yaml").write_text(
-            "event: vault.document.created\n"
-            "actions:\n  - type: shell\n    command: echo doc\n",
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo doc\n",
             encoding="utf-8",
         )
         specs = load_provider_hook_specs(tmp_path)
@@ -206,8 +205,7 @@ class TestLaneSeparation:
         self, tmp_path: Path
     ):
         (tmp_path / "doc.yaml").write_text(
-            "event: vault.document.created\n"
-            "actions:\n  - type: shell\n    command: echo doc\n",
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo doc\n",
             encoding="utf-8",
         )
 
@@ -234,12 +232,11 @@ class TestLaneSeparation:
         from vaultspec_core.triggers import load_triggers
 
         (tmp_path / "doc.yaml").write_text(
-            "event: vault.document.created\n"
-            "actions:\n  - type: shell\n    command: echo doc\n",
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo doc\n",
             encoding="utf-8",
         )
 
-        assert {t.event for t in load_triggers(tmp_path)} == {"vault.document.created"}
+        assert {t.event for t in load_triggers(tmp_path)} == {"config.synced"}
 
 
 class TestEndToEndSync:

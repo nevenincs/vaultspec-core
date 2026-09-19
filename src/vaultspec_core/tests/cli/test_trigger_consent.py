@@ -91,7 +91,7 @@ class TestNonInteractiveRunsFailClosed:
 
         result = runner.invoke(
             app,
-            ["spec", "hooks", "run", EVENT, "--target", str(root)],
+            ["spec", "triggers", "run", EVENT, "--target", str(root)],
             input="",
             env=attended_env(home),
         )
@@ -126,7 +126,7 @@ class TestNonInteractiveRunsFailClosed:
 
         runner.invoke(
             app,
-            ["spec", "hooks", "run", EVENT, "--json", "--target", str(root)],
+            ["spec", "triggers", "run", EVENT, "--json", "--target", str(root)],
             input="y\n",
             env=attended_env(home),
         )
@@ -144,7 +144,7 @@ class TestNonInteractiveRunsFailClosed:
 
         runner.invoke(
             app,
-            ["spec", "hooks", "run", EVENT, "--target", str(root)],
+            ["spec", "triggers", "run", EVENT, "--target", str(root)],
             input="y\n",
             env=env,
         )
@@ -164,14 +164,14 @@ class TestApprovalRestoresTheWorkflow:
 
         approved = runner.invoke(
             app,
-            ["spec", "hooks", "trust", "--target", str(root)],
+            ["spec", "triggers", "trust", "--target", str(root)],
             env=attended_env(home),
         )
         assert approved.exit_code == 0
 
         result = runner.invoke(
             app,
-            ["spec", "hooks", "run", EVENT, "--target", str(root)],
+            ["spec", "triggers", "run", EVENT, "--target", str(root)],
             input="",
             env=attended_env(home),
         )
@@ -186,7 +186,7 @@ class TestApprovalRestoresTheWorkflow:
         root, home = carried_workspace(tmp_path, marker)
         runner.invoke(
             app,
-            ["spec", "hooks", "trust", "--target", str(root)],
+            ["spec", "triggers", "trust", "--target", str(root)],
             env=attended_env(home),
         )
 
@@ -206,18 +206,18 @@ class TestApprovalRestoresTheWorkflow:
         root, home = carried_workspace(tmp_path, marker)
         runner.invoke(
             app,
-            ["spec", "hooks", "trust", "--target", str(root)],
+            ["spec", "triggers", "trust", "--target", str(root)],
             env=attended_env(home),
         )
         runner.invoke(
             app,
-            ["spec", "hooks", "trust", "--revoke", "--target", str(root)],
+            ["spec", "triggers", "trust", "--revoke", "--target", str(root)],
             env=attended_env(home),
         )
 
         runner.invoke(
             app,
-            ["spec", "hooks", "run", EVENT, "--target", str(root)],
+            ["spec", "triggers", "run", EVENT, "--target", str(root)],
             input="",
             env=attended_env(home),
         )
@@ -228,14 +228,14 @@ class TestApprovalRestoresTheWorkflow:
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
         root, home = carried_workspace(tmp_path, tmp_path / "marker.txt")
-        listing = ["spec", "hooks", "list", "--json", "--target", str(root)]
+        listing = ["spec", "triggers", "list", "--json", "--target", str(root)]
 
         before = runner.invoke(app, listing, env=attended_env(home))
         assert '"trusted":false' in before.output.lower()
 
         runner.invoke(
             app,
-            ["spec", "hooks", "trust", "--target", str(root)],
+            ["spec", "triggers", "trust", "--target", str(root)],
             env=attended_env(home),
         )
         after = runner.invoke(app, listing, env=attended_env(home))

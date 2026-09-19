@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import time
@@ -55,13 +56,14 @@ class TestSupportedEvents:
     def test_events_is_frozenset(self):
         assert isinstance(SUPPORTED_EVENTS, frozenset)
 
-    def test_expected_events(self):
-        expected = {
-            "vault.document.created",
-            "config.synced",
-            "audit.completed",
-        }
-        assert expected == SUPPORTED_EVENTS
+    def test_only_events_that_are_emitted(self):
+        """A declared event nothing fires is worse than no event at all.
+
+        ``config.synced`` and ``config.synced`` sat here for several
+        releases with no emitter, so a trigger bound to either parsed, listed
+        and reported as supported while never running.
+        """
+        assert {"config.synced"} == SUPPORTED_EVENTS
 
 
 class TestParseAction:
@@ -136,7 +138,7 @@ class TestParseHook:
 
     def test_multiple_actions(self, tmp_path: Path) -> None:
         (tmp_path / "test.yaml").write_text(
-            "event: vault.document.created\nactions:\n"
+            "event: config.synced\nactions:\n"
             "  - type: shell\n    command: echo 1\n"
             "  - type: shell\n    command: echo 2\n",
             encoding="utf-8",
@@ -332,7 +334,7 @@ class TestDeduplication:
             encoding="utf-8",
         )
         (tmp_path / "hook-b.yml").write_text(
-            "event: audit.completed\nactions:\n  - type: shell\n    command: echo b\n",
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo b\n",
             encoding="utf-8",
         )
         hooks = load_triggers(tmp_path)
@@ -407,15 +409,15 @@ class TestReentrantGuard:
         write_hook(
             tmp_path / "hooks",
             "test",
-            "audit.completed",
+            "config.synced",
             f"{sys.executable.replace('\\', '/')} -V",
         )
         hooks = load_trusted(tmp_path / "hooks", home)
-        first = fire(hooks, "audit.completed", home=home)
+        first = fire(hooks, "config.synced", home=home)
         assert len(first) == 1
         assert first[0].success is True
 
-        second = fire(hooks, "audit.completed", home=home)
+        second = fire(hooks, "config.synced", home=home)
         assert len(second) == 1
         assert second[0].success is True
 
@@ -438,7 +440,7 @@ class TestFireHooksIntegration:
             encoding="utf-8",
         )
         hook_content = (
-            "event: vault.document.created\n"
+            "event: config.synced\n"
             "actions:\n"
             f"  - type: shell\n"
             f"    command: {sys.executable} {script}\n"
@@ -453,8 +455,8 @@ class TestFireHooksIntegration:
 
         results = fire(
             hooks,
-            "vault.document.created",
-            {"root": str(tmp_path), "event": "vault.document.created"},
+            "config.synced",
+            {"root": str(tmp_path), "event": "config.synced"},
             home=home,
         )
         assert len(results) == 1
@@ -463,7 +465,7 @@ class TestFireHooksIntegration:
 
     def test_no_hooks_returns_empty(self, tmp_path: Path) -> None:
         hooks = load_triggers(tmp_path)
-        results = fire(hooks, "vault.document.created")
+        results = fire(hooks, "config.synced")
         assert results == []
 
 
@@ -542,3 +544,45 @@ class TestFireHooksExplicitDirectory:
         assert not marker.exists(), (
             "a hook named by triggers_dir ran without an operator consent record"
         )
+
+
+class TestCommandSplitting:
+    """Argv splitting has to survive both a Windows path and a quoted space."""
+
+    def test_a_quoted_argument_containing_a_space_arrives_as_one_argument(
+        self, tmp_path: Path
+    ) -> None:
+        home = tmp_path / "home"
+        script = tmp_path / "show.py"
+        script.write_text(
+            "import sys; print(len(sys.argv) - 1, sys.argv[1], sep='|')",
+            encoding="utf-8",
+        )
+        exe = sys.executable.replace(chr(92), "/")
+        target = str(script).replace(chr(92), "/")
+
+        write_hook(
+            tmp_path / "triggers",
+            "quoted",
+            "config.synced",
+            # Single-quoted YAML scalar carrying double-quoted shell args, so
+            # YAML keeps the string intact and the splitter sees the quotes.
+            f"""'"{exe}" "{target}" "one two three"'""",
+        )
+        triggers = load_trusted(tmp_path / "triggers", home)
+        results = fire(triggers, "config.synced", home=home)
+
+        assert len(results) == 1
+        assert results[0].success is True, results[0].error
+        count, seen = results[0].output.strip().split("|")
+        assert count == "1", "the quoted argument must not split on its spaces"
+        assert seen == "one two three"
+
+    def test_an_unquoted_windows_path_keeps_its_separators(self) -> None:
+        """POSIX splitting eats backslashes; an unquoted path must survive."""
+        from vaultspec_core.triggers.engine import _split_command
+
+        if os.name != "nt":
+            pytest.skip("backslash-as-separator is a Windows concern")
+
+        assert _split_command(r"C:\tools\run.exe -V") == [r"C:\tools\run.exe", "-V"]

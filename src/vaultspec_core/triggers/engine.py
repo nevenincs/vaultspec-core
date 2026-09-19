@@ -45,13 +45,14 @@ __all__ = [
     "parse_yaml",
 ]
 
-SUPPORTED_EVENTS = frozenset(
-    {
-        "vault.document.created",
-        "config.synced",
-        "audit.completed",
-    }
-)
+#: Lifecycle events a trigger may bind to.
+#:
+#: Only what is actually emitted. ``vault.document.created`` and
+#: ``audit.completed`` were declared here for several releases and fired from
+#: nowhere, so a trigger bound to either parsed, listed, and reported as
+#: supported while never running - the failure this set exists to prevent. An
+#: event earns its place here when something emits it.
+SUPPORTED_EVENTS = frozenset({"config.synced"})
 
 
 @dataclass
@@ -343,6 +344,31 @@ def _execute_action(
     )
 
 
+def _split_command(cmd: str) -> list[str]:
+    """Split a command string into argv, correctly on Windows as well.
+
+    POSIX splitting treats a backslash as an escape, which silently destroys
+    every unquoted Windows path - ``C:\tools\run.exe`` arrives as
+    ``C:toolsrun.exe``. Non-POSIX splitting keeps backslashes but also keeps the
+    quote characters inside each token, and ``Popen`` then quotes the token
+    again, so a quoted argument containing a space reached the child wrapped in
+    literal quotes.
+
+    Neither mode is right on Windows alone, so there it splits without POSIX
+    escaping and then strips one matched pair of surrounding quotes per token,
+    which preserves the path and hands ``Popen`` the argument the author wrote.
+    """
+    if os.name != "nt":
+        return shlex.split(cmd, posix=True)
+    tokens = shlex.split(cmd, posix=False)
+    return [
+        token[1:-1]
+        if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'"
+        else token
+        for token in tokens
+    ]
+
+
 def _execute_shell(
     trigger_name: str,
     action: TriggerAction,
@@ -380,7 +406,7 @@ def _execute_shell(
         cwd = None
 
     try:
-        cmd_args = shlex.split(cmd, posix=(os.name != "nt"))
+        cmd_args = _split_command(cmd)
         process = subprocess.Popen(
             cmd_args,
             stdout=subprocess.PIPE,
