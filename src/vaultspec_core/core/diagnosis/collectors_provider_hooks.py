@@ -49,6 +49,7 @@ _SEVERITY: tuple[ProviderHookSignal, ...] = (
     ProviderHookSignal.SIDECAR_MISSING,
     ProviderHookSignal.STALE,
     ProviderHookSignal.NOT_RENDERED,
+    ProviderHookSignal.UNTRUSTED,
     ProviderHookSignal.IN_SYNC,
     ProviderHookSignal.NO_SOURCES,
 )
@@ -210,7 +211,7 @@ def _unsupported_for(specs: list[Any], tool: Tool) -> tuple[str, ...]:
 
 
 def collect_provider_hook_reports(
-    hooks_dir: Path, targets: list[HookTarget]
+    hooks_dir: Path, targets: list[HookTarget], home: Path | None = None
 ) -> list[ProviderHookReport]:
     """Assess each provider's rendered hooks against ``.vaultspec/hooks/``.
 
@@ -222,14 +223,28 @@ def collect_provider_hook_reports(
         hooks_dir: The provider-hook source directory.
         targets: Installed hook-capable providers and their files, in the
             order sync visits them.
+        home: Machine-global VaultSpec home holding the consent ledger.
+            Defaults to the operator's real home; tests pass their own.
 
     Returns:
         One :class:`ProviderHookReport` per target, in the order given.
     """
-    from ..provider_hooks import load_provider_hook_specs, render_hooks_payload
+    from ..provider_hooks import (
+        load_provider_hook_specs,
+        render_hooks_payload,
+        trusted_specs,
+    )
 
-    specs = load_provider_hook_specs(hooks_dir)
-    has_sources = bool(specs)
+    declared = load_provider_hook_specs(hooks_dir)
+    has_sources = bool(declared)
+
+    # Partition by consent through the same call the renderer uses, so the set
+    # reported here is the set it actually rendered. Comparing the provider
+    # file against every declared spec would report a hook the operator
+    # deliberately declined as an un-run sync, and tell them to run a sync that
+    # cannot fix it.
+    specs, refused = trusted_specs(declared, home)
+    awaiting_consent = bool(refused) and not specs
 
     reports: list[ProviderHookReport] = []
     for target in targets:
@@ -251,12 +266,25 @@ def collect_provider_hook_reports(
                 has_sources=has_sources,
             )
 
+        # Every declared hook is awaiting approval, so the renderer wrote
+        # nothing on purpose. Saying "not rendered, run sync" here would name a
+        # remedy that cannot work: the operator has to approve, not re-run.
+        if awaiting_consent and signal in (
+            ProviderHookSignal.NOT_RENDERED,
+            ProviderHookSignal.NO_SOURCES,
+            ProviderHookSignal.IN_SYNC,
+        ):
+            signal = ProviderHookSignal.UNTRUSTED
+
         reports.append(
             ProviderHookReport(
                 tool=target.tool.value,
                 signal=signal,
                 native_path=str(target.native),
-                unsupported=_unsupported_for(specs, target.tool),
+                # Reported over every declared hook, approved or not: an event
+                # no provider can run is worth knowing about before the
+                # operator decides whether to approve it.
+                unsupported=_unsupported_for(declared, target.tool),
             )
         )
     return reports

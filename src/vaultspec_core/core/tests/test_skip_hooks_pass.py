@@ -33,6 +33,26 @@ def _write_hook(root: Path) -> None:
     (hooks_dir / "guard.yaml").write_text(_HOOK_SOURCE, encoding="utf-8")
 
 
+def _isolate_ledger(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the consent ledger somewhere other than the real operator home.
+
+    The renderer refuses an unapproved hook, so without this a run would
+    depend on what the developer executing it happens to have approved.
+    """
+    from vaultspec_core.triggers import trust
+
+    ledger = root / "operator-home" / ".vaultspec" / trust.TRUST_FILE_NAME
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
+
+
+def _approve(root: Path) -> None:
+    """Approve every declared hook, as an operator at a terminal would."""
+    from vaultspec_core.triggers.trust import grant
+
+    grant(sorted((root / ".vaultspec" / "hooks").glob("*.yaml")))
+
+
 def _claude_hooks(root: Path) -> dict[str, object]:
     path = root / ".claude" / "settings.json"
     if not path.exists():
@@ -65,9 +85,13 @@ class TestSkipTokenValidation:
 
 
 class TestSkipHooksPass:
-    def test_sync_renders_provider_hooks_by_default(self, tmp_path: Path):
+    def test_sync_renders_provider_hooks_by_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        _isolate_ledger(tmp_path, monkeypatch)
         factory = WorkspaceFactory(tmp_path).install("all")
         _write_hook(tmp_path)
+        _approve(tmp_path)
         factory.sync("all")
 
         assert "PreToolUse" in _claude_hooks(tmp_path)
@@ -91,9 +115,13 @@ class TestSkipHooksPass:
         # turns off one pass rather than the command.
         assert factory.provider_has_rules("claude")
 
-    def test_skip_hooks_does_not_prune_already_rendered_hooks(self, tmp_path: Path):
+    def test_skip_hooks_does_not_prune_already_rendered_hooks(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        _isolate_ledger(tmp_path, monkeypatch)
         factory = WorkspaceFactory(tmp_path).install("all")
         _write_hook(tmp_path)
+        _approve(tmp_path)
         factory.sync("all")
         assert "PreToolUse" in _claude_hooks(tmp_path)
 

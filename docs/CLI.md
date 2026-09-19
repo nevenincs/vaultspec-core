@@ -2432,6 +2432,12 @@ unnoticed one.
   `VAULTSPEC_NON_INTERACTIVE`, or an MCP tool call - the hooks are skipped and the
   reason is written to stderr. There is no flag that auto-approves, because a flag a
   script can pass is a flag a repository can talk a script into passing.
+- The refusal lives in the renderer, not in the prompt, so every route into it is gated
+  and not only the ones that can ask. A hook with no source file on disk is refused for
+  the same reason: nothing about it can be matched against the ledger.
+- You are asked before a sync that would render and before
+  `vaultspec-core install --upgrade`. A fresh install renders nothing, so it does not
+  ask.
 - Declining costs only the hooks. The sync itself still completes.
 - Revoking works end to end: the next sync omits the withdrawn hook and removes the
   entry it had written, rather than leaving it behind.

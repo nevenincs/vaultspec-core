@@ -204,6 +204,7 @@ def _append_provider_hook_rows(
         {
             ProviderHookSignal.NO_SOURCES: ("info", "dim"),
             ProviderHookSignal.IN_SYNC: ("ok", "green"),
+            ProviderHookSignal.UNTRUSTED: ("info", "dim"),
             ProviderHookSignal.NOT_RENDERED: ("warn", "yellow"),
             ProviderHookSignal.STALE: ("warn", "yellow"),
             ProviderHookSignal.SIDECAR_MISSING: ("warn", "yellow"),
@@ -689,6 +690,11 @@ def _provider_hook_detail(
         return "no hooks declared in .vaultspec/hooks/"
     if worst is ProviderHookSignal.IN_SYNC:
         return f"rendered and recorded for {len(reports)} provider(s)"
+    if worst is ProviderHookSignal.UNTRUSTED:
+        return (
+            "declared hooks are awaiting approval on this machine, so none "
+            "render - review them and run 'vaultspec-core spec hooks trust'"
+        )
 
     explanations = {
         ProviderHookSignal.NOT_RENDERED: (
@@ -787,7 +793,13 @@ def _provider_hooks_weigh_warn(reports: "list[ProviderHookReport]") -> bool:
     """
     from vaultspec_core.core.diagnosis import ProviderHookSignal
 
-    benign = (ProviderHookSignal.IN_SYNC, ProviderHookSignal.NO_SOURCES)
+    benign = (
+        ProviderHookSignal.IN_SYNC,
+        ProviderHookSignal.NO_SOURCES,
+        # A hook that does not render because nobody approved it is the
+        # consent gate working as designed, not a fault to weigh.
+        ProviderHookSignal.UNTRUSTED,
+    )
     return any(report.signal not in benign for report in reports)
 
 
