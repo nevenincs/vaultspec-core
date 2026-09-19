@@ -353,7 +353,9 @@ still renders and abandons the rest in place, where nothing will clean them up.
 alone. It doesn't remove hooks an earlier sync already rendered; it declines to
 reconcile them. `vaultspec-core install --skip hooks` does the same during install.
 
-Removing a source file and syncing is the way to withdraw a rendered hook.
+Removing a source file and syncing is the way to withdraw a rendered hook. A config file
+that held nothing but hooks Core wrote is removed along with them rather than left
+behind empty; one that carries your own settings keeps them and loses only the hooks.
 
 <p id="machine-global-runtime-state"></p>
 
