@@ -1,19 +1,30 @@
 name: Core Merge Gate
 
 # The one workflow a pull request runs, and the only one whose verdict main
-# requires. It has two tiers, and the tier is chosen by the event:
+# requires. It has two tiers, and DRAFT STATE chooses the tier:
 #
-#   every push to a pull request   `Check: Lint (Linux)` only - minutes, not
+#   a draft pull request           `Check: Lint (Linux)` only - minutes, not
 #                                  the better part of an hour, on a fleet with
-#                                  one runner per platform.
-#   the `ci:full` label            the lint, plus both full suites.
+#                                  one runner per platform. Iterate here.
+#   a ready pull request           the lint, plus both full suites, on every
+#                                  push. Asking to merge is the signal that
+#                                  the suites are worth their runner time.
+#   the `ci:full` label            the lint, plus both full suites, on demand -
+#                                  the one way to prove a draft without
+#                                  marking it ready.
 #   a call or a dispatch           the lint, plus both full suites, always.
+#
+# The tier is chosen by the pull request's own state rather than by a label a
+# contributor has to know to apply. A label the checks list never mentions is
+# not discoverable, and the cost of missing it was a red required check on a
+# green branch: the gate refused a commit it had no verdict for, and the
+# refusal read as a failure rather than as a step not yet taken.
 #
 # `Check: Merge gate (Linux)` is the sole required status check. It passes only
 # when the lint passed AND the full suites passed on this commit - in this run,
-# or in an earlier run of this workflow on the same SHA. A push therefore
-# resets the verdict: the label must be applied again before the merge, which
-# is the point at which the full suite is worth its runner time.
+# or in an earlier run of this workflow on the same SHA. A push to a ready pull
+# request therefore re-proves the commit it produced, and a commit is never
+# merged on a verdict earned by a different tree.
 #
 # `push: main` is deliberately absent. main is ruleset-protected, so every
 # commit reaching it passed this gate on its pull request; a direct push is an
@@ -25,7 +36,7 @@ name: Core Merge Gate
 on:
   pull_request:
     branches: [main]
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, reopened, synchronize, ready_for_review, labeled]
   workflow_call:
     inputs:
       ref:
@@ -123,7 +134,7 @@ jobs:
 
   test-linux:
     name: "Test: Full suite (Linux)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
     timeout-minutes: 120
     runs-on: [self-hosted, Linux, X64, build]
     steps:
@@ -203,7 +214,7 @@ jobs:
   # Independent of the Linux suite: it must start even when that one fails.
   test-windows:
     name: "Test: Library suite (Windows)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
     timeout-minutes: 90
     runs-on: [self-hosted, Windows, X64]
     env:
@@ -255,6 +266,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       EVENT: ${{ github.event_name }}
+      DRAFT: ${{ github.event.pull_request.draft }}
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
@@ -262,8 +274,10 @@ jobs:
       LINUX: ${{ needs.test-linux.result }}
       WINDOWS: ${{ needs.test-windows.result }}
     steps:
-      # The label asks for ONE full run. Released first, so the next push is
-      # lint-only again; a label another run already removed is not an error.
+      # The label asks for ONE full run, so it is released as soon as that
+      # run starts judging. A ready pull request does not need it again - its
+      # next push runs the suites by itself - and a label another run already
+      # removed is not an error.
       - name: Release the ci:full label
         if: ${{ github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'ci:full' }}
         run: gh api --method DELETE "repos/${GITHUB_REPOSITORY}/issues/${PR}/labels/ci:full" --silent || true
@@ -276,7 +290,7 @@ jobs:
             echo "::error::pull requests from forks are refused; re-open the change from a branch of ${GITHUB_REPOSITORY}"
             exit 1
           fi
-          echo "lint=${LINT} linux=${LINUX} windows=${WINDOWS}"
+          echo "lint=${LINT} linux=${LINUX} windows=${WINDOWS} draft=${DRAFT:-n/a}"
           if [ "${LINT}" = "success" ] && [ "${LINUX}" = "success" ] && [ "${WINDOWS}" = "success" ]; then
             echo "lint and both full suites passed"
             exit 0
@@ -297,5 +311,5 @@ jobs:
             echo "the full suites already passed on ${HEAD_SHA}"
             exit 0
           fi
-          echo "::error::the full suites have not run on ${HEAD_SHA}; add the ci:full label to run them before merging"
+          echo "::error::the full suites have not run on ${HEAD_SHA}; mark the pull request ready for review to run them, or add the ci:full label to prove it while it stays a draft"
           exit 1
