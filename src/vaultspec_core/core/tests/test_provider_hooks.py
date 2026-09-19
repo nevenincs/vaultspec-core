@@ -12,11 +12,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from vaultspec_core.core.enums import Tool
+from vaultspec_core.core.enums import ProviderCapability, Tool
 from vaultspec_core.core.provider_hooks import (
     HookEvent,
     HookSpec,
     compose_flat_hooks,
+    hook_targets,
     load_provider_hook_specs,
     render_hooks_payload,
     supported_events,
@@ -256,3 +257,43 @@ class TestEndToEndSync:
             (tmp_path / ".gemini" / "settings.json").read_text(encoding="utf-8")
         )
         assert "BeforeTool" in gemini["hooks"]
+
+
+class TestHookTargets:
+    """The set a status surface reports must be the set the renderer writes."""
+
+    def test_targets_match_the_files_sync_actually_writes(self, tmp_path: Path):
+        factory = WorkspaceFactory(tmp_path).install("all")
+        hooks_dir = tmp_path / ".vaultspec" / "hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        (hooks_dir / "guard.yaml").write_text(
+            "event: pre_tool_use\ncommand: echo GUARD\n", encoding="utf-8"
+        )
+
+        factory.sync("all")
+        targets = hook_targets()
+
+        assert targets, "an all-provider install has hook-capable providers"
+        for _tool, native, _sidecar in targets:
+            assert native.exists(), f"{native} was reported but never written"
+
+    def test_only_antigravity_has_no_sidecar(self, tmp_path: Path):
+        WorkspaceFactory(tmp_path).install("all").sync("all")
+
+        by_tool = {tool: sidecar for tool, _native, sidecar in hook_targets()}
+
+        assert by_tool[Tool.ANTIGRAVITY] is None, "agy owns a named hookset"
+        assert all(
+            sidecar is not None
+            for tool, sidecar in by_tool.items()
+            if tool is not Tool.ANTIGRAVITY
+        )
+
+    def test_every_target_declares_the_hooks_capability(self, tmp_path: Path):
+        from vaultspec_core.core.manifest import installed_tool_configs
+
+        WorkspaceFactory(tmp_path).install("all").sync("all")
+        configs = installed_tool_configs()
+
+        for tool, _native, _sidecar in hook_targets():
+            assert ProviderCapability.HOOKS in configs[tool].capabilities
