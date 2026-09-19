@@ -57,7 +57,7 @@ SUPPORTED_EVENTS = frozenset({"config.synced"})
 
 @dataclass
 class TriggerAction:
-    """A single action within a trig.
+    """A single action within a trigger.
 
     Attributes:
         action_type: Kind of action  - currently only ``"shell"`` is supported.

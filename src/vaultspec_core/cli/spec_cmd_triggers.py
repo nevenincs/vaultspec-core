@@ -329,7 +329,7 @@ def cmd_triggers_status(
         Field("triggers_dir", str(status["triggers_dir"])),
         Field("definitions", ", ".join(status["definitions"]) or "none"),
     ]
-    render_record(fields, title="hooks status")
+    render_record(fields, title="triggers status")
 
     console = get_console()
     for warning in status["warnings"]:

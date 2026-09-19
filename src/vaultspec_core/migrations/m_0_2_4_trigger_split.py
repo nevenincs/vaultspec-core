@@ -78,12 +78,13 @@ _PROVIDER_EVENTS = frozenset(
 )
 
 
-def _event_of(path: Path) -> str | None:
-    """Return the ``event`` value of a hook source file, or ``None``.
+def _event_of(path: Path) -> tuple[str | None, bool]:
+    """Return ``(event, parsed)`` for a hook source file.
 
-    ``None`` covers every case where the lane cannot be established from the
-    file itself: unreadable, not valid YAML, not a mapping, or carrying no
-    string ``event``. All of them leave the file in place.
+    ``parsed`` is ``False`` only when the file could not be read or is not
+    YAML a mapping could come out of. It is reported separately from a missing
+    or unrecognised event because the two need different advice: one is a
+    broken file, the other is a file in the wrong place or with a typo.
     """
     import yaml
 
@@ -91,29 +92,46 @@ def _event_of(path: Path) -> str | None:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except Exception:
         logger.debug("Migration %s: cannot parse %s", _NAME, path.name, exc_info=True)
-        return None
+        return None, False
     if not isinstance(data, dict):
-        return None
+        return None, False
     event = data.get("event")
-    return event if isinstance(event, str) else None
+    return (event if isinstance(event, str) else None), True
 
 
-def _classify(hooks_dir: Path) -> tuple[list[Path], list[Path]]:
-    """Partition the shared directory into files to move and files to leave.
+def _classify(hooks_dir: Path) -> tuple[list[Path], list[Path], list[Path]]:
+    """Partition the shared directory by what can be established about each file.
 
-    Returns ``(lifecycle, unclassified)``. Canonical provider files are in
-    neither list: they are already where they belong and need no report.
+    Returns ``(lifecycle, unrecognised, unparseable)``. Canonical provider
+    files are in none of them: they are already where they belong and need no
+    report.
     """
     lifecycle: list[Path] = []
-    unclassified: list[Path] = []
+    unrecognised: list[Path] = []
+    unparseable: list[Path] = []
     for ext in ("*.yaml", "*.yml"):
         for path in sorted(hooks_dir.glob(ext)):
-            event = _event_of(path)
-            if event in _LIFECYCLE_EVENTS:
+            event, parsed = _event_of(path)
+            if not parsed:
+                unparseable.append(path)
+            elif event in _LIFECYCLE_EVENTS:
                 lifecycle.append(path)
             elif event not in _PROVIDER_EVENTS:
-                unclassified.append(path)
-    return lifecycle, unclassified
+                unrecognised.append(path)
+    return lifecycle, unrecognised, unparseable
+
+
+def _left_in_place(unrecognised: list[Path], unparseable: list[Path]) -> str:
+    """Describe the files left behind, saying which kind of problem each had."""
+    parts: list[str] = []
+    if unrecognised:
+        parts.append(
+            f"{len(unrecognised)} file(s) left in place: event is neither a "
+            "provider hook nor a lifecycle trigger"
+        )
+    if unparseable:
+        parts.append(f"{len(unparseable)} file(s) left in place: unparseable")
+    return f" ({'; '.join(parts)})" if parts else ""
 
 
 def preview(workspace: Path) -> list[Path]:
@@ -166,16 +184,13 @@ def migrate(workspace: Path) -> MigrationResult:
             counts=counts,
         )
 
-    lifecycle, unclassified = _classify(hooks_dir)
-    counts["left"] = len(unclassified)
+    lifecycle, unrecognised, unparseable = _classify(hooks_dir)
+    counts["left"] = len(unrecognised) + len(unparseable)
+    left_note = _left_in_place(unrecognised, unparseable)
 
     if not lifecycle:
         summary = "no lifecycle triggers in .vaultspec/hooks/; nothing to move"
-        if unclassified:
-            summary += (
-                f" ({len(unclassified)} file(s) left in place: "
-                "event is neither a provider hook nor a lifecycle trigger)"
-            )
+        summary += left_note
         return MigrationResult(
             name=_NAME,
             target_version=_TARGET_VERSION,
@@ -207,11 +222,7 @@ def migrate(workspace: Path) -> MigrationResult:
         f".vaultspec/{Resource.TRIGGERS.value}/; "
         "re-approve them with `vaultspec-core spec triggers trust`"
     )
-    if unclassified:
-        summary += (
-            f" ({len(unclassified)} file(s) left in place: "
-            "event is neither a provider hook nor a lifecycle trigger)"
-        )
+    summary += left_note
     logger.info("Migration %s: %s", _NAME, summary)
     return MigrationResult(
         name=_NAME,
