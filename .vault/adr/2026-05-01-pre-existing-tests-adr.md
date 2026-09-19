@@ -3,11 +3,11 @@ tags:
   - '#adr'
   - '#pre-existing-tests'
 date: '2026-05-01'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:bfbf41e49cc4657407916ea38d8993bfacd276ffdc76da1c7f2f4b9096a8b5e4'
 related:
   - '[[2026-05-01-pre-existing-tests-research]]'
-  - '[[2026-05-01-pre-existing-tests-plan]]'
+  - '[[2026-09-19-pre-existing-tests-plan]]'
 ---
 
 # `pre-existing-tests` adr: pre-existing test failure fix paths (#98, #99) | (**status:** `accepted`)

@@ -3,13 +3,13 @@ tags:
   - '#adr'
   - '#plan-hardening'
 date: '2026-05-05'
-modified: '2026-06-13'
-body_hash: 'sha256:08c7504233f1c0f7a85058eeaa2fa21a4d41c7adc87cfe3c40fb6f6f72cbf877'
+modified: '2026-09-19'
+body_hash: 'sha256:dd1eddcd9c23a4f92d019d44de32e78a957c2d26974555c085d086288e017559'
 related:
   - '[[2026-05-05-plan-hardening-research]]'
 ---
 
-# `plan-hardening` adr: plan-hardening natural-language convention | (**status:** `proposed`)
+# `plan-hardening` adr: plan-hardening natural-language convention | (**status:** `accepted`)
 
 This ADR authorises **Wave 1** of the `#plan-hardening` plan
 document: the language-only rewrite of the `.vaultspec/`

@@ -3,11 +3,11 @@ tags:
   - '#research'
   - '#pre-existing-tests'
 date: '2026-05-01'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:79dde84bea4a61eecb2045fe26aff1a6d70a883befa0238f735d40feb6895323'
 related:
   - '[[2026-05-01-pre-existing-tests-adr]]'
-  - '[[2026-05-01-pre-existing-tests-plan]]'
+  - '[[2026-09-19-pre-existing-tests-plan]]'
 ---
 
 # `pre-existing-tests` research: pre-existing test failures (#98, #99)

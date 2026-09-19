@@ -3,13 +3,14 @@ tags:
   - '#adr'
   - '#migration-convergence-scope'
 date: '2026-09-06'
-modified: '2026-09-06'
+modified: '2026-09-19'
 body_schema: 'body-v2'
 body_hash: 'sha256:2bc9eea02794fad36d006718f07e21e9bcd4ac7cec630ff5ca92ffd518d5e7bd'
 related:
   - "[[2026-05-01-migration-registry-research]]"
   - "[[2026-05-01-migration-registry-adr]]"
   - "[[2026-04-30-vault-index-folder-adr]]"
+  - '[[2026-09-06-migration-registry-write-boundary-adr]]'
 ---
 
 # `migration-convergence-scope` adr: `Scoped migration convergence for authoring verbs` | (**status:** `accepted`)

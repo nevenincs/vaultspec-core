@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-logging'
 date: '2026-02-22'
-modified: '2026-06-13'
-body_hash: 'sha256:3c38d5043ddb34903a962ff6cfababff907ae28f50e0290f6c85da6735f7708a'
+modified: '2026-09-19'
+body_hash: 'sha256:50eb7f1952d1504c4c97bdc3b404c994ec3541e747d92515d40db46fd90295f0'
 related:
   - '[[2026-02-22-cli-logging-research]]'
 ---
@@ -113,7 +113,7 @@ both providers identical visual treatment with zero provider-specific code.
 
 # Tool call — dim, parenthesized name, no ID
 
-(Read) src/vaultspec/logging_config.py
+(Read) src/vaultspec_core/logging_config.py
 
 # Agent thinking — italic, no prefix
 

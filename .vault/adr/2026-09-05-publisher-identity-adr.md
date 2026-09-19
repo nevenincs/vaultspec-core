@@ -3,12 +3,13 @@ tags:
   - '#adr'
   - '#publisher-identity'
 date: '2026-09-05'
-modified: '2026-09-07'
+modified: '2026-09-19'
 body_schema: 'body-v2'
 body_hash: 'sha256:9f33bb3d19e5bf54ef8feaef02d5fee3e49d4cfd390f717ec1a50cc2e99a8d6d'
 related:
   - "[[2026-09-05-publisher-identity-research]]"
   - "[[2026-08-28-binary-portability-adr]]"
+  - '[[2026-09-06-offline-binaries-prepared-distribution-adr]]'
 ---
 
 # `publisher-identity` adr: `attest provenance now; defer publisher identity to a route that costs nothing` | (**status:** `accepted`)

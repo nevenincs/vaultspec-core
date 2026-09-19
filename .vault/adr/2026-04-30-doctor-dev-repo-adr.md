@@ -1,16 +1,17 @@
 ---
 tags:
-  - '#adr'
-  - '#doctor-dev-repo'
+  - "#adr"
+  - "#doctor-dev-repo"
 date: '2026-04-30'
-modified: '2026-06-13'
-body_hash: 'sha256:aa7eeeb13825f42cf49bf9567968bf604d113093df0c9d4c4b4003c249063e8a'
 related:
-  - '[[2026-04-30-doctor-dev-repo-research]]'
-  - '[[2026-04-30-doctor-dev-repo-plan]]'
+  - "[[2026-04-30-doctor-dev-repo-research]]"
+  - "[[2026-09-19-doctor-dev-repo-plan]]"
+superseded_by: '2026-05-17-vaultspec-source-layout-collapse-adr'
+modified: '2026-09-19'
+body_hash: 'sha256:96645154f906ea10ea35e5d1c44a9b4fc46aad893b9bacc63676959d3239f409'
 ---
 
-# `doctor-dev-repo` adr: `consult is_dev_repo in collect_framework_presence` | (**status:** `accepted`)
+# `doctor-dev-repo` adr: `consult is_dev_repo in collect_framework_presence` | (**status:** `superseded`)
 
 ## Problem Statement
 

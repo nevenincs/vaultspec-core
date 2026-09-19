@@ -3,15 +3,15 @@ tags:
   - '#adr'
   - '#advisory-lock-cycle'
 date: '2026-09-06'
-modified: '2026-09-06'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:109f1734630814dde04dbb24792698885c87b7d282733d6fc1bed02fb25b445f'
+body_hash: 'sha256:72f97a79c4cd0f537ba917dd64f7d24daa23144c54b7a1bd5b6bd957f8c92464'
 related:
   - "[[2026-09-06-advisory-lock-cycle-research]]"
   - "[[2026-08-13-plan-mutation-concurrency-adr]]"
 ---
 
-# `advisory-lock-cycle` adr: `break the docs/index/manifest advisory-lock cycle by construction` | (**status:** `proposed`)
+# `advisory-lock-cycle` adr: `break the docs/index/manifest advisory-lock cycle by construction` | (**status:** `accepted`)
 
 ## Problem Statement
 

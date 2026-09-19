@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-output'
 date: '2026-02-23'
-modified: '2026-06-13'
-body_hash: 'sha256:1f08dafe77ef2332b3c434f62203cee4d88779bcb6ee56e8ca8857bf4b04bab9'
+modified: '2026-09-19'
+body_hash: 'sha256:a4944fc970b691bced1758a111fcfda0836703e00b5d4fd0630e0f1067458e85'
 related:
   - '[[2026-02-23-cli-output-architecture-research]]'
   - '[[2026-02-22-cli-logging-research]]'
@@ -86,7 +86,7 @@ The implementation is structured as three ordered sub-phases to minimise blast r
 
 **Sub-phase A — infrastructure only:**
 
-Create `src/vaultspec/printer.py` with the `Printer` class:
+Create a `printer.py` module with the `Printer` class. Amended 2026-09-19: this module was later purged by the `cli-target-refactor` work, which routed output through `typer.echo` and `rich.print` instead; the design below is retained as the original intent, not as current structure.
 
 ```python
 class Printer:

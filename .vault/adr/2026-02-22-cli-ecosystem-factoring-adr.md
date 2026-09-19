@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-ecosystem-factoring'
 date: '2026-02-22'
-modified: '2026-06-28'
-body_hash: 'sha256:695475c16fd173e87b46e687388e2c7e6ecd6ff8349c666f13bbd34a498f4e74'
+modified: '2026-09-19'
+body_hash: 'sha256:e3cae69cfdba752f31ed0df3db23be06d71a329e94439ddcc1c1dd0603181675'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
   - '[[2026-02-23-cli-test-coverage-plan]]'
@@ -18,7 +18,7 @@ The vaultspec package has a naming inversion at its foundation that misleads
 developers, obscures architectural intent, and makes the central business logic
 untestable in isolation.
 
-**`vaultspec.core` is not core.** The package contains exactly two modules:
+**`vaultspec_core.core` is not core.** The package contains exactly two modules:
 `config.py` (623 lines -- `VaultSpecConfig` singleton, env-var registry,
 `CONFIG_REGISTRY`, parsing helpers) and `workspace.py` (406 lines --
 `WorkspaceLayout`, `GitInfo`, `resolve_workspace`). These are configuration
@@ -42,10 +42,10 @@ This inversion causes concrete problems:
   provider instantiation, and mutable global initialization via `init_paths()`.
   There is no way to import the library without its CLI side effects.
 
-- **Deceptive import paths.** `from vaultspec.core import get_config` reads as
+- **Deceptive import paths.** `from vaultspec_core.core import get_config` reads as
   "import from the core of the system," but it is actually importing from a
   configuration utility module. Meanwhile, the real core logic lives in
-  `from vaultspec.cli import collect_rules` -- an import path that suggests
+  `from vaultspec_core.cli import collect_rules` -- an import path that suggests
   CLI code, not library code.
 
 - **Monolith resistance.** Adding a new resource type (e.g., templates,
@@ -71,64 +71,64 @@ This inversion causes concrete problems:
 
 ### Rename cascade scope
 
-Renaming `vaultspec.core` to `vaultspec.config` touches every file that imports
+Renaming `vaultspec_core.core` to `vaultspec_core.config` touches every file that imports
 from it. The research identified **57 import occurrences across 34 files** in
-`src/vaultspec/` and 2 more in `tests/`. The imports follow two patterns:
+`src/vaultspec_core/` and 2 more in `tests/`. The imports follow two patterns:
 
-- **Top-level imports** (`from vaultspec.core import WorkspaceLayout, resolve_workspace`) -- found in all 4 CLI modules plus
+- **Top-level imports** (`from vaultspec_core.core import WorkspaceLayout, resolve_workspace`) -- found in all 4 CLI modules plus
   `tests/cli/test_integration.py` and `core/tests/test_workspace.py`.
 
-- **Deferred/lazy imports** (`from vaultspec.core import get_config`) -- found
+- **Deferred/lazy imports** (`from vaultspec_core.core import get_config`) -- found
   in 30+ files across `rag/`, `protocol/`, `orchestration/`, `vaultcore/`,
   `hooks/`, `server.py`, and the CLI modules. These are function-level imports
   that defer the config singleton access until runtime.
 
-The rename is mechanical (find-and-replace `vaultspec.core` with
-`vaultspec.config`) but the sheer number of touch points means it must be
+The rename is mechanical (find-and-replace `vaultspec_core.core` with
+`vaultspec_core.config`) but the sheer number of touch points means it must be
 executed carefully in a single atomic commit to avoid half-migrated states.
 
 ### Backward compatibility via re-exports
 
 To prevent breakage for any external consumers or scripts that import
-`vaultspec.core`, a compatibility shim can be maintained:
+`vaultspec_core.core`, a compatibility shim can be maintained:
 
 ```python
 
-# src/vaultspec/core/__init__.py (deprecated shim)
+# src/vaultspec_core/core/__init__.py (deprecated shim)
 
-"""Deprecated: use vaultspec.config instead."""
+"""Deprecated: use vaultspec_core.config instead."""
 import warnings
 warnings.warn(
-    "vaultspec.core is deprecated, use vaultspec.config",
+    "vaultspec_core.core is deprecated, use vaultspec_core.config",
     DeprecationWarning,
     stacklevel=2,
 )
-from vaultspec.config import *  # noqa: F401,F403
+from vaultspec_core.config import *  # noqa: F401,F403
 ```
 
 This shim should be removed after one release cycle. All first-party code
-must use `vaultspec.config` from the start -- the shim exists only for
+must use `vaultspec_core.config` from the start -- the shim exists only for
 hypothetical external consumers.
 
 ### Test impact
 
-- **`src/vaultspec/core/tests/test_config.py`** and
-  **`src/vaultspec/core/tests/test_workspace.py`** move to
-  `src/vaultspec/config/tests/`. Their internal imports
-  (`from vaultspec.core.config import ...`, `from vaultspec.core.workspace import ...`) become `from vaultspec.config.config import ...` and
-  `from vaultspec.config.workspace import ...`.
+- **`src/vaultspec_core/core/tests/test_config.py`** and
+  **`src/vaultspec_core/core/tests/test_workspace.py`** move to
+  `src/vaultspec_core/config/tests/`. Their internal imports
+  (`from vaultspec_core.core.config import ...`, `from vaultspec_core.core.workspace import ...`) become `from vaultspec_core.config.config import ...` and
+  `from vaultspec_core.config.workspace import ...`.
 
 - **8 `conftest.py` files** across `graph/`, `metrics/`, `orchestration/`,
   `rag/`, `vaultcore/`, and `verification/` import `reset_config` from
-  `vaultspec.core`. These are one-line changes.
+  `vaultspec_core.core`. These are one-line changes.
 
 - **`tests/conftest.py`** imports `VaultSpecConfig`, `get_config`, and
-  `reset_config` from `vaultspec.core`. Single-line change.
+  `reset_config` from `vaultspec_core.core`. Single-line change.
 
-- **`src/vaultspec/tests/cli/test_integration.py`** imports
+- **`src/vaultspec_core/tests/cli/test_integration.py`** imports
   `LayoutMode`, `WorkspaceError`, `WorkspaceLayout`, and `resolve_workspace`
-  from `vaultspec.core.workspace`. These become
-  `from vaultspec.config.workspace import ...`.
+  from `vaultspec_core.core.workspace`. These become
+  `from vaultspec_core.config.workspace import ...`.
 
 No test logic changes -- only import paths.
 
@@ -137,40 +137,40 @@ No test logic changes -- only import paths.
 The `pyproject.toml` entry points are:
 
 ```toml
-vaultspec = "vaultspec.cli:main"
-vaultspec-mcp = "vaultspec.server:main"
-vaultspec-vault = "vaultspec.vault_cli:main"
-vaultspec-team = "vaultspec.team_cli:main"
-vaultspec-subagent = "vaultspec.subagent_cli:main"
+vaultspec = "vaultspec_core.cli:main"
+vaultspec-mcp = "vaultspec_core.server:main"
+vaultspec-vault = "vaultspec_core.vault_cli:main"
+vaultspec-team = "vaultspec_core.team_cli:main"
+vaultspec-subagent = "vaultspec_core.subagent_cli:main"
 ```
 
 Decision 3 (extracting business logic from `cli.py`) does **not** convert
-`cli.py` into a package. The file remains `src/vaultspec/cli.py` and the
-entry point `vaultspec.cli:main` continues to resolve without change. The
-extracted domain modules live under `src/vaultspec/core/` -- the new core
+`cli.py` into a package. The file remains `src/vaultspec_core/cli.py` and the
+entry point `vaultspec_core.cli:main` continues to resolve without change. The
+extracted domain modules live under `src/vaultspec_core/core/` -- the new core
 package. The CLI file becomes a thin argparse wrapper that imports from
-`vaultspec.core`.
+`vaultspec_core.core`.
 
 If a future phase converts `cli.py` into a `cli/` package, the entry point
-`vaultspec.cli:main` will still resolve because `cli/__init__.py` can
+`vaultspec_core.cli:main` will still resolve because `cli/__init__.py` can
 re-export `main`. This is deferred and not part of this ADR.
 
 ### Module naming: why `core` and not `engine` or `lib`
 
-The extracted domain library is named `vaultspec.core` because it is the
+The extracted domain library is named `vaultspec_core.core` because it is the
 core of the system -- the resource management engine that everything else
 depends on. Alternative names considered:
 
-- `vaultspec.engine` -- implies a single long-running process; the resource
+- `vaultspec_core.engine` -- implies a single long-running process; the resource
   management library is stateless and synchronous.
 
-- `vaultspec.lib` -- too generic; does not communicate that this is the
+- `vaultspec_core.lib` -- too generic; does not communicate that this is the
   primary domain logic.
 
-- `vaultspec.resources` -- too narrow; the library also handles config
+- `vaultspec_core.resources` -- too narrow; the library also handles config
   generation, system prompt assembly, and sync orchestration.
 
-`core` is the correct name precisely because the current `vaultspec.core`
+`core` is the correct name precisely because the current `vaultspec_core.core`
 package is *not* core -- it is config. Reclaiming the name for the actual
 core logic restores semantic accuracy.
 
@@ -180,13 +180,13 @@ core logic restores semantic accuracy.
   function must produce identical output before and after the restructuring.
   The test suite is the verification mechanism.
 
-- **Single-commit rename.** The `vaultspec.core` to `vaultspec.config` rename
+- **Single-commit rename.** The `vaultspec_core.core` to `vaultspec_core.config` rename
   must land in one commit. Partial migration (some files using old path, some
   using new) creates import failures.
 
 - **Import-time side effects persist (for now).** The `cli.py` module
   currently calls `resolve_workspace()` at import time and stores the result
-  in `_default_layout`. The extracted `vaultspec.core` modules will inherit
+  in `_default_layout`. The extracted `vaultspec_core.core` modules will inherit
   this pattern initially. Deferring workspace resolution to `main()` is a
   desirable future improvement but is out of scope for this refactoring to
   limit churn.
@@ -205,34 +205,34 @@ The restructuring proceeds in four phases. Each phase is independently
 committable and testable. Phases 1 and 2 have no ordering dependency on each
 other and can execute in parallel. Phases 3 and 4 depend on Phase 1.
 
-### Phase 1: Rename `vaultspec.core` to `vaultspec.config`
+### Phase 1: Rename `vaultspec_core.core` to `vaultspec_core.config`
 
 **Goal:** Restore semantic accuracy to the configuration package.
 
 **Steps:**
 
-- Rename `src/vaultspec/core/` to `src/vaultspec/config/`.
+- Rename `src/vaultspec_core/core/` to `src/vaultspec_core/config/`.
 
-- Rename `src/vaultspec/core/tests/` to `src/vaultspec/config/tests/`.
+- Rename `src/vaultspec_core/core/tests/` to `src/vaultspec_core/config/tests/`.
 
 - Update all 57 import sites in `src/` and 2 in `tests/` from
-  `vaultspec.core` to `vaultspec.config`.
+  `vaultspec_core.core` to `vaultspec_core.config`.
 
-- Update `src/vaultspec/config/__init__.py` docstring.
+- Update `src/vaultspec_core/config/__init__.py` docstring.
 
-- Place a deprecation shim at `src/vaultspec/core/__init__.py` that re-exports
-  everything from `vaultspec.config` with a `DeprecationWarning`.
+- Place a deprecation shim at `src/vaultspec_core/core/__init__.py` that re-exports
+  everything from `vaultspec_core.config` with a `DeprecationWarning`.
 
 - Run the full test suite to verify zero behavioral change.
 
 **Concrete path changes:**
 
-| Before                            | After                               |
-| :-------------------------------- | :---------------------------------- |
-| `src/vaultspec/core/__init__.py`  | `src/vaultspec/config/__init__.py`  |
-| `src/vaultspec/core/config.py`    | `src/vaultspec/config/config.py`    |
-| `src/vaultspec/core/workspace.py` | `src/vaultspec/config/workspace.py` |
-| `src/vaultspec/core/tests/`       | `src/vaultspec/config/tests/`       |
+| Before                                 | After                                    |
+| :------------------------------------- | :--------------------------------------- |
+| `src/vaultspec_core/core/__init__.py`  | `src/vaultspec_core/config/__init__.py`  |
+| `src/vaultspec_core/core/config.py`    | `src/vaultspec_core/config/config.py`    |
+| `src/vaultspec_core/core/workspace.py` | `src/vaultspec_core/config/workspace.py` |
+| `src/vaultspec_core/core/tests/`       | `src/vaultspec_core/config/tests/`       |
 
 **Import change pattern (all 36 files):**
 
@@ -240,26 +240,26 @@ other and can execute in parallel. Phases 3 and 4 depend on Phase 1.
 
 # Before:
 
-from vaultspec.core import WorkspaceLayout, resolve_workspace
-from vaultspec.core import get_config
-from vaultspec.core import reset_config
-from vaultspec.core.config import VaultSpecConfig, CONFIG_REGISTRY
-from vaultspec.core.workspace import LayoutMode, WorkspaceError, resolve_workspace
+from vaultspec_core.core import WorkspaceLayout, resolve_workspace
+from vaultspec_core.core import get_config
+from vaultspec_core.core import reset_config
+from vaultspec_core.core.config import VaultSpecConfig, CONFIG_REGISTRY
+from vaultspec_core.core.workspace import LayoutMode, WorkspaceError, resolve_workspace
 
 # After:
 
-from vaultspec.config import WorkspaceLayout, resolve_workspace
-from vaultspec.config import get_config
-from vaultspec.config import reset_config
-from vaultspec.config.config import VaultSpecConfig, CONFIG_REGISTRY
-from vaultspec.config.workspace import LayoutMode, WorkspaceError, resolve_workspace
+from vaultspec_core.config import WorkspaceLayout, resolve_workspace
+from vaultspec_core.config import get_config
+from vaultspec_core.config import reset_config
+from vaultspec_core.config.config import VaultSpecConfig, CONFIG_REGISTRY
+from vaultspec_core.config.workspace import LayoutMode, WorkspaceError, resolve_workspace
 ```
 
-### Phase 2: Extract shared CLI foundation (`vaultspec.cli_common`)
+### Phase 2: Extract shared CLI foundation (`vaultspec_core.cli_common`)
 
 **Goal:** Eliminate boilerplate duplication across the four CLI entry points.
 
-**Module:** `src/vaultspec/cli_common.py`
+**Module:** `src/vaultspec_core/cli_common.py`
 
 **Extracted functions** (based on
 \[[2026-02-22-cli-ecosystem-factoring-research]\] sections 2.1--2.7):
@@ -277,12 +277,12 @@ from vaultspec.config.workspace import LayoutMode, WorkspaceError, resolve_works
 duplication) = net -10 lines. More importantly, all four CLI modules shrink
 to thin parser+dispatch wrappers and behavioral consistency is enforced.
 
-### Phase 3: Extract business logic from `cli.py` into `vaultspec.core`
+### Phase 3: Extract business logic from `cli.py` into `vaultspec_core.core`
 
 **Goal:** Make the resource management library independently importable and
 testable, separate from the CLI layer.
 
-**Package:** `src/vaultspec/core/` (reclaiming the name from Phase 1)
+**Package:** `src/vaultspec_core/core/` (reclaiming the name from Phase 1)
 
 **Module decomposition** (based on
 \[[2026-02-22-cli-ecosystem-factoring-research]\] section 1.1 functional
@@ -342,7 +342,7 @@ errors.
 The restructuring is driven by three findings from
 \[[2026-02-22-cli-ecosystem-factoring-research]\]:
 
-**Naming accuracy matters for navigation.** When `vaultspec.core` contains
+**Naming accuracy matters for navigation.** When `vaultspec_core.core` contains
 only config and workspace resolution, developers looking for the "core" of
 the system are misdirected. The research (section 4) shows that `core`
 provides none of the domain functions that other modules depend on for
@@ -352,7 +352,7 @@ actual domain library aligns the package structure with the dependency graph.
 **Monolithic CLI modules resist testing.** The research (section 1.1)
 documents that `cli.py` is 2460 lines with 13 mutable module-level globals,
 import-time side effects, and no separation between library logic and CLI
-dispatch. Extracting the domain logic into `vaultspec.core` submodules makes
+dispatch. Extracting the domain logic into `vaultspec_core.core` submodules makes
 every function independently importable and testable without triggering
 argparse construction or workspace resolution.
 
@@ -371,24 +371,24 @@ can execute in parallel to reduce calendar time.
 ### Import path changes (high-churn, low-risk)
 
 Phase 1 touches **36 files** (34 in `src/`, 2 in `tests/`) to update
-`vaultspec.core` to `vaultspec.config`. This is the highest-churn phase but
+`vaultspec_core.core` to `vaultspec_core.config`. This is the highest-churn phase but
 the lowest-risk because the change is purely mechanical -- a global
 find-and-replace with no logic changes. The deprecation shim at
-`vaultspec.core` provides a fallback for any missed references.
+`vaultspec_core.core` provides a fallback for any missed references.
 
 ### `pyproject.toml` entry points (no change required)
 
 All five entry points (`vaultspec`, `vaultspec-mcp`, `vaultspec-vault`,
 `vaultspec-team`, `vaultspec-subagent`) reference top-level module paths
-(`vaultspec.cli:main`, `vaultspec.server:main`, etc.) that are not affected
+(`vaultspec_core.cli:main`, `vaultspec_core.server:main`, etc.) that are not affected
 by the internal restructuring. The `cli.py` file remains at
-`src/vaultspec/cli.py` -- it just becomes thinner. No `pyproject.toml` entry
+`src/vaultspec_core/cli.py` -- it just becomes thinner. No `pyproject.toml` entry
 point changes are needed.
 
 ### Risk: the rename cascade
 
 The primary risk is an incomplete rename in Phase 1. If any file is missed,
-the deprecation shim at `vaultspec.core` will catch it at runtime with a
+the deprecation shim at `vaultspec_core.core` will catch it at runtime with a
 warning rather than a hard failure. The mitigation strategy is:
 
 - Use `rg "from vaultspec\.core" src/ tests/` to generate the exhaustive
@@ -412,7 +412,7 @@ where they live in `cli.py`.
 
 ### Benefits
 
-- **Correct naming.** `vaultspec.config` contains config. `vaultspec.core`
+- **Correct naming.** `vaultspec_core.config` contains config. `vaultspec_core.core`
   contains the domain engine. Import paths communicate architectural intent.
 
 - **Testable library.** Resource management functions can be imported and
@@ -434,3 +434,20 @@ where they live in `cli.py`.
 
 - **Extensibility.** Adding new resource types follows the established
   `core/<resource>.py` pattern rather than appending to a monolith.
+
+**Amendment note, 2026-09-19**: the namespace above was corrected from `vaultspec` to
+`vaultspec_core`; every module named here exists under that package. Two parts of this
+decision diverged from what shipped, and the text is left as authored rather than
+rewritten to match.
+
+- Phase 1 landed in substance: `config/` holds `config.py`, `workspace.py`, and
+  `tests/`. But `core/` was not reduced to a deprecation shim re-exporting
+  `vaultspec_core.config`. It was repurposed into a distinct package for resource
+  management and sync orchestration, and is consumed directly by `cli` and
+  `mcp_server`. The shim step was not taken.
+- Phase 2 was not implemented. There is no `cli_common` package; the shared CLI
+  foundation it proposed does not exist under that name.
+
+Neither divergence reverses a decision recorded here, so this is an amendment. The
+unbuilt `cli_common` extraction remains open, and whether to pursue or retire it is not
+settled by this record.

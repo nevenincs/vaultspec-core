@@ -3,36 +3,48 @@ tags:
   - '#adr'
   - '#cli-test-coverage'
 date: '2026-03-23'
-modified: '2026-06-25'
-body_hash: 'sha256:df03b40294531975b88fce211be89033050b1e5b76515c58c96f89f98d6bd2e7'
+modified: '2026-09-19'
+body_hash: 'sha256:630567f011c16518ed532b2bd08bbe40fa4784c0965a15426d4ed4fa77617a84'
 related:
   - '[[2026-03-23-cli-test-coverage-research]]'
 ---
 
-# `cli-test-coverage` adr: `cli test coverage` | (**status:** `accepted`)
+# `cli-test-coverage` adr: `cli test coverage` | (**status:** `deprecated`)
 
 ## Problem Statement
 
-Briefly describe the architectural problem or concern.
+This record was scaffolded on 2026-03-23 and never authored. Every section below
+retained its template placeholder text, so the record states no problem, weighs no
+options, and commits to no decision. It is deprecated rather than superseded: nothing
+was ever decided here for a successor to replace.
 
 ## Considerations
 
-Key factors, constraints, requirements. Tech/libraries considered.
+The scaffold carried an `accepted` status token, which made an empty record read as a
+ratified decision to both a human reader and any status-driven tooling. Its grounding
+research record, `2026-03-23-cli-test-coverage-research`, is an unfilled scaffold of the same date.
 
 ## Constraints
 
-Technical limitations, time constraints, etc.
+Deprecation changes only this record's status and states what it contains. It asserts
+nothing about the work the feature tag covers, which is evidenced by that feature's
+execution records where they exist.
 
 ## Implementation
 
-High-level description of HOW it will be implemented. Reference `{research}`
-and `{reference}` specs.
+None. No decision is recorded, so nothing governs and nothing rolls out.
 
 ## Rationale
 
-Why this option was chosen. Reference `{research}` findings and external
-`{reference}` patterns.
+Test-coverage practice is governed by the core mandates and by the feature's own
+later records. An empty scaffold cannot be reconstructed into a decision without
+inventing one, so it is retired instead.
 
 ## Consequences
 
-Difficulties, implementation consequences, future considerations.
+Good: the corpus no longer presents an empty scaffold as an accepted decision.
+
+Bad: whatever reasoning was intended on 2026-03-23 is not recoverable from this record.
+
+Neutral: if the underlying decision still needs recording, it is authored as a new ADR
+with its own evidence rather than by filling this one in retrospectively.
