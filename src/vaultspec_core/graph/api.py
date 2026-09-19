@@ -43,7 +43,6 @@ from . import api_export, rendering
 from .algorithms import (
     PAGERANK_ALPHA,
     betweenness_centrality,
-    docnode_from_attrs,
     edge_kind,
     extract_feature,
     extract_title,
@@ -55,8 +54,6 @@ from .networkx_runtime import (
     NetworkXGraph,
     directed_graph,
     ego_graph,
-    node_link_data,
-    node_link_graph,
 )
 from .networkx_runtime import density as graph_density
 
@@ -253,99 +250,35 @@ class VaultGraph:
             )
 
     def _to_cache_graph(self) -> dict[str, Any]:
-        """Return the node-link serialisation of the canonical graph for caching.
+        """Serialise the canonical graph for caching.
 
-        Uses the same ``edges="edges"`` node-link contract the JSON export
-        uses, then injects each node's *raw* document text - the whole file as
-        the ingress read normalised it, plus whether the source used CRLF -
-        so a cache load can reconstruct a behaviourally identical graph,
-        including :meth:`to_dict` with ``include_body=True``.
-
-        Raw text rather than body text, because the body is a prefix-strip
-        away from it (:func:`~vaultspec_core.vaultcore.parser.split_frontmatter`,
-        0.06 s over a 4,739-document corpus) while the raw text is not
-        recoverable from the body at all. Storing the body instead left
-        :meth:`ensure_raw_texts` to re-read the entire corpus on every cache
-        hit, which cost the check pipeline 1.3 s per run. The frontmatter this
-        adds is 1.7 MB against a 40.4 MB body payload.
-
-        Returns:
-            A node-link ``dict`` with raw text attached to each node.
+        Delegates to :func:`~vaultspec_core.graph.cache_io.to_cache_graph`,
+        which owns the cached node-link shape.
         """
-        data = node_link_data(self._digraph)
-        for node_dict in data.get("nodes", []):
-            nid = node_dict.get("id", "")
-            doc = self.nodes.get(nid)
-            raw, crlf = ("", False)
-            if doc is not None and doc.path is not None:
-                raw, crlf = self._raw_texts.get(doc.path, (doc.body, False))
-            node_dict["raw"] = raw
-            node_dict["crlf"] = crlf
-        return data
+        from .cache_io import to_cache_graph
+
+        return to_cache_graph(self._digraph, self.nodes, self._raw_texts)
 
     def _load_from_cache(self, payload: cache.GraphCachePayload) -> None:
-        """Reconstruct the graph state from a validated cache payload.
+        """Adopt the graph state rebuilt from a validated cache payload.
 
-        Rebuilds ``self._digraph``, ``self.nodes``, ``self._stem_index``,
-        ``self._raw_texts``, and ``self._dangling_links`` from the serialised
-        node-link data so the loaded graph is behaviourally identical to a
-        fresh build (same nodes, edges, attributes, node-size metrics, and
-        document text).  No filesystem read occurs.
-
-        Restoring the raw-text map here is what lets :meth:`ensure_raw_texts`
-        find its work already done after a cache hit instead of re-reading the
-        corpus. Each node's body is split back out of its raw text through the
-        same :func:`~vaultspec_core.vaultcore.parser.split_frontmatter` the
-        cold build's parse uses, so a cached body cannot drift from a parsed
-        one.
+        The reconstruction itself lives in
+        :func:`~vaultspec_core.graph.cache_io.restore_graph`; this assigns
+        what it returns.
 
         Args:
             payload: A cache payload that has already passed
                 :func:`vaultspec_core.graph.cache.validate`.
         """
-        from ..vaultcore.parser import split_frontmatter
+        from .cache_io import restore_graph
 
-        self._digraph = node_link_graph(payload.graph)
-        self.nodes = {}
-        self._stem_index = {}
-        self._raw_texts = {}
-        by_stem: dict[str, list[str]] = {}
-        for key in self._digraph.nodes():
-            attrs = self._digraph.nodes[key]
-            self.nodes[key] = docnode_from_attrs(key, attrs)
-            # Raw text is held on the graph, body on the DocNode; neither is an
-            # nx node attribute on a fresh build, so both are pulled back off
-            # the cached attrs and dropped to keep the attribute set identical.
-            raw = cast("str", attrs.pop("raw", ""))
-            crlf = cast("bool", attrs.pop("crlf", False))
-            node_path = self.nodes[key].path
-            if node_path is not None:
-                self._raw_texts[node_path] = (raw, crlf)
-            self.nodes[key].body = split_frontmatter(raw)[1] if raw else ""
-            # Phantoms are excluded from _stem_index to match fresh-build
-            # semantics: _rebuild_from_files only indexes real (non-phantom)
-            # nodes in passes 1a/1b; phantoms are added later in pass 2 and
-            # never entered into _stem_index.
-            if not attrs.get("phantom", False):
-                bare_stem = key.split("/", 1)[1] if "/" in key else key
-                by_stem.setdefault(bare_stem, []).append(key)
-        for bare_stem, keys in by_stem.items():
-            self._stem_index[bare_stem] = sorted(keys)
-        self._dangling_links = [(pair[0], pair[1]) for pair in payload.dangling_links]
-        # A document that failed to read or decode never becomes a usable node,
-        # so the cache carries these separately; restoring them keeps a warm
-        # run's encoding findings identical to a cold one's.
-        from pathlib import Path as _Path
-
-        self._encoding_issues = [
-            EncodingIssue(_Path(raw_path), kind, detail, start)
-            for raw_path, kind, detail, start in payload.encoding_issues
-        ]
-        logger.info(
-            "Graph loaded from cache: %d nodes, %d edges",
-            self._digraph.number_of_nodes(),
-            self._digraph.number_of_edges(),
-        )
+        restored = restore_graph(payload)
+        self._digraph = restored.digraph
+        self.nodes = restored.nodes
+        self._stem_index = restored.stem_index
+        self._raw_texts = restored.raw_texts
+        self._dangling_links = restored.dangling_links
+        self._encoding_issues = restored.encoding_issues
 
     def _rebuild_from_files(self, scanned_files: list[pathlib.Path]) -> None:
         """Rebuild the graph by parsing every scanned file.
