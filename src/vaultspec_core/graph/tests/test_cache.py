@@ -928,3 +928,131 @@ class TestIngressFingerprintReuse:
         assert cache_mod.cache_path(root).exists()
         assert sorted(warm.nodes) == sorted(cold.nodes)
         assert warm._digraph.number_of_edges() == cold._digraph.number_of_edges()
+
+
+class TestCachedRawTextRestoresTheCorpus:
+    """A cache hit restores document text instead of re-reading the corpus.
+
+    The cache used to store each node's body. The body is not enough: the
+    check pipeline needs each document's whole raw text, so every cache hit
+    called ``ensure_raw_texts`` and read all of it back off disk - 1.3 s per
+    run on a 4,739-document vault, on top of a cache load that had just
+    produced 40 MB of body text. The cache now stores the raw text, whose
+    frontmatter adds 1.7 MB, and splits the body back out of it.
+
+    What has to hold is that a warm graph is indistinguishable from a cold
+    one, text included, and that the warm path reads nothing.
+    """
+
+    @staticmethod
+    def _vault(root: Path) -> None:
+        WorkspaceFactory(root).install()
+        bodies = [
+            "# plain\n\nOrdinary prose.\n",
+            "# fenced\n\n```python\ncode = 1\n```\n\nAfter.\n",
+            "# crlf\n\nLine one.\n",
+            "# empty body\n",
+        ]
+        for n, body in enumerate(bodies):
+            text = (
+                "---\n"
+                "tags:\n"
+                "  - '#research'\n"
+                f"  - '#raw-{n}'\n"
+                f"date: '2026-04-0{n + 1}'\n"
+                f"modified: '2026-04-0{n + 1}'\n"
+                "related: []\n"
+                "---\n\n" + body
+            )
+            name = f"2026-04-0{n + 1}-raw-{n}-research.md"
+            path = root / ".vault" / "research" / name
+            if n == 2:
+                path.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+            else:
+                path.write_text(text, encoding="utf-8")
+
+    def test_warm_graph_carries_the_same_raw_texts_as_a_cold_one(
+        self, tmp_path: Path
+    ) -> None:
+        """Including the CRLF flag, which a body-only cache could not carry."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        assert warm.raw_texts == cold.raw_texts
+        assert any(crlf for _, crlf in cold.raw_texts.values()), (
+            "the fixture must include a CRLF document for this to mean anything"
+        )
+
+    def test_warm_bodies_match_the_parsed_bodies(self, tmp_path: Path) -> None:
+        """The body split out of cached raw text equals the parsed body."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        assert sorted(warm.nodes) == sorted(cold.nodes)
+        for key, node in cold.nodes.items():
+            assert warm.nodes[key].body == node.body, f"body drifted for {key}"
+
+    def test_a_cache_hit_reads_no_document_off_disk(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The whole point: the warm path performs no corpus read at all.
+
+        ``ensure_raw_texts`` is called explicitly afterwards because that is
+        what the check pipeline does; before the raw text was cached it read
+        every document there.
+        """
+        import pathlib as _pathlib
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        VaultGraph(root)
+
+        reads: list[Path] = []
+        real_read_bytes = _pathlib.Path.read_bytes
+
+        def counting_read_bytes(self: Path) -> bytes:
+            if self.suffix == ".md":
+                reads.append(self)
+            return real_read_bytes(self)
+
+        monkeypatch.setattr(_pathlib.Path, "read_bytes", counting_read_bytes)
+
+        warm = VaultGraph(root)
+        warm.ensure_raw_texts()
+
+        assert reads == [], f"the warm path read {len(reads)} document(s) off disk"
+        assert warm.raw_texts, "a warm graph must still end up with its text"
+
+    def test_the_nx_node_attributes_match_a_fresh_build(self, tmp_path: Path) -> None:
+        """Raw text and its CRLF flag must not leak into the node attributes.
+
+        They are carried on the cache payload only; a fresh build has neither,
+        so a warm build that left them on the node would serialise a different
+        graph than a cold one.
+        """
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        for key in cold._digraph.nodes:
+            cold_attrs = cold._digraph.nodes[key]
+            warm_attrs = warm._digraph.nodes[key]
+            assert "raw" not in warm_attrs
+            assert "crlf" not in warm_attrs
+            assert set(warm_attrs) == set(cold_attrs), f"attribute set differs at {key}"

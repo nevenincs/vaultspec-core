@@ -21,7 +21,12 @@ if TYPE_CHECKING:
 
 from .models import DocumentMetadata
 
-__all__ = ["SafeLoader", "parse_frontmatter", "parse_vault_metadata"]
+__all__ = [
+    "SafeLoader",
+    "parse_frontmatter",
+    "parse_vault_metadata",
+    "split_frontmatter",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +128,45 @@ except ImportError:
     _yaml_load = _simple_yaml_load
 
 
+#: The frontmatter fence: a leading ``---`` line, the YAML block, a closing
+#: ``---`` line, and everything after it.
+_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
+
+
+def split_frontmatter(content: str) -> tuple[str | None, str]:
+    """Split *content* into its YAML frontmatter block and its body.
+
+    The single definition of where a document's body begins. Both parsers
+    below and the graph cache's body reconstruction call it, so a cached body
+    cannot drift from a parsed one: the cache stores each document's raw text
+    and derives the body through this function rather than storing a second
+    copy of it.
+
+    A leading UTF-8 BOM (U+FEFF) is dropped before the fence is looked for. It
+    is not whitespace, so ``str.lstrip`` leaves it in front of the ``---`` and
+    a perfectly valid BOM-prefixed document would parse as having no
+    frontmatter, silently losing its tags.
+
+    Args:
+        content: Raw markdown text, optionally beginning with ``---`` fenced
+            YAML frontmatter.
+
+    Returns:
+        ``(yaml_block, body)``. *yaml_block* is ``None`` when the document
+        carries no parseable frontmatter, in which case *body* is the whole
+        BOM- and whitespace-stripped content.
+    """
+    if content.startswith("\ufeff"):
+        content = content[1:]
+    content = content.lstrip()
+    if not content.startswith("---"):
+        return None, content
+    match = _FRONTMATTER_RE.match(content)
+    if not match:
+        return None, content
+    return match.group(1), match.group(2)
+
+
 def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     """Parse YAML frontmatter and return (metadata dict, body).
 
@@ -139,28 +183,20 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         if no frontmatter is present.
     """
     # A UTF-8 BOM (U+FEFF) is not whitespace, so ``str.lstrip`` leaves it in
-    # place and the ``---`` fence check below would fail - silently classifying
-    # a perfectly valid BOM-prefixed document as having no frontmatter. Strip a
-    # single leading BOM first so BOM docs are discovered everywhere this parser
-    # runs (vault scan, feature listing, graph build, every check).
-    if content.startswith("\ufeff"):
-        content = content[1:]
-    content = content.lstrip()
+    # place and the ``---`` fence check would fail - silently classifying a
+    # perfectly valid BOM-prefixed document as having no frontmatter. That,
+    # and where the body begins, is :func:`split_frontmatter`'s job.
+    yaml_block, body = split_frontmatter(content)
     frontmatter: dict[str, Any] = {}
-    body = content
-    if not content.startswith("---"):
-        return frontmatter, body
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", content, re.DOTALL)
-    if not match:
+    if yaml_block is None:
         return frontmatter, body
 
     try:
-        frontmatter = _yaml_load(match.group(1))
+        frontmatter = _yaml_load(yaml_block)
     except Exception as e:
         # Summarize rather than dump the block: this is the kind of warning
         # that gets pasted verbatim into a public bug report, and the block
         # itself may carry values the author never intended to publish.
-        yaml_block = match.group(1)
         logger.warning(
             "Failed to parse %d-char frontmatter block (starts %r): %s",
             len(yaml_block),
@@ -169,7 +205,6 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
             exc_info=True,
         )
         frontmatter = {}
-    body = match.group(2)
     return frontmatter, body
 
 
@@ -199,17 +234,10 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
     # whitespace, so ``str.lstrip`` would leave it in front of the ``---`` fence
     # and the document would parse as having no metadata - silently dropping its
     # tags and making it invisible to every feature scan and check.
-    if content.startswith("\ufeff"):
-        content = content[1:]
-    content = content.lstrip()
+    yaml_content, body = split_frontmatter(content)
     metadata = DocumentMetadata()
-    body = content
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", content, re.DOTALL)
-    if not match:
+    if yaml_content is None:
         return metadata, body
-
-    yaml_content = match.group(1)
-    body = match.group(2)
 
     current_key: str | None = None
 

@@ -87,7 +87,7 @@ __all__ = [
 #: Schema string stamped into every cache file.  Bump when the on-disk
 #: payload shape changes so an older cache is treated as a miss rather than
 #: misread.  Tied to the graph wire schema generation (``v3``).
-CACHE_SCHEMA = "vaultspec.vault.graph.cache.v4"
+CACHE_SCHEMA = "vaultspec.vault.graph.cache.v5"
 
 #: Manifest value type: ``(st_size, st_mtime_ns, sha256_hex)`` per file.
 Fingerprint = tuple[int, int, str]
@@ -104,7 +104,8 @@ class GraphCachePayload:
         graph: The networkx node-link ``dict`` of the cached canonical
             graph, exactly as produced by
             :func:`networkx.readwrite.json_graph.node_link_data` with
-            ``edges="edges"``.
+            ``edges="edges"``, each node additionally carrying the ``raw``
+            document text and its ``crlf`` flag.
         dangling_links: The ``(source, target)`` dangling-link pairs
             recorded during the cached build, as two-element lists.
         encoding_issues: The read and decode failures the cached build's
