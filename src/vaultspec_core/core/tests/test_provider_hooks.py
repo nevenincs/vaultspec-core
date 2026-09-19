@@ -74,6 +74,40 @@ class TestRenderPayload:
         payload = render_hooks_payload([_spec(HookEvent.POST_TOOL_USE)], Tool.GEMINI)
         assert payload is not None and "AfterTool" in payload
 
+    def test_antigravity_maps_only_events_the_binary_fires(self):
+        """agy fires five events; three we once mapped are not among them.
+
+        A hook rendered under a name agy never fires is written, reported as
+        synced, and silently never runs - so the map is asserted exactly rather
+        than by spot check.
+        """
+        assert supported_events(Tool.ANTIGRAVITY) == {
+            HookEvent.PRE_TOOL_USE,
+            HookEvent.POST_TOOL_USE,
+            HookEvent.STOP,
+        }
+
+    def test_antigravity_non_tool_events_are_a_flat_handler_list(self):
+        """agy's Stop takes handlers directly; a matcher group there is inert."""
+        payload = render_hooks_payload([_spec(HookEvent.STOP)], Tool.ANTIGRAVITY)
+        assert payload is not None
+        stop = payload["vaultspec"]["Stop"]
+        assert stop == [{"type": "command", "command": "echo x"}]
+
+    def test_antigravity_tool_events_keep_the_matcher_group(self):
+        payload = render_hooks_payload(
+            [_spec(HookEvent.PRE_TOOL_USE, matcher="run_command")], Tool.ANTIGRAVITY
+        )
+        assert payload is not None
+        group = payload["vaultspec"]["PreToolUse"][0]
+        assert group["matcher"] == "run_command"
+        assert group["hooks"] == [{"type": "command", "command": "echo x"}]
+
+    def test_codex_supports_session_end(self):
+        """Verified against Codex's published hook reference."""
+        assert HookEvent.SESSION_END in supported_events(Tool.CODEX)
+        assert HookEvent.NOTIFICATION not in supported_events(Tool.CODEX)
+
     def test_antigravity_wraps_in_named_hookset(self):
         payload = render_hooks_payload(
             [_spec(HookEvent.PRE_TOOL_USE)], Tool.ANTIGRAVITY
@@ -116,6 +150,7 @@ class TestRenderPayload:
         assert HookEvent.STOP not in supported_events(Tool.GEMINI)
         assert HookEvent.NOTIFICATION not in supported_events(Tool.CODEX)
         assert HookEvent.USER_PROMPT_SUBMIT not in supported_events(Tool.ANTIGRAVITY)
+        assert HookEvent.SESSION_START not in supported_events(Tool.ANTIGRAVITY)
 
 
 class TestLoader:

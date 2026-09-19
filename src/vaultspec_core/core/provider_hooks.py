@@ -7,10 +7,10 @@ tool-lifecycle hooks (pre/post tool use, session start/stop, ...) consumed by
 the coding agents themselves - Claude Code, OpenAI Codex, the Antigravity CLI
 (``agy``), and the Gemini CLI.
 
-Every provider verified (mid-2026) shares the same structural shape - an event
-maps to a list of matcher groups, each with a list of ``{"type": "command",
-"command": ...}`` handlers - but the providers disagree on event names, file
-location, and packaging:
+Providers broadly share one structural shape - an event maps to a list of
+matcher groups, each with a list of ``{"type": "command", "command": ...}``
+handlers - but they disagree on event names, file location, packaging, and, in
+agy's case, on the shape itself for non-tool events:
 
 ============  ==========================================  ==================
 Provider      File                                        Pre/post tool event
@@ -25,6 +25,12 @@ Authors write a canonical :class:`HookEvent`; each provider renderer maps it to
 the native name (or drops it, with a warning, when the provider lacks an
 equivalent), converts the timeout to the provider's unit, and emits the native
 structure.
+
+A mapping to an event a provider does not actually fire is the failure mode
+this module is most exposed to: the file is written, the sync reports success,
+and the hook never runs. The tables below were checked against each provider's
+published hook reference; claude, codex, gemini and antigravity were verified,
+and a table cell is only as good as that check.
 """
 
 from __future__ import annotations
@@ -93,17 +99,22 @@ PROVIDER_EVENT_NAMES: dict[Tool, dict[HookEvent, str]] = {
         HookEvent.POST_TOOL_USE: "PostToolUse",
         HookEvent.USER_PROMPT_SUBMIT: "UserPromptSubmit",
         HookEvent.SESSION_START: "SessionStart",
+        HookEvent.SESSION_END: "SessionEnd",
         HookEvent.STOP: "Stop",
-        # Codex has no SessionEnd or Notification hook events.
+        # Codex has no Notification hook event.
     },
     Tool.ANTIGRAVITY: {
         HookEvent.PRE_TOOL_USE: "PreToolUse",
         HookEvent.POST_TOOL_USE: "PostToolUse",
-        HookEvent.SESSION_START: "SessionStart",
-        HookEvent.SESSION_END: "SessionEnd",
         HookEvent.STOP: "Stop",
-        HookEvent.NOTIFICATION: "Notification",
-        # agy has no UserPromptSubmit hook event.
+        # agy fires exactly five events: PreInvocation, PostInvocation,
+        # PreToolUse, PostToolUse, Stop. SessionStart, SessionEnd and
+        # Notification were mapped here and exist nowhere in the binary, so
+        # those hooks rendered into .agents/hooks.json under names nothing
+        # fires - no error, no warning, and no execution. PreInvocation and
+        # PostInvocation are the nearest thing to a session boundary, but they
+        # carry a different response contract, so they stay unmapped rather
+        # than trading three silent no-ops for one malformed reply.
     },
     Tool.GEMINI: {
         HookEvent.PRE_TOOL_USE: "BeforeTool",
@@ -118,6 +129,12 @@ PROVIDER_EVENT_NAMES: dict[Tool, dict[HookEvent, str]] = {
 # Timeout units differ: gemini-cli expresses hook timeouts in milliseconds,
 # every other provider in seconds. Authors always write seconds.
 _MILLISECOND_TIMEOUT_TOOLS = frozenset({Tool.GEMINI})
+
+#: agy events whose value is a flat list of handlers rather than a list of
+#: matcher groups. Its tool events take the matcher-group shape every other
+#: provider uses; its non-tool events do not, and a matcher group written under
+#: one is not a handler agy can run.
+_AGY_FLAT_EVENTS = frozenset({"PreInvocation", "PostInvocation", "Stop"})
 
 # The named hookset agy groups vaultspec-managed hooks under in hooks.json.
 # Public: agy records ownership by owning this hookset rather than by writing a
@@ -224,7 +241,15 @@ def render_hooks_payload(
         return None
 
     if tool is Tool.ANTIGRAVITY:
-        return {AGY_HOOKSET_NAME: {"enabled": True, **grouped}}
+        shaped: dict[str, Any] = {}
+        for native, groups in grouped.items():
+            if native in _AGY_FLAT_EVENTS:
+                shaped[native] = [
+                    handler for group in groups for handler in group["hooks"]
+                ]
+            else:
+                shaped[native] = groups
+        return {AGY_HOOKSET_NAME: {"enabled": True, **shaped}}
     return dict(grouped)
 
 
