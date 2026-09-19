@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.4](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.3...vaultspec-core-v0.2.4) (2026-09-19)
+
+
+### Features
+
+* **firmware:** carry the code boundary to the surfaces that write code ([8e0382c](https://github.com/nevenincs/vaultspec-core/commit/8e0382cce447fb7d370893092c5c85b733ea1976))
+
+
+### Bug Fixes
+
+* **ci:** point the package managers at a release that exists ([ff74a41](https://github.com/nevenincs/vaultspec-core/commit/ff74a41a1bfbbeb260f7f27f53c0c36a1c00513f))
+* **vault:** rebuild the feature indexes the status changes invalidated ([7ed3739](https://github.com/nevenincs/vaultspec-core/commit/7ed3739bcc8bacfa857d9970ea360bc441c17ad5))
+
+
+### Performance
+
+* index and graph operations on large vaults ([#537](https://github.com/nevenincs/vaultspec-core/issues/537)) ([3c29056](https://github.com/nevenincs/vaultspec-core/commit/3c29056aae2671b9cfd829b3e452200e5c1b4c54))
+
 ## [0.2.3](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.2...vaultspec-core-v0.2.3) (2026-09-18)
 
 
