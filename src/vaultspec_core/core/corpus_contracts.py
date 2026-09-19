@@ -30,7 +30,7 @@ EXTERNAL_VAULTSPEC_NAMES = frozenset(
     {
         "vaultspec-core",  # this package's CLI entry point
         "vaultspec-rag",  # companion semantic-search package
-        "vaultspec-mcp",  # the MCP server's advertised name (mcp_server/app.py)
+        "vaultspec-core-mcp",  # the MCP server's advertised name (mcp_server/app.py)
         "vaultspec-managed",  # adjective in cli.md for the pre-commit hook
     }
 )

@@ -105,11 +105,11 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
                     break
                 continue
             startup_lines.append(line)
-            if "Starting vaultspec-mcp server root=" in line:
+            if "Starting vaultspec-core-mcp server root=" in line:
                 break
 
         startup_output = "".join(startup_lines)
-        assert "Starting vaultspec-mcp server" in startup_output, startup_output
+        assert "Starting vaultspec-core-mcp server" in startup_output, startup_output
         assert "root=" in startup_output, startup_output
         assert proc.poll() is None
 
@@ -125,7 +125,8 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
         response_line = stdout_queue.get(timeout=15)
         response = json.loads(response_line)
         assert response["id"] == 1, response
-        assert response["result"]["serverInfo"]["name"] == "vaultspec-mcp", response
+        name = response["result"]["serverInfo"]["name"]
+        assert name == "vaultspec-core-mcp", response
     finally:
         proc.terminate()
         try:
@@ -167,7 +168,8 @@ def test_mcp_entrypoint_exits_cleanly_on_stdin_eof_while_serving(
         proc.stdin.write((json.dumps(_INITIALIZE_REQUEST) + "\n").encode("utf-8"))
         proc.stdin.flush()
         response = json.loads(proc.stdout.readline())
-        assert response["result"]["serverInfo"]["name"] == "vaultspec-mcp", response
+        name = response["result"]["serverInfo"]["name"]
+        assert name == "vaultspec-core-mcp", response
 
         proc.stdin.close()
         returncode = proc.wait(timeout=20)

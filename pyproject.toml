@@ -24,10 +24,7 @@ dependencies = [
   "rich>=14.3.2",
   "ruamel.yaml>=0.18",
   "rustworkx>=0.18.0",
-  "sse-starlette>=3.2.0",
-  "starlette>=0.52.1",
   "typer>=0.12.0",
-  "uvicorn>=0.41.0",
 ]
 description = "Decision-driven harness for coding agents, and humans."
 keywords = [
@@ -52,7 +49,7 @@ version = "0.2.3"
 
   [project.scripts]
   "vaultspec-core" = "vaultspec_core.__main__:main"
-  "vaultspec-mcp" = "vaultspec_core.mcp_server.app:run"
+  "vaultspec-core-mcp" = "vaultspec_core.mcp_server.app:run"
 
   [project.optional-dependencies]
   dev = [
@@ -789,23 +786,17 @@ known_first_party = ["vaultspec_core"]
   [tool.deptry.per_rule_ignores]
   # DEP002 is "declared but never imported".
   #
-  # sse-starlette / starlette / uvicorn are declared in [project.dependencies]
-  # but serve no first-party import, and the evidence says they are redundant
-  # rather than deliberate:
-  #
-  #   - The MCP server is STDIO-ONLY. `mcp_server/app.py` calls a bare
-  #     `mcp.run()`, whose default transport is stdio, and the module's own
-  #     comments name the stdio lifetime contract throughout. The HTTP and SSE
-  #     transport stack is never constructed.
-  #   - `mcp@2.0.0` already requires all three itself, so removing these
-  #     declarations would not change a single resolved environment.
-  #
-  # They are NOT removed here only because a direct declaration of a transitive
-  # package is also how one pins a security floor, and whether any of the three
-  # was pinned for an advisory is an intent question the code cannot answer.
-  # Resolve that, then delete them from [project.dependencies] and drop these
-  # three names from the list below - do not leave the ignores standing as the
-  # permanent answer.
+  # sse-starlette / starlette / uvicorn WERE declared in
+  # [project.dependencies] and are now resolved: the intent question this note
+  # used to pose has an answer. Their floors were introduced by the A2A rewrite
+  # commit, whose ADRs and plan no longer exist in the vault and whose code was
+  # never written, so they were an abandoned HTTP-server ambition rather than
+  # security pins. The OSV gate reports no advisory against any of the three,
+  # and `mcp` requires all three itself, so the resolved environment is
+  # unchanged. Declaring a transport this server does not serve made the
+  # dependency set assert a capability that does not exist, so the declarations
+  # are gone and these names are out of the ignore list below. If HTTP is ever
+  # wanted it is its own feature with its own decision record.
   #
   # `httpx` WAS a fourth name here and is now resolved: the mcp 2.0 bump moved
   # the SDK to `httpx2`, so httpx stopped being a transitive of the runtime tree
@@ -819,9 +810,6 @@ known_first_party = ["vaultspec_core"]
   # surfaces onto the dependency group is tracked separately; until then the
   # scanner reports every one of them.
   DEP002 = [
-    "sse-starlette",
-    "starlette",
-    "uvicorn",
     "identify",
     "mdformat",
     "mdformat-frontmatter",

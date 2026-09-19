@@ -9,23 +9,45 @@ spawn, a non-zero exit folding stderr into the structured error payload,
 reserved and unknown flag rejection, the ``discover`` ranking order, and a
 reference stripped of its command-inventory markers refusing with
 remediation text rather than a bare ``Error executing tool``.
+
+The cancellation and timeout cases at the end exercise real children against
+real pids: a cancelled call and a timed-out call must both reap the child
+promptly rather than wait it out, and a ``notifications/cancelled`` sent over
+the raw in-memory wire must leave its request unanswered.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import asyncio
+import logging
+import re
+import sys
+import time
+from typing import TYPE_CHECKING, Any
 
+import anyio
 import pytest
 from mcp import Client
+from mcp.client._memory import InMemoryTransport
 from mcp.server.mcpserver import MCPServer
-from mcp.types import CallToolResult, TextContent
+from mcp.shared.message import SessionMessage
+from mcp.types import (
+    LATEST_PROTOCOL_VERSION,
+    CallToolResult,
+    JSONRPCNotification,
+    JSONRPCRequest,
+    TextContent,
+)
 
 from vaultspec_core.mcp_server.tools.gateway import (
+    _child_environment,
     _load_catalog,
+    _run_verb,
     register_gateway_tools,
 )
 
 from .conftest import data_of, vault_root
+from .test_watchdog import _wait_for_pid_exit
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,7 +64,7 @@ def _gateway_server() -> MCPServer[None]:
     isolation end-to-end through the same session transport; the full
     nine-tool ``create_server`` wiring is covered by the surface test.
     """
-    mcp = MCPServer(name="vaultspec-mcp-gateway-test")
+    mcp = MCPServer(name="vaultspec-core-mcp-gateway-test")
     register_gateway_tools(mcp)
     return mcp
 
@@ -348,3 +370,226 @@ async def test_invoke_marks_its_child_as_non_interactive(vault_root: Path) -> No
         payload = data_of(result)
         assert payload["ok"] is False
         assert "no terminal" in payload["error"]["stderr"].lower()
+
+
+# ---------------------------------------------------------------------------
+# cancellation and timeout
+# ---------------------------------------------------------------------------
+
+#: A child that outlives any test budget, so only the reap discipline ends it.
+_SLEEPER_ARGV = [sys.executable, "-c", "import time; time.sleep(60)"]
+
+_GATEWAY_LOGGER = "vaultspec_core.mcp_server.tools.gateway"
+_PID_LINE = re.compile(r"invoke: child pid=(\d+)")
+
+#: Wall-clock ceiling for a reap: terminate is immediate and the grace is 2s,
+#: so anything approaching the child's own 60s lifetime means it was waited out
+#: rather than killed.
+_REAP_BUDGET = 15.0
+
+
+def _logged_child_pid(caplog: pytest.LogCaptureFixture) -> int:
+    """Return the pid the gateway logged for its spawned child.
+
+    Liveness is asserted by pid rather than through the ``Process`` object,
+    because the object reports what the parent believes while the pid reports
+    what the OS still has.
+    """
+    for record in caplog.records:
+        match = _PID_LINE.fullmatch(record.getMessage())
+        if match:
+            return int(match.group(1))
+    raise AssertionError("the gateway logged no child pid")
+
+
+async def _await_child_pid(
+    caplog: pytest.LogCaptureFixture, timeout: float = 30.0
+) -> int:
+    """Wait until the gateway logs its child pid, then return it.
+
+    Polling for the spawn rather than sleeping a fixed interval keeps the test
+    honest on a slow machine: the cancel must arrive while the child is
+    genuinely running, not before it started or after it was reaped.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for record in caplog.records:
+            match = _PID_LINE.fullmatch(record.getMessage())
+            if match:
+                return int(match.group(1))
+        await anyio.sleep(0.05)
+    raise AssertionError("the gateway logged no child pid before the deadline")
+
+
+async def test_run_verb_cancellation_reaps_the_child(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Cancelling the handler kills the child instead of leaking it.
+
+    The blocking ``subprocess.run`` this replaced pinned the event loop for the
+    child's whole lifetime, so a ``notifications/cancelled`` was not even read
+    until the verb finished. The coroutine must instead take the cancellation
+    at its next await, reap the child, and let ``CancelledError`` propagate -
+    the SDK discards a cancelled handler's result, so there is nothing to
+    return.
+    """
+    caplog.set_level(logging.INFO, logger=_GATEWAY_LOGGER)
+    task = asyncio.ensure_future(_run_verb(_SLEEPER_ARGV, _child_environment(), 60.0))
+    pid = await _await_child_pid(caplog)
+    await asyncio.sleep(0.2)
+
+    task.cancel()
+    started = time.monotonic()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    elapsed = time.monotonic() - started
+
+    assert _wait_for_pid_exit(pid, 3.0), f"child {pid} survived cancellation"
+    # The child sleeps far longer than this bound, so a reap that merely waited
+    # it out would also leave the pid gone. Only the elapsed time separates
+    # "killed" from "outlived", which is the whole point of the change.
+    assert elapsed < _REAP_BUDGET, (
+        f"cancellation took {elapsed:.1f}s; the child was waited out, not killed"
+    )
+
+
+async def test_run_verb_timeout_reaps_the_child(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The timeout path takes the same kill discipline as cancellation.
+
+    Timeout and cancellation differ only in what follows the reap: the timeout
+    raises for the handler to fold into the structured payload, where the
+    cancellation re-raises and returns nothing.
+    """
+    caplog.set_level(logging.INFO, logger=_GATEWAY_LOGGER)
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        await _run_verb(_SLEEPER_ARGV, _child_environment(), 0.5)
+    elapsed = time.monotonic() - started
+
+    pid = _logged_child_pid(caplog)
+    assert _wait_for_pid_exit(pid, 3.0), f"child {pid} survived the timeout"
+    assert elapsed < _REAP_BUDGET, (
+        f"timeout took {elapsed:.1f}s; the child was waited out, not killed"
+    )
+
+
+async def test_invoke_folds_a_timeout_into_the_structured_error(
+    vault_root: Path,
+) -> None:
+    """A verb that outlives its budget returns the ``timeout`` error kind.
+
+    A budget below interpreter startup makes the real binary miss it every
+    time, so the folded payload is exercised without a contrived slow verb.
+    """
+    mcp = _gateway_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "invoke", {"verb": "vault list", "timeout": 0.01}
+        )
+        payload = data_of(result)
+        assert payload["ok"] is False
+        assert payload["exit_code"] == -1
+        assert payload["error"]["kind"] == "timeout"
+        assert payload["error"]["exit_code"] == -1
+
+
+async def _send(stream: Any, message: Any) -> None:
+    """Put one raw JSON-RPC message on the client's write stream."""
+    await stream.send(SessionMessage(message=message))
+
+
+def _wire_id(received: Any) -> Any:
+    """Return the JSON-RPC id of one received wire item.
+
+    The stream carries ``SessionMessage | Exception``; a transport failure is
+    a test failure rather than something to skip past, so it is raised here.
+    """
+    if isinstance(received, Exception):
+        raise received
+    return getattr(received.message, "id", None)
+
+
+async def _recv_id(stream: Any, request_id: int, timeout: float = 30.0) -> None:
+    """Receive until the reply to *request_id* arrives."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with anyio.move_on_after(deadline - time.monotonic()):
+            if _wire_id(await stream.receive()) == request_id:
+                return
+    raise AssertionError(f"no reply to request {request_id} arrived")
+
+
+async def test_invoke_cancellation_over_the_protocol(
+    vault_root: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A real ``notifications/cancelled`` stops a real ``invoke`` mid-flight.
+
+    Driven over the raw in-memory wire rather than through ``Client`` so the
+    request id is this test's own and the server's write stream can be
+    inspected directly. That costs a dependency on a private SDK module; if a
+    future SDK drops it, drive the same exchange through whatever public
+    transport replaces it rather than deleting the test, because nothing else
+    covers the whole path from a protocol cancellation to a dead child.
+
+    The child's death is the assertion that discriminates. The unanswered
+    request does not: the SDK discards any response to a cancelled id itself,
+    so a handler that swallowed ``CancelledError`` and returned a result
+    still leaves the wire silent - measured, not assumed. It is asserted
+    anyway because a response appearing for a cancelled id would be a
+    protocol violation worth catching, not because it proves this code
+    cancels.
+    """
+    caplog.set_level(logging.INFO, logger=_GATEWAY_LOGGER)
+    mcp = _gateway_server()
+    async with InMemoryTransport(mcp) as (read_stream, write_stream):
+        await _send(
+            write_stream,
+            JSONRPCRequest(
+                jsonrpc="2.0",
+                id=1,
+                method="initialize",
+                params={
+                    "protocolVersion": LATEST_PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": {"name": "gateway-cancel-test", "version": "0"},
+                },
+            ),
+        )
+        await _recv_id(read_stream, 1)
+        await _send(
+            write_stream,
+            JSONRPCNotification(jsonrpc="2.0", method="notifications/initialized"),
+        )
+
+        call_id = 2
+        await _send(
+            write_stream,
+            JSONRPCRequest(
+                jsonrpc="2.0",
+                id=call_id,
+                method="tools/call",
+                params={"name": "invoke", "arguments": {"verb": "vault list"}},
+            ),
+        )
+        pid = await _await_child_pid(caplog)
+        await _send(
+            write_stream,
+            JSONRPCNotification(
+                jsonrpc="2.0",
+                method="notifications/cancelled",
+                params={"requestId": call_id, "reason": "test cancellation"},
+            ),
+        )
+
+        # Nothing may be written for the cancelled id. Draining for longer than
+        # the verb needs to finish distinguishes "never answered" from "not
+        # answered yet".
+        with anyio.move_on_after(5.0):
+            while True:
+                assert _wire_id(await read_stream.receive()) != call_id, (
+                    "the cancelled request was answered"
+                )
+
+        assert _wait_for_pid_exit(pid, 5.0), f"child {pid} survived the cancellation"

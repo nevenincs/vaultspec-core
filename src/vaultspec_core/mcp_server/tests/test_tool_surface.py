@@ -183,8 +183,28 @@ async def test_surface_instructions_name_the_tools_and_version(
     mcp = create_server()
     instructions = mcp.instructions or ""
     assert __version__ in instructions
-    for name in _EXPECTED_TOOLS:
-        assert name in instructions, f"{name} missing from instructions"
+    # Derive the expectation from what the server actually registered, so a new
+    # tool cannot reach the surface without the orientation string following
+    # it. Match the quoted form the string uses: a bare substring test passes
+    # whenever a tool name is a fragment of a longer word - 'log' sits inside
+    # "catalog", which is how the ledger tool stayed unnamed here while this
+    # guard reported green.
+    for name in {tool.name for tool in await mcp.list_tools()}:
+        assert f"'{name}'" in instructions, f"{name} missing from instructions"
+
+
+async def test_read_only_instructions_name_only_the_read_only_surface(
+    vault_root: Path,
+) -> None:
+    """The read-only instructions name their own tools and no mutating one."""
+    mcp = create_server(read_only=True)
+    instructions = mcp.instructions or ""
+    assert __version__ in instructions
+    registered = {tool.name for tool in await mcp.list_tools()}
+    for name in registered:
+        assert f"'{name}'" in instructions, f"{name} missing from instructions"
+    for name in _EXPECTED_TOOLS - registered:
+        assert f"'{name}'" not in instructions, f"{name} advertised in read-only mode"
 
 
 async def test_surface_representative_call_per_tool(vault_root: Path) -> None:

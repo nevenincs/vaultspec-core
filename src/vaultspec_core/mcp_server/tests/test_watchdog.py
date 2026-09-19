@@ -109,7 +109,7 @@ def _assert_server_serves(stdin_pipe: IO[bytes], stdout_pipe: IO[bytes]) -> None
         }
     )
     init_result = recv(1)
-    assert init_result["serverInfo"]["name"] == "vaultspec-mcp", init_result
+    assert init_result["serverInfo"]["name"] == "vaultspec-core-mcp", init_result
     send({"jsonrpc": "2.0", "method": "notifications/initialized"})
     send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     tools_result = recv(2)
@@ -418,7 +418,7 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
         # Functional floor: the server must prove it serves MCP through
         # this exact pipe before the lifecycle assertion means anything.
         serving_line = client.stdout.readline().strip()
-        assert serving_line.startswith("SERVING name=vaultspec-mcp "), serving_line
+        assert serving_line.startswith("SERVING name=vaultspec-core-mcp "), serving_line
         served_tools = set(serving_line.split("tools=", 1)[1].split(","))
         assert served_tools == _EXPECTED_TOOLS, served_tools
 

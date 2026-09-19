@@ -1,7 +1,7 @@
 """Bootstrap the MCPServer application for the vaultspec MCP server.
 
 Constructs the ``MCPServer`` instance, registers the vault tool surface, and
-provides the runtime entry boundary for ``vaultspec-mcp``. Supports both
+provides the runtime entry boundary for ``vaultspec-core-mcp``. Supports both
 root-CLI-injected context (via ``ctx.obj``) and standalone fallback
 configuration via :func:`~vaultspec_core.config.get_config`.
 """
@@ -67,9 +67,9 @@ def _build_instructions(*, read_only: bool) -> str:
 
     Names each first-class tool so a host that surfaces server instructions can
     orient an agent without a round-trip, and carries the tool-schema version
-    (the package version per ADR Q8) as a third channel alongside the
-    ``initialize`` implementation info and the ``status`` structured output, so
-    the version survives the stateless protocol where ``initialize`` disappears.
+    (the package version) as a third channel alongside the server identity in
+    ``serverInfo`` and the ``status`` structured output, so the version survives
+    a stateless protocol that has no handshake to announce it in.
 
     Returns:
         The assembled instructions string.
@@ -86,13 +86,14 @@ def _build_instructions(*, read_only: bool) -> str:
 
     return (
         "Vaultspec-core MCP server (tool-schema version "
-        f"{__version__}). Nine tools cover the vaultspec workflow. Hot path: "
+        f"{__version__}). These tools cover the vaultspec workflow. Hot path: "
         "'status' (project orientation and grounding traces), 'find' (document "
         "and feature discovery with blob hashes and resource links), 'create' "
         "(batch document scaffolding from templates), 'edit' (batch body-prose "
         "editing with optimistic-concurrency guards), 'plan_progress' (mark "
         "plan steps checked/unchecked), 'plan_edit' (add/insert/edit/remove "
-        "plan steps), and 'check' (vault health checks with optional fix). "
+        "plan steps), 'log' (append a Step's rows to its plan's execution "
+        "ledger), and 'check' (vault health checks with optional fix). "
         "Long tail: 'discover' searches the full verb catalog and returns "
         "parameter schemas on demand, and 'invoke' runs any cataloged verb "
         "against the installed binary. Prefer the hot tools; reach for "
@@ -130,7 +131,7 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
         Configured :class:`~mcp.server.mcpserver.MCPServer` ready to serve.
     """
     mcp = MCPServer(
-        name="vaultspec-mcp",
+        name="vaultspec-core-mcp",
         instructions=_build_instructions(read_only=read_only),
         lifespan=_lifespan,
         extensions=[_ReadOnlyCheckGuard()] if read_only else None,
@@ -191,7 +192,7 @@ def _serve(
     # Initialize core paths (TARGET_DIR, TEMPLATES_DIR, etc.)
     init_paths(root_dir)
 
-    logger.info("Starting vaultspec-mcp server root=%s", root_dir)
+    logger.info("Starting vaultspec-core-mcp server root=%s", root_dir)
 
     mcp = create_server(read_only=read_only)
 
@@ -233,7 +234,7 @@ def main(
         ),
     ] = False,
 ) -> None:
-    """Typer callback entrypoint for vaultspec-mcp.
+    """Typer callback entrypoint for vaultspec-core-mcp.
 
     Args:
         ctx: Typer context carrying the optional ``obj`` dict injected by

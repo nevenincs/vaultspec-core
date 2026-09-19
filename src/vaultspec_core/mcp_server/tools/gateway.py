@@ -30,6 +30,11 @@ every spawned child is marked through
 it has no terminal and declines to open an editor no matter which source the
 editor command came from.
 
+The child runs through anyio rather than a blocking :func:`subprocess.run`, so
+the handler stays interruptible while the verb works and a cancelled or
+timed-out call reaps the child instead of leaking it; :func:`_run_verb` holds
+that contract.
+
 Both handlers keep the copied-context isolation wrapper, and both declare
 structured output through typed Pydantic return models.
 """
@@ -44,6 +49,7 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING, Any, cast
 
+import anyio
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -65,6 +71,7 @@ from ..isolation import isolated_context as _isolated_context
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from anyio.abc import ByteReceiveStream, Process
     from mcp.server.mcpserver import MCPServer
 
 logger = logging.getLogger(__name__)
@@ -75,6 +82,9 @@ __all__ = ["register_gateway_tools"]
 #: is low-frequency by definition, so a generous ceiling covers Python startup
 #: plus the verb's own work without letting a wedged verb hang the handler.
 _DEFAULT_TIMEOUT = 60.0
+
+#: How long a child gets to exit after ``terminate()`` before it is killed.
+_KILL_GRACE = 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +308,7 @@ def _build_argv(
         root_dir: The server root injected via ``--target``.
 
     Returns:
-        The full argv list ready for :func:`subprocess.run`.
+        The full argv list ready for :func:`_run_verb`.
 
     Raises:
         ToolError: When an argument names a reserved or undeclared flag.
@@ -440,11 +450,149 @@ def _child_environment() -> dict[str, str]:
     is what permits editing, and the marker is set unconditionally.
 
     Returns:
-        The environment mapping to hand to :func:`subprocess.run`.
+        The environment mapping to hand to the child process.
     """
     env = dict(os.environ)
     env[GATEWAY_ENV_MARKER] = "1"
     return env
+
+
+# ---------------------------------------------------------------------------
+# subprocess execution
+# ---------------------------------------------------------------------------
+
+
+def _decode(chunks: list[bytes]) -> str:
+    """Decode captured stream bytes the way ``text=True`` used to.
+
+    Reproduces :func:`subprocess.run`'s text mode exactly: UTF-8 with
+    replacement, then universal-newline translation, so a Windows child's
+    ``\\r\\n`` reaches the caller as ``\\n`` and the captured text does not
+    drift now that the streams arrive as raw bytes.
+
+    Args:
+        chunks: The received byte chunks in arrival order.
+
+    Returns:
+        The decoded, newline-normalized text.
+    """
+    text = b"".join(chunks).decode("utf-8", errors="replace")
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+async def _drain(stream: ByteReceiveStream | None, chunks: list[bytes]) -> None:
+    """Accumulate one child stream to EOF.
+
+    Both streams are drained concurrently by the caller, because a child that
+    fills one pipe buffer while the reader waits on the other deadlocks - the
+    same reason :func:`subprocess.run` reads through ``communicate()``.
+
+    Args:
+        stream: The child stream, or ``None`` when it was not piped.
+        chunks: The list to append received chunks to.
+    """
+    if stream is None:
+        return
+    async for chunk in stream:
+        chunks.append(chunk)
+
+
+async def _reap(process: Process) -> None:
+    """Stop a still-running child: terminate, grace, then kill.
+
+    The wait is shielded because this runs from the cancellation path, where
+    every unshielded ``await`` would re-raise at once and leave the child
+    running.
+
+    anyio's own context-manager exit does not cover this. Its ``aclose``
+    kills only when its internal ``wait()`` is itself interrupted, which
+    requires a cancel scope still actively cancelling around it. Here the
+    process context manager wraps the timeout scope rather than sitting
+    inside it, so by the time ``aclose`` runs the timeout has already fired
+    and the cancellation has already been delivered - and ``aclose`` then
+    blocks on ``wait()`` for the child's entire natural lifetime. Measured on
+    anyio 4.15.1, dropping this call makes a cancelled or timed-out verb hang
+    until the child exits by itself.
+
+    Only the child itself is reaped, one level, never a tree. On Windows
+    ``terminate()`` and ``kill()`` are both ``TerminateProcess`` and neither
+    reaps descendants, which is accepted here: the child is
+    ``sys.executable -m vaultspec_core`` directly with no ``uv`` wrapper,
+    editor spawning is refused by the non-interactive environment marker, and
+    the hook and sync verbs are denylisted, so the only possible grandchildren
+    are short-lived git invocations that exit on their own. Job Objects are
+    deliberately deferred rather than overlooked.
+
+    Args:
+        process: The child to reap; a no-op when it has already exited.
+    """
+    if process.returncode is not None:
+        return
+    with anyio.CancelScope(shield=True):
+        process.terminate()
+        with anyio.move_on_after(_KILL_GRACE):
+            await process.wait()
+            return
+        process.kill()
+        await process.wait()
+
+
+async def _run_verb(
+    argv: list[str], env: dict[str, str], timeout: float
+) -> subprocess.CompletedProcess[str]:
+    """Run a validated argv list as a cancellable child process.
+
+    The subprocess boundary itself is settled architecture and unchanged here
+    (the module docstring states why the long tail is subprocessed rather than
+    dispatched in-process); this only changes *how* the child is run. A
+    blocking :func:`subprocess.run` inside an async handler pins the event
+    loop for the child's whole lifetime, so the server cannot even read a
+    ``notifications/cancelled`` until the child exits. Running the child
+    through anyio - the same framework the SDK scopes its cancellation to -
+    makes the handler interruptible at every await.
+
+    Cancellation and timeout share one disposition: reap the child, then
+    differ only in what follows. A cancelled call re-raises and returns
+    nothing, since the SDK discards a cancelled handler's result anyway; a
+    timeout raises :class:`TimeoutError` for the caller to fold into the
+    structured ``timeout`` payload.
+
+    Args:
+        argv: The full argv list, interpreter prefix included. Never a shell
+            string.
+        env: The child environment, carrying the non-interactive marker.
+        timeout: The wall-clock budget in seconds for the child's output.
+
+    Returns:
+        The finished process with both streams captured as text.
+
+    Raises:
+        TimeoutError: When the child outlives *timeout*; it is reaped first.
+    """
+    stdout_chunks: list[bytes] = []
+    stderr_chunks: list[bytes] = []
+    async with await anyio.open_process(
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    ) as process:
+        # The child can now be terminated out from under itself, so its pid is
+        # what correlates a killed or wedged verb with what the OS saw.
+        logger.info("invoke: child pid=%d", process.pid)
+        try:
+            with anyio.fail_after(timeout):
+                async with anyio.create_task_group() as streams:
+                    streams.start_soon(_drain, process.stdout, stdout_chunks)
+                    streams.start_soon(_drain, process.stderr, stderr_chunks)
+                returncode = await process.wait()
+        except BaseException:
+            await _reap(process)
+            raise
+    return subprocess.CompletedProcess(
+        argv, returncode, _decode(stdout_chunks), _decode(stderr_chunks)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -637,18 +785,8 @@ def register_gateway_tools(
 
         command = ["vaultspec-core", *argv[argv.index("--target") :]]
         try:
-            completed = subprocess.run(
-                argv,
-                env=_child_environment(),
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
+            completed = await _run_verb(argv, _child_environment(), timeout)
+        except TimeoutError:
             logger.warning("invoke: verb=%r timed out after %ss", verb, timeout)
             return InvokeResult(
                 verb=entry.verb,

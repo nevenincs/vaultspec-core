@@ -2,7 +2,7 @@
 
 Run against an installed wheel or sdist to verify that the package is
 importable, exposes expected metadata, and that both console-script entry
-points (``vaultspec-core`` and ``vaultspec-mcp``) are functional.
+points (``vaultspec-core`` and ``vaultspec-core-mcp``) are functional.
 
 Usage from CI (``.github/workflows/publish.yml``)::
 
@@ -41,7 +41,7 @@ def _run_script(name: str, args: list[str]) -> subprocess.CompletedProcess[str]:
     else:
         # Fallback: not every install context puts scripts on PATH
         module = name.replace("-", "_")
-        if name == "vaultspec-mcp":
+        if name == "vaultspec-core-mcp":
             module = "vaultspec_core.mcp_server.app"
         cmd = [sys.executable, "-m", module, *args]
     return subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -66,7 +66,7 @@ def check_entry_points_registered() -> None:
     """Verify that [project.scripts] entry points are in wheel metadata."""
     eps = importlib.metadata.entry_points()
     console_scripts = {ep.name for ep in eps if ep.group == "console_scripts"}
-    for name in ("vaultspec-core", "vaultspec-mcp"):
+    for name in ("vaultspec-core", "vaultspec-core-mcp"):
         if name not in console_scripts:
             _fail(
                 f"console_scripts entry point '{name}' not found in metadata.\n"
@@ -116,14 +116,14 @@ def check_cli_help() -> None:
 
 
 def check_mcp_entrypoint() -> None:
-    """Verify vaultspec-mcp starts and exits cleanly with --help."""
-    result = _run_script("vaultspec-mcp", ["--help"])
+    """Verify vaultspec-core-mcp starts and exits cleanly with --help."""
+    result = _run_script("vaultspec-core-mcp", ["--help"])
     if result.returncode != 0:
         _fail(
-            f"vaultspec-mcp --help exited {result.returncode}\n"
+            f"vaultspec-core-mcp --help exited {result.returncode}\n"
             f"  stderr: {result.stderr.strip()}"
         )
-    print("PASS: vaultspec-mcp --help exits 0")
+    print("PASS: vaultspec-core-mcp --help exits 0")
 
 
 if __name__ == "__main__":

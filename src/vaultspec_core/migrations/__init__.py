@@ -327,7 +327,7 @@ def warn_if_pending(workspace: Path) -> list[str]:
     seen up to date, seen without a manifest, or seen through a
     transient I/O failure is left unlatched, so the manifest is read
     again on the next call and drift that appears later is still
-    reported. That matters most in the long-lived ``vaultspec-mcp``
+    reported. That matters most in the long-lived ``vaultspec-core-mcp``
     process, where a workspace first read before ``vaultspec-core
     install`` ran in it would otherwise be silenced for the life of the
     server. The cost is a manifest read per call for workspaces that

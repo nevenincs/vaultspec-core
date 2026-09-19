@@ -1,7 +1,15 @@
 # Distribution channels
 
 Install Core with Scoop on Windows or Homebrew on macOS and Linux. Both channels install
-`vaultspec-core` and `vaultspec-mcp`.
+`vaultspec-core` and `vaultspec-core-mcp`.
+
+> [!IMPORTANT]
+> The MCP server executable was previously named `vaultspec-mcp` and is now
+> `vaultspec-core-mcp`, matching the package it ships in. Upgrading replaces the old
+> name rather than keeping both, so a script that calls `vaultspec-mcp` directly needs
+> updating. Generated MCP enrollment is unaffected: it launches the server as
+> `python -m vaultspec_core.mcp_server.app`, never through the executable, and the
+> enrolled server entry is still named `vaultspec-core`.
 
 You don't need a separate Python installation on any release, and from v0.1.74 you don't
 need network access either.
@@ -59,8 +67,8 @@ version, and Rust target; its extracted command names do not vary by platform.
 | Linux x86-64   | `vaultspec-core-v<version>-x86_64-unknown-linux-gnu.tar.gz`  |
 | Linux arm64    | `vaultspec-core-v<version>-aarch64-unknown-linux-gnu.tar.gz` |
 
-Each archive contains `vaultspec-core`, `vaultspec-mcp`, `LICENSE`, `README.txt`, and
-`manifest.json`. On Windows the executables end in `.exe`. The manifest records the
+Each archive contains `vaultspec-core`, `vaultspec-core-mcp`, `LICENSE`, `README.txt`,
+and `manifest.json`. On Windows the executables end in `.exe`. The manifest records the
 archive contract, target, runtime, platform floor, and SHA-256 for each member.
 
 Extract the asset for your target, then run the stable command name:
