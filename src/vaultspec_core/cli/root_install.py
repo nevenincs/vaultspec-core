@@ -160,6 +160,15 @@ def cmd_install(
         skip=set(skip),
     )
 
+    # Only ``--upgrade`` reaches the provider-hook renderer; a fresh install
+    # scaffolds and seeds and returns without rendering, so gating it would be
+    # a prompt with nothing behind it, and an operator taught to click through
+    # an empty prompt is worse off than one who never saw it.
+    if upgrade and not dry_run and "hooks" not in skip:
+        from vaultspec_core.cli._hook_trust import hook_consent_gate
+
+        hook_consent_gate(json_output=json_output)
+
     try:
         result = install_run(
             path=path,

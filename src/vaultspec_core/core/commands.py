@@ -95,43 +95,43 @@ __all__ = [
 
 
 def triggers_list_data() -> dict[str, Any]:
-    """Return structured data about all defined hooks.
+    """Return structured data about all defined lifecycle triggers.
 
     Returns:
         A dict with:
-        - ``"hooks"``: list of dicts with ``"name"``, ``"enabled"``,
+        - ``"triggers"``: list of dicts with ``"name"``, ``"enabled"``,
           ``"event"``, ``"actions"``, ``"trusted"`` keys.
         - ``"supported_events"``: sorted list of supported event names.
-        - ``"triggers_dir"``: relative path to hooks directory.
+        - ``"triggers_dir"``: relative path to the triggers directory.
     """
     from vaultspec_core.triggers import SUPPORTED_EVENTS, is_trusted, load_triggers
 
     ctx = _t.get_context()
-    hooks = load_triggers(ctx.triggers_dir)
-    hooks_data: list[dict[str, Any]] = []
-    for hook in hooks:
-        actions = ", ".join(a.command for a in hook.actions if a.action_type == "shell")
-        hooks_data.append(
+    triggers = load_triggers(ctx.triggers_dir)
+    triggers_data: list[dict[str, Any]] = []
+    for trig in triggers:
+        actions = ", ".join(a.command for a in trig.actions if a.action_type == "shell")
+        triggers_data.append(
             {
-                "name": hook.name,
-                "enabled": hook.enabled,
-                "event": hook.event,
+                "name": trig.name,
+                "enabled": trig.enabled,
+                "event": trig.event,
                 "actions": actions,
-                # An enabled hook that is not trusted never runs. Reporting the
-                # two flags separately is what stops "enabled" from reading as
-                # "will run" and turning a refusal into a mystery.
-                "trusted": is_trusted(hook.source_path),
+                # An enabled trigger that is not trusted never runs. Reporting
+                # the two flags separately is what stops "enabled" from reading
+                # as "will run" and turning a refusal into a mystery.
+                "trusted": is_trusted(trig.source_path),
             }
         )
 
     try:
         rel = str(ctx.triggers_dir.relative_to(ctx.target_dir))
     except ValueError:
-        # HOOKS_DIR may live in the CWD workspace, not under TARGET_DIR,
-        # when --target points to a separate directory.
+        # The triggers directory may live in the CWD workspace, not under
+        # TARGET_DIR, when --target points to a separate directory.
         rel = str(ctx.triggers_dir)
     return {
-        "hooks": hooks_data,
+        "triggers": triggers_data,
         "supported_events": sorted(SUPPORTED_EVENTS),
         "triggers_dir": rel,
     }

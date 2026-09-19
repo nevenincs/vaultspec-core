@@ -420,6 +420,33 @@ class WorkspaceFactory:
         sync_provider(provider, force=force, dry_run=dry_run, skip=skip)
         return self
 
+    def trust_hooks(self, home: Path | None = None) -> Self:
+        """Record operator consent for every provider hook in this workspace.
+
+        ``provider_hooks_sync`` refuses to render a hook the consent ledger does
+        not carry, so a test that wants hooks rendered has to approve them the
+        way an operator would. Call this before :meth:`sync`, not instead of
+        asserting the gate somewhere: a test that never approves is asserting
+        the refusal, which is also worth doing, in its own test.
+
+        Args:
+            home: Machine-global VaultSpec home holding the ledger. Tests that
+                supply their own keep the operator's ledger untouched; the
+                default writes wherever the ambient environment points, so pass
+                one unless the surrounding fixture has already redirected home.
+        """
+        from vaultspec_core.config import reset_config
+        from vaultspec_core.config.workspace import resolve_workspace
+        from vaultspec_core.core.provider_hooks import load_provider_hook_specs
+        from vaultspec_core.core.types import init_paths
+        from vaultspec_core.triggers import grant
+
+        reset_config()
+        init_paths(resolve_workspace(target_override=self.root))
+        specs = load_provider_hook_specs()
+        grant([s.source_path for s in specs if s.source_path is not None], home)
+        return self
+
     def uninstall(
         self,
         provider: str = "all",

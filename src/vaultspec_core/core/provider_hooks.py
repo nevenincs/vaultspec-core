@@ -60,6 +60,7 @@ __all__ = [
     "provider_hooks_sync",
     "render_hooks_payload",
     "supported_events",
+    "trusted_specs",
 ]
 
 
@@ -156,6 +157,9 @@ class HookSpec:
             non-tool events but preserved verbatim.
         timeout: Optional timeout in seconds (converted per provider).
         enabled: When ``False`` the hook is parsed but never rendered.
+        source_path: File this spec was parsed from. Consent is keyed by
+            resolved path and content digest, so a spec with no source path
+            cannot be matched against the ledger and is never trusted.
     """
 
     name: str
@@ -164,6 +168,7 @@ class HookSpec:
     matcher: str = ""
     timeout: int | None = None
     enabled: bool = True
+    source_path: Path | None = None
 
 
 def supported_events(tool: Tool) -> frozenset[HookEvent]:
@@ -342,9 +347,47 @@ def load_provider_hook_specs(
                 matcher=matcher.strip() if isinstance(matcher, str) else "",
                 timeout=timeout if isinstance(timeout, int) else None,
                 enabled=bool(data.get("enabled", True)),
+                source_path=path,
             )
         )
     return specs
+
+
+def trusted_specs(
+    specs: list[HookSpec] | None = None, home: Path | None = None
+) -> tuple[list[HookSpec], list[HookSpec]]:
+    """Split hook specs into ``(trusted, refused)`` by consent-ledger lookup.
+
+    Hook files arrive through git like the rest of ``.vaultspec/``, and a
+    rendered hook runs inside the agent's own session on every matching tool
+    call rather than once per sync. Rendering one is therefore gated on the
+    same operator consent ledger the lifecycle triggers use, keyed by resolved
+    path and content digest, so editing an approved hook or pulling a change to
+    one withdraws the approval until it is granted again.
+
+    :func:`provider_hooks_sync` calls this to decide what it renders, so a
+    status surface that calls it reports the set the renderer actually skipped
+    rather than reconstructing the decision and drifting from it.
+
+    Args:
+        specs: Specs to partition. Loads the workspace's own when omitted.
+        home: Machine-global VaultSpec home holding the ledger. Defaults to the
+            operator's real home; tests pass their own.
+
+    Returns:
+        ``(trusted, refused)``. A spec with no ``source_path`` is refused,
+        because nothing can be matched against the ledger for it.
+    """
+    from ..triggers.trust import is_trusted
+
+    if specs is None:
+        specs = load_provider_hook_specs()
+    trusted: list[HookSpec] = []
+    refused: list[HookSpec] = []
+    for spec in specs:
+        ok = spec.source_path is not None and is_trusted(spec.source_path, home)
+        (trusted if ok else refused).append(spec)
+    return trusted, refused
 
 
 # ---------------------------------------------------------------------------
@@ -555,7 +598,7 @@ def hook_targets() -> list[tuple[Tool, Path, Path | None]]:
     return targets
 
 
-def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
+def provider_hooks_sync(dry_run: bool = False, home: Path | None = None) -> SyncResult:
     """Render provider hooks into every installed hook-capable provider.
 
     Loads canonical hook specs once and renders them into each installed
@@ -565,6 +608,10 @@ def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
 
     Args:
         dry_run: When ``True``, compute actions without writing.
+        home: Machine-global VaultSpec home holding the consent ledger.
+            Defaults to the operator's real home, which is what every
+            production caller wants; real-filesystem tests pass their own so
+            they neither read nor write the operator's approvals.
 
     Returns:
         Accumulated :class:`SyncResult`, with per-provider results under
@@ -574,6 +621,20 @@ def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
     parse_warnings: list[str] = []
     specs = load_provider_hook_specs(warnings=parse_warnings)
     total.warnings.extend(parse_warnings)
+
+    # Enforcement lives here rather than at the CLI, so every route into the
+    # renderer is gated and not just the ones that can prompt. Refusing costs
+    # the hook, never the sync: the rest of the sync is a legitimate operation
+    # and still completes.
+    specs, refused = trusted_specs(specs, home)
+    for spec in refused:
+        where = spec.source_path.name if spec.source_path else spec.name
+        msg = (
+            f"Hook {where!r} is not approved for this machine; not rendering it. "
+            "Review it and run 'vaultspec-core spec hooks trust' to allow it."
+        )
+        logger.warning(msg)
+        total.warnings.append(msg)
 
     target_dir = _t.get_context().target_dir
     for tool, _native, _sidecar in hook_targets():

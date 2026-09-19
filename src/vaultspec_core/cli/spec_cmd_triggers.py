@@ -49,10 +49,10 @@ def cmd_triggers_list(
     from vaultspec_core.cli.rendering import Cell, Column, render_listing, summary_line
     from vaultspec_core.console import get_console
 
-    hooks = data["hooks"]
+    triggers = data["triggers"]
     console = get_console()
 
-    if not hooks:
+    if not triggers:
         console.print("No triggers defined.")
         console.print(
             f"  Add [dim].yaml[/dim] files to [bold]{data['triggers_dir']}/[/bold]"
@@ -64,17 +64,17 @@ def cmd_triggers_list(
 
     rows = [
         {
-            "name": hook["name"],
+            "name": trig["name"],
             "status": Cell("enabled", style="bold green")
-            if hook["enabled"]
+            if trig["enabled"]
             else Cell("disabled", style="dim"),
             "trust": Cell("trusted", style="bold green")
-            if hook["trusted"]
+            if trig["trusted"]
             else Cell("untrusted", style="yellow"),
-            "event": hook["event"],
-            "actions": hook["actions"],
+            "event": trig["event"],
+            "actions": trig["actions"],
         }
-        for hook in hooks
+        for trig in triggers
     ]
     render_listing(
         rows,
@@ -87,9 +87,9 @@ def cmd_triggers_list(
         ],
         title="hooks",
         summary=summary_line(len(rows), "hooks"),
-        empty="no hooks",
+        empty="no triggers",
     )
-    if any(not hook["trusted"] for hook in hooks):
+    if any(not trig["trusted"] for trig in triggers):
         console.print(
             "\n[dim]Untrusted hooks are never run. Their commands would "
             "execute as you, and a repository cannot approve its own; review "
@@ -428,17 +428,17 @@ def cmd_triggers_trust(
         get_console().print(f"Withdrew approval for {dropped} trigger(s).")
         return
 
-    hooks = load_triggers(ctx.triggers_dir)
+    triggers = load_triggers(ctx.triggers_dir)
     if name is not None:
-        hooks = [hook for hook in hooks if hook.name == name]
-        if not hooks:
+        triggers = [trig for trig in triggers if trig.name == name]
+        if not triggers:
             _handle_error(
                 ResourceNotFoundError(f"Trigger '{name}' not found."),
                 json_output=json_output,
             )
             return
 
-    paths = [hook.source_path for hook in hooks if hook.source_path is not None]
+    paths = [t.source_path for t in triggers if t.source_path is not None]
     recorded = grant(paths)
     approved = sorted(path.name for path in recorded)
 
@@ -456,10 +456,10 @@ def cmd_triggers_trust(
     # Echo the commands that were just approved rather than only the filenames.
     # This verb is the one place an operator commits to running them, so it is
     # the one place the record of what they agreed to has to be legible.
-    for hook in hooks:
-        if hook.source_path is None or hook.source_path not in recorded:
+    for trig in triggers:
+        if trig.source_path is None or trig.source_path not in recorded:
             continue
-        for line in describe_trigger(hook, ctx.target_dir):
+        for line in describe_trigger(trig, ctx.target_dir):
             console.print(line, highlight=False)
     console.print(
         "[dim]Approval is recorded on this machine and pinned to each file's "
