@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#flow-bugs'
 date: '2026-04-21'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:f6e192ccbdd6c67b24d79a7bac59edd849a95ab5c24532bcb9151562639246dc'
 related:
-  - '[[2026-04-21-flow-bugs-plan]]'
+  - '[[2026-09-19-flow-bugs-plan]]'
   - '[[2026-04-21-flow-bugs-adr]]'
   - '[[2026-04-21-flow-bugs-research]]'
 ---

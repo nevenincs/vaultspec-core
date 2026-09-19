@@ -3,11 +3,11 @@ tags:
   - '#research'
   - '#doctor-dev-repo'
 date: '2026-04-30'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:37ae010c4f99e9a9ff36cbdd8f60ad50e63e875693c546971df0312f71132f97'
 related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
-  - '[[2026-04-30-doctor-dev-repo-plan]]'
+  - '[[2026-09-19-doctor-dev-repo-plan]]'
 ---
 
 # `doctor-dev-repo` research: `spec doctor false positive on source repo`

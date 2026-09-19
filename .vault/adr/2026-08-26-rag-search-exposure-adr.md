@@ -3,14 +3,14 @@ tags:
   - '#adr'
   - '#rag-search-exposure'
 date: '2026-08-26'
-modified: '2026-09-02'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:75e79314017d39e7543ff28a28d0ec2456a5ddd61beb99b0a3b420a6d21e7e2f'
+body_hash: 'sha256:285284fc23b1c2f5bb1062188eab93dd78374172222e9a3880b7954271de7c53'
 related:
   - '[[2026-08-26-rag-search-exposure-research]]'
 ---
 
-# `rag-search-exposure` adr: `Expose rag capability, not rag search, from vaultspec-core` | (**status:** `proposed`)
+# `rag-search-exposure` adr: `Expose rag capability, not rag search, from vaultspec-core` | (**status:** `accepted`)
 
 ## Problem Statement
 

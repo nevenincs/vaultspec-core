@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#framework'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:9e7cfbe6eb00a7da60c10255cac17429a2687adb43a66e0c58e603e55717d062'
+body_hash: 'sha256:bb4c4c6e470f609c503a3f26e50907b005df3623859d8e90d59ecd9a455e8a22'
 related:
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-environment-variable-adr]]'
@@ -14,6 +14,7 @@ related:
   - '[[2026-02-16-hardcoded-constants-research]]'
   - '[[2026-02-17-bootstrap-prompt-adr]]'
   - '[[2026-02-17-bootstrap-prompt-engineering-research]]'
+  - '[[2026-02-17-framework-ledger]]'
   - '[[2026-02-17-framework-plan]]'
 ---
 
@@ -27,6 +28,10 @@ Auto-generated index of all documents tagged with `#framework`.
 
 - `2026-02-16-environment-variable-adr` - `framework` adr: `Environment Variable Standardization` | (**status:** `accepted`)
 - `2026-02-17-bootstrap-prompt-adr` - bootstrap-prompt adr: framework bootstrap prompt redesign | (**status:** `accepted`)
+
+### exec
+
+- `2026-02-17-framework-ledger` - `framework` ledger
 
 ### plan
 

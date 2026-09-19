@@ -4,12 +4,13 @@ tags:
   - '#index'
   - '#curator-reframe'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:b132f513c35cbc92ceb04fba5e4cf7eafe1e4324a05270cef11cf457a711fa6d'
+body_hash: 'sha256:a65c434519845872062e022752de74896b5845724eb7585316fc00bf16a2ece7'
 related:
   - '[[2026-06-28-curator-reframe-adr]]'
   - '[[2026-06-28-curator-reframe-audit]]'
+  - '[[2026-06-28-curator-reframe-ledger]]'
   - '[[2026-06-28-curator-reframe-plan]]'
   - '[[2026-06-28-curator-reframe-research]]'
 ---
@@ -27,6 +28,10 @@ Auto-generated index of all documents tagged with `#curator-reframe`.
 ### audit
 
 - `2026-06-28-curator-reframe-audit` - `curator-reframe` audit: `curator reframe code review`
+
+### exec
+
+- `2026-06-28-curator-reframe-ledger` - `curator-reframe` ledger
 
 ### plan
 

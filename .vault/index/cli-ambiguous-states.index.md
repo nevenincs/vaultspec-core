@@ -4,17 +4,19 @@ tags:
   - '#index'
   - '#cli-ambiguous-states'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:48d7c4ce54cd705a52b3cf601780ea464c4a3c0e7246663bcdf4102cdb52a5c5'
+body_hash: 'sha256:d34685a708345d057c2e26dc767177868c1dc26d8c29f1ba788c4d5e8ba3b278'
 related:
   - '[[2026-03-27-cli-ambiguous-states-audit]]'
   - '[[2026-03-27-cli-ambiguous-states-gitignore-adr]]'
+  - '[[2026-03-27-cli-ambiguous-states-ledger]]'
   - '[[2026-03-27-cli-ambiguous-states-plan]]'
   - '[[2026-03-27-cli-ambiguous-states-prior-art-research]]'
   - '[[2026-03-27-cli-ambiguous-states-research]]'
   - '[[2026-03-27-cli-ambiguous-states-resolver-adr]]'
   - '[[2026-03-28-cli-ambiguous-states-audit-fixes-plan]]'
+  - '[[2026-03-28-cli-ambiguous-states-ledger]]'
 ---
 
 # `cli-ambiguous-states` feature index
@@ -31,6 +33,11 @@ Auto-generated index of all documents tagged with `#cli-ambiguous-states`.
 ### audit
 
 - `2026-03-27-cli-ambiguous-states-audit` - `cli-ambiguous-states` rolling audit
+
+### exec
+
+- `2026-03-27-cli-ambiguous-states-ledger` - `cli-ambiguous-states` ledger
+- `2026-03-28-cli-ambiguous-states-ledger` - `cli-ambiguous-states` ledger
 
 ### plan
 

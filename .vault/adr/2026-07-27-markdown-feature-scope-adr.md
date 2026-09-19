@@ -3,13 +3,13 @@ tags:
   - '#adr'
   - '#markdown-feature-scope'
 date: '2026-07-27'
-modified: '2026-07-27'
-body_hash: 'sha256:04bf8eadf77c61cdfddf409ad0f0a4253140856106346e9f3b25379c29c51c9f'
+modified: '2026-09-19'
+body_hash: 'sha256:b0cf24383f2cbc561acb83170e4f23fcf3a4b4d67a15f181642dd458ad5e48a2'
 related:
   - "[[2026-07-27-markdown-feature-scope-research]]"
 ---
 
-# `markdown-feature-scope` adr: `feature-scoped markdown repair bypasses lazy migrations` | (**status:** `proposed`)
+# `markdown-feature-scope` adr: `feature-scoped markdown repair bypasses lazy migrations` | (**status:** `rejected`)
 
 ## Problem Statement
 

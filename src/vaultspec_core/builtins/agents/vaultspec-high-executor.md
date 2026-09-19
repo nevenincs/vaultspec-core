@@ -38,6 +38,9 @@ authority or asks the user, records the answer, and tells you to continue.
 
 - Any governing ADR and Research, Reference, or Audit records the Step depends on are
   your technical references. Code and tests follow the core mandates.
+- **Code stands alone:** deliverable code, comments, docstrings, tests, and
+  configuration never reference the plan, Step ids, vault documents, or harness paths.
+  Traceability lives in the ledger, which cites the code, never the reverse.
 - Review follows the cadence in the vaultspec section, not per Step. Report assignment
   completion to the orchestrator; report Phase close only when a Phase exists.
 - If your context compacts, keep the plan stem, the feature tag, and the current Step

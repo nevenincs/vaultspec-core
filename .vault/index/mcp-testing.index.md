@@ -4,11 +4,12 @@ tags:
   - '#index'
   - '#mcp-testing'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:11b7d516a4e9043624e7841da3f7ddae4e1359f1b4a3edefcd6cb6e84441ef8e'
+body_hash: 'sha256:d15a5fefaa468db658167b7fa822aa3b17f07c100b22d5a98b376598df7f9f38'
 related:
   - '[[2026-02-22-mcp-testing-adr]]'
+  - '[[2026-02-22-mcp-testing-ledger]]'
   - '[[2026-02-22-mcp-testing-plan]]'
   - '[[2026-02-22-mcp-testing-research]]'
   - '[[2026-07-17-mcp-testing-audit]]'
@@ -33,6 +34,7 @@ Auto-generated index of all documents tagged with `#mcp-testing`.
 
 ### exec
 
+- `2026-02-22-mcp-testing-ledger` - `mcp-testing` ledger
 - `2026-07-17-mcp-testing-ledger` - `mcp-testing` ledger
 
 ### plan

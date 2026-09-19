@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#pytest-e2e'
 date: '2026-02-21'
-modified: '2026-06-13'
-body_hash: 'sha256:e3e50146fed2255e8bdcd49d16c9836388c967a66895d704493131cb06c465f7'
+modified: '2026-09-19'
+body_hash: 'sha256:36bdc6adfec6a791afe3095852659147d17c7c2609f00bd7ceef2cc994730a68'
 related:
   - '[[2026-02-21-pytest-e2e-observability-research]]'
 ---
@@ -93,7 +93,7 @@ Add to `[project.optional-dependencies]` test extras:
 E2E tests remain **opt-out** (run by default). Exclude with:
 
 ```bash
-pytest src/vaultspec/protocol/ -m "not (claude or gemini)"
+pytest src/vaultspec_core/protocol/ -m "not (claude or gemini)"
 ```
 
 ### 5. Retry Policy for E2E Tests
@@ -118,7 +118,7 @@ conflicts.
 Default invocation for E2E runs:
 
 ```bash
-pytest src/vaultspec/protocol/ --report-log=test-events.jsonl
+pytest src/vaultspec_core/protocol/ --report-log=test-events.jsonl
 ```
 
 Add `test-events.jsonl` and `test-debug.log` to `.gitignore`.

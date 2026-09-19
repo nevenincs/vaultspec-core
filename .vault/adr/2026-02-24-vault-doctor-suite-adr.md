@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#vault-doctor-suite'
 date: '2026-02-24'
-modified: '2026-06-13'
-body_hash: 'sha256:4f3d35c68743d108735b4bf41389ab4e691ea9d8c149ba88937ce46e99424ba5'
+modified: '2026-09-19'
+body_hash: 'sha256:3a7bab3f8dfd8d5767ee65d6b739527b35d1123c015d412ddc1923ad629bf7f4'
 related:
   - '[[2026-02-24-vault-doctor-suite-research]]'
   - '[[2026-02-24-vault-doctor-suite-p1-plan]]'
@@ -64,7 +64,7 @@ A `doctor/` module invoked by both `vault audit --verify` (backward compat) and 
 `vaultspec vault doctor` is the primary and sole interface for vault content health checks.
 `vault audit` is removed entirely — no shim, no deprecation notice, no sunsetting period.
 
-The doctor suite introduces a `src/vaultspec/doctor/` module:
+The doctor suite introduces a doctor module. Amended 2026-09-19: the suite shipped as `src/vaultspec_core/core/diagnosis/` with its command surface in `src/vaultspec_core/cli/root_doctor.py`, not as a single `doctor/` package; the layout sketched below is the original intent.
 
 ```
 src/vaultspec/doctor/

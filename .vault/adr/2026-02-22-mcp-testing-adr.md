@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#mcp-testing'
 date: '2026-02-22'
-modified: '2026-07-17'
-body_hash: 'sha256:639695697176887c53794240799b1a971d5eb4836301520aff55d579093fbb9f'
+modified: '2026-09-19'
+body_hash: 'sha256:1fc4f2bc76d5e4bb370d2c3b8a8989a738483e88077191ee2bc34393d786e66e'
 related:
   - '[[2026-02-22-mcp-testing-research]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'
@@ -57,7 +57,7 @@ clients.
 
 ## Implementation
 
-Add `src/vaultspec/mcp_server/tests/test_client_session.py` with these test
+Add an MCP client-session test module with these test
 classes:
 
 - **`TestProtocolHandshake`** — verify `initialize()` succeeds and returns

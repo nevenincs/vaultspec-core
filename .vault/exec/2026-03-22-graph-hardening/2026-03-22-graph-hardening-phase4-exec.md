@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#graph-hardening'
 date: '2026-03-22'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:1164e1eb80c7d6061fb1ef8efba37546c9d80a33ade51f833a108075952d8ead'
 related:
-  - '[[2026-03-22-graph-hardening-plan]]'
+  - '[[2026-09-19-graph-hardening-plan]]'
 ---
 
 # graph-hardening phase 4 - check_dangling checker

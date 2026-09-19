@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#cli-architecture'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:4079ece3f20479da5e654412c01d618301c8bdb4ec90334cc6257fa3c1aeae76'
+body_hash: 'sha256:b7f5af00fd2157a396515496cdd79efa692a757558b4d6f3d442d2f1bd08aad2'
 related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-05-cli-audit-notes-reference]]'
@@ -14,7 +14,6 @@ related:
   - '[[2026-03-05-cli-engine-typer-adr]]'
   - '[[2026-03-05-cli-grounding-reference]]'
   - '[[2026-03-05-cli-path-resolution-adr]]'
-  - '[[2026-03-05-cli-target-refactor-plan]]'
   - '[[2026-03-21-cli-contract-reference]]'
   - '[[2026-03-21-cli-grounding-reference]]'
   - '[[2026-03-21-cli-reference]]'
@@ -35,10 +34,6 @@ Auto-generated index of all documents tagged with `#cli-architecture`.
 ### audit
 
 - `2026-03-05-cli-architecture-audit` - Vaultspec CLI Architecture Audit
-
-### plan
-
-- `2026-03-05-cli-target-refactor-plan` - `cli-target-refactor` plan
 
 ### reference
 

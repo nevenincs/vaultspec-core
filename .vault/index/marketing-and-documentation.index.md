@@ -4,17 +4,19 @@ tags:
   - '#index'
   - '#marketing-and-documentation'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:eda723cdbf867d1687513dbae9e3b2a9b350e17dcd0130a04c12590a9ffce1d2'
+body_hash: 'sha256:5ae964ed0a09f079f281d4180c2d947cad39966200702c5fcbceedb59136c5d9'
 related:
   - '[[2026-02-20-marketing-and-documentation-adr]]'
+  - '[[2026-02-20-marketing-and-documentation-ledger]]'
   - '[[2026-02-20-marketing-and-documentation-p1-review-exec]]'
   - '[[2026-02-20-marketing-and-documentation-p1-step1-exec]]'
   - '[[2026-02-20-marketing-and-documentation-p1-step2-exec]]'
   - '[[2026-02-20-marketing-and-documentation-p1-step3-exec]]'
   - '[[2026-02-20-marketing-and-documentation-p1-step4-exec]]'
   - '[[2026-02-20-marketing-and-documentation-p1-summary-exec]]'
+  - '[[2026-02-20-marketing-and-documentation-plan]]'
   - '[[2026-02-20-marketing-and-documentation-research]]'
 ---
 
@@ -30,12 +32,17 @@ Auto-generated index of all documents tagged with `#marketing-and-documentation`
 
 ### exec
 
+- `2026-02-20-marketing-and-documentation-ledger` - `marketing-and-documentation` ledger
 - `2026-02-20-marketing-and-documentation-p1-review-exec` - `marketing-and-documentation` code review
 - `2026-02-20-marketing-and-documentation-p1-step1-exec` - `marketing-and-documentation` `phase1` `step1`
 - `2026-02-20-marketing-and-documentation-p1-step2-exec` - `marketing-and-documentation` `phase1` `step2`
 - `2026-02-20-marketing-and-documentation-p1-step3-exec` - `marketing-and-documentation` `phase1` `step3`
 - `2026-02-20-marketing-and-documentation-p1-step4-exec` - `marketing-and-documentation` `phase1` `step4`
 - `2026-02-20-marketing-and-documentation-p1-summary-exec` - `marketing-and-documentation` `phase1` summary
+
+### plan
+
+- `2026-02-20-marketing-and-documentation-plan` - `marketing-and-documentation` plan
 
 ### research
 

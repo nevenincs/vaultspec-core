@@ -3,15 +3,15 @@ tags:
   - '#adr'
   - '#operator-cli-repair-pipeline'
 date: '2026-05-15'
-modified: '2026-06-13'
-body_hash: 'sha256:2cf784cee5e6b305b84ee159d20d528293652d17dee012f6446ac04b8fa00ebe'
+modified: '2026-09-19'
+body_hash: 'sha256:c540ae6fdec36a379c012c6ef2ad51ead08939c0c145221a68e62d73c87cc2c3'
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-research]]'
   - '[[2026-05-15-operator-cli-repair-pipeline-audit]]'
   - '[[2026-05-15-operator-cli-repair-pipeline-reference]]'
 ---
 
-# `operator-cli-repair-pipeline` adr: `explicit vault repair pipeline` | (**status:** `proposed`)
+# `operator-cli-repair-pipeline` adr: `explicit vault repair pipeline` | (**status:** `accepted`)
 
 ## Problem Statement
 

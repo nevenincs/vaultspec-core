@@ -1,17 +1,18 @@
 ---
 tags:
-  - '#adr'
-  - '#mcp-consolidation'
+  - "#adr"
+  - "#mcp-consolidation"
 date: '2026-02-22'
-modified: '2026-06-13'
-body_hash: 'sha256:5d227a5ee25ecdabfadb3d0c597b6c98dc1cddcf0e3319729080c5cb4cee4afe'
 related:
-  - '[[2026-02-22-mcp-consolidation-research]]'
-  - '[[2026-02-21-packaging-restructure-adr]]'
-  - '[[2026-02-22-cli-ecosystem-factoring-adr]]'
+  - "[[2026-02-22-mcp-consolidation-research]]"
+  - "[[2026-02-21-packaging-restructure-adr]]"
+  - "[[2026-02-22-cli-ecosystem-factoring-adr]]"
+superseded_by: '2026-07-09-mcp-tool-schema-adr'
+modified: '2026-09-19'
+body_hash: 'sha256:88ea23997ab2268fb52f5913ae287d1b6c8c6d01a55bbca7b449da7adf3bf862'
 ---
 
-# `mcp-consolidation` adr: `merge server.py, subagent_server/, and mcp_tools/ into mcp_server/` | (**status:** `accepted`)
+# `mcp-consolidation` adr: `merge server.py, subagent_server/, and mcp_tools/ into mcp_server/` | (**status:** `superseded`)
 
 ## Problem Statement
 

@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#graph-hardening'
 date: '2026-03-22'
-modified: '2026-06-13'
-body_hash: 'sha256:6961f473d8b7a02d25cb06f7a1fd169bf8f44d1da307282909ef78bb5920356e'
+modified: '2026-09-19'
+body_hash: 'sha256:7ab7ceb44914e4b0a868b0f43cd514f11ec9a47ad2c907c289583ad2f9a21dac'
 related:
-  - '[[2026-03-22-graph-hardening-plan]]'
+  - '[[2026-09-19-graph-hardening-plan]]'
 ---
 
 # graph-hardening phase 6 - tests
@@ -44,7 +44,7 @@ Added 13 new tests across two new test classes:
 ### `src/vaultspec_core/vaultcore/checks/tests/` (new directory)
 
 - **conftest.py** - vault_root fixture pointing to test-project, config reset
-- **__init__.py** - package marker
+- **`__init__.py`** - package marker
 - **test_dangling.py** - TestCheckDangling (2 tests)
   - `test_reports_error_for_each_dangling_link` - ERROR severity, count matches invalid links
   - `test_fix_removes_related_entry` - copies vault to tmp, runs fix, verifies entry removed

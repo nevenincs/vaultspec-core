@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#vault-index-folder'
 date: '2026-04-30'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:6eea6398f69ce20c238d450d36026e5cb3aca1a9268a0e6f3cbd99ddc91284f5'
 related:
-  - '[[2026-04-30-vault-index-folder-plan]]'
+  - '[[2026-09-19-vault-index-folder-plan]]'
 ---
 
 # `vault-index-folder` exec: phases 4-9 migration, checkers, template

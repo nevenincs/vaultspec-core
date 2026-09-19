@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#audit-fixes'
 date: '2026-02-22'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:f073a6364cb04e6ee54734cf61cfdf44134acdd868aa56e1b4a9a3a409c97cbe'
 related:
-  - '[[2026-02-22-audit-fixes-plan]]'
+  - '[[2026-09-19-audit-fixes-plan]]'
 ---
 
 # Execution Summary: Audit Remediations

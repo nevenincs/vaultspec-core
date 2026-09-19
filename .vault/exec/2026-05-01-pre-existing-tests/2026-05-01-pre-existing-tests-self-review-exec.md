@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#pre-existing-tests'
 date: '2026-05-01'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:889c2e44c7c9f51e292e05d836e2aac55f5348b729b93238c08a4c3cd2537bff'
 related:
-  - '[[2026-05-01-pre-existing-tests-plan]]'
+  - '[[2026-09-19-pre-existing-tests-plan]]'
   - '[[2026-05-01-pre-existing-tests-adr]]'
   - '[[2026-05-01-pre-existing-tests-research]]'
 ---

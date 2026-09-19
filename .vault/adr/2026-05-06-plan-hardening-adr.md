@@ -3,14 +3,14 @@ tags:
   - '#adr'
   - '#plan-hardening'
 date: '2026-05-06'
-modified: '2026-06-13'
-body_hash: 'sha256:8a4ab93b1cd1284b277c07fc2aba135fbc2b5428374e27f573112ed7aa1dfbc6'
+modified: '2026-09-19'
+body_hash: 'sha256:72dd86447137687bd236a3de374e00dd4080f3a3c822243c755c704785780b1e'
 related:
   - '[[2026-05-05-plan-hardening-adr]]'
   - '[[2026-05-05-plan-hardening-research]]'
 ---
 
-# `plan-hardening` adr: vault plan CLI surface | (**status:** `proposed`)
+# `plan-hardening` adr: vault plan CLI surface | (**status:** `accepted`)
 
 This ADR authorises **Wave 2** of the `#plan-hardening` plan
 document: the `vault plan` CLI implementation. Wave 1

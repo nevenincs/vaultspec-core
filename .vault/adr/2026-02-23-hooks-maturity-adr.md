@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#hooks-maturity'
 date: '2026-02-23'
-modified: '2026-06-13'
-body_hash: 'sha256:fd0b97f9bbf7fdcb7e853bd337f2cf6cf604d6feff9173970f5dae29b67bf770'
+modified: '2026-09-19'
+body_hash: 'sha256:0140876d81ff41ecdce65646a4da3f1329f087b016ae7dd6f88ed9b0fe34fcf8'
 related:
   - '[[2026-02-23-hooks-maturity-research]]'
 ---
@@ -135,7 +135,7 @@ Files: `engine.py`
 ### Phase 2 — Auto-Trigger Wiring + Dead Code Cleanup
 
 **2a. Wire lifecycle triggers**
-Add `_fire_hooks(event, ctx)` helper in `src/vaultspec/core/commands.py`
+Add `_fire_hooks(event, ctx)` helper in `src/vaultspec_core/core/commands.py`
 (or a new `hooks/integration.py`) that wraps `load_hooks()` + `trigger()`
 in a try/except that logs but never raises:
 

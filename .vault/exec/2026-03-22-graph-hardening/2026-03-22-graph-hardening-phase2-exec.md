@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#graph-hardening'
 date: '2026-03-22'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:bda136eda1ff890077155dae070b4683ebefd2a38f7e5fa73e00821973b6f113'
 related:
-  - '[[2026-03-22-graph-hardening-plan]]'
+  - '[[2026-09-19-graph-hardening-plan]]'
 ---
 
 # graph-hardening phase 2 - guards and metrics

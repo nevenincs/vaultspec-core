@@ -4,16 +4,18 @@ tags:
   - '#index'
   - '#packaging-restructure'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:c7e9cca2f179ed2d392cdbb63d9b5c2fb303dea76611a306cd123398baffe806'
+body_hash: 'sha256:f243496967cfa48d86dbac450052ec83cab18ddc409113413f781353d9a08ef4'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
+  - '[[2026-02-21-packaging-restructure-ledger]]'
   - '[[2026-02-21-packaging-restructure-p1-review-exec]]'
   - '[[2026-02-21-packaging-restructure-p1-step05-exec]]'
   - '[[2026-02-21-packaging-restructure-p1-step06-exec]]'
   - '[[2026-02-21-packaging-restructure-p1-step09-exec]]'
   - '[[2026-02-21-packaging-restructure-p2-steps18-22-exec]]'
+  - '[[2026-02-21-packaging-restructure-plan]]'
   - '[[2026-02-21-packaging-restructure-research]]'
 ---
 
@@ -29,11 +31,16 @@ Auto-generated index of all documents tagged with `#packaging-restructure`.
 
 ### exec
 
+- `2026-02-21-packaging-restructure-ledger` - `packaging-restructure` ledger
 - `2026-02-21-packaging-restructure-p1-review-exec` - `packaging-restructure` Phase 1 code review
 - `2026-02-21-packaging-restructure-p1-step05-exec` - Step 5: Rewrite imports in leaf packages `core/` and `vaultcore/`
 - `2026-02-21-packaging-restructure-p1-step06-exec` - Step 6: Rewrite imports in mid-tier packages `orchestration/`, `protocol/`, `hooks/`
 - `2026-02-21-packaging-restructure-p1-step09-exec` - Step 9: Rewrite imports in all test files and conftest files
 - `2026-02-21-packaging-restructure-p2-steps18-22-exec` - Phase 2: Unified MCP Server (Steps 18-22)
+
+### plan
+
+- `2026-02-21-packaging-restructure-plan` - `packaging-restructure` plan
 
 ### research
 

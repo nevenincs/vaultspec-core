@@ -1,16 +1,16 @@
 ---
 tags:
   - '#plan'
-  - '#cli-architecture'
+  - '#cli-target-refactor'
 date: '2026-03-05'
-modified: '2026-07-31'
-body_hash: 'sha256:6105f53fa07dab169afc261d2e64c2155d689b006d5ef2a116f580a9cee35930'
 tier: L2
 related:
   - '[[2026-03-05-cli-path-resolution-adr]]'
   - '[[2026-03-05-cli-engine-typer-adr]]'
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-23-cli-architecture-research]]'
+modified: '2026-09-19'
+body_hash: 'sha256:9c123802ada4236f64a47b50df83c4b75f44877b8c820f538a7d7c3f24f3f76a'
 ---
 
 # `cli-target-refactor` plan
@@ -51,6 +51,7 @@ Fix init scaffold ordering and isolate hook subprocess execution context.
 
 - [x] `P05.S09` - fix init scaffold to re-resolve the workspace after writing framework.md so provider scaffolding reads fresh config; `src/vaultspec_core/cli/root_install.py`.
 - [x] `P05.S10` - clone os.environ, inject VAULTSPEC_TARGET_DIR, and pass cwd into hook subprocess execution; `src/vaultspec_core/hooks/engine.py`.
+- [x] `P05.S12` - remove the RAG index and search CLI commands and their dependency residue after the backend moved to an external repository; `src/vaultspec/vault_cli.py`.
 
 ### Phase `P06` - Test suite migration
 

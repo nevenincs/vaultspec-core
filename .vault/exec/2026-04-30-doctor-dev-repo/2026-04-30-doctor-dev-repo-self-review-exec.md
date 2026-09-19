@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#doctor-dev-repo'
 date: '2026-04-30'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:a5d400be97e9250c08d8d282cf9bee0015242c4d5563cb184016df16404f276e'
 related:
-  - '[[2026-04-30-doctor-dev-repo-plan]]'
+  - '[[2026-09-19-doctor-dev-repo-plan]]'
   - '[[2026-04-30-doctor-dev-repo-adr]]'
   - '[[2026-04-30-doctor-dev-repo-research]]'
 ---

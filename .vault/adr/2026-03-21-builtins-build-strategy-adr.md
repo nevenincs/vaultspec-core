@@ -1,16 +1,17 @@
 ---
 tags:
-  - '#adr'
-  - '#builtins-build-strategy'
+  - "#adr"
+  - "#builtins-build-strategy"
 date: '2026-03-21'
-modified: '2026-06-25'
-body_hash: 'sha256:572cfee445d40963e5de5ea36e5f96e5e30e1737e14cff1ee812564f7cebea03'
 related:
-  - '[[2026-02-21-packaging-restructure-research]]'
-  - '[[2026-02-21-packaging-restructure-adr]]'
+  - "[[2026-02-21-packaging-restructure-research]]"
+  - "[[2026-02-21-packaging-restructure-adr]]"
+superseded_by: '2026-05-17-vaultspec-source-layout-collapse-adr'
+modified: '2026-09-19'
+body_hash: 'sha256:5c5efbe3632a3db1d375c81d5e214657851cde5d76c3315f3b0fd7eec0403906'
 ---
 
-# `builtins-build-strategy` adr: `builtins-build-strategy` | (**status:** `accepted`)
+# `builtins-build-strategy` adr: `builtins-build-strategy` | (**status:** `superseded`)
 
 ______________________________________________________________________
 

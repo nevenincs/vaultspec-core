@@ -4,11 +4,12 @@ tags:
   - '#index'
   - '#commit-linkage'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:fe4fe44da6ba3494a872764ac2010d0829630ef39faf7bc7bec3177574b5242d'
+body_hash: 'sha256:08c0d7b03c434a7fbb96bb19ccd7a9e0107fe8dd47631335957cae8da7d9f17f'
 related:
   - '[[2026-06-13-commit-linkage-adr]]'
+  - '[[2026-06-13-commit-linkage-ledger]]'
   - '[[2026-06-13-commit-linkage-plan]]'
   - '[[2026-06-13-commit-linkage-research]]'
 ---
@@ -22,6 +23,10 @@ Auto-generated index of all documents tagged with `#commit-linkage`.
 ### adr
 
 - `2026-06-13-commit-linkage-adr` - `commit-linkage` adr: `opt-in commit-linkage trailer convention` | (**status:** `accepted`)
+
+### exec
+
+- `2026-06-13-commit-linkage-ledger` - `commit-linkage` ledger
 
 ### plan
 

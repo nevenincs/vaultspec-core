@@ -3,14 +3,14 @@ tags:
   - '#adr'
   - '#operator-cli-sync-authority'
 date: '2026-05-15'
-modified: '2026-06-13'
-body_hash: 'sha256:5ce54a085a9a4d2009e62d69a310e51d04eba72ff673a4ea8b55e701b8b3301f'
+modified: '2026-09-19'
+body_hash: 'sha256:8f300ad6dad04495b63b69cd72bd4984c86729f1a02ee89a924ce6881669f715'
 related:
   - '[[2026-05-15-operator-cli-sync-authority-research]]'
   - '[[2026-05-15-operator-cli-repair-pipeline-reference]]'
 ---
 
-# `operator-cli-sync-authority` adr: `make top-level sync the only authoritative synchronization surface` | (**status:** `proposed`)
+# `operator-cli-sync-authority` adr: `make top-level sync the only authoritative synchronization surface` | (**status:** `accepted`)
 
 ## Problem Statement
 

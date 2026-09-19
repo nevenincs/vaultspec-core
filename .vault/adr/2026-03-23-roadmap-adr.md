@@ -3,36 +3,48 @@ tags:
   - '#adr'
   - '#roadmap'
 date: '2026-03-23'
-modified: '2026-06-25'
-body_hash: 'sha256:6ce297911ae6ba064bdf0055ca8ec469df8f5d92a29e2f6f91b5d1448e585599'
+modified: '2026-09-19'
+body_hash: 'sha256:c7920867cf21d3ebd042cdc5325e3e75a322564e04f5abb7c8c4d720e4d90fbd'
 related:
   - '[[2026-03-23-roadmap-research]]'
 ---
 
-# `roadmap` adr: `roadmap` | (**status:** `accepted`)
+# `roadmap` adr: `roadmap` | (**status:** `deprecated`)
 
 ## Problem Statement
 
-Briefly describe the architectural problem or concern.
+This record was scaffolded on 2026-03-23 and never authored. Every section below
+retained its template placeholder text, so the record states no problem, weighs no
+options, and commits to no decision. It is deprecated rather than superseded: nothing
+was ever decided here for a successor to replace.
 
 ## Considerations
 
-Key factors, constraints, requirements. Tech/libraries considered.
+The scaffold carried an `accepted` status token, which made an empty record read as a
+ratified decision to both a human reader and any status-driven tooling. Its grounding
+research record, `2026-03-23-roadmap-research`, is an unfilled scaffold of the same date.
 
 ## Constraints
 
-Technical limitations, time constraints, etc.
+Deprecation changes only this record's status and states what it contains. It asserts
+nothing about the work the feature tag covers, which is evidenced by that feature's
+execution records where they exist.
 
 ## Implementation
 
-High-level description of HOW it will be implemented. Reference `{research}`
-and `{reference}` specs.
+None. No decision is recorded, so nothing governs and nothing rolls out.
 
 ## Rationale
 
-Why this option was chosen. Reference `{research}` findings and external
-`{reference}` patterns.
+No governing decision can be reconstructed from an empty record without inventing
+one. Authoring content now would fabricate a decision history rather than record it,
+so the honest terminal state is deprecation.
 
 ## Consequences
 
-Difficulties, implementation consequences, future considerations.
+Good: the corpus no longer presents an empty scaffold as an accepted decision.
+
+Bad: whatever reasoning was intended on 2026-03-23 is not recoverable from this record.
+
+Neutral: if the underlying decision still needs recording, it is authored as a new ADR
+with its own evidence rather than by filling this one in retrospectively.
