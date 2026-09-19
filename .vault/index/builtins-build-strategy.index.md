@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#builtins-build-strategy'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:e10f34d6ce35fc4302fec2a9ce030f86471369345bad12dd3022c1da08a1e9b7'
+body_hash: 'sha256:b30c8176e69837c755f522ddde9e46a3bf54b2fa2ed067d78919c8a2ce0e6fde'
 related:
   - '[[2026-03-21-builtins-build-strategy-adr]]'
 ---
@@ -19,4 +19,4 @@ Auto-generated index of all documents tagged with `#builtins-build-strategy`.
 
 ### adr
 
-- `2026-03-21-builtins-build-strategy-adr` - `builtins-build-strategy` adr: `builtins-build-strategy` | (**status:** `accepted`)
+- `2026-03-21-builtins-build-strategy-adr` - `builtins-build-strategy` adr: `builtins-build-strategy` | (**status:** `superseded`)

@@ -6,7 +6,7 @@ tags:
 date: '2026-07-31'
 modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:f243496967cfa48d86dbac450052ec83cab18ddc409113413f781353d9a08ef4'
+body_hash: 'sha256:d3bcd184273f2e21b413efb4d80b725212d987761bf770e71eb8c17f02dae4c0'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
   - '[[2026-02-21-packaging-restructure-ledger]]'
@@ -27,7 +27,7 @@ Auto-generated index of all documents tagged with `#packaging-restructure`.
 
 ### adr
 
-- `2026-02-21-packaging-restructure-adr` - `packaging-restructure` adr: `src/vaultspec namespace + uv + unified MCP` | (**status:** `accepted`)
+- `2026-02-21-packaging-restructure-adr` - `packaging-restructure` adr: `src layout + uv + unified MCP` | (**status:** `accepted`)
 
 ### exec
 

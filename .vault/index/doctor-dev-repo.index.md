@@ -6,7 +6,7 @@ tags:
 date: '2026-07-31'
 modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:f521b370a7e57dbc6313b8cdda783b4b36f82db3517bddcab2ab4949668fdb61'
+body_hash: 'sha256:68a09868e1c1aa4b3ae8ace6cc28cd70f837b0d63a7c048189cf1055f5f557db'
 related:
   - '[[2026-04-30-doctor-dev-repo-adr]]'
   - '[[2026-04-30-doctor-dev-repo-ledger]]'
@@ -23,7 +23,7 @@ Auto-generated index of all documents tagged with `#doctor-dev-repo`.
 
 ### adr
 
-- `2026-04-30-doctor-dev-repo-adr` - `doctor-dev-repo` adr: `consult is_dev_repo in collect_framework_presence` | (**status:** `accepted`)
+- `2026-04-30-doctor-dev-repo-adr` - `doctor-dev-repo` adr: `consult is_dev_repo in collect_framework_presence` | (**status:** `superseded`)
 
 ### exec
 

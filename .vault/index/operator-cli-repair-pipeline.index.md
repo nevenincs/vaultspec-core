@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#operator-cli-repair-pipeline'
 date: '2026-07-31'
-modified: '2026-09-05'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:a9bd38a4e02596ae8913a747767a6b99d48c06900613115f1225887d3f4b96c8'
+body_hash: 'sha256:eb0ca8a7336210776bc379cb4e072e48ba8a9418e340b244417f7a55e5ddbec8'
 related:
   - '[[2026-05-15-operator-cli-repair-pipeline-adr]]'
   - '[[2026-05-15-operator-cli-repair-pipeline-audit]]'
@@ -24,7 +24,7 @@ Auto-generated index of all documents tagged with `#operator-cli-repair-pipeline
 
 ### adr
 
-- `2026-05-15-operator-cli-repair-pipeline-adr` - `operator-cli-repair-pipeline` adr: `explicit vault repair pipeline` | (**status:** `proposed`)
+- `2026-05-15-operator-cli-repair-pipeline-adr` - `operator-cli-repair-pipeline` adr: `explicit vault repair pipeline` | (**status:** `accepted`)
 
 ### audit
 

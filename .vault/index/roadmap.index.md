@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#roadmap'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:dbde4b196cd3e64028adcc8d330c1397c52c5a542df0d6953aff2898aa721cd1'
+body_hash: 'sha256:15e20a8f1e8a44e4b17c1520ff43de305fc968373df4f857b66d8385954e8991'
 related:
   - '[[2026-02-17-audit-summary-audit]]'
   - '[[2026-02-17-competitive-landscape-audit]]'
@@ -26,7 +26,7 @@ Auto-generated index of all documents tagged with `#roadmap`.
 
 ### adr
 
-- `2026-03-23-roadmap-adr` - `roadmap` adr: `roadmap` | (**status:** `accepted`)
+- `2026-03-23-roadmap-adr` - `roadmap` adr: `roadmap` | (**status:** `deprecated`)
 
 ### audit
 

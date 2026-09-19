@@ -6,7 +6,7 @@ tags:
 date: '2026-07-31'
 modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:faf9de0527390dcd36dfcf9aa699dc73f645d982fd5213d301f4d240ecc66079'
+body_hash: 'sha256:4f675af67bbf47b2375c4488cc30d63c9997555b4818a2443a0f050c3dca3dbf'
 related:
   - '[[2026-02-20-test-quality-ledger]]'
   - '[[2026-02-20-test-quality-plan]]'
@@ -24,7 +24,7 @@ Auto-generated index of all documents tagged with `#test-quality`.
 
 ### adr
 
-- `2026-03-23-test-quality-adr` - `test-quality` adr: `test quality` | (**status:** `accepted`)
+- `2026-03-23-test-quality-adr` - `test-quality` adr: `test quality` | (**status:** `deprecated`)
 
 ### exec
 

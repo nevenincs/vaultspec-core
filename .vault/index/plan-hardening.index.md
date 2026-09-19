@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#plan-hardening'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:afe2535b3fa0273d6de7ee0152d59c32339603b4666329d28a4f65a0764f3a2e'
+body_hash: 'sha256:0061fa0f30a39a87f275bf91ceb8eb6a87f510612865c00a060357c9c9b78089'
 related:
   - '[[2026-05-05-plan-hardening-adr]]'
   - '[[2026-05-05-plan-hardening-exec]]'
@@ -23,8 +23,8 @@ Auto-generated index of all documents tagged with `#plan-hardening`.
 
 ### adr
 
-- `2026-05-05-plan-hardening-adr` - `plan-hardening` adr: plan-hardening natural-language convention | (**status:** `proposed`)
-- `2026-05-06-plan-hardening-adr` - `plan-hardening` adr: vault plan CLI surface | (**status:** `proposed`)
+- `2026-05-05-plan-hardening-adr` - `plan-hardening` adr: plan-hardening natural-language convention | (**status:** `accepted`)
+- `2026-05-06-plan-hardening-adr` - `plan-hardening` adr: vault plan CLI surface | (**status:** `accepted`)
 
 ### exec
 

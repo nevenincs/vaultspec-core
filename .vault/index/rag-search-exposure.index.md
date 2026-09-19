@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#rag-search-exposure'
 date: '2026-08-26'
-modified: '2026-08-26'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:e24c285687c3584080e7240c35b039382ff96641475ddac78867691fdda609e0'
+body_hash: 'sha256:dfbee3c92d89ba8adb548c9bf70118d7014063504f26b66f549c74244fbe6290'
 related:
   - '[[2026-08-26-rag-search-exposure-adr]]'
   - '[[2026-08-26-rag-search-exposure-research]]'
@@ -20,7 +20,7 @@ Auto-generated index of all documents tagged with `#rag-search-exposure`.
 
 ### adr
 
-- `2026-08-26-rag-search-exposure-adr` - `rag-search-exposure` adr: `Expose rag capability, not rag search, from vaultspec-core` | (**status:** `proposed`)
+- `2026-08-26-rag-search-exposure-adr` - `rag-search-exposure` adr: `Expose rag capability, not rag search, from vaultspec-core` | (**status:** `accepted`)
 
 ### research
 

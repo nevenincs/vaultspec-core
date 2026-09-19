@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#markdown-feature-scope'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:ac40a2f62fc4ad64d9b42ac48eaa5efc379b051788200a55c02c40ea197ef418'
+body_hash: 'sha256:a3eff7115e5de82ecad3b2c7a146dd4632d1e6188fe78f97f23915714b7e2289'
 related:
   - '[[2026-07-27-markdown-feature-scope-P01-summary]]'
   - '[[2026-07-27-markdown-feature-scope-P02-summary]]'
@@ -26,7 +26,7 @@ Auto-generated index of all documents tagged with `#markdown-feature-scope`.
 
 ### adr
 
-- `2026-07-27-markdown-feature-scope-adr` - `markdown-feature-scope` adr: `feature-scoped markdown repair bypasses lazy migrations` | (**status:** `proposed`)
+- `2026-07-27-markdown-feature-scope-adr` - `markdown-feature-scope` adr: `feature-scoped markdown repair bypasses lazy migrations` | (**status:** `rejected`)
 
 ### audit
 

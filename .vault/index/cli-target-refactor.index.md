@@ -6,7 +6,7 @@ tags:
 date: '2026-07-31'
 modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:d382fa700253ea378a6105f894ffecfa769df29150eb84ee8bc6d6709b795b5d'
+body_hash: 'sha256:8afc8ba23e51828221e77f18787fe5aee0a473e573eb7d3d1d8ac54124cd342a'
 related:
   - '[[2026-03-05-cli-target-refactor-ledger]]'
   - '[[2026-03-05-cli-target-refactor-phase0-step1-exec]]'
@@ -35,7 +35,7 @@ Auto-generated index of all documents tagged with `#cli-target-refactor`.
 
 ### adr
 
-- `2026-03-23-cli-target-refactor-adr` - `cli-target-refactor` adr: `cli target refactor` | (**status:** `accepted`)
+- `2026-03-23-cli-target-refactor-adr` - `cli-target-refactor` adr: `cli target refactor` | (**status:** `deprecated`)
 
 ### exec
 

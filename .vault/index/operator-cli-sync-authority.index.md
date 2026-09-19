@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#operator-cli-sync-authority'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:f67ea2d73fd07b8fe64f69623c1eb065df893cc645f0bf0067e4ba06fa1d2527'
+body_hash: 'sha256:9a785214140e1e62c55107190b36de5b1cc8055c0e59b1332676aaa2dafb1e82'
 related:
   - '[[2026-05-15-operator-cli-sync-authority-adr]]'
   - '[[2026-05-15-operator-cli-sync-authority-research]]'
@@ -20,7 +20,7 @@ Auto-generated index of all documents tagged with `#operator-cli-sync-authority`
 
 ### adr
 
-- `2026-05-15-operator-cli-sync-authority-adr` - `operator-cli-sync-authority` adr: `make top-level sync the only authoritative synchronization surface` | (**status:** `proposed`)
+- `2026-05-15-operator-cli-sync-authority-adr` - `operator-cli-sync-authority` adr: `make top-level sync the only authoritative synchronization surface` | (**status:** `accepted`)
 
 ### research
 
