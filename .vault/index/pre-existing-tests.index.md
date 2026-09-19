@@ -4,13 +4,15 @@ tags:
   - '#index'
   - '#pre-existing-tests'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:77fec108433fb8676bf887af96f8fb211a480f254025062aa239f52b4e10a047'
+body_hash: 'sha256:c6b3ee8c2cd8995a07717da536b3c7659e7d98d9f6392e5731aedd59ad12eb8a'
 related:
   - '[[2026-05-01-pre-existing-tests-adr]]'
+  - '[[2026-05-01-pre-existing-tests-ledger]]'
   - '[[2026-05-01-pre-existing-tests-research]]'
   - '[[2026-05-01-pre-existing-tests-self-review-exec]]'
+  - '[[2026-09-19-pre-existing-tests-plan]]'
 ---
 
 # `pre-existing-tests` feature index
@@ -25,7 +27,12 @@ Auto-generated index of all documents tagged with `#pre-existing-tests`.
 
 ### exec
 
+- `2026-05-01-pre-existing-tests-ledger` - `pre-existing-tests` ledger
 - `2026-05-01-pre-existing-tests-self-review-exec` - `pre-existing-tests` self-review: pre-existing test fixes (#98, #99)
+
+### plan
+
+- `2026-09-19-pre-existing-tests-plan` - `pre-existing-tests` plan
 
 ### research
 

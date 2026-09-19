@@ -4,11 +4,12 @@ tags:
   - '#index'
   - '#vault-graph-ref'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:29bd3177d7e194535e60f5b9f0b2e0dd245441db2dca3f2f528a9039f01ec4fd'
+body_hash: 'sha256:8fea47bdd0443a00318bd1370519209a7d1f898c7d45623be52748a46a56612c'
 related:
   - '[[2026-06-13-vault-graph-ref-adr]]'
+  - '[[2026-06-13-vault-graph-ref-ledger]]'
   - '[[2026-06-13-vault-graph-ref-plan]]'
   - '[[2026-06-13-vault-graph-ref-research]]'
 ---
@@ -22,6 +23,10 @@ Auto-generated index of all documents tagged with `#vault-graph-ref`.
 ### adr
 
 - `2026-06-13-vault-graph-ref-adr` - `vault-graph-ref` adr: `ref-scoped vault graph` | (**status:** `accepted`)
+
+### exec
+
+- `2026-06-13-vault-graph-ref-ledger` - `vault-graph-ref` ledger
 
 ### plan
 

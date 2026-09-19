@@ -4,16 +4,18 @@ tags:
   - '#index'
   - '#module-exports'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:3d67e7146b6f42b8bb1fd4d37aa0bf0d06b21711c4f2c7a501908355e40f267b'
+body_hash: 'sha256:1445915ba3d913a475c2c41fe3aee224e2755ae2e25c17b361a1b244251cf46f'
 related:
   - '[[2026-02-21-module-exports-adr]]'
+  - '[[2026-02-21-module-exports-ledger]]'
   - '[[2026-02-21-module-exports-p1-step07-exec]]'
   - '[[2026-02-21-module-exports-p1-step08-exec]]'
   - '[[2026-02-21-module-exports-part1-research]]'
   - '[[2026-02-21-module-exports-part2-research]]'
   - '[[2026-02-21-module-exports-part3-research]]'
+  - '[[2026-09-19-module-exports-plan]]'
 ---
 
 # `module-exports` feature index
@@ -28,8 +30,13 @@ Auto-generated index of all documents tagged with `#module-exports`.
 
 ### exec
 
+- `2026-02-21-module-exports-ledger` - `module-exports` ledger
 - `2026-02-21-module-exports-p1-step07-exec` - Step 7: Add `__all__`, `__init__.py` re-exports for `subagent_server/` and rewrite consumers
 - `2026-02-21-module-exports-p1-step08-exec` - Step 8: Retarget entry point imports and add `__all__` to top-level modules
+
+### plan
+
+- `2026-09-19-module-exports-plan` - `module-exports` plan
 
 ### research
 

@@ -4,14 +4,16 @@ tags:
   - '#index'
   - '#migration-registry'
 date: '2026-07-31'
-modified: '2026-09-06'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:1b7334cfa30a4fb668d8baf0a66ace60d73d542380fb1bdb6c910f73f54ae8e9'
+body_hash: 'sha256:5ed00ac2bde4c395a870b91b1721ddaa8d665787a7130fc1da9df8965e64ab18'
 related:
   - '[[2026-05-01-migration-registry-adr]]'
+  - '[[2026-05-01-migration-registry-ledger]]'
   - '[[2026-05-01-migration-registry-phase1-summary-exec]]'
   - '[[2026-05-01-migration-registry-research]]'
   - '[[2026-09-06-migration-registry-write-boundary-adr]]'
+  - '[[2026-09-19-migration-registry-plan]]'
 ---
 
 # `migration-registry` feature index
@@ -27,7 +29,12 @@ Auto-generated index of all documents tagged with `#migration-registry`.
 
 ### exec
 
+- `2026-05-01-migration-registry-ledger` - `migration-registry` ledger
 - `2026-05-01-migration-registry-phase1-summary-exec` - `migration-registry` phase-1 summary
+
+### plan
+
+- `2026-09-19-migration-registry-plan` - `migration-registry` plan
 
 ### research
 

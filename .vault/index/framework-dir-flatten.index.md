@@ -4,11 +4,12 @@ tags:
   - '#index'
   - '#framework-dir-flatten'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:2a922adc1f750eda23e2a445e62af1fa143ef60da5598949b3574622675209e4'
+body_hash: 'sha256:0727286548eff302b6fead066aa197b93e83ebdc1827e4c9720102f45e18491d'
 related:
   - '[[2026-06-25-framework-dir-flatten-adr]]'
+  - '[[2026-06-25-framework-dir-flatten-ledger]]'
   - '[[2026-06-25-framework-dir-flatten-plan]]'
   - '[[2026-06-25-framework-dir-flatten-research]]'
 ---
@@ -22,6 +23,10 @@ Auto-generated index of all documents tagged with `#framework-dir-flatten`.
 ### adr
 
 - `2026-06-25-framework-dir-flatten-adr` - `framework-dir-flatten` adr: `collapse the redundant rules wrapper in the framework dir` | (**status:** `accepted`)
+
+### exec
+
+- `2026-06-25-framework-dir-flatten-ledger` - `framework-dir-flatten` ledger
 
 ### plan
 

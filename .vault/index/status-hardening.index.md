@@ -4,11 +4,12 @@ tags:
   - '#index'
   - '#status-hardening'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:4373177a6e8f06bfc3a8257bee65dcf290bb3fcb1b9eb4f6b7d3603b50741bf9'
+body_hash: 'sha256:38c0c4a5aa13abf82537a0db3de7cafbc0837ddce031aa6c63a801eed0ceef8b'
 related:
   - '[[2026-06-13-status-hardening-adr]]'
+  - '[[2026-06-13-status-hardening-ledger]]'
   - '[[2026-06-13-status-hardening-plan]]'
   - '[[2026-06-13-status-hardening-research]]'
 ---
@@ -22,6 +23,10 @@ Auto-generated index of all documents tagged with `#status-hardening`.
 ### adr
 
 - `2026-06-13-status-hardening-adr` - status-hardening adr: status discovery mini-framework | (**status:** `accepted`)
+
+### exec
+
+- `2026-06-13-status-hardening-ledger` - `status-hardening` ledger
 
 ### plan
 

@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#cli-output'
 date: '2026-02-23'
-modified: '2026-06-13'
-body_hash: 'sha256:493809ada904f0b1c6da76b8312a1f8e6a8f853acd89b94916dd2e86871d1746'
+modified: '2026-09-19'
+body_hash: 'sha256:ef4a7647919fef867ef0a02d5bbf150c831135a492dec0779934c5fecf712390'
 related:
-  - '[[2026-02-23-cli-output-plan]]'
+  - '[[2026-09-19-cli-output-plan]]'
   - '[[2026-02-23-cli-output-architecture-adr]]'
 ---
 
@@ -21,7 +21,7 @@ related:
 - **Scope:**
   - src/vaultspec/printer.py (new - Phase 1 infrastructure)
   - src/vaultspec/cli_common.py (modified - Phase 1 wiring)
-  - src/vaultspec/__init__.py (modified - Phase 1 export)
+  - `src/vaultspec/__init__.py` (modified - Phase 1 export)
   - src/vaultspec/tests/cli/test_printer.py (new - Phase 1 tests)
   - src/vaultspec/vault_cli.py (modified - Phase 2 fixes)
   - src/vaultspec/core/commands.py (modified - Phase 2 fixes)
@@ -85,7 +85,7 @@ singleton; no locks required.
 
 **Circular imports:** printer.py imports only json, typing.Any, and
 rich.console.Console - zero vaultspec-internal imports. The
-from .printer import Printer in __init__.py cannot create a circular import
+from .printer import Printer in `__init__.py` cannot create a circular import
 cycle, even when commands.py \_get_package_dir() does import vaultspec at
 runtime. Verified by tracing the full import graph.
 
@@ -135,7 +135,7 @@ All four Phase 1 deliverables are present and correct:
 - cli_common.py setup_logging() attaches args.printer as the final step
   after configure_logging() runs.
 
-- __init__.py exports Printer with __all__ = ["Printer"].
+- `__init__.py` exports Printer with `__all__ = ["Printer"]`.
 
 - test_printer.py has 13 tests, all passing (live run: 13 passed in 0.14s),
   no mocks.
@@ -147,7 +147,7 @@ injection in warn() and error() is the correct pattern - it allows callers
 to override the default style without discarding the fallback.
 
 **Documentation:** All five public methods have doc comments. The class-level
-docstring documents all three constructor parameters. __all__ is set.
+docstring documents all three constructor parameters. `__all__` is set.
 
 **Compile verification:** All six modified or created files compile cleanly
 under python -m py_compile. Exit 0, no output.

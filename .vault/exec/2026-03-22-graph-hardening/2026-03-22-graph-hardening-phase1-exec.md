@@ -3,10 +3,10 @@ tags:
   - '#exec'
   - '#graph-hardening'
 date: '2026-03-22'
-modified: '2026-06-13'
+modified: '2026-09-19'
 body_hash: 'sha256:d631441f95f8719b4450a5df6d9216c484c4d6421164125280cca21d8de5d997'
 related:
-  - '[[2026-03-22-graph-hardening-plan]]'
+  - '[[2026-09-19-graph-hardening-plan]]'
 ---
 
 # `graph-hardening` phase 1: phantom nodes in the graph

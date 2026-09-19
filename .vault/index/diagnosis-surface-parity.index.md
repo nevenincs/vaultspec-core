@@ -4,12 +4,13 @@ tags:
   - '#index'
   - '#diagnosis-surface-parity'
 date: '2026-07-31'
-modified: '2026-08-23'
+modified: '2026-09-19'
 body_schema: 'body-v2'
-body_hash: 'sha256:a48859d78aa47c6ca964fc9c383038b09bd57372388d49e261590a30a49c390e'
+body_hash: 'sha256:6c01a0c55871f5bc6bc0c2c81fd24927ce28a0e6150391ded9ba78fc1e31acf8'
 related:
   - '[[2026-06-28-diagnosis-surface-parity-adr]]'
   - '[[2026-06-28-diagnosis-surface-parity-audit]]'
+  - '[[2026-06-28-diagnosis-surface-parity-ledger]]'
   - '[[2026-06-28-diagnosis-surface-parity-plan]]'
   - '[[2026-06-28-diagnosis-surface-parity-research]]'
 ---
@@ -27,6 +28,10 @@ Auto-generated index of all documents tagged with `#diagnosis-surface-parity`.
 ### audit
 
 - `2026-06-28-diagnosis-surface-parity-audit` - `diagnosis-surface-parity` audit: `diagnosis surface parity: install/sync/doctor drift`
+
+### exec
+
+- `2026-06-28-diagnosis-surface-parity-ledger` - `diagnosis-surface-parity` ledger
 
 ### plan
 
