@@ -712,35 +712,34 @@ def _group_root_causes(results: Iterable[CheckResult]) -> list[dict[str, Any]]:
 
 
 def _refresh_indexes(root_dir: Path, feature: str | None) -> list[Path]:
+    """Rewrite every feature index the repair's index phase owns.
+
+    Membership is sliced from the one graph built here, matching the preview
+    in :func:`_index_paths`. The loop that used to build a graph per feature
+    made this phase ``O(features x documents)``.
+    """
     from ..graph import VaultGraph
-    from .index import generate_feature_index_result
+    from .index import generate_feature_indexes
 
     graph = VaultGraph(root_dir)
     features = [feature] if feature else graph.get_features()
-    generated: list[Path] = []
-    for feat in features:
-        result = generate_feature_index_result(root_dir, feat)
-        if result.changed:
-            generated.append(result.path)
-    return generated
+    return [
+        result.path
+        for result in generate_feature_indexes(root_dir, features, graph=graph)
+        if result.changed
+    ]
 
 
 def _index_paths(root_dir: Path, feature: str | None) -> list[Path]:
     """Return the feature index paths a repair would rewrite.
 
-    Membership comes from one shared graph, sliced per feature. Omitting
-    ``nodes`` here instead would make :func:`generate_feature_index_result`
-    rebuild a fresh cache-disabled ``VaultGraph`` - a full parse of every
-    document in the vault - once per feature, which is
+    Membership comes from one shared graph, sliced per feature by
+    :func:`~vaultspec_core.vaultcore.index.generate_feature_indexes`, which is
+    now also what the mutating phase in :func:`_refresh_indexes` uses. A loop
+    that omits ``nodes`` builds a whole-vault graph per feature, which is
     ``O(features x documents)``: 130 rebuilds over 1,229 documents measured at
-    112.6 s of a 115 s run, and a projected ~72 minutes at 10,476 documents.
-
-    Passing shared nodes is safe on *this* path specifically. The parameter is
-    documented as one production callers omit so that membership is re-read
-    under the index lock - but the dry-run branch takes ``nullcontext()`` and
-    holds no lock, so there is no lock-ordering guarantee to preserve. It
-    computes what *would* change and writes nothing. The mutating path is a
-    different case and is deliberately left alone here.
+    112.6 s of a 115 s run, and 18m39s over 745 features at 4,739 documents to
+    decide that nothing needed writing.
 
     Args:
         root_dir: Project root directory.
@@ -750,19 +749,17 @@ def _index_paths(root_dir: Path, feature: str | None) -> list[Path]:
         The index paths whose canonical content would change.
     """
     from ..graph import VaultGraph
-    from .index import generate_feature_index_result
+    from .index import generate_feature_indexes
 
     graph = VaultGraph(root_dir)
-    features = [feature] if feature else graph.get_features()
+    candidates = [feature] if feature else graph.get_features()
+    features = [feat for feat in candidates if feat]
     return [
         result.path
-        for feat in features
-        if feat
-        and (
-            result := generate_feature_index_result(
-                root_dir, feat, nodes=graph.get_feature_nodes(feat), dry_run=True
-            )
-        ).changed
+        for result in generate_feature_indexes(
+            root_dir, features, graph=graph, dry_run=True
+        )
+        if result.changed
     ]
 
 

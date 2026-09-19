@@ -70,9 +70,15 @@ class MarkdownStats:
 
 
 def _is_fence(line: str) -> bool:
-    """Return ``True`` if *line* opens or closes a fenced code block."""
-    stripped = line.lstrip()
-    return stripped.startswith("```") or stripped.startswith("~~~")
+    """Return ``True`` if *line* opens or closes a fenced code block.
+
+    Called once per line of every document, so the cheap character tests come
+    before the ``lstrip`` allocation: a fence needs a backtick or a tilde, and
+    most lines have neither.
+    """
+    if "`" not in line and "~" not in line:
+        return False
+    return line.lstrip().startswith(("```", "~~~"))
 
 
 def apply_markdown_hygiene(content: str) -> tuple[str, MarkdownStats]:
@@ -266,9 +272,13 @@ def check_markdown(
         sources = iter_document_texts(root_dir)
 
     for doc_path, raw_content, _has_crlf in sources:
-        metadata, _body = parse_vault_metadata(raw_content)
-        if wanted_feature and wanted_feature not in extract_feature_tags(metadata.tags):
-            continue
+        # Parsed only to answer the feature filter, so an unrestricted pass -
+        # what `vault check all` runs - has no use for it at all. It was being
+        # parsed for every document regardless.
+        if wanted_feature:
+            metadata, _body = parse_vault_metadata(raw_content)
+            if wanted_feature not in extract_feature_tags(metadata.tags):
+                continue
 
         _cleaned_lf, stats = apply_markdown_hygiene(raw_content.replace("\r\n", "\n"))
         if stats.total == 0:

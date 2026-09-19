@@ -60,7 +60,7 @@ def check_features(
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"features"``. Does not support ``--fix``.
     """
-    from ..scanner import get_doc_type
+    from ..scanner import doc_type_resolver
 
     result = CheckResult(check_name="features", supports_fix=False)
 
@@ -71,12 +71,13 @@ def check_features(
     by_feature: dict[str, set[str]] = {}
     doc_counts: dict[str, int] = {}
     index_names: set[str] = set()
+    resolve_doc_type = doc_type_resolver(root_dir)
     for doc_path, (metadata, _body) in snapshot.items():
         if is_generated_index(doc_path):
             index_names.add(doc_path.name)
             continue
         feat_tags = extract_feature_tags(metadata.tags)
-        dt = get_doc_type(doc_path, root_dir)
+        dt = resolve_doc_type(doc_path)
         dt_value = dt.value if dt else None
         for ft in set(feat_tags):
             doc_counts[ft] = doc_counts.get(ft, 0) + 1

@@ -38,6 +38,7 @@ from vaultspec_core.core.windowing import apply_window
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from vaultspec_core.graph import VaultGraph
     from vaultspec_core.vaultcore.query import (
         FeatureArchiveResult,
         FeatureDetail,
@@ -187,14 +188,18 @@ def _generate_feature_indexes(
     root_dir: Path,
     features: list[str],
     json_output: bool,
+    graph: VaultGraph,
 ) -> list[Path]:
-    """Regenerate the index document for each feature, returning written paths."""
+    """Regenerate the index document for each feature, returning written paths.
+
+    Membership comes from *graph*, the one the caller already built to
+    enumerate the features, rather than from a fresh build per feature.
+    """
     from vaultspec_core.console import get_console
-    from vaultspec_core.vaultcore.index import generate_feature_index_result
+    from vaultspec_core.vaultcore.index import generate_feature_indexes
 
     generated_paths: list[Path] = []
-    for feat in features:
-        result = generate_feature_index_result(root_dir, feat)
+    for result in generate_feature_indexes(root_dir, features, graph=graph):
         if result.changed:
             generated_paths.append(result.path)
             if not json_output:
@@ -229,7 +234,7 @@ def _run_feature_index(
         get_console().print("[dim]No features found in vault.[/dim]")
         return
 
-    generated_paths = _generate_feature_indexes(root_dir, features, json_output)
+    generated_paths = _generate_feature_indexes(root_dir, features, json_output, graph)
 
     if generated_paths:
         from vaultspec_core.cli._cache_hook import invalidate_graph_cache

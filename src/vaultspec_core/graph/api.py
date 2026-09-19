@@ -22,6 +22,7 @@ Exports:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections import Counter
 from typing import TYPE_CHECKING, Any, cast
@@ -42,7 +43,6 @@ from . import api_export, rendering
 from .algorithms import (
     PAGERANK_ALPHA,
     betweenness_centrality,
-    docnode_from_attrs,
     edge_kind,
     extract_feature,
     extract_title,
@@ -54,8 +54,6 @@ from .networkx_runtime import (
     NetworkXGraph,
     directed_graph,
     ego_graph,
-    node_link_data,
-    node_link_graph,
 )
 from .networkx_runtime import density as graph_density
 
@@ -130,6 +128,9 @@ class VaultGraph:
         self._dangling_links: list[tuple[str, str]] = []
         self._stem_index: dict[str, list[str]] = {}
         self._raw_texts: dict[pathlib.Path, tuple[str, bool]] = {}
+        #: sha256 of each ingested file's raw bytes, recorded by the ingress
+        #: read so the cache manifest need not read the corpus a second time.
+        self._content_hashes: dict[pathlib.Path, str] = {}
         self._encoding_issues: list[EncodingIssue] = []
         self._build_graph(use_cache=use_cache)
 
@@ -171,6 +172,7 @@ class VaultGraph:
         graph._dangling_links = []
         graph._stem_index = {}
         graph._raw_texts = {}
+        graph._content_hashes = {}
         graph._encoding_issues = []
 
         docs_dir_name = pathlib.Path(get_config().docs_dir).name
@@ -234,7 +236,11 @@ class VaultGraph:
         if use_cache:
             cache_mod.save(
                 path,
-                cache_mod.fingerprint_vault(scanned_files, self.root_dir),
+                cache_mod.fingerprint_vault(
+                    scanned_files,
+                    self.root_dir,
+                    content_hashes=self._content_hashes,
+                ),
                 self._to_cache_graph(),
                 self._dangling_links,
                 [
@@ -244,73 +250,35 @@ class VaultGraph:
             )
 
     def _to_cache_graph(self) -> dict[str, Any]:
-        """Return the node-link serialisation of the canonical graph for caching.
+        """Serialise the canonical graph for caching.
 
-        Uses the same ``edges="edges"`` node-link contract the JSON export
-        uses, then injects each node's body text (which is held on the
-        :class:`DocNode`, not on the networkx node) so a cache load can
-        reconstruct a behaviourally identical graph, including
-        :meth:`to_dict` with ``include_body=True``.
-
-        Returns:
-            A node-link ``dict`` with body text attached to each node.
+        Delegates to :func:`~vaultspec_core.graph.cache_io.to_cache_graph`,
+        which owns the cached node-link shape.
         """
-        data = node_link_data(self._digraph)
-        for node_dict in data.get("nodes", []):
-            nid = node_dict.get("id", "")
-            doc = self.nodes.get(nid)
-            node_dict["body"] = doc.body if doc is not None else ""
-        return data
+        from .cache_io import to_cache_graph
+
+        return to_cache_graph(self._digraph, self.nodes, self._raw_texts)
 
     def _load_from_cache(self, payload: cache.GraphCachePayload) -> None:
-        """Reconstruct the graph state from a validated cache payload.
+        """Adopt the graph state rebuilt from a validated cache payload.
 
-        Rebuilds ``self._digraph``, ``self.nodes``, ``self._stem_index``, and
-        ``self._dangling_links`` from the serialised node-link data so the
-        loaded graph is behaviourally identical to a fresh build (same nodes,
-        edges, attributes, and node-size metrics).  No filesystem parsing
-        occurs.
+        The reconstruction itself lives in
+        :func:`~vaultspec_core.graph.cache_io.restore_graph`; this assigns
+        what it returns.
 
         Args:
             payload: A cache payload that has already passed
                 :func:`vaultspec_core.graph.cache.validate`.
         """
-        self._digraph = node_link_graph(payload.graph)
-        self.nodes = {}
-        self._stem_index = {}
-        by_stem: dict[str, list[str]] = {}
-        for key in self._digraph.nodes():
-            attrs = self._digraph.nodes[key]
-            self.nodes[key] = docnode_from_attrs(key, attrs)
-            # The node body is held on the DocNode, not the nx node; pull it
-            # back off the cached node attrs and drop it so the nx node
-            # attribute set matches a fresh build exactly.
-            body = attrs.pop("body", "")
-            self.nodes[key].body = body
-            # Phantoms are excluded from _stem_index to match fresh-build
-            # semantics: _rebuild_from_files only indexes real (non-phantom)
-            # nodes in passes 1a/1b; phantoms are added later in pass 2 and
-            # never entered into _stem_index.
-            if not attrs.get("phantom", False):
-                bare_stem = key.split("/", 1)[1] if "/" in key else key
-                by_stem.setdefault(bare_stem, []).append(key)
-        for bare_stem, keys in by_stem.items():
-            self._stem_index[bare_stem] = sorted(keys)
-        self._dangling_links = [(pair[0], pair[1]) for pair in payload.dangling_links]
-        # A document that failed to read or decode never becomes a usable node,
-        # so the cache carries these separately; restoring them keeps a warm
-        # run's encoding findings identical to a cold one's.
-        from pathlib import Path as _Path
+        from .cache_io import restore_graph
 
-        self._encoding_issues = [
-            EncodingIssue(_Path(raw_path), kind, detail, start)
-            for raw_path, kind, detail, start in payload.encoding_issues
-        ]
-        logger.info(
-            "Graph loaded from cache: %d nodes, %d edges",
-            self._digraph.number_of_nodes(),
-            self._digraph.number_of_edges(),
-        )
+        restored = restore_graph(payload)
+        self._digraph = restored.digraph
+        self.nodes = restored.nodes
+        self._stem_index = restored.stem_index
+        self._raw_texts = restored.raw_texts
+        self._dangling_links = restored.dangling_links
+        self._encoding_issues = restored.encoding_issues
 
     def _rebuild_from_files(self, scanned_files: list[pathlib.Path]) -> None:
         """Rebuild the graph by parsing every scanned file.
@@ -334,6 +302,7 @@ class VaultGraph:
         self._digraph = nx.DiGraph()
         self._dangling_links = []
         self._raw_texts = {}
+        self._content_hashes = {}
         self._encoding_issues = []
 
         # Pass 1a: collect all DocNodes keyed by stem, detecting collisions
@@ -376,6 +345,11 @@ class VaultGraph:
             self._encoding_issues.append(EncodingIssue(path, "read", str(e), None))
             logger.warning("Failed to read metadata from %s: %s", path, e)
             return None
+        # Fingerprinted here, off the bytes this read already holds. The cache
+        # manifest needs the same sha256 that `cache.hash_file` computes, and
+        # recomputing it afterwards meant reading the whole corpus a second
+        # time - 3.2 s of the 11 s cold rebuild on a 4,739-document vault.
+        self._content_hashes[path] = hashlib.sha256(raw_bytes).hexdigest()
         try:
             decoded = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as e:
@@ -392,11 +366,13 @@ class VaultGraph:
     def ensure_raw_texts(self) -> None:
         """Guarantee :attr:`raw_texts` is populated for a working-tree graph.
 
-        A cold build fills the raw-text map during its parse; a cache-hit
-        build parses nothing, so a caller that needs document text (the
-        check pipeline) invokes this to perform the run's single ingress
-        read pass.  A no-op when the map is already populated or when the
-        graph is ref-scoped (checks do not run against history).
+        A cold build fills the raw-text map during its parse, and a cache hit
+        restores it from the cached raw text, so this is normally already
+        satisfied.  It still performs the run's single ingress read pass for
+        the one case that has no text in hand: a graph built with the cache
+        disabled whose parse was skipped.  A no-op when the map is already
+        populated or when the graph is ref-scoped (checks do not run against
+        history).
         """
         if self._raw_texts or self.ref is not None:
             return
@@ -410,8 +386,8 @@ class VaultGraph:
     def raw_texts(self) -> dict[pathlib.Path, tuple[str, bool]]:
         """Per-document ``(normalised text, source_had_crlf)`` in scan order.
 
-        Populated by a cold build or :meth:`ensure_raw_texts`; empty after a
-        bare cache hit or for a ref-scoped graph.
+        Populated by a cold build, restored by a cache hit, or filled on
+        demand by :meth:`ensure_raw_texts`; empty for a ref-scoped graph.
         """
         return self._raw_texts
 

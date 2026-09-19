@@ -227,6 +227,14 @@ def check_placeholders(
             if feat not in extract_feature_tags(metadata.tags):
                 continue
 
+        # Every token this checker reports is brace-delimited, and stripping
+        # only removes text, so a body with no brace has nothing to report
+        # whatever the strip would produce. 92% of a 4,738-document vault
+        # carries no "{" in its body, and the strip is a line-by-line fence
+        # scan plus two regex passes over the whole of it.
+        if "{" not in body:
+            continue
+
         rel_path = doc_path.relative_to(root_dir)
         prose = _strip_non_prose(body)
 

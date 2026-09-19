@@ -41,13 +41,21 @@ def test_the_release_workflow_generates_rather_than_edits_the_pointers(
     empty hashes out of a green run - which is exactly what
     vaultspec-core-v0.1.60 shipped. Pinning the invocation keeps the release
     path from drifting back to editing a pointer in place.
+
+    Reads ``channels.yml``. The pointer generation moved there when the
+    release job was split from ``binaries.yml``, and this guard kept reading
+    the file it had been left behind in - so it failed on every pull request
+    while asserting nothing about the job that actually generates. That is the
+    decoupling the module docstring above warns about, arrived at from the
+    other direction: a red that means "the test moved" rather than "the
+    release broke".
     """
-    workflow = (repo_root / ".github" / "workflows" / "binaries.yml").read_text(
+    workflow = (repo_root / ".github" / "workflows" / "channels.yml").read_text(
         encoding="utf-8",
     )
 
     assert "dev.packaging.generate" in workflow
-    assert "--checksums dist-bin/SHA256SUMS" in workflow
+    assert "--checksums published/SHA256SUMS" in workflow
     assert "jq \\" not in workflow
 
 
@@ -58,8 +66,10 @@ def test_the_release_workflow_validates_before_committing(repo_root: Path) -> No
     is what turns that from a release that ships to a release that stops, so
     the release job losing this step would silently restore the old failure
     mode - with the reassuring `generate` invocation above still in place.
+
+    Reads ``channels.yml`` for the same reason the generator assertion does.
     """
-    workflow = (repo_root / ".github" / "workflows" / "binaries.yml").read_text(
+    workflow = (repo_root / ".github" / "workflows" / "channels.yml").read_text(
         encoding="utf-8",
     )
 

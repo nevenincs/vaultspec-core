@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from .models import DocType
 from .parser import parse_frontmatter
-from .scanner import get_doc_type, scan_vault
+from .scanner import doc_type_resolver, scan_vault
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -134,8 +134,9 @@ def scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocume
         files that pass the filter.
     """
     docs: list[VaultDocument] = []
+    resolve_doc_type = doc_type_resolver(root_dir)
     for doc_path in scan_vault(root_dir):
-        dt = get_doc_type(doc_path, root_dir)
+        dt = resolve_doc_type(doc_path)
         dt_str = dt.value if dt else "unknown"
         if doc_type is not None and dt_str != doc_type:
             continue

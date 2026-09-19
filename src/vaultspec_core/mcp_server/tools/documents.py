@@ -744,20 +744,24 @@ def _edit_result_to_item(
 def _regenerate_indexes(root_dir: Path, features: set[str]) -> None:
     """Regenerate the feature index for every feature touched by a batch.
 
-    The graph is built through the fingerprint cache: the freshly-written
+    The graph is built once, through the fingerprint cache: the freshly-written
     documents change their files' size or mtime, so validation misses and
     the rebuild sees them, while the refreshed cache warms the next read.
     Index generation is the automatic side effect the ADR folds into
     ``create``, absorbing the manual ``vault feature index`` call class.
 
+    One read, not one per feature. Regenerating in a loop rebuilt the whole
+    graph per feature, and because each index it wrote is itself a scanned
+    document, every iteration after the first also missed the cache it had
+    just refreshed - so a batch touching *n* features paid *n* cold rebuilds.
+
     Args:
         root_dir: The project root.
         features: The normalized feature names to regenerate indexes for.
     """
-    from ...vaultcore.index import generate_feature_index_result
+    from ...vaultcore.index import generate_feature_indexes
 
-    for feature in sorted(features):
-        generate_feature_index_result(root_dir, feature)
+    generate_feature_indexes(root_dir, sorted(features))
 
 
 # ---------------------------------------------------------------------------

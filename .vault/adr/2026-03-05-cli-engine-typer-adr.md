@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-architecture'
 date: 2026-03-05
-modified: '2026-06-28'
-body_hash: 'sha256:23a5371bb8a3c2ecb42f1d2570a23478cd78730f7b08c8c487ceed139d5768a2'
+modified: '2026-09-19'
+body_hash: 'sha256:84ce3242954409ce279f64ada1e12aac0c006ffe62dc3f9b0c39541f9c0d799f'
 related:
   - '[[2026-03-05-cli-architecture-audit]]'
   - '[[2026-03-05-cli-path-resolution-adr]]'
@@ -24,7 +24,7 @@ within the current argparse-based CLI layer:
    cascade to nested subcommands (e.g., rules list), causing them to disappear from
    --help menus.
 
-1. **sys.argv Hacking:** __main__.py intercepts and rewrites sys.argv using raw string
+1. **sys.argv Hacking:** `__main__.py` intercepts and rewrites sys.argv using raw string
    matching to route commands. If a user types vaultspec --target /foo vault audit (a
    standard CLI pattern), the string matcher hits the --target flag instead of the vault
    namespace, causing an immediate crash.
@@ -64,7 +64,7 @@ the entire vaultspec CLI to **[Typer](https://typer.tiangolo.com/)**.
   - Permanently eliminates the fragility of sys.argv string-matching.
 
   - Significantly reduces boilerplate code in vault_cli.py, spec_cli.py, and
-    __main__.py.
+    `__main__.py`.
 
   - Provides a highly professional, beautifully formatted terminal UX out-of-the-box via
     Rich.

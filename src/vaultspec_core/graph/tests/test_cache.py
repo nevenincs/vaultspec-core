@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import pytest
 from typer.testing import CliRunner
@@ -39,6 +39,7 @@ from typer.testing import CliRunner
 from ...cli import app
 from ...config import reset_config
 from ...testing.synthetic import build_synthetic_vault
+from ...tests.cli.workspace_factory import WorkspaceFactory
 from .. import cache as cache_mod
 from ..api import VaultGraph
 from .conftest import stem_index_of
@@ -793,3 +794,391 @@ class TestUnreadableDocumentsExcludedFromGraphDerivedQueries:
         assert [e.document.name for e in with_graph] == [
             e.document.name for e in without
         ]
+
+
+class TestIngressFingerprintReuse:
+    """The manifest reuses the digests the build's ingress read already took.
+
+    ``fingerprint_vault`` used to re-read and re-hash the whole corpus
+    immediately after ``_rebuild_from_files`` had read every byte of it, which
+    cost 2.65 s of an 11 s cold rebuild on a 4,739-document vault. The digests
+    must be identical whichever route computes them, or the cache would
+    validate against hashes that ``hash_file`` never reproduces - a permanent
+    cache miss, or worse, a false hit.
+    """
+
+    @staticmethod
+    def _vault(root: Path) -> None:
+        WorkspaceFactory(root).install()
+        for n in range(4):
+            (
+                root / ".vault" / "research" / f"2026-02-0{n + 1}-doc-{n}-research.md"
+            ).write_text(
+                "---\n"
+                "tags:\n"
+                "  - '#research'\n"
+                f"  - '#ingress-{n}'\n"
+                f"date: '2026-02-0{n + 1}'\n"
+                f"modified: '2026-02-0{n + 1}'\n"
+                "related: []\n"
+                "---\n\n"
+                f"# doc {n}\n\nBody with a `code span` and text.\n",
+                encoding="utf-8",
+            )
+
+    def test_ingress_digests_match_reading_each_file_again(
+        self, tmp_path: Path
+    ) -> None:
+        """A digest taken at ingress equals the one ``hash_file`` computes."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        graph = VaultGraph(root, use_cache=False)
+
+        assert graph._content_hashes, "the ingress read recorded no digests"
+        for path, digest in graph._content_hashes.items():
+            assert digest == cache_mod.hash_file(path), (
+                f"ingress digest for {path.name} disagrees with hash_file"
+            )
+
+    def test_manifest_is_identical_with_and_without_reuse(self, tmp_path: Path) -> None:
+        """Passing ingress digests must not change the manifest at all."""
+        from ...vaultcore.scanner import scan_vault
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        files = list(scan_vault(root))
+        graph = VaultGraph(root, use_cache=False)
+
+        reused = cache_mod.fingerprint_vault(
+            files, root, content_hashes=graph._content_hashes
+        )
+        reread = cache_mod.fingerprint_vault(files, root)
+
+        assert reused == reread
+
+    def test_a_path_without_a_recorded_digest_falls_back_to_reading(
+        self, tmp_path: Path
+    ) -> None:
+        """An unknown path is hashed here rather than dropped from the manifest."""
+        from ...vaultcore.scanner import scan_vault
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        files = list(scan_vault(root))
+        partial = {files[0]: cache_mod.hash_file(files[0])}
+
+        manifest = cache_mod.fingerprint_vault(files, root, content_hashes=partial)
+
+        assert manifest == cache_mod.fingerprint_vault(files, root)
+        assert len(manifest) == len(files)
+
+    def test_reused_digests_validate_on_the_racy_path(self, tmp_path: Path) -> None:
+        """A reload that actually checks the hashes must still hit.
+
+        Validation only content-hashes files whose mtime is not older than the
+        cache file's own, so an ordinary reload never compares the stored
+        digests at all and would hit even if every one of them were wrong.
+        The cache file's mtime is therefore pushed into the past, which makes
+        every document racy and forces the hash comparison the reuse has to
+        survive.
+        """
+        from ...vaultcore.scanner import scan_vault
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        VaultGraph(root)
+        cache_file = cache_mod.cache_path(root)
+        assert cache_file.exists()
+
+        files = list(scan_vault(root))
+        oldest = min(p.stat().st_mtime_ns for p in files)
+        os.utime(cache_file, ns=(oldest - 1_000_000_000, oldest - 1_000_000_000))
+
+        payload = cache_mod.load(cache_file)
+        assert payload is not None
+        assert (
+            cache_mod.validate(
+                payload.manifest,
+                files,
+                root,
+                cache_mtime_ns=cache_file.stat().st_mtime_ns,
+            )
+            is True
+        ), "the manifest built from ingress digests failed its own hash check"
+
+    def test_a_cold_build_writes_a_cache_the_next_build_accepts(
+        self, tmp_path: Path
+    ) -> None:
+        """A warm build reconstructs the same graph the cold build produced."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root)
+        warm = VaultGraph(root)
+
+        assert cache_mod.cache_path(root).exists()
+        assert sorted(warm.nodes) == sorted(cold.nodes)
+        assert warm._digraph.number_of_edges() == cold._digraph.number_of_edges()
+
+
+class TestCachedRawTextRestoresTheCorpus:
+    """A cache hit restores document text instead of re-reading the corpus.
+
+    The cache used to store each node's body. The body is not enough: the
+    check pipeline needs each document's whole raw text, so every cache hit
+    called ``ensure_raw_texts`` and read all of it back off disk - 1.3 s per
+    run on a 4,739-document vault, on top of a cache load that had just
+    produced 40 MB of body text. The cache now stores the raw text, whose
+    frontmatter adds 1.7 MB, and splits the body back out of it.
+
+    What has to hold is that a warm graph is indistinguishable from a cold
+    one, text included, and that the warm path reads nothing.
+    """
+
+    @staticmethod
+    def _vault(root: Path) -> None:
+        WorkspaceFactory(root).install()
+        bodies = [
+            "# plain\n\nOrdinary prose.\n",
+            "# fenced\n\n```python\ncode = 1\n```\n\nAfter.\n",
+            "# crlf\n\nLine one.\n",
+            "# empty body\n",
+        ]
+        for n, body in enumerate(bodies):
+            text = (
+                "---\n"
+                "tags:\n"
+                "  - '#research'\n"
+                f"  - '#raw-{n}'\n"
+                f"date: '2026-04-0{n + 1}'\n"
+                f"modified: '2026-04-0{n + 1}'\n"
+                "related: []\n"
+                "---\n\n" + body
+            )
+            name = f"2026-04-0{n + 1}-raw-{n}-research.md"
+            path = root / ".vault" / "research" / name
+            if n == 2:
+                path.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+            else:
+                path.write_text(text, encoding="utf-8")
+
+    def test_warm_graph_carries_the_same_raw_texts_as_a_cold_one(
+        self, tmp_path: Path
+    ) -> None:
+        """Including the CRLF flag, which a body-only cache could not carry."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        assert warm.raw_texts == cold.raw_texts
+        assert any(crlf for _, crlf in cold.raw_texts.values()), (
+            "the fixture must include a CRLF document for this to mean anything"
+        )
+
+    def test_warm_bodies_match_the_parsed_bodies(self, tmp_path: Path) -> None:
+        """The body split out of cached raw text equals the parsed body."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        assert sorted(warm.nodes) == sorted(cold.nodes)
+        for key, node in cold.nodes.items():
+            assert warm.nodes[key].body == node.body, f"body drifted for {key}"
+
+    def test_a_cache_hit_reads_no_document_off_disk(self, tmp_path: Path) -> None:
+        """The whole point: the warm path performs no corpus read at all.
+
+        Proven from the filesystem rather than by watching the reads. Once the
+        cache is written, every document is overwritten with same-length
+        sentinel bytes and its mtime put back, which is the residual window
+        the module documents as served stale by design: same size, same mtime,
+        older than the cache, so validation trusts it without hashing. A build
+        that reads any of those files comes back full of sentinel; a build
+        that restores its text from the cache comes back with the originals.
+
+        ``ensure_raw_texts`` is called afterwards because that is what the
+        check pipeline does - before the raw text was cached, it read every
+        document there.
+        """
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        VaultGraph(root)
+
+        from ...vaultcore import scan_vault
+
+        originals: dict[Path, str] = {}
+        for path in scan_vault(root):
+            stat = path.stat()
+            originals[path] = path.read_text(encoding="utf-8")
+            path.write_bytes(b"X" * stat.st_size)
+            os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        assert originals, "the fixture produced no corpus to sentinel"
+
+        warm = VaultGraph(root)
+        warm.ensure_raw_texts()
+
+        assert warm.raw_texts, "a warm graph must still end up with its text"
+        for path, text in originals.items():
+            restored, _crlf = warm.raw_texts[path]
+            assert restored == text, (
+                f"{path.name} came back from disk, not from the cache"
+            )
+        assert not any("XXXX" in text for text, _ in warm.raw_texts.values()), (
+            "the warm build picked up the sentinel, so it read the corpus"
+        )
+
+    def test_the_nx_node_attributes_match_a_fresh_build(self, tmp_path: Path) -> None:
+        """Raw text and its CRLF flag must not leak into the node attributes.
+
+        They are carried on the cache payload only; a fresh build has neither,
+        so a warm build that left them on the node would serialise a different
+        graph than a cold one.
+        """
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        for key in cold._digraph.nodes:
+            cold_attrs = cold._digraph.nodes[key]
+            warm_attrs = warm._digraph.nodes[key]
+            assert "raw" not in warm_attrs
+            assert "crlf" not in warm_attrs
+            assert set(warm_attrs) == set(cold_attrs), f"attribute set differs at {key}"
+
+
+class TestFrontmatterTypesSurviveTheCache:
+    """A cache hit must not change the *type* of a frontmatter value.
+
+    ``cache.save`` serialised with ``json.dumps(..., default=str)``, so a
+    ``datetime.date`` - what PyYAML returns for an unquoted ``date:`` stamp -
+    was written as a bare string and came back as one. A warm build then
+    disagreed with a cold build about ``frontmatter['date']``, and only for
+    documents whose stamp is unquoted: exactly the non-canonical shape the
+    frontmatter checker exists to find. Four documents in a 4,739-document
+    production vault were affected.
+    """
+
+    @staticmethod
+    def _vault(root: Path) -> None:
+        WorkspaceFactory(root).install()
+        # date: is deliberately unquoted, so PyYAML yields a datetime.date.
+        (
+            root / ".vault" / "research" / "2026-06-03-unquoted-date-research.md"
+        ).write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#unquoted-date'\n"
+            "date: 2026-06-03\n"
+            "modified: 2026-06-04\n"
+            "related: []\n"
+            "---\n\n# unquoted\n\nBody.\n",
+            encoding="utf-8",
+        )
+
+    def test_an_unquoted_date_stays_a_date_across_a_cache_hit(
+        self, tmp_path: Path
+    ) -> None:
+        import datetime
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        key = next(k for k in cold.nodes if "unquoted-date" in k)
+        cold_date = cold.nodes[key].frontmatter.get("date")
+        warm_date = warm.nodes[key].frontmatter.get("date")
+
+        assert isinstance(cold_date, datetime.date), (
+            "the fixture must produce a real date for this test to mean anything"
+        )
+        assert warm_date == cold_date
+        assert type(warm_date) is type(cold_date), (
+            f"cache turned {type(cold_date).__name__} into {type(warm_date).__name__}"
+        )
+
+    def test_every_node_attribute_survives_the_round_trip(self, tmp_path: Path) -> None:
+        """The general property, not just the date field."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        for key in cold._digraph.nodes:
+            assert warm._digraph.nodes[key] == cold._digraph.nodes[key], (
+                f"node attributes differ after a cache round trip at {key}"
+            )
+
+    def test_a_nested_temporal_is_restored(self) -> None:
+        """Decoding walks into lists and mappings, not just top-level fields."""
+        import datetime
+
+        encoded = cache_mod._encode_unjsonable(datetime.date(2026, 6, 3))
+        graph = {"nodes": [{"frontmatter": {"outer": {"inner": [encoded]}}}]}
+
+        cache_mod._restore_node_frontmatter(graph)
+
+        assert graph["nodes"][0]["frontmatter"]["outer"]["inner"] == [
+            datetime.date(2026, 6, 3)
+        ]
+
+    def test_a_datetime_keeps_its_time(self) -> None:
+        import datetime
+
+        moment = datetime.datetime(2026, 6, 3, 14, 30, 5)
+        graph = {
+            "nodes": [{"frontmatter": {"at": cache_mod._encode_unjsonable(moment)}}]
+        }
+
+        cache_mod._restore_node_frontmatter(graph)
+
+        assert graph["nodes"][0]["frontmatter"]["at"] == moment
+
+    def test_an_unserialisable_value_is_still_written_and_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A type with no reversible form must not fail the write silently."""
+        import logging
+
+        class Opaque:
+            @override
+            def __str__(self) -> str:
+                return "opaque-value"
+
+        with caplog.at_level(logging.WARNING, logger="vaultspec_core.graph.cache"):
+            encoded = cache_mod._encode_unjsonable(Opaque())
+
+        assert encoded == "opaque-value"
+        assert any(
+            "stringified an unserialisable" in r.getMessage() for r in caplog.records
+        )

@@ -125,7 +125,7 @@ def check_body_sections(
         name ``"body-sections"``. Does not support ``--fix``.
     """
     from ..body_schema import read_baseline, resolve_body_schema
-    from ..scanner import get_doc_type
+    from ..scanner import doc_type_resolver
 
     result = CheckResult(check_name="body-sections", supports_fix=False)
 
@@ -133,8 +133,10 @@ def check_body_sections(
     # whole pass, never per document.
     baseline = read_baseline(root_dir)
 
+    resolve_doc_type = doc_type_resolver(root_dir)
+
     for doc_path, (metadata, body) in sorted(snapshot.items()):
-        doc_type = get_doc_type(doc_path, root_dir)
+        doc_type = resolve_doc_type(doc_path)
         if doc_type is None:
             continue
         if is_generated_index(doc_path):
