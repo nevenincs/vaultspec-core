@@ -51,7 +51,7 @@ __all__ = [
     "compose_flat_hooks",
     "hook_targets",
     "load_provider_hook_specs",
-    "provider_triggers_sync",
+    "provider_hooks_sync",
     "render_hooks_payload",
     "supported_events",
 ]
@@ -505,7 +505,7 @@ def hook_targets() -> list[tuple[Tool, Path, Path | None]]:
     providers that record ownership by owning a named hookset rather than by
     writing a sidecar beside the native file - currently only antigravity.
 
-    This is the same filter :func:`provider_triggers_sync` iterates, exposed so a
+    This is the same filter :func:`provider_hooks_sync` iterates, exposed so a
     status surface reports exactly the set the renderer would write, rather
     than re-deriving the capability test and drifting from it.
 
@@ -530,7 +530,7 @@ def hook_targets() -> list[tuple[Tool, Path, Path | None]]:
     return targets
 
 
-def provider_triggers_sync(dry_run: bool = False) -> SyncResult:
+def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
     """Render provider hooks into every installed hook-capable provider.
 
     Loads canonical hook specs once and renders them into each installed

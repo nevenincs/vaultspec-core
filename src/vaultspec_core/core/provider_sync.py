@@ -169,9 +169,9 @@ def _run_all_syncs(
             )
         )
     if "hooks" not in skip:
-        from .provider_hooks import provider_triggers_sync
+        from .provider_hooks import provider_hooks_sync
 
-        sync_passes.append((lambda: provider_triggers_sync(dry_run=dry_run), "hooks"))
+        sync_passes.append((lambda: provider_hooks_sync(dry_run=dry_run), "hooks"))
     for sync_fn, label in sync_passes:
         try:
             results.append(sync_fn())
