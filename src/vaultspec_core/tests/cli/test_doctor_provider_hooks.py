@@ -31,6 +31,31 @@ def _write_hook(root: Path, event: str = "pre_tool_use", name: str = "guard") ->
     return path
 
 
+def _installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WorkspaceFactory:
+    """Install with the consent ledger redirected away from the real one.
+
+    The renderer refuses an unapproved hook, so a test that let it read the
+    developer's own ledger would pass or fail on whatever they had approved.
+    The redirect is at ``trust_file_path``, the one function whose job is
+    locating that file, rather than at ``Path.home``, which the CLI runner also
+    depends on.
+    """
+    from vaultspec_core.triggers import trust
+
+    ledger = tmp_path / "operator-home" / ".vaultspec" / trust.TRUST_FILE_NAME
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
+    return WorkspaceFactory(tmp_path).install("all")
+
+
+def _approve(tmp_path: Path) -> None:
+    """Grant consent for every hook source, as an operator at a terminal would."""
+    from vaultspec_core.triggers.trust import grant
+
+    hooks_dir = tmp_path / ".vaultspec" / "hooks"
+    grant(sorted(hooks_dir.glob("*.yaml")))
+
+
 def _hook_report(factory: WorkspaceFactory) -> list[dict[str, object]]:
     result = factory.run("spec", "doctor", "--json")
     data = json.loads(result.output)["data"]
@@ -40,49 +65,65 @@ def _hook_report(factory: WorkspaceFactory) -> list[dict[str, object]]:
 
 
 class TestNoHooksDeclared:
-    def test_a_workspace_with_no_hooks_stays_healthy(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_a_workspace_with_no_hooks_stays_healthy(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         result = factory.run("spec", "doctor")
 
         assert result.exit_code == 0, result.output
         assert "no hooks declared" in result.output
 
-    def test_every_hook_capable_provider_is_reported(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_every_hook_capable_provider_is_reported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         tools = {str(report["tool"]) for report in _hook_report(factory)}
 
         assert tools == {"claude", "codex", "gemini", "antigravity"}
 
 
 class TestUnrenderedHooksAreVisible:
-    def test_a_declared_hook_that_never_synced_warns(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_a_declared_hook_that_never_synced_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
+        # Approved, so consent is not what is missing - only the sync is.
+        _approve(tmp_path)
 
         result = factory.run("spec", "doctor")
         assert result.exit_code == 1, result.output
         assert "never rendered" in result.output
 
-    def test_the_row_names_the_providers_it_applies_to(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_the_row_names_the_providers_it_applies_to(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
 
         output = factory.run("spec", "doctor").output
         for tool in ("claude", "codex", "gemini", "antigravity"):
             assert tool in output
 
-    def test_a_synced_hook_reports_healthy(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_a_synced_hook_reports_healthy(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
+        _approve(tmp_path)
         factory.sync("all")
 
         result = factory.run("spec", "doctor")
         assert result.exit_code == 0, result.output
         assert "rendered and recorded" in result.output
 
-    def test_a_deleted_sidecar_warns_about_ownership(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_a_deleted_sidecar_warns_about_ownership(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
+        _approve(tmp_path)
         factory.sync("all")
         (tmp_path / ".claude" / ".vaultspec-hooks.json").unlink()
 
@@ -91,8 +132,10 @@ class TestUnrenderedHooksAreVisible:
         assert "ownership record absent" in result.output
         assert "claude" in result.output
 
-    def test_gate_errors_does_not_fail_on_a_hook_warning(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_gate_errors_does_not_fail_on_a_hook_warning(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
 
         # An unrendered hook is warning-weighted, so the pre-commit gate must
@@ -101,12 +144,74 @@ class TestUnrenderedHooksAreVisible:
         assert result.exit_code == 0, result.output
 
 
+class TestAwaitingApproval:
+    """An unapproved hook is a decision the operator has yet to make."""
+
+    def test_it_does_not_read_as_a_missing_sync(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
+        _write_hook(tmp_path)
+        factory.sync("all")
+
+        result = factory.run("spec", "doctor")
+        assert "awaiting approval" in result.output
+        # "run sync" would be the wrong advice: the sync already ran and
+        # refused, and running it again changes nothing.
+        assert "never rendered" not in result.output
+
+    def test_it_does_not_raise_the_exit_code(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
+        _write_hook(tmp_path)
+        factory.sync("all")
+
+        # The consent gate working as designed is not a fault to weigh, so a
+        # workspace full of unapproved hooks still exits clean.
+        result = factory.run("spec", "doctor")
+        assert result.exit_code == 0, result.output
+
+    def test_it_names_the_verb_that_approves(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
+        _write_hook(tmp_path)
+        factory.sync("all")
+
+        assert "spec hooks trust" in factory.run("spec", "doctor").output
+
+    def test_approving_and_syncing_clears_the_row(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
+        _write_hook(tmp_path)
+        factory.sync("all")
+        _approve(tmp_path)
+        factory.sync("all")
+
+        result = factory.run("spec", "doctor")
+        assert "awaiting approval" not in result.output
+        assert "rendered and recorded" in result.output
+
+    def test_the_json_surface_names_the_state(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
+        _write_hook(tmp_path)
+        factory.sync("all")
+
+        signals = {str(r["signal"]) for r in _hook_report(factory)}
+        assert signals == {"untrusted"}
+
+
 class TestUnsupportedEventAdvisory:
     def test_an_event_a_provider_lacks_is_reported_without_failing(
-        self, tmp_path: Path
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path, event="user_prompt_submit", name="ask")
+        _approve(tmp_path)
         factory.sync("all")
 
         result = factory.run("spec", "doctor")
@@ -117,10 +222,13 @@ class TestUnsupportedEventAdvisory:
         assert "not supported by" in result.output
 
     def test_no_advisory_when_every_provider_supports_the_event(
-        self, tmp_path: Path
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
-        _write_hook(tmp_path, event="session_start", name="orient")
+        factory = _installed(tmp_path, monkeypatch)
+        # pre_tool_use is one of only two events every provider runs, so it
+        # is the shape that must produce no advisory.
+        _write_hook(tmp_path, event="pre_tool_use", name="guard-all")
+        _approve(tmp_path)
         factory.sync("all")
 
         result = factory.run("spec", "doctor")
@@ -129,9 +237,12 @@ class TestUnsupportedEventAdvisory:
 
 
 class TestJsonSurface:
-    def test_each_report_carries_its_signal_and_path(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_each_report_carries_its_signal_and_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
+        _approve(tmp_path)
         factory.sync("all")
 
         by_tool = {str(r["tool"]): r for r in _hook_report(factory)}
@@ -141,9 +252,12 @@ class TestJsonSurface:
         assert str(claude["native_path"]).endswith("settings.json")
         assert claude["unsupported"] == []
 
-    def test_an_unrendered_hook_is_machine_readable(self, tmp_path: Path) -> None:
-        factory = WorkspaceFactory(tmp_path).install("all")
+    def test_an_unrendered_hook_is_machine_readable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
+        _approve(tmp_path)
 
         signals = {str(r["signal"]) for r in _hook_report(factory)}
         assert signals == {"not_rendered"}

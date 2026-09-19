@@ -236,6 +236,10 @@ class ProviderHookSignal(StrEnum):
             consume, and the provider carries none.
         IN_SYNC: Every group the current source renders is present, and the
             ownership record matches it exactly.
+        UNTRUSTED: Every hook this provider would render is awaiting operator
+            approval, so the renderer skipped it. Benign: a hook that does not
+            render because nobody approved it is the consent gate working, and
+            a sync will not change it. The remedy is a decision, not a command.
         NOT_RENDERED: The source renders groups for this provider and none of
             them reached its config file. Ordinarily an un-run sync, or one
             run with ``--skip hooks``.
@@ -252,6 +256,7 @@ class ProviderHookSignal(StrEnum):
 
     NO_SOURCES = "no_sources"
     IN_SYNC = "in_sync"
+    UNTRUSTED = "untrusted"
     NOT_RENDERED = "not_rendered"
     STALE = "stale"
     SIDECAR_MISSING = "sidecar_missing"

@@ -358,6 +358,11 @@ Core reads and writes `.codex/hooks.json` only. Codex also accepts an inline `[h
 table in `.codex/config.toml`; Core neither reads that nor reports it, so hooks you put
 there are invisible to `vaultspec-core spec hooks status`.
 
+Under `--target`, hooks and triggers resolve differently, and it isn't an oversight. Hooks
+are source content, like rules and skills: they're read from the workspace you run the
+command in and written into the target. Triggers are read from the target, because a
+trigger reacts to something that happened to that workspace.
+
 Hooks you wrote into those files by hand are preserved. Core records exactly what it
 wrote last sync in the sidecar beside the file, so the next sync removes precisely its
 own previous entries and leaves everything else alone. The record sits in a sidecar
@@ -370,6 +375,41 @@ one called `vaultspec`.
 Don't edit the sidecars. Deleting one makes Core forget what it wrote, so the entries
 from before become indistinguishable from yours. The next sync re-adopts the ones it
 still renders and abandons the rest in place, where nothing will clean them up.
+
+### Approve before they render
+
+A hook file travels with the repository, and rendering one writes a command into your
+agent's own configuration, where it runs as you on every matching tool call rather than
+once per sync. So Core renders nothing until you have approved it on this machine.
+
+You are asked before any sync that would render, and before
+`vaultspec-core install --upgrade`. Not on a fresh install, which has nothing to render
+yet, and never under `--skip hooks`. For each unapproved hook you see its name, its path,
+the event, the matcher, and the command exactly as written, then a single prompt that
+defaults to no.
+
+Declining costs only the hooks. The sync itself completes, the hook isn't rendered, and
+stderr names the files it skipped and the command that approves them.
+
+Approval is recorded outside the workspace, in `~/.vaultspec/hook-trust.json`, and pinned
+to each file's current contents. Editing an approved hook, or pulling a change to one,
+withdraws the approval until you grant it again. Nothing a clone or an archive carries can
+add an entry there.
+
+Where there is no operator to ask, nothing renders. `--json` output, `CI`, a redirected
+stream, `VAULTSPEC_NON_INTERACTIVE`, and MCP tool calls all skip the prompt, skip the
+rendering, and write nothing to the ledger. There's no flag that approves on your behalf,
+because a flag a script can pass is a flag a repository can talk a script into passing.
+The refusal lives in the renderer rather than in the prompt, so a route that never reaches
+a prompt still cannot render an unapproved hook.
+
+To withdraw approval, run `vaultspec-core spec hooks trust --revoke` and sync: the next
+sync removes the entries it had written, so the hook leaves the provider's config rather
+than lingering there unapproved.
+
+Triggers are approved separately, with
+[`vaultspec-core spec triggers trust`](CLI.md#vaultspec-core-spec-triggers). Approving one
+system never approves the other.
 
 ### Turn it off
 
