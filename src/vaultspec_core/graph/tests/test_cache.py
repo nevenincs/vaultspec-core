@@ -1056,3 +1056,117 @@ class TestCachedRawTextRestoresTheCorpus:
             assert "raw" not in warm_attrs
             assert "crlf" not in warm_attrs
             assert set(warm_attrs) == set(cold_attrs), f"attribute set differs at {key}"
+
+
+class TestFrontmatterTypesSurviveTheCache:
+    """A cache hit must not change the *type* of a frontmatter value.
+
+    ``cache.save`` serialised with ``json.dumps(..., default=str)``, so a
+    ``datetime.date`` - what PyYAML returns for an unquoted ``date:`` stamp -
+    was written as a bare string and came back as one. A warm build then
+    disagreed with a cold build about ``frontmatter['date']``, and only for
+    documents whose stamp is unquoted: exactly the non-canonical shape the
+    frontmatter checker exists to find. Four documents in a 4,739-document
+    production vault were affected.
+    """
+
+    @staticmethod
+    def _vault(root: Path) -> None:
+        WorkspaceFactory(root).install()
+        # date: is deliberately unquoted, so PyYAML yields a datetime.date.
+        (
+            root / ".vault" / "research" / "2026-06-03-unquoted-date-research.md"
+        ).write_text(
+            "---\n"
+            "tags:\n"
+            "  - '#research'\n"
+            "  - '#unquoted-date'\n"
+            "date: 2026-06-03\n"
+            "modified: 2026-06-04\n"
+            "related: []\n"
+            "---\n\n# unquoted\n\nBody.\n",
+            encoding="utf-8",
+        )
+
+    def test_an_unquoted_date_stays_a_date_across_a_cache_hit(
+        self, tmp_path: Path
+    ) -> None:
+        import datetime
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        key = next(k for k in cold.nodes if "unquoted-date" in k)
+        cold_date = cold.nodes[key].frontmatter.get("date")
+        warm_date = warm.nodes[key].frontmatter.get("date")
+
+        assert isinstance(cold_date, datetime.date), (
+            "the fixture must produce a real date for this test to mean anything"
+        )
+        assert warm_date == cold_date
+        assert type(warm_date) is type(cold_date), (
+            f"cache turned {type(cold_date).__name__} into {type(warm_date).__name__}"
+        )
+
+    def test_every_node_attribute_survives_the_round_trip(self, tmp_path: Path) -> None:
+        """The general property, not just the date field."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root, use_cache=False)
+        VaultGraph(root)
+        warm = VaultGraph(root)
+
+        for key in cold._digraph.nodes:
+            assert warm._digraph.nodes[key] == cold._digraph.nodes[key], (
+                f"node attributes differ after a cache round trip at {key}"
+            )
+
+    def test_a_nested_temporal_is_restored(self) -> None:
+        """Decoding walks into lists and mappings, not just top-level fields."""
+        import datetime
+
+        encoded = cache_mod._encode_unjsonable(datetime.date(2026, 6, 3))
+        graph = {"nodes": [{"frontmatter": {"outer": {"inner": [encoded]}}}]}
+
+        cache_mod._restore_node_frontmatter(graph)
+
+        assert graph["nodes"][0]["frontmatter"]["outer"]["inner"] == [
+            datetime.date(2026, 6, 3)
+        ]
+
+    def test_a_datetime_keeps_its_time(self) -> None:
+        import datetime
+
+        moment = datetime.datetime(2026, 6, 3, 14, 30, 5)
+        graph = {
+            "nodes": [{"frontmatter": {"at": cache_mod._encode_unjsonable(moment)}}]
+        }
+
+        cache_mod._restore_node_frontmatter(graph)
+
+        assert graph["nodes"][0]["frontmatter"]["at"] == moment
+
+    def test_an_unserialisable_value_is_still_written_and_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A type with no reversible form must not fail the write silently."""
+        import logging
+
+        class Opaque:
+            def __str__(self) -> str:
+                return "opaque-value"
+
+        with caplog.at_level(logging.WARNING, logger="vaultspec_core.graph.cache"):
+            encoded = cache_mod._encode_unjsonable(Opaque())
+
+        assert encoded == "opaque-value"
+        assert any(
+            "stringified an unserialisable" in r.getMessage() for r in caplog.records
+        )

@@ -471,6 +471,101 @@ def _parse_encoding_issues(
     return encoding
 
 
+#: Marker key identifying a JSON object that stands in for a date value the
+#: YAML parser produced.  Chosen to be one no frontmatter field would use.
+_TEMPORAL_TAG = "__vaultspec_temporal__"
+
+
+def _encode_unjsonable(value: object) -> object:
+    """Serialise a value ``json`` cannot represent, reversibly where possible.
+
+    ``json.dumps(..., default=str)`` used to stand here, which meant a
+    ``datetime.date`` - what PyYAML returns for an unquoted ``date:`` stamp -
+    was written as a bare string and came back as one.  A cache hit then
+    disagreed with a cold build about the type of ``frontmatter['date']``,
+    and it disagreed only for documents whose stamp is unquoted, which is
+    precisely the non-canonical shape the frontmatter checker exists to find.
+
+    Temporal values are therefore tagged so :func:`_decode_temporal` can put
+    them back. Anything else is still stringified rather than failing the
+    write - a cache that refuses to persist would turn every subsequent build
+    cold - but it is logged, because silently lossy is how this started.
+
+    Args:
+        value: The object ``json`` could not serialise.
+
+    Returns:
+        A JSON-representable stand-in.
+    """
+    import datetime as _dt
+
+    if isinstance(value, _dt.datetime):
+        return {_TEMPORAL_TAG: value.isoformat(), "kind": "datetime"}
+    if isinstance(value, _dt.date):
+        return {_TEMPORAL_TAG: value.isoformat(), "kind": "date"}
+    logger.warning(
+        "Graph cache stringified an unserialisable %s; a cache hit will "
+        "disagree with a cold build about this value",
+        type(value).__name__,
+    )
+    return str(value)
+
+
+def _decode_temporal(value: object) -> object:
+    """Invert :func:`_encode_unjsonable` over a decoded frontmatter value.
+
+    Walks lists and mappings because a frontmatter field may nest them. A
+    mapping that does not carry the tag is rebuilt rather than returned as-is
+    so nested values inside it are decoded too.
+
+    Args:
+        value: A value decoded from the cache file's JSON.
+
+    Returns:
+        The value with tagged temporals restored.
+    """
+    import datetime as _dt
+
+    if isinstance(value, list):
+        return [_decode_temporal(item) for item in cast("list[Any]", value)]
+    if not isinstance(value, dict):
+        return value
+    mapping = cast("dict[str, Any]", value)
+    tagged = mapping.get(_TEMPORAL_TAG)
+    if isinstance(tagged, str):
+        try:
+            if mapping.get("kind") == "datetime":
+                return _dt.datetime.fromisoformat(tagged)
+            return _dt.date.fromisoformat(tagged)
+        except ValueError:
+            logger.warning("Graph cache carried an unparseable temporal %r", tagged)
+            return tagged
+    return {key: _decode_temporal(item) for key, item in mapping.items()}
+
+
+def _restore_node_frontmatter(graph: dict[str, Any]) -> None:
+    """Decode tagged temporals in every cached node's ``frontmatter``.
+
+    Applied to the frontmatter mapping alone, not the whole payload: that is
+    where YAML-typed values live, and walking 50 MB of node-link data to reach
+    1.7 MB of it would cost more than the fidelity is worth.
+
+    Args:
+        graph: The node-link ``dict`` read from the cache file, mutated
+            in place.
+    """
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        return
+    for node in cast("list[Any]", nodes):
+        if not isinstance(node, dict):
+            continue
+        entry = cast("dict[str, Any]", node)
+        frontmatter = entry.get("frontmatter")
+        if isinstance(frontmatter, dict):
+            entry["frontmatter"] = _decode_temporal(cast("dict[str, Any]", frontmatter))
+
+
 def load(path: Path) -> GraphCachePayload | None:
     """Read and parse a cache file, returning ``None`` on any failure.
 
@@ -497,6 +592,9 @@ def load(path: Path) -> GraphCachePayload | None:
     manifest = _parse_manifest(raw_manifest)
     if manifest is None:
         return None
+    # Undo the temporal tagging the write applied, so a warm node's
+    # frontmatter carries the same types a cold parse produced.
+    _restore_node_frontmatter(raw_graph)
     dangling = _parse_dangling(raw_dangling)
     if dangling is None:
         return None
@@ -550,6 +648,6 @@ def save(
     }
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write(path, json.dumps(payload, default=str))
+        atomic_write(path, json.dumps(payload, default=_encode_unjsonable))
     except Exception as exc:
         logger.warning("Failed to persist graph cache at %s: %s", path, exc)
