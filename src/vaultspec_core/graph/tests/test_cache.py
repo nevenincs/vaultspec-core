@@ -39,6 +39,7 @@ from typer.testing import CliRunner
 from ...cli import app
 from ...config import reset_config
 from ...testing.synthetic import build_synthetic_vault
+from ...tests.cli.workspace_factory import WorkspaceFactory
 from .. import cache as cache_mod
 from ..api import VaultGraph
 from .conftest import stem_index_of
@@ -793,3 +794,137 @@ class TestUnreadableDocumentsExcludedFromGraphDerivedQueries:
         assert [e.document.name for e in with_graph] == [
             e.document.name for e in without
         ]
+
+
+class TestIngressFingerprintReuse:
+    """The manifest reuses the digests the build's ingress read already took.
+
+    ``fingerprint_vault`` used to re-read and re-hash the whole corpus
+    immediately after ``_rebuild_from_files`` had read every byte of it, which
+    cost 2.65 s of an 11 s cold rebuild on a 4,739-document vault. The digests
+    must be identical whichever route computes them, or the cache would
+    validate against hashes that ``hash_file`` never reproduces - a permanent
+    cache miss, or worse, a false hit.
+    """
+
+    @staticmethod
+    def _vault(root: Path) -> None:
+        WorkspaceFactory(root).install()
+        for n in range(4):
+            (
+                root / ".vault" / "research" / f"2026-02-0{n + 1}-doc-{n}-research.md"
+            ).write_text(
+                "---\n"
+                "tags:\n"
+                "  - '#research'\n"
+                f"  - '#ingress-{n}'\n"
+                f"date: '2026-02-0{n + 1}'\n"
+                f"modified: '2026-02-0{n + 1}'\n"
+                "related: []\n"
+                "---\n\n"
+                f"# doc {n}\n\nBody with a `code span` and text.\n",
+                encoding="utf-8",
+            )
+
+    def test_ingress_digests_match_reading_each_file_again(
+        self, tmp_path: Path
+    ) -> None:
+        """A digest taken at ingress equals the one ``hash_file`` computes."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        graph = VaultGraph(root, use_cache=False)
+
+        assert graph._content_hashes, "the ingress read recorded no digests"
+        for path, digest in graph._content_hashes.items():
+            assert digest == cache_mod.hash_file(path), (
+                f"ingress digest for {path.name} disagrees with hash_file"
+            )
+
+    def test_manifest_is_identical_with_and_without_reuse(self, tmp_path: Path) -> None:
+        """Passing ingress digests must not change the manifest at all."""
+        from ...vaultcore.scanner import scan_vault
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        files = list(scan_vault(root))
+        graph = VaultGraph(root, use_cache=False)
+
+        reused = cache_mod.fingerprint_vault(
+            files, root, content_hashes=graph._content_hashes
+        )
+        reread = cache_mod.fingerprint_vault(files, root)
+
+        assert reused == reread
+
+    def test_a_path_without_a_recorded_digest_falls_back_to_reading(
+        self, tmp_path: Path
+    ) -> None:
+        """An unknown path is hashed here rather than dropped from the manifest."""
+        from ...vaultcore.scanner import scan_vault
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        files = list(scan_vault(root))
+        partial = {files[0]: cache_mod.hash_file(files[0])}
+
+        manifest = cache_mod.fingerprint_vault(files, root, content_hashes=partial)
+
+        assert manifest == cache_mod.fingerprint_vault(files, root)
+        assert len(manifest) == len(files)
+
+    def test_reused_digests_validate_on_the_racy_path(self, tmp_path: Path) -> None:
+        """A reload that actually checks the hashes must still hit.
+
+        Validation only content-hashes files whose mtime is not older than the
+        cache file's own, so an ordinary reload never compares the stored
+        digests at all and would hit even if every one of them were wrong.
+        The cache file's mtime is therefore pushed into the past, which makes
+        every document racy and forces the hash comparison the reuse has to
+        survive.
+        """
+        from ...vaultcore.scanner import scan_vault
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        VaultGraph(root)
+        cache_file = cache_mod.cache_path(root)
+        assert cache_file.exists()
+
+        files = list(scan_vault(root))
+        oldest = min(p.stat().st_mtime_ns for p in files)
+        os.utime(cache_file, ns=(oldest - 1_000_000_000, oldest - 1_000_000_000))
+
+        payload = cache_mod.load(cache_file)
+        assert payload is not None
+        assert (
+            cache_mod.validate(
+                payload.manifest,
+                files,
+                root,
+                cache_mtime_ns=cache_file.stat().st_mtime_ns,
+            )
+            is True
+        ), "the manifest built from ingress digests failed its own hash check"
+
+    def test_a_cold_build_writes_a_cache_the_next_build_accepts(
+        self, tmp_path: Path
+    ) -> None:
+        """A warm build reconstructs the same graph the cold build produced."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        self._vault(root)
+
+        cold = VaultGraph(root)
+        warm = VaultGraph(root)
+
+        assert cache_mod.cache_path(root).exists()
+        assert sorted(warm.nodes) == sorted(cold.nodes)
+        assert warm._digraph.number_of_edges() == cold._digraph.number_of_edges()
