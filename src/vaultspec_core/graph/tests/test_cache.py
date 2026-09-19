@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import pytest
 from typer.testing import CliRunner
@@ -1002,38 +1002,49 @@ class TestCachedRawTextRestoresTheCorpus:
         for key, node in cold.nodes.items():
             assert warm.nodes[key].body == node.body, f"body drifted for {key}"
 
-    def test_a_cache_hit_reads_no_document_off_disk(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_a_cache_hit_reads_no_document_off_disk(self, tmp_path: Path) -> None:
         """The whole point: the warm path performs no corpus read at all.
 
-        ``ensure_raw_texts`` is called explicitly afterwards because that is
-        what the check pipeline does; before the raw text was cached it read
-        every document there.
-        """
-        import pathlib as _pathlib
+        Proven from the filesystem rather than by watching the reads. Once the
+        cache is written, every document is overwritten with same-length
+        sentinel bytes and its mtime put back, which is the residual window
+        the module documents as served stale by design: same size, same mtime,
+        older than the cache, so validation trusts it without hashing. A build
+        that reads any of those files comes back full of sentinel; a build
+        that restores its text from the cache comes back with the originals.
 
+        ``ensure_raw_texts`` is called afterwards because that is what the
+        check pipeline does - before the raw text was cached, it read every
+        document there.
+        """
         root = tmp_path / "repo"
         root.mkdir()
         self._vault(root)
 
         VaultGraph(root)
 
-        reads: list[Path] = []
-        real_read_bytes = _pathlib.Path.read_bytes
+        from ...vaultcore import scan_vault
 
-        def counting_read_bytes(self: Path) -> bytes:
-            if self.suffix == ".md":
-                reads.append(self)
-            return real_read_bytes(self)
-
-        monkeypatch.setattr(_pathlib.Path, "read_bytes", counting_read_bytes)
+        originals: dict[Path, str] = {}
+        for path in scan_vault(root):
+            stat = path.stat()
+            originals[path] = path.read_text(encoding="utf-8")
+            path.write_bytes(b"X" * stat.st_size)
+            os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        assert originals, "the fixture produced no corpus to sentinel"
 
         warm = VaultGraph(root)
         warm.ensure_raw_texts()
 
-        assert reads == [], f"the warm path read {len(reads)} document(s) off disk"
         assert warm.raw_texts, "a warm graph must still end up with its text"
+        for path, text in originals.items():
+            restored, _crlf = warm.raw_texts[path]
+            assert restored == text, (
+                f"{path.name} came back from disk, not from the cache"
+            )
+        assert not any("XXXX" in text for text, _ in warm.raw_texts.values()), (
+            "the warm build picked up the sentinel, so it read the corpus"
+        )
 
     def test_the_nx_node_attributes_match_a_fresh_build(self, tmp_path: Path) -> None:
         """Raw text and its CRLF flag must not leak into the node attributes.
@@ -1160,6 +1171,7 @@ class TestFrontmatterTypesSurviveTheCache:
         import logging
 
         class Opaque:
+            @override
             def __str__(self) -> str:
                 return "opaque-value"
 
