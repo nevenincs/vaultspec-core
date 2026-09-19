@@ -307,9 +307,9 @@ doesn't belong here.
 
 ### Canonical events
 
-Write the canonical name. Each provider gets its own spelling, and a provider that has
-no equivalent for an event is skipped for that hook, with a warning naming the hook and
-the provider.
+Write the canonical name. Core translates it to each provider's own spelling. The table
+below is Core's mapping: a dash means Core renders nothing for that provider, and the
+hook is skipped there with a warning naming the hook and the provider.
 
 | Canonical event      | claude             | codex              | antigravity    | gemini         |
 | -------------------- | ------------------ | ------------------ | -------------- | -------------- |
@@ -321,8 +321,15 @@ the provider.
 | `user_prompt_submit` | `UserPromptSubmit` | `UserPromptSubmit` | -              | -              |
 | `notification`       | `Notification`     | -                  | `Notification` | `Notification` |
 
-Only Claude Code consumes all seven. If a hook matters everywhere, bind it to
-`pre_tool_use`, `post_tool_use` or `session_start`, which every provider supports.
+A dash is not a statement about the provider. It says only that Core has no mapping, and
+in some cases the provider does have an equivalent Core doesn't use yet. Treat the table
+as what Core does, and each provider's own hooks documentation as what that provider
+supports.
+
+Three mappings above are known to be wrong and are being corrected: Codex does have a
+session-end event, and Antigravity has no session-start, session-end or notification
+event, so hooks bound to those three render for Antigravity and never fire. Until that
+lands, `pre_tool_use` and `post_tool_use` are the only events that work everywhere.
 
 Gemini expresses hook timeouts in milliseconds and every other provider in seconds.
 Write seconds; Core multiplies where it has to.
