@@ -1,0 +1,43 @@
+# The red/green verdict on main's tip, and the only thing the README's CI pill
+# reads.
+#
+# A badge can only name a workflow file on a branch, and no workflow had ever
+# run on main - so the pill had nothing to read and reported whatever had most
+# recently touched the branch instead.
+#
+# This does NOT run on push. `dev/guards/test_ci_check_shape.py` holds main to
+# release-please as the only push-triggered lane, because main is
+# ruleset-protected and a commit reaching it already passed the merge gate.
+# Re-proving it on arrival would spend a full suite on a verdict already given.
+# A schedule asks a different question - is main's tip still green today,
+# against today's dependencies and today's runners - and that answer is not in
+# the pull request's.
+#
+# It calls the gate rather than restating it, so the suites the pill reports
+# are the suites a pull request had to pass. A call always runs the full tier.
+#
+# The badge is therefore at most a day behind main. That is the honest cost of
+# leaving the push policy alone, and it is the only staleness in the row.
+name: Core Main Health
+
+on:
+  schedule:
+    # Off the top of the hour: every repository asking for a daily run gets
+    # minute 0, and this has no reason to join that stampede.
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: main-health
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: "Check: Main health (Linux, Windows)"
+    uses: ./.github/workflows/merge-gate.yml
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: write
+    with:
+      ref: main

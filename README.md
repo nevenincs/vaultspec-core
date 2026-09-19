@@ -11,10 +11,10 @@ development.
 
 The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
 
-[![release](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/release.yml?style=flat&label=release&logo=githubactions&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/actions/workflows/release.yml)
-[![release](https://img.shields.io/pypi/v/vaultspec-core?style=flat&label=release&logo=pypi&logoColor=white&labelColor=24292f&color=57606a)](https://pypi.org/project/vaultspec-core/)
+[![ci](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/main-health.yml?branch=main&style=flat&label=ci&logo=githubactions&logoColor=white&labelColor=24292f)](https://github.com/nevenincs/vaultspec-core/actions/workflows/main-health.yml)
+<picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/github/release/nevenincs/vaultspec-core.svg?size=xs&amp;mode=dark&amp;font=roboto"><img alt="Release" src="https://www.shieldcn.dev/github/release/nevenincs/vaultspec-core.svg?size=xs&amp;mode=light&amp;font=roboto"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="https://www.shieldcn.dev/github/license/nevenincs/vaultspec-core.svg?variant=ghost&amp;size=xs&amp;mode=dark&amp;font=roboto"><img alt="License" src="https://www.shieldcn.dev/github/license/nevenincs/vaultspec-core.svg?variant=ghost&amp;size=xs&amp;mode=light&amp;font=roboto"></picture>
 [![runtime](https://img.shields.io/badge/runtime-Python%203.13%20%7C%203.14-57606a?style=flat&logo=python&logoColor=white&labelColor=24292f)](https://www.python.org/downloads/)
-[![license](https://img.shields.io/github/license/nevenincs/vaultspec-core?style=flat&label=license&logo=opensourceinitiative&logoColor=white&labelColor=24292f&color=57606a)](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)
 
 [Install](#install) · [Start a feature](#start-a-feature) ·
 [Documentation](#documentation)
