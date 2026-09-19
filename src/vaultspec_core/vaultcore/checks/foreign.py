@@ -65,7 +65,12 @@ _VAULTSPEC_ALLOWED_FILES = frozenset(
 #: Directory names the framework places under ``.vaultspec/`` that are not
 #: mirrored under ``builtins/`` (so :func:`_vaultspec_allowed_dir_names`
 #: cannot derive them from the bundled resource tree).
-_VAULTSPEC_EXTRA_DIRS = frozenset({"_snapshots"})
+#:
+#: ``triggers`` is here because lifecycle triggers ship no bundled example, and
+#: a directory cannot be carried in the package while it is empty. Scaffold
+#: creates it regardless, because the authoring verbs write into it and the
+#: documentation names it.
+_VAULTSPEC_EXTRA_DIRS = frozenset({"_snapshots", "triggers"})
 
 
 def _vaultspec_allowed_dir_names() -> frozenset[str]:
