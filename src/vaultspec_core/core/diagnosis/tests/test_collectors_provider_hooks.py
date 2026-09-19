@@ -62,7 +62,7 @@ def _agy_target(root: Path) -> HookTarget:
     )
 
 
-def _installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WorkspaceFactory:
+def _installed(tmp_path: Path) -> WorkspaceFactory:
     """Install with the consent ledger redirected away from the real one.
 
     ``provider_hooks_sync`` refuses a hook the ledger does not carry, so a test
@@ -73,11 +73,6 @@ def _installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WorkspaceFact
     outside the workspace, because the VaultSpec home is ``~/.vaultspec`` and
     aiming it at the workspace root would collide with the workspace's own.
     """
-    from vaultspec_core.triggers import trust
-
-    ledger = tmp_path / "operator-home" / ".vaultspec" / trust.TRUST_FILE_NAME
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
     return WorkspaceFactory(tmp_path).install("all")
 
 
@@ -95,19 +90,15 @@ def _write(path: Path, data: dict[str, object]) -> None:
 
 
 class TestSidecarProvider:
-    def test_no_sources_and_nothing_rendered(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        _installed(tmp_path, monkeypatch)
+    def test_no_sources_and_nothing_rendered(self, tmp_path: Path, operator_home: Path):
+        _installed(tmp_path)
         reports = collect_provider_hook_reports(
             _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.NO_SOURCES
 
-    def test_a_completed_sync_reads_in_sync(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        factory = _installed(tmp_path, monkeypatch)
+    def test_a_completed_sync_reads_in_sync(self, tmp_path: Path, operator_home: Path):
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -118,9 +109,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.IN_SYNC
 
     def test_a_source_that_never_synced_reads_not_rendered(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         # Approved, so consent is not what is missing - only the sync is.
         factory.trust_hooks()
@@ -131,9 +122,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
     def test_skipping_the_pass_is_visible_as_not_rendered(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all", skip={"hooks"})
@@ -144,9 +135,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
     def test_a_deleted_sidecar_reads_sidecar_missing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -158,9 +149,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.SIDECAR_MISSING
 
     def test_an_edited_source_reads_stale_not_unrendered(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -180,9 +171,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.STALE
 
     def test_not_rendered_requires_nothing_managed_anywhere(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -200,9 +191,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
     def test_a_record_for_a_withdrawn_source_reads_stale(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         source = _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -216,9 +207,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.STALE
 
     def test_one_of_two_rendered_groups_reads_stale(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path, name="guard")
         _write_source(tmp_path, name="watch", event="post_tool_use")
         factory.trust_hooks()
@@ -237,9 +228,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.STALE
 
     def test_a_sidecar_that_disagrees_reads_sidecar_stale(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -256,9 +247,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.SIDECAR_STALE
 
     def test_hand_authored_hooks_do_not_make_it_stale(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -275,9 +266,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.IN_SYNC
 
     def test_unparseable_config_reads_unreadable(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -289,9 +280,9 @@ class TestSidecarProvider:
         assert _only(reports).signal is ProviderHookSignal.UNREADABLE
 
     def test_unparseable_sidecar_reads_unreadable(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -304,10 +295,8 @@ class TestSidecarProvider:
 
 
 class TestHooksetProvider:
-    def test_a_completed_sync_reads_in_sync(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        factory = _installed(tmp_path, monkeypatch)
+    def test_a_completed_sync_reads_in_sync(self, tmp_path: Path, operator_home: Path):
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -318,9 +307,9 @@ class TestHooksetProvider:
         assert _only(reports).signal is ProviderHookSignal.IN_SYNC
 
     def test_a_source_that_never_synced_reads_not_rendered(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         # Approved, so consent is not what is missing - only the sync is.
         factory.trust_hooks()
@@ -331,9 +320,9 @@ class TestHooksetProvider:
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
     def test_a_withdrawn_source_leaves_the_hookset_stale(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         source = _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -344,10 +333,8 @@ class TestHooksetProvider:
         )
         assert _only(reports).signal is ProviderHookSignal.STALE
 
-    def test_an_edited_hookset_reads_stale(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        factory = _installed(tmp_path, monkeypatch)
+    def test_an_edited_hookset_reads_stale(self, tmp_path: Path, operator_home: Path):
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -363,10 +350,8 @@ class TestHooksetProvider:
         )
         assert _only(reports).signal is ProviderHookSignal.STALE
 
-    def test_a_foreign_hookset_is_left_alone(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
-        factory = _installed(tmp_path, monkeypatch)
+    def test_a_foreign_hookset_is_left_alone(self, tmp_path: Path, operator_home: Path):
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -383,9 +368,9 @@ class TestHooksetProvider:
 
 class TestUnsupportedEvents:
     def test_an_event_a_provider_lacks_is_reported(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path, name="ask", event="user_prompt_submit")
         factory.trust_hooks()
         factory.sync("all")
@@ -401,9 +386,9 @@ class TestUnsupportedEvents:
         assert by_tool["antigravity"].unsupported == ("ask (user_prompt_submit)",)
 
     def test_a_provider_with_nothing_to_render_still_reads_benignly(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path, name="ask", event="user_prompt_submit")
         factory.trust_hooks()
         factory.sync("all")
@@ -416,9 +401,9 @@ class TestUnsupportedEvents:
         assert report.signal is ProviderHookSignal.IN_SYNC
 
     def test_a_disabled_source_is_not_reported_as_unsupported(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        _installed(tmp_path, monkeypatch)
+        _installed(tmp_path)
         (_hooks_dir(tmp_path) / "off.yaml").write_text(
             "event: user_prompt_submit\ncommand: echo x\nenabled: false\n",
             encoding="utf-8",
@@ -433,9 +418,9 @@ class TestConsent:
     """A hook nobody approved is a decision, not an un-run sync."""
 
     def test_an_unapproved_hook_reads_untrusted(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         # Sync without approving: the renderer refuses, by design.
         factory.sync("all")
@@ -448,9 +433,9 @@ class TestConsent:
         assert report.signal is ProviderHookSignal.UNTRUSTED
 
     def test_untrusted_is_not_reported_as_unrendered(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.sync("all")
 
@@ -464,9 +449,9 @@ class TestConsent:
         assert report.signal is not ProviderHookSignal.NOT_RENDERED
 
     def test_approving_then_syncing_clears_it(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.sync("all")
         factory.trust_hooks()
@@ -480,9 +465,9 @@ class TestConsent:
         assert report.signal is ProviderHookSignal.IN_SYNC
 
     def test_editing_an_approved_hook_withdraws_consent(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_source(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -521,9 +506,9 @@ class TestConsent:
         assert report.signal is ProviderHookSignal.UNTRUSTED
 
     def test_an_unsupported_event_is_still_reported_when_unapproved(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        _installed(tmp_path, monkeypatch)
+        _installed(tmp_path)
         _write_source(tmp_path, name="ask", event="user_prompt_submit")
 
         # Worth knowing before the operator decides whether to approve it, so

@@ -377,6 +377,10 @@ full options.
   native config.
 - `vaultspec-core spec hooks trust` - Approve this workspace's hooks to be rendered into
   your agents' configs.
+- `vaultspec-core spec hooks add` - Deprecated - use 'spec triggers add'; this alias
+  goes next release.
+- `vaultspec-core spec hooks run` - Deprecated - use 'spec triggers run'; this alias
+  goes next release.
 
 #### Triggers
 
@@ -2398,10 +2402,18 @@ command group, and a separate approval.
 - `trust [NAME] [--revoke] [--json]` - Approve this workspace's hooks to be rendered
   into your agents' configs, or withdraw that approval.
 
-There is no `add`: a hook is a file you write in `.vaultspec/hooks/`.
-`vaultspec-core spec hooks add` and `run` still exist as hidden aliases for the trigger
-verbs of the same name and print a deprecation line naming the replacement; they are
-removed one release from now.
+There is no hook `add`: a hook is a file you write in `.vaultspec/hooks/`, like a rule
+or a skill.
+
+- `add [NAME] [--event EVENT] [--command COMMAND] [--force] [--json]` - Deprecated.
+  Creates a *trigger*, not a hook, and is kept only so a caller of the pre-split name
+  reaches what it meant. Use `vaultspec-core spec triggers add`.
+- `run EVENT [--json]` - Deprecated. Fires a *trigger*, not a hook. Use
+  `vaultspec-core spec triggers run`.
+
+Both print a deprecation line naming the replacement, and both are removed one release
+from now. They are listed rather than hidden because the operator reading `--help` to
+find where `add` went is exactly the person who needs to be told.
 
 #### Hook trust
 

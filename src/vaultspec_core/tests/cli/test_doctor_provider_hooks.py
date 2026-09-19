@@ -9,7 +9,7 @@ install so what the doctor reads is what a sync actually wrote.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -31,7 +31,7 @@ def _write_hook(root: Path, event: str = "pre_tool_use", name: str = "guard") ->
     return path
 
 
-def _installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WorkspaceFactory:
+def _installed(tmp_path: Path) -> WorkspaceFactory:
     """Install with the consent ledger redirected away from the real one.
 
     The renderer refuses an unapproved hook, so a test that let it read the
@@ -40,36 +40,33 @@ def _installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WorkspaceFact
     locating that file, rather than at ``Path.home``, which the CLI runner also
     depends on.
     """
-    from vaultspec_core.triggers import trust
-
-    ledger = tmp_path / "operator-home" / ".vaultspec" / trust.TRUST_FILE_NAME
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
     return WorkspaceFactory(tmp_path).install("all")
 
 
 def _hook_report(factory: WorkspaceFactory) -> list[dict[str, object]]:
     result = factory.run("spec", "doctor", "--json")
-    data = json.loads(result.output)["data"]
-    reports = data["home"]["provider_hooks"]
+    envelope = cast("dict[str, Any]", json.loads(result.output))
+    data = cast("dict[str, Any]", envelope["data"])
+    home = cast("dict[str, Any]", data["home"])
+    reports = home["provider_hooks"]
     assert isinstance(reports, list)
-    return reports
+    return cast("list[dict[str, object]]", reports)
 
 
 class TestNoHooksDeclared:
     def test_a_workspace_with_no_hooks_stays_healthy(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         result = factory.run("spec", "doctor")
 
         assert result.exit_code == 0, result.output
         assert "no hooks declared" in result.output
 
     def test_every_hook_capable_provider_is_reported(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         tools = {str(report["tool"]) for report in _hook_report(factory)}
 
         assert tools == {"claude", "codex", "gemini", "antigravity"}
@@ -77,9 +74,9 @@ class TestNoHooksDeclared:
 
 class TestUnrenderedHooksAreVisible:
     def test_a_declared_hook_that_never_synced_warns(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         # Approved, so consent is not what is missing - only the sync is.
         factory.trust_hooks()
@@ -89,9 +86,9 @@ class TestUnrenderedHooksAreVisible:
         assert "never rendered" in result.output
 
     def test_the_row_names_the_providers_it_applies_to(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
 
         output = factory.run("spec", "doctor").output
@@ -99,9 +96,9 @@ class TestUnrenderedHooksAreVisible:
             assert tool in output
 
     def test_a_synced_hook_reports_healthy(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -111,9 +108,9 @@ class TestUnrenderedHooksAreVisible:
         assert "rendered and recorded" in result.output
 
     def test_a_deleted_sidecar_warns_about_ownership(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -125,9 +122,9 @@ class TestUnrenderedHooksAreVisible:
         assert "claude" in result.output
 
     def test_gate_errors_does_not_fail_on_a_hook_warning(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
 
         # An unrendered hook is warning-weighted, so the pre-commit gate must
@@ -140,9 +137,9 @@ class TestAwaitingApproval:
     """An unapproved hook is a decision the operator has yet to make."""
 
     def test_it_does_not_read_as_a_missing_sync(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.sync("all")
 
@@ -153,9 +150,9 @@ class TestAwaitingApproval:
         assert "never rendered" not in result.output
 
     def test_it_does_not_raise_the_exit_code(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.sync("all")
 
@@ -165,18 +162,18 @@ class TestAwaitingApproval:
         assert result.exit_code == 0, result.output
 
     def test_it_names_the_verb_that_approves(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.sync("all")
 
         assert "spec hooks trust" in factory.run("spec", "doctor").output
 
     def test_approving_and_syncing_clears_the_row(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.sync("all")
         factory.trust_hooks()
@@ -187,9 +184,9 @@ class TestAwaitingApproval:
         assert "rendered and recorded" in result.output
 
     def test_the_json_surface_names_the_state(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.sync("all")
 
@@ -199,9 +196,9 @@ class TestAwaitingApproval:
 
 class TestUnsupportedEventAdvisory:
     def test_an_event_a_provider_lacks_is_reported_without_failing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path, event="user_prompt_submit", name="ask")
         factory.trust_hooks()
         factory.sync("all")
@@ -214,9 +211,9 @@ class TestUnsupportedEventAdvisory:
         assert "not supported by" in result.output
 
     def test_no_advisory_when_every_provider_supports_the_event(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         # pre_tool_use is one of only two events every provider runs, so it
         # is the shape that must produce no advisory.
         _write_hook(tmp_path, event="pre_tool_use", name="guard-all")
@@ -230,9 +227,9 @@ class TestUnsupportedEventAdvisory:
 
 class TestJsonSurface:
     def test_each_report_carries_its_signal_and_path(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.trust_hooks()
         factory.sync("all")
@@ -245,9 +242,9 @@ class TestJsonSurface:
         assert claude["unsupported"] == []
 
     def test_an_unrendered_hook_is_machine_readable(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ) -> None:
-        factory = _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path)
         _write_hook(tmp_path)
         factory.trust_hooks()
 

@@ -49,24 +49,6 @@ def _spec(
     )
 
 
-@pytest.fixture
-def isolated_ledger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Redirect the consent ledger away from the operator's real home.
-
-    Redirects the one function whose job is locating that file, rather than
-    patching ``Path.home``: the latter sends pathlib's own internals into
-    unbounded recursion under a CLI runner, and this keeps the consent logic
-    itself under test. The home is kept outside the workspace so the
-    machine-global ``.vaultspec`` cannot collide with the workspace's own.
-    """
-    from vaultspec_core.triggers import trust
-
-    ledger = tmp_path / "operator-home" / ".vaultspec" / trust.TRUST_FILE_NAME
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
-    return ledger
-
-
 class TestRenderPayload:
     def test_claude_uses_pretooluse_and_seconds(self):
         specs = [_spec(HookEvent.PRE_TOOL_USE, matcher="Bash", timeout=30)]
@@ -294,8 +276,9 @@ class TestLaneSeparation:
 
 class TestEndToEndSync:
     def test_sync_writes_native_files_per_provider(
-        self, tmp_path: Path, isolated_ledger: Path
+        self, tmp_path: Path, operator_home: Path
     ):
+        # operator_home moves the consent ledger off this developer's account.
         factory = WorkspaceFactory(tmp_path).install("all")
         hooks_dir = tmp_path / ".vaultspec" / "hooks"
         hooks_dir.mkdir(parents=True, exist_ok=True)
@@ -336,8 +319,9 @@ class TestHookTargets:
     """The set a status surface reports must be the set the renderer writes."""
 
     def test_targets_match_the_files_sync_actually_writes(
-        self, tmp_path: Path, isolated_ledger: Path
+        self, tmp_path: Path, operator_home: Path
     ):
+        # operator_home moves the consent ledger off this developer's account.
         factory = WorkspaceFactory(tmp_path).install("all")
         hooks_dir = tmp_path / ".vaultspec" / "hooks"
         hooks_dir.mkdir(parents=True, exist_ok=True)

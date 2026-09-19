@@ -715,7 +715,7 @@ def _provider_hook_detail(
             "hook config or ownership record could not be read; this check did not run"
         ),
     }
-    parts = []
+    parts: list[str] = []
     for signal, explanation in explanations.items():
         tools = sorted(r.tool for r in reports if r.signal is signal)
         if tools:

@@ -39,7 +39,7 @@ See also:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
 
@@ -95,7 +95,7 @@ def _event_of(path: Path) -> tuple[str | None, bool]:
         return None, False
     if not isinstance(data, dict):
         return None, False
-    event = data.get("event")
+    event = cast("dict[str, object]", data).get("event")
     return (event if isinstance(event, str) else None), True
 
 

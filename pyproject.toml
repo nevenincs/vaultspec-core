@@ -550,7 +550,11 @@ reportInvalidCast = "error"
 
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false
-  root = "src/vaultspec_core/hooks/tests"
+  root = "src/vaultspec_core/triggers/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
+  root = "src/vaultspec_core/core/diagnosis/tests"
 
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false

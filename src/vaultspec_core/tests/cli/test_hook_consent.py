@@ -19,30 +19,48 @@ is never read or written.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+import os
+import subprocess
+import sys
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from vaultspec_core.cli import app
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from typer.testing import CliRunner
-
 pytestmark = [pytest.mark.unit]
 
 
-def attended_env(home: Path) -> dict[str, str | None]:
-    """Environment for a run with an operator's home and no CI marker."""
-    return {
-        "NO_COLOR": "1",
-        "HOME": str(home),
-        "USERPROFILE": str(home),
-        "CI": None,
-        "VAULTSPEC_NON_INTERACTIVE": None,
-    }
+def run_cli(
+    *args: str, cwd: Path, home: Path, stdin: str = "", ci: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """Run the real CLI in *cwd*, with the ledger under a home the test owns.
+
+    A subprocess rather than an in-process runner, because a provider hook is
+    read from the workspace the command runs in: the working directory is part
+    of what is under test, and cannot be simulated without patching something.
+    """
+    env = dict(os.environ)
+    env.update({"NO_COLOR": "1", "HOME": str(home), "USERPROFILE": str(home)})
+    env.pop("VAULTSPEC_NON_INTERACTIVE", None)
+    if ci:
+        env["CI"] = "1"
+    else:
+        env.pop("CI", None)
+    return subprocess.run(
+        [sys.executable, "-m", "vaultspec_core", *args],
+        cwd=cwd,
+        env=env,
+        input=stdin,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=120,
+    )
 
 
 def carried_workspace(tmp_path: Path) -> tuple[Path, Path]:
@@ -63,128 +81,89 @@ def carried_workspace(tmp_path: Path) -> tuple[Path, Path]:
     return root, home
 
 
-def claude_hooks(root: Path) -> dict:
+def claude_hooks(root: Path) -> dict[str, Any]:
     """Return the ``hooks`` mapping claude's settings file carries, if any."""
     settings = root / ".claude" / "settings.json"
     if not settings.exists():
         return {}
-    loaded = json.loads(settings.read_text(encoding="utf-8"))
-    return loaded.get("hooks", {})
+    loaded = cast("dict[str, Any]", json.loads(settings.read_text(encoding="utf-8")))
+    hooks = loaded.get("hooks", {})
+    return cast("dict[str, Any]", hooks) if isinstance(hooks, dict) else {}
 
 
 def rendered_commands(root: Path) -> list[str]:
     """Every command string vaultspec wrote into claude's settings."""
-    return [
-        handler.get("command", "")
-        for groups in claude_hooks(root).values()
-        for group in groups
-        for handler in group.get("hooks", [])
-    ]
+    commands: list[str] = []
+    for groups in claude_hooks(root).values():
+        for group in cast("list[dict[str, Any]]", groups):
+            for handler in cast("list[dict[str, Any]]", group.get("hooks", [])):
+                command = handler.get("command", "")
+                if isinstance(command, str):
+                    commands.append(command)
+    return commands
 
 
 class TestUnapprovedHooksAreNotRendered:
     """A cloned repository's hook must not reach an agent's configuration."""
 
-    def test_sync_all_without_a_grant_writes_nothing(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_all_without_a_grant_writes_nothing(self, tmp_path: Path) -> None:
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
 
-        result = runner.invoke(
-            app,
-            ["sync"],
-            input="",
-            env=attended_env(home),
-        )
+        result = run_cli("sync", cwd=root, home=home)
 
         assert "CARRIED" not in " ".join(rendered_commands(root))
-        assert "carried" in result.output.lower()
+        assert "carried" in (result.stdout + result.stderr).lower()
 
     def test_sync_one_provider_without_a_grant_writes_nothing(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path
     ) -> None:
         """The gate is not narrowed to the all-provider sync."""
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
 
-        runner.invoke(
-            app,
-            ["sync", "claude"],
-            input="",
-            env=attended_env(home),
-        )
+        run_cli("sync", "claude", cwd=root, home=home)
 
         assert "CARRIED" not in " ".join(rendered_commands(root))
 
-    def test_json_run_never_prompts_and_never_grants(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_json_run_never_prompts_and_never_grants(self, tmp_path: Path) -> None:
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
 
-        runner.invoke(
-            app,
-            ["sync", "--json"],
-            input="y\n",
-            env=attended_env(home),
-        )
+        run_cli("sync", "--json", cwd=root, home=home, stdin="y\n")
 
         assert "CARRIED" not in " ".join(rendered_commands(root))
         assert not (home / ".vaultspec" / "hook-trust.json").exists()
 
-    def test_ci_marker_never_grants(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_ci_marker_never_grants(self, tmp_path: Path) -> None:
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
-        env = attended_env(home)
-        env["CI"] = "1"
 
-        runner.invoke(app, ["sync"], input="y\n", env=env)
+        run_cli("sync", cwd=root, home=home, stdin="y\n", ci=True)
 
         assert "CARRIED" not in " ".join(rendered_commands(root))
         assert not (home / ".vaultspec" / "hook-trust.json").exists()
 
-    def test_the_refusal_names_the_file_and_the_verb(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_refusal_names_the_file_and_the_verb(self, tmp_path: Path) -> None:
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
 
-        result = runner.invoke(
-            app,
-            ["sync"],
-            input="",
-            env=attended_env(home),
-        )
+        result = run_cli("sync", cwd=root, home=home)
 
-        assert "carried" in result.output.lower()
-        assert "spec hooks trust" in result.output
+        assert "carried" in (result.stdout + result.stderr).lower()
+        assert "spec hooks trust" in result.stdout + result.stderr
 
 
 class TestApprovalRendersAndRevocationWithdraws:
     """Approval is the whole workflow, and so is taking it back."""
 
-    def test_trust_then_sync_renders_the_hook(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_trust_then_sync_renders_the_hook(self, tmp_path: Path) -> None:
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
 
-        approved = runner.invoke(
-            app,
-            ["spec", "hooks", "trust"],
-            env=attended_env(home),
-        )
-        assert approved.exit_code == 0, approved.output
+        approved = run_cli("spec", "hooks", "trust", cwd=root, home=home)
+        assert approved.returncode == 0, approved.stdout + approved.stderr
 
-        runner.invoke(app, ["sync"], env=attended_env(home))
+        run_cli("sync", cwd=root, home=home)
 
         assert "echo CARRIED" in rendered_commands(root)
 
     def test_revoking_then_syncing_removes_what_was_rendered(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path
     ) -> None:
         """Revocation has to reach the provider file, not just the ledger.
 
@@ -194,55 +173,31 @@ class TestApprovalRendersAndRevocationWithdraws:
         mechanism.
         """
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
-        runner.invoke(
-            app,
-            ["spec", "hooks", "trust"],
-            env=attended_env(home),
-        )
-        runner.invoke(app, ["sync"], env=attended_env(home))
+        run_cli("spec", "hooks", "trust", cwd=root, home=home)
+        run_cli("sync", cwd=root, home=home)
         assert "echo CARRIED" in rendered_commands(root)
 
-        revoked = runner.invoke(
-            app,
-            ["spec", "hooks", "trust", "--revoke"],
-            env=attended_env(home),
-        )
-        assert revoked.exit_code == 0, revoked.output
+        revoked = run_cli("spec", "hooks", "trust", "--revoke", cwd=root, home=home)
+        assert revoked.returncode == 0, revoked.stdout + revoked.stderr
 
-        runner.invoke(
-            app,
-            ["sync"],
-            input="",
-            env=attended_env(home),
-        )
+        run_cli("sync", cwd=root, home=home)
 
         assert "echo CARRIED" not in rendered_commands(root)
 
     def test_editing_an_approved_hook_withdraws_the_approval(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path
     ) -> None:
         """Consent is pinned to content, so a pulled change asks again."""
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
-        runner.invoke(
-            app,
-            ["spec", "hooks", "trust"],
-            env=attended_env(home),
-        )
-        runner.invoke(app, ["sync"], env=attended_env(home))
+        run_cli("spec", "hooks", "trust", cwd=root, home=home)
+        run_cli("sync", cwd=root, home=home)
         assert "echo CARRIED" in rendered_commands(root)
 
         (root / ".vaultspec" / "hooks" / "carried.yaml").write_text(
             "event: pre_tool_use\nmatcher: Bash\ncommand: echo REPLACED\n",
             encoding="utf-8",
         )
-        runner.invoke(
-            app,
-            ["sync"],
-            input="",
-            env=attended_env(home),
-        )
+        run_cli("sync", cwd=root, home=home)
 
         commands = rendered_commands(root)
         assert "echo REPLACED" not in commands
@@ -252,11 +207,8 @@ class TestApprovalRendersAndRevocationWithdraws:
 class TestGrantsAreSeparatePerSystem:
     """Approving hooks must not approve triggers, or the reverse."""
 
-    def test_trusting_hooks_does_not_trust_triggers(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_trusting_hooks_does_not_trust_triggers(self, tmp_path: Path) -> None:
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
         triggers_dir = root / ".vaultspec" / "triggers"
         triggers_dir.mkdir(parents=True, exist_ok=True)
         (triggers_dir / "lifecycle.yaml").write_text(
@@ -265,26 +217,15 @@ class TestGrantsAreSeparatePerSystem:
             encoding="utf-8",
         )
 
-        runner.invoke(
-            app,
-            ["spec", "hooks", "trust"],
-            env=attended_env(home),
-        )
-        listed = runner.invoke(
-            app,
-            ["spec", "triggers", "list", "--json"],
-            env=attended_env(home),
-        )
+        run_cli("spec", "hooks", "trust", cwd=root, home=home)
+        listed = run_cli("spec", "triggers", "list", "--json", cwd=root, home=home)
 
-        payload = json.loads(listed.output)
+        payload = json.loads(listed.stdout)
         assert payload["data"]["triggers"][0]["trusted"] is False
 
-    def test_hooks_trust_points_at_the_other_verb(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_hooks_trust_points_at_the_other_verb(self, tmp_path: Path) -> None:
         """The one verb whose meaning changed says where the other grant is."""
         root, home = carried_workspace(tmp_path)
-        monkeypatch.chdir(root)
         triggers_dir = root / ".vaultspec" / "triggers"
         triggers_dir.mkdir(parents=True, exist_ok=True)
         (triggers_dir / "lifecycle.yaml").write_text(
@@ -293,10 +234,6 @@ class TestGrantsAreSeparatePerSystem:
             encoding="utf-8",
         )
 
-        result = runner.invoke(
-            app,
-            ["spec", "hooks", "trust"],
-            env=attended_env(home),
-        )
+        result = run_cli("spec", "hooks", "trust", cwd=root, home=home)
 
-        assert "spec triggers trust" in result.output
+        assert "spec triggers trust" in result.stdout + result.stderr

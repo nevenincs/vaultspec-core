@@ -1,8 +1,7 @@
-"""Unit tests for the hooks engine."""
+"""Unit tests for the lifecycle trigger engine."""
 
 from __future__ import annotations
 
-import os
 import sys
 import threading
 import time
@@ -28,7 +27,7 @@ pytestmark = [pytest.mark.unit]
 
 
 def write_hook(triggers_dir: Path, name: str, event: str, command: str) -> Path:
-    """Write one shell hook definition, the way a workspace carries it."""
+    """Write one shell trigger definition, the way a workspace carries it."""
     triggers_dir.mkdir(parents=True, exist_ok=True)
     path = triggers_dir / f"{name}.yaml"
     path.write_text(
@@ -39,7 +38,7 @@ def write_hook(triggers_dir: Path, name: str, event: str, command: str) -> Path:
 
 
 def load_trusted(triggers_dir: Path, home: Path) -> list[Trigger]:
-    """Load a hooks directory and record consent for every file in it.
+    """Load a triggers directory and record consent for every file in it.
 
     Execution tests need a hook the operator has approved. They must never
     reach the real ledger under the operator's home, so *home* is always a
@@ -59,7 +58,7 @@ class TestSupportedEvents:
     def test_only_events_that_are_emitted(self):
         """A declared event nothing fires is worse than no event at all.
 
-        ``config.synced`` and ``config.synced`` sat here for several
+        ``vault.document.created`` and ``audit.completed`` sat here for several
         releases with no emitter, so a trigger bound to either parsed, listed
         and reported as supported while never running.
         """
@@ -579,10 +578,22 @@ class TestCommandSplitting:
         assert seen == "one two three"
 
     def test_an_unquoted_windows_path_keeps_its_separators(self) -> None:
-        """POSIX splitting eats backslashes; an unquoted path must survive."""
+        """POSIX splitting eats backslashes; an unquoted path must survive.
+
+        Exercised from either platform by naming the rule rather than reading
+        the running one. Skipping it off Windows would leave the branch
+        untested everywhere this suite usually runs, which is the failure the
+        branch exists to prevent.
+        """
         from vaultspec_core.triggers.engine import _split_command
 
-        if os.name != "nt":
-            pytest.skip("backslash-as-separator is a Windows concern")
+        assert _split_command(r"C:\tools\run.exe -V", windows=True) == [
+            r"C:\tools\run.exe",
+            "-V",
+        ]
 
-        assert _split_command(r"C:\tools\run.exe -V") == [r"C:\tools\run.exe", "-V"]
+    def test_posix_splitting_still_treats_a_backslash_as_an_escape(self) -> None:
+        """The other branch, and the reason Windows cannot share it."""
+        from vaultspec_core.triggers.engine import _split_command
+
+        assert _split_command("echo a\\ b", windows=False) == ["echo", "a b"]

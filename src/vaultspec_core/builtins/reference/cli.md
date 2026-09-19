@@ -306,6 +306,10 @@ hand-edit between the markers.
   native config.
 - `vaultspec-core spec hooks trust` - Approve this workspace's hooks to be rendered into
   your agents' configs.
+- `vaultspec-core spec hooks add` - Deprecated - use 'spec triggers add'; this alias
+  goes next release.
+- `vaultspec-core spec hooks run` - Deprecated - use 'spec triggers run'; this alias
+  goes next release.
 
 #### Triggers
 

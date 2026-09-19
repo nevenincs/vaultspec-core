@@ -344,7 +344,7 @@ def _execute_action(
     )
 
 
-def _split_command(cmd: str) -> list[str]:
+def _split_command(cmd: str, windows: bool | None = None) -> list[str]:
     """Split a command string into argv, correctly on Windows as well.
 
     POSIX splitting treats a backslash as an escape, which silently destroys
@@ -357,8 +357,17 @@ def _split_command(cmd: str) -> list[str]:
     Neither mode is right on Windows alone, so there it splits without POSIX
     escaping and then strips one matched pair of surrounding quotes per token,
     which preserves the path and hands ``Popen`` the argument the author wrote.
+
+    Args:
+        cmd: The command string as the trigger file declares it.
+        windows: Which splitting rule to apply. Defaults to the running
+            platform; passing it explicitly lets both branches be exercised
+            from either one, since each guards against a hazard the other
+            platform cannot reproduce.
     """
-    if os.name != "nt":
+    if windows is None:
+        windows = os.name == "nt"
+    if not windows:
         return shlex.split(cmd, posix=True)
     tokens = shlex.split(cmd, posix=False)
     return [

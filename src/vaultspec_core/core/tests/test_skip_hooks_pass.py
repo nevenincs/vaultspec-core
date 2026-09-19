@@ -11,7 +11,7 @@ it names is the only thing it turns off.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -33,26 +33,13 @@ def _write_hook(root: Path) -> None:
     (hooks_dir / "guard.yaml").write_text(_HOOK_SOURCE, encoding="utf-8")
 
 
-def _isolate_ledger(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Point the consent ledger somewhere other than the real operator home.
-
-    The renderer refuses an unapproved hook, so without this a run would
-    depend on what the developer executing it happens to have approved.
-    """
-    from vaultspec_core.triggers import trust
-
-    ledger = root / "operator-home" / ".vaultspec" / trust.TRUST_FILE_NAME
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
-
-
 def _claude_hooks(root: Path) -> dict[str, object]:
     path = root / ".claude" / "settings.json"
     if not path.exists():
         return {}
-    settings = json.loads(path.read_text(encoding="utf-8"))
+    settings = cast("dict[str, object]", json.loads(path.read_text(encoding="utf-8")))
     hooks = settings.get("hooks")
-    return hooks if isinstance(hooks, dict) else {}
+    return cast("dict[str, object]", hooks) if isinstance(hooks, dict) else {}
 
 
 class TestSkipTokenValidation:
@@ -79,9 +66,8 @@ class TestSkipTokenValidation:
 
 class TestSkipHooksPass:
     def test_sync_renders_provider_hooks_by_default(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        _isolate_ledger(tmp_path, monkeypatch)
         factory = WorkspaceFactory(tmp_path).install("all")
         _write_hook(tmp_path)
         factory.trust_hooks()
@@ -109,9 +95,8 @@ class TestSkipHooksPass:
         assert factory.provider_has_rules("claude")
 
     def test_skip_hooks_does_not_prune_already_rendered_hooks(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, operator_home: Path
     ):
-        _isolate_ledger(tmp_path, monkeypatch)
         factory = WorkspaceFactory(tmp_path).install("all")
         _write_hook(tmp_path)
         factory.trust_hooks()

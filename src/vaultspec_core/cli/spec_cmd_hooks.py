@@ -14,7 +14,9 @@ these three were separated, ``spec hooks`` reached the lifecycle system; the
 aliases at the foot of this module carry those callers over for one release.
 """
 
-from typing import Annotated
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -27,13 +29,16 @@ from vaultspec_core.cli.spec_cmd_shared import (
     emit_sync_result,
 )
 
+if TYPE_CHECKING:
+    from vaultspec_core.core.provider_hooks import HookSpec
+
 hooks_app = make_app(
     help="Render shell commands into each provider's agent-runtime hook config",
     no_args_is_help=True,
 )
 
 
-def _load(warnings: list[str] | None = None):
+def _load(warnings: list[str] | None = None) -> list[HookSpec]:
     """Load this workspace's hook specs."""
     from vaultspec_core.core.provider_hooks import load_provider_hook_specs
 
@@ -52,30 +57,36 @@ def cmd_hooks_list(
 
     specs = _load()
     targets = hook_targets()
+    hooks_dir = str(get_context().hooks_dir)
+    provider_names = [tool.value for tool, _n, _s in targets]
 
-    def _renders_into(event: object) -> list[str]:
+    def _renders_into(spec: HookSpec) -> list[str]:
         return [
-            tool.value for tool, _n, _s in targets if event in supported_events(tool)
+            tool.value
+            for tool, _n, _s in targets
+            if spec.event in supported_events(tool)
         ]
 
-    payload = {
-        "hooks": [
-            {
-                "name": spec.name,
-                "event": spec.event.value,
-                "matcher": spec.matcher,
-                "enabled": spec.enabled,
-                "timeout": spec.timeout,
-                "providers": _renders_into(spec.event),
-            }
-            for spec in specs
-        ],
-        "hooks_dir": str(get_context().hooks_dir),
-        "providers": [tool.value for tool, _n, _s in targets],
-    }
-
     if json_output:
-        emit_json("spec.hooks.list", "unchanged", payload)
+        emit_json(
+            "spec.hooks.list",
+            "unchanged",
+            {
+                "hooks": [
+                    {
+                        "name": spec.name,
+                        "event": spec.event.value,
+                        "matcher": spec.matcher,
+                        "enabled": spec.enabled,
+                        "timeout": spec.timeout,
+                        "providers": _renders_into(spec),
+                    }
+                    for spec in specs
+                ],
+                "hooks_dir": hooks_dir,
+                "providers": provider_names,
+            },
+        )
         raise typer.Exit(0)
 
     from vaultspec_core.cli.rendering import Cell, Column, render_listing, summary_line
@@ -84,22 +95,20 @@ def cmd_hooks_list(
     console = get_console()
     if not specs:
         console.print("No hooks defined.")
-        console.print(
-            f"  Add [dim].yaml[/dim] files to [bold]{payload['hooks_dir']}/[/bold]"
-        )
+        console.print(f"  Add [dim].yaml[/dim] files to [bold]{hooks_dir}/[/bold]")
         return
 
-    rows = [
+    rows: list[dict[str, object]] = [
         {
-            "name": hook["name"],
+            "name": spec.name,
             "status": Cell("enabled", style="bold green")
-            if hook["enabled"]
+            if spec.enabled
             else Cell("disabled", style="dim"),
-            "event": hook["event"],
-            "matcher": hook["matcher"] or "-",
-            "providers": ", ".join(hook["providers"]) or Cell("none", style="yellow"),
+            "event": spec.event.value,
+            "matcher": spec.matcher or "-",
+            "providers": ", ".join(_renders_into(spec)) or Cell("none", style="yellow"),
         }
-        for hook in payload["hooks"]
+        for spec in specs
     ]
     render_listing(
         rows,
@@ -177,16 +186,22 @@ def cmd_hooks_status(
         render_hooks_payload(specs, tool, warnings)
 
     status = "warning" if warnings else "ok"
-    payload = {
-        "status": status,
-        "hooks_dir": str(get_context().hooks_dir),
-        "definitions": [spec.name for spec in specs],
-        "warnings": warnings,
-        "providers": [tool.value for tool, _n, _s in targets],
-    }
+    hooks_dir = str(get_context().hooks_dir)
+    definitions = [spec.name for spec in specs]
+    provider_names = [tool.value for tool, _n, _s in targets]
 
     if json_output:
-        emit_json("spec.hooks.status", status, payload)
+        emit_json(
+            "spec.hooks.status",
+            status,
+            {
+                "status": status,
+                "hooks_dir": hooks_dir,
+                "definitions": definitions,
+                "warnings": warnings,
+                "providers": provider_names,
+            },
+        )
         raise typer.Exit(0 if status == "ok" else 1)
 
     from vaultspec_core.cli.rendering import Field, render_record
@@ -195,9 +210,9 @@ def cmd_hooks_status(
     render_record(
         [
             Field("status", status, style="green" if status == "ok" else "yellow"),
-            Field("hooks_dir", payload["hooks_dir"]),
-            Field("definitions", ", ".join(payload["definitions"]) or "none"),
-            Field("providers", ", ".join(payload["providers"]) or "none"),
+            Field("hooks_dir", hooks_dir),
+            Field("definitions", ", ".join(definitions) or "none"),
+            Field("providers", ", ".join(provider_names) or "none"),
         ],
         title="hooks status",
     )
@@ -353,6 +368,11 @@ def cmd_hooks_trust(
 # real ``trust`` above, so only ``add`` and ``run`` can be aliased here, and
 # ``spec hooks trust`` now grants for hooks. That change of meaning is the one
 # an operator is told about by the deprecation line on the other two.
+#
+# Listed rather than hidden. The documentation contract is that every command
+# the docs name is a command the CLI shows, and a deprecation nobody can
+# discover is a worse deprecation: the operator reading ``--help`` to find out
+# where ``add`` went is exactly who needs to be told.
 
 
 def _deprecated(verb: str) -> None:
@@ -363,7 +383,7 @@ def _deprecated(verb: str) -> None:
     )
 
 
-@hooks_app.command("add", hidden=True)
+@hooks_app.command("add")
 def cmd_hooks_add_alias(
     name: Annotated[str, typer.Argument(help="Trigger name")],
     event: Annotated[str, typer.Option("--event", help="Lifecycle event")] = (
@@ -374,7 +394,7 @@ def cmd_hooks_add_alias(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Deprecated: use 'spec triggers add'."""
+    """Deprecated - use 'spec triggers add'; this alias goes next release."""
     _deprecated("add")
     from vaultspec_core.cli.spec_cmd_triggers import cmd_triggers_add
 
@@ -388,13 +408,13 @@ def cmd_hooks_add_alias(
     )
 
 
-@hooks_app.command("run", hidden=True)
+@hooks_app.command("run")
 def cmd_hooks_run_alias(
     event: Annotated[str, typer.Argument(help="Lifecycle event")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
-    """Deprecated: use 'spec triggers run'."""
+    """Deprecated - use 'spec triggers run'; this alias goes next release."""
     _deprecated("run")
     from vaultspec_core.cli.spec_cmd_triggers import cmd_triggers_run
 
