@@ -46,9 +46,9 @@ def cmd_hooks_list(
 ) -> None:
     """List all defined hooks."""
     apply_target(target)
-    from vaultspec_core.core.commands import hooks_list_data
+    from vaultspec_core.core.commands import triggers_list_data
 
-    data = hooks_list_data()
+    data = triggers_list_data()
 
     if json_output:
         emit_json("spec.hooks.list", "unchanged", data)
@@ -63,7 +63,7 @@ def cmd_hooks_list(
     if not hooks:
         console.print("No hooks defined.")
         console.print(
-            f"  Add [dim].yaml[/dim] files to [bold]{data['hooks_dir']}/[/bold]"
+            f"  Add [dim].yaml[/dim] files to [bold]{data['triggers_dir']}/[/bold]"
         )
         console.print(
             "\n[dim]Supported events:[/dim] " + ", ".join(data["supported_events"])
@@ -106,14 +106,14 @@ def cmd_hooks_list(
 
 
 @hooks_app.command("add")
-def cmd_hooks_add(
-    name: Annotated[str, typer.Argument(help="Hook name")],
+def cmd_triggers_add(
+    name: Annotated[str, typer.Argument(help="Trigger name")],
     event: Annotated[
         str, typer.Option("--event", help="Lifecycle event to trigger on")
     ] = "vault.document.created",
     command: Annotated[str, typer.Option("--command", help="Command to run")] = "",
     body: Annotated[
-        str | None, typer.Option("--body", help="Hook body content")
+        str | None, typer.Option("--body", help="Trigger body content")
     ] = None,
     from_file: Annotated[
         Path | None, typer.Option("--from-file", help="Read body content from file")
@@ -141,11 +141,11 @@ def cmd_hooks_add(
     elif body is not None:
         resolved_body = body
 
-    from vaultspec_core.core import hooks_add
+    from vaultspec_core.core import triggers_add
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        file_path = hooks_add(
+        file_path = triggers_add(
             name=name,
             event=event,
             command=command,
@@ -161,23 +161,23 @@ def cmd_hooks_add(
         emit_json("spec.hooks.add", "created", {"path": str(file_path)})
         raise typer.Exit(0)
 
-    action = "Would create hook source" if dry_run else "Hook source updated"
+    action = "Would create hook source" if dry_run else "Trigger source updated"
     print_source_mutation_notice(file_path, action=action)
 
 
 @hooks_app.command("show")
-def cmd_hooks_show(
-    name: Annotated[str, typer.Argument(help="Hook name")],
+def cmd_triggers_show(
+    name: Annotated[str, typer.Argument(help="Trigger name")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Display a hook's content."""
     apply_target(target)
-    from vaultspec_core.core import hooks_show
+    from vaultspec_core.core import triggers_show
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        content = hooks_show(name=name)
+        content = triggers_show(name=name)
         if json_output:
             emit_json(
                 "spec.hooks.show", "unchanged", {"name": name, "content": content}
@@ -189,8 +189,8 @@ def cmd_hooks_show(
 
 
 @hooks_app.command("edit")
-def cmd_hooks_edit(
-    name: Annotated[str, typer.Argument(help="Hook name")],
+def cmd_triggers_edit(
+    name: Annotated[str, typer.Argument(help="Trigger name")],
     editor: Annotated[
         str | None,
         typer.Option(
@@ -206,7 +206,7 @@ def cmd_hooks_edit(
 ) -> None:
     """Open a hook in the configured editor."""
     apply_target(target)
-    from vaultspec_core.core import hooks_edit
+    from vaultspec_core.core import triggers_edit
     from vaultspec_core.core.exceptions import (
         EditorCancellationError,
         EditorResolutionError,
@@ -215,7 +215,7 @@ def cmd_hooks_edit(
     )
 
     try:
-        hooks_edit(name=name, editor=editor)
+        triggers_edit(name=name, editor=editor)
     except EditorResolutionError as exc:
         typer.echo(f"Error: {exc}", err=True)
         if exc.hint:
@@ -238,7 +238,7 @@ def cmd_hooks_edit(
 
 
 @hooks_app.command("rename")
-def cmd_hooks_rename(
+def cmd_triggers_rename(
     old_name: Annotated[str, typer.Argument(help="Current hook name")],
     new_name: Annotated[str, typer.Argument(help="New hook name")],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
@@ -246,11 +246,11 @@ def cmd_hooks_rename(
 ) -> None:
     """Rename an existing hook atomically."""
     apply_target(target)
-    from vaultspec_core.core import hooks_rename
+    from vaultspec_core.core import triggers_rename
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        new_path = hooks_rename(old_name=old_name, new_name=new_name)
+        new_path = triggers_rename(old_name=old_name, new_name=new_name)
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
         return
@@ -263,12 +263,12 @@ def cmd_hooks_rename(
         )
         raise typer.Exit(0)
 
-    print_source_mutation_notice(new_path, action="Hook source renamed")
+    print_source_mutation_notice(new_path, action="Trigger source renamed")
 
 
 @hooks_app.command("remove")
-def cmd_hooks_remove(
-    name: Annotated[str, typer.Argument(help="Hook name")],
+def cmd_triggers_remove(
+    name: Annotated[str, typer.Argument(help="Trigger name")],
     force: Annotated[
         bool,
         typer.Option(
@@ -283,11 +283,11 @@ def cmd_hooks_remove(
 ) -> None:
     """Delete a hook."""
     apply_target(target)
-    from vaultspec_core.core import hooks_remove
+    from vaultspec_core.core import triggers_remove
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        hooks_remove(
+        triggers_remove(
             name=name,
             force=force,
             confirm_fn=typer.confirm,
@@ -300,17 +300,19 @@ def cmd_hooks_remove(
         emit_json("spec.hooks.remove", "removed", {"removed": name})
         raise typer.Exit(0)
 
-    from vaultspec_core.core.hooks import resolve_hook_path
+    from vaultspec_core.core.triggers import resolve_trigger_path
 
     print_source_mutation_notice(
-        resolve_hook_path(name),
-        action="Hook source removed",
+        resolve_trigger_path(name),
+        action="Trigger source removed",
     )
 
 
 @hooks_app.command("restore")
-def cmd_hooks_restore(
-    filename: Annotated[str, typer.Argument(help="Hook name or filename to restore")],
+def cmd_triggers_restore(
+    filename: Annotated[
+        str, typer.Argument(help="Trigger name or filename to restore")
+    ],
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
@@ -329,7 +331,7 @@ def cmd_hooks_restore(
 
 
 @hooks_app.command("sync")
-def cmd_hooks_sync(
+def cmd_triggers_sync(
     provider: Annotated[
         str,
         typer.Argument(
@@ -347,9 +349,9 @@ def cmd_hooks_sync(
     """Sync only hooks files; use vaultspec-core sync for complete refresh."""
     apply_target(target)
     apply_provider_filter(provider)
-    from vaultspec_core.core import hooks_sync
+    from vaultspec_core.core import triggers_sync
 
-    result = hooks_sync(prune=force, dry_run=dry_run)
+    result = triggers_sync(prune=force, dry_run=dry_run)
 
     if not json_output:
         print_complete_sync_notice(resource="hook")
@@ -357,15 +359,15 @@ def cmd_hooks_sync(
 
 
 @hooks_app.command("status")
-def cmd_hooks_status(
+def cmd_triggers_status(
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
     """Report declarative hooks parsing and taxonomy compliance status."""
     apply_target(target)
-    from vaultspec_core.core import hooks_status
+    from vaultspec_core.core import triggers_status
 
-    status = hooks_status()
+    status = triggers_status()
 
     if json_output:
         emit_json("spec.hooks.status", status["status"], status)
@@ -382,7 +384,7 @@ def cmd_hooks_status(
     )
     fields = [
         Field("status", status_str, style=status_style),
-        Field("hooks_dir", str(status["hooks_dir"])),
+        Field("triggers_dir", str(status["triggers_dir"])),
         Field("definitions", ", ".join(status["definitions"]) or "none"),
     ]
     render_record(fields, title="hooks status")
@@ -397,7 +399,7 @@ def cmd_hooks_status(
 
 
 @hooks_app.command("run")
-def cmd_hooks_run(
+def cmd_triggers_run(
     event: Annotated[str, typer.Argument(help="Event name")],
     path: Annotated[
         str | None, typer.Option("--path", help="Context path variable")
@@ -407,15 +409,15 @@ def cmd_hooks_run(
 ) -> None:
     """Trigger hooks for a specific event."""
     apply_target(target)
-    from vaultspec_core.cli._hook_trust import consent_gate
+    from vaultspec_core.cli._trigger_trust import consent_gate
     from vaultspec_core.console import get_console
-    from vaultspec_core.core.commands import hooks_run
+    from vaultspec_core.core.commands import triggers_run
     from vaultspec_core.core.exceptions import VaultSpecError
 
     consent_gate(event, json_output=json_output)
 
     try:
-        results = hooks_run(event=event, path=path)
+        results = triggers_run(event=event, path=path)
     except VaultSpecError as exc:
         _handle_error(exc, json_output=json_output)
         return
@@ -434,7 +436,7 @@ def cmd_hooks_run(
             icon = "[bold green]OK[/bold green]"
         else:
             icon = "[bold red]FAIL[/bold red]"
-        console.print(f"  {r['hook_name']} ({r['action_type']}): {icon}")
+        console.print(f"  {r['trigger_name']} ({r['action_type']}): {icon}")
         if r["output"]:
             for line in str(r["output"]).splitlines()[:5]:
                 console.print(f"    {line}")
@@ -446,7 +448,7 @@ def cmd_hooks_run(
 def cmd_hooks_trust(
     name: Annotated[
         str | None,
-        typer.Argument(help="Hook name; omit to cover every hook in the workspace"),
+        typer.Argument(help="Trigger name; omit to cover every hook in the workspace"),
     ] = None,
     revoke: Annotated[
         bool,
@@ -457,23 +459,23 @@ def cmd_hooks_trust(
 ) -> None:
     """Approve this workspace's hooks to run their shell commands as you.
 
-    Hook files are shared through git, so a checkout arrives carrying commands
+    Trigger files are shared through git, so a checkout arrives carrying commands
     its author chose. Approval is therefore recorded on this machine rather than
     in the workspace, and is pinned to each file's current contents: editing an
     approved hook, or pulling a change to one, withdraws the approval until you
     run this again. Use --revoke to withdraw it yourself.
     """
     apply_target(target)
-    from vaultspec_core.cli._hook_trust import describe_hook
+    from vaultspec_core.cli._trigger_trust import describe_trigger
     from vaultspec_core.core.exceptions import ResourceNotFoundError
     from vaultspec_core.core.types import get_context
-    from vaultspec_core.hooks import grant, load_hooks
-    from vaultspec_core.hooks import revoke as revoke_trust
+    from vaultspec_core.triggers import grant, load_triggers
+    from vaultspec_core.triggers import revoke as revoke_trust
 
     ctx = get_context()
 
     if revoke:
-        dropped = revoke_trust(ctx.hooks_dir)
+        dropped = revoke_trust(ctx.triggers_dir)
         if json_output:
             emit_json("spec.hooks.trust", "removed", {"revoked": dropped})
             raise typer.Exit(0)
@@ -482,12 +484,12 @@ def cmd_hooks_trust(
         get_console().print(f"Withdrew approval for {dropped} hook(s).")
         return
 
-    hooks = load_hooks(ctx.hooks_dir)
+    hooks = load_triggers(ctx.triggers_dir)
     if name is not None:
         hooks = [hook for hook in hooks if hook.name == name]
         if not hooks:
             _handle_error(
-                ResourceNotFoundError(f"Hook '{name}' not found."),
+                ResourceNotFoundError(f"Trigger '{name}' not found."),
                 json_output=json_output,
             )
             return
@@ -506,14 +508,14 @@ def cmd_hooks_trust(
     if not approved:
         console.print("No hooks to approve.")
         return
-    console.print(f"Approved {len(approved)} hook(s) in {ctx.hooks_dir}:")
+    console.print(f"Approved {len(approved)} trigger(s) in {ctx.triggers_dir}:")
     # Echo the commands that were just approved rather than only the filenames.
     # This verb is the one place an operator commits to running them, so it is
     # the one place the record of what they agreed to has to be legible.
     for hook in hooks:
         if hook.source_path is None or hook.source_path not in recorded:
             continue
-        for line in describe_hook(hook, ctx.target_dir):
+        for line in describe_trigger(hook, ctx.target_dir):
             console.print(line, highlight=False)
     console.print(
         "[dim]Approval is recorded on this machine and pinned to each file's "

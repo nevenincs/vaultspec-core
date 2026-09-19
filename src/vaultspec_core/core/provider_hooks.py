@@ -1,6 +1,6 @@
 """Author agent-runtime hooks once and render them per provider.
 
-This module is distinct from :mod:`vaultspec_core.hooks`, which handles
+This module is distinct from :mod:`vaultspec_core.triggers`, which handles
 vaultspec's own CLI-lifecycle events (``vault.document.created`` etc.) that
 fire inside the vaultspec runtime. *Provider hooks* are agent-runtime
 tool-lifecycle hooks (pre/post tool use, session start/stop, ...) consumed by
@@ -44,13 +44,14 @@ from .types import SyncResult
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "AGY_HOOKSET_NAME",
     "PROVIDER_EVENT_NAMES",
     "HookEvent",
     "HookSpec",
     "compose_flat_hooks",
     "hook_targets",
     "load_provider_hook_specs",
-    "provider_hooks_sync",
+    "provider_triggers_sync",
     "render_hooks_payload",
     "supported_events",
 ]
@@ -119,7 +120,10 @@ PROVIDER_EVENT_NAMES: dict[Tool, dict[HookEvent, str]] = {
 _MILLISECOND_TIMEOUT_TOOLS = frozenset({Tool.GEMINI})
 
 # The named hookset agy groups vaultspec-managed hooks under in hooks.json.
-_AGY_HOOKSET_NAME = "vaultspec"
+# Public: agy records ownership by owning this hookset rather than by writing a
+# sidecar, so a status surface needs the name to find a stale one left behind
+# when nothing renders any more and no payload can name it for pruning.
+AGY_HOOKSET_NAME = "vaultspec"
 
 
 @dataclass(frozen=True)
@@ -220,7 +224,7 @@ def render_hooks_payload(
         return None
 
     if tool is Tool.ANTIGRAVITY:
-        return {_AGY_HOOKSET_NAME: {"enabled": True, **grouped}}
+        return {AGY_HOOKSET_NAME: {"enabled": True, **grouped}}
     return dict(grouped)
 
 
@@ -261,7 +265,7 @@ def load_provider_hook_specs(
     Reads ``*.yaml``/``*.yml`` files whose ``event`` is a canonical
     :class:`HookEvent`. Files whose event is not canonical are ignored here -
     they belong to the CLI-lifecycle hook system in
-    :mod:`vaultspec_core.hooks`. Returns specs sorted by source filename stem
+    :mod:`vaultspec_core.triggers`. Returns specs sorted by source filename stem
     for deterministic output.
 
     Args:
@@ -408,9 +412,9 @@ def _compose_agy_hooks(
     """Compose the next ``.agents/hooks.json`` dict (named-hookset ownership)."""
     out = dict(existing)
     if payload:
-        out[_AGY_HOOKSET_NAME] = payload[_AGY_HOOKSET_NAME]
+        out[AGY_HOOKSET_NAME] = payload[AGY_HOOKSET_NAME]
     else:
-        out.pop(_AGY_HOOKSET_NAME, None)
+        out.pop(AGY_HOOKSET_NAME, None)
     return out
 
 
@@ -501,7 +505,7 @@ def hook_targets() -> list[tuple[Tool, Path, Path | None]]:
     providers that record ownership by owning a named hookset rather than by
     writing a sidecar beside the native file - currently only antigravity.
 
-    This is the same filter :func:`provider_hooks_sync` iterates, exposed so a
+    This is the same filter :func:`provider_triggers_sync` iterates, exposed so a
     status surface reports exactly the set the renderer would write, rather
     than re-deriving the capability test and drifting from it.
 
@@ -526,7 +530,7 @@ def hook_targets() -> list[tuple[Tool, Path, Path | None]]:
     return targets
 
 
-def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
+def provider_triggers_sync(dry_run: bool = False) -> SyncResult:
     """Render provider hooks into every installed hook-capable provider.
 
     Loads canonical hook specs once and renders them into each installed

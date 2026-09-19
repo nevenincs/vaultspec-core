@@ -18,7 +18,7 @@ Subpackages:
         ``sync``, ``vault``, and ``spec`` command groups.
     :mod:`vaultspec_core.graph`: Vault document relationship graph backed by
         ``networkx`` (:class:`~vaultspec_core.graph.VaultGraph`).
-    :mod:`vaultspec_core.hooks`: Declarative lifecycle hook runtime for
+    :mod:`vaultspec_core.triggers`: Declarative lifecycle hook runtime for
         vault/spec-core events.
     :mod:`vaultspec_core.metrics`: Lightweight aggregate statistics over
         ``.vault/`` content (:class:`~vaultspec_core.metrics.VaultSummary`).
