@@ -137,3 +137,19 @@ def test_provider_hooks_only_leaves_the_directory_untouched(tmp_path: Path) -> N
     assert result.counts == {"moved": 0, "left": 0}
     assert _names(tmp_path / ".vaultspec" / "hooks") == ["guard.yaml"]
     assert not (tmp_path / ".vaultspec" / "triggers").exists()
+
+
+def test_a_broken_file_and_a_typo_are_reported_differently(tmp_path: Path) -> None:
+    """One is a file to repair, the other a file to move or correct.
+
+    Both are left alone, so the summary is the only thing telling an operator
+    which problem they have.
+    """
+    _hook(tmp_path, "broken.yaml", "::: not yaml :::" + chr(10))
+    _hook(tmp_path, "typo.yaml", _spec("config.syncd"))
+
+    result = migrate(tmp_path)
+
+    assert result.counts["left"] == 2
+    assert "unparseable" in result.summary
+    assert "neither a provider hook nor a lifecycle trigger" in result.summary
