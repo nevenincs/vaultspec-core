@@ -61,8 +61,12 @@ def validate_skip(skip: set[str] | None, *, allow_core: bool = True) -> set[str]
     if not skip:
         return set()
     # "all" is not a valid skip target  - you'd just not run the command.
-    # "mcp" is a valid skip target but is not a provider.
-    allowed = (VALID_PROVIDERS - {"all"}) | {"mcp", "precommit"}
+    # "mcp", "hooks" and "precommit" are valid skip targets but are not
+    # providers: they name sync passes. Both sync pass dispatch
+    # (:func:`vaultspec_core.core.provider_sync._sync_all_providers`) and the
+    # consent gate in ``cmd_sync`` honour "hooks", so it has to pass validation
+    # to reach them.
+    allowed = (VALID_PROVIDERS - {"all"}) | {"mcp", "hooks", "precommit"}
     if not allow_core:
         allowed.discard("core")
     bad = skip - allowed

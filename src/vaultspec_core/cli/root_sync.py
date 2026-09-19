@@ -245,7 +245,7 @@ def cmd_sync(
         typer.Option(
             "--skip",
             help=(
-                "Skip a component: core, a provider name, mcp, or "
+                "Skip a component: a provider name, mcp, hooks, or "
                 "precommit. Repeatable."
             ),
         ),
@@ -265,7 +265,9 @@ def cmd_sync(
     Defaults to syncing all providers. Pass a provider name to sync only
     that provider (e.g. 'vaultspec-core sync claude').
     Use --skip to exclude components (e.g. --skip claude --skip precommit);
-    valid targets are core, provider names, mcp, and precommit.
+    valid targets are provider names, mcp, hooks, and precommit. Sync always
+    reconciles core, so core is not a valid skip target here; install accepts
+    it.
     """
     skip = list(skip or [])
     apply_target(target, split_source=True, json_output=json_output)
