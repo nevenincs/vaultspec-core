@@ -42,14 +42,15 @@ from typing import TYPE_CHECKING
 
 from ..exec_ledger import (
     MIGRATED_OP,
+    LedgerRow,
     is_ledger_stem,
-    ledger_step_ids,
     parse_ledger_rows,
+    step_ids_from_rows,
 )
 from ._base import CheckDiagnostic, CheckResult, Severity, extract_feature_tags
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from ._base import VaultSnapshot
@@ -106,9 +107,12 @@ def check_exec_mapping(
     """
     from ...config import get_config
     from ..models import DocType
-    from ..scanner import get_doc_type
+    from ..scanner import doc_type_resolver
 
     result = CheckResult(check_name="exec-mapping", supports_fix=False)
+    # One classification per directory rather than per document: this
+    # loop walks the whole snapshot to reach the exec records in it.
+    resolve_doc_type = doc_type_resolver(root_dir)
 
     docs_dir = root_dir / get_config().docs_dir
     plan_dir = docs_dir / "plan"
@@ -133,7 +137,7 @@ def check_exec_mapping(
     unattributable: dict[Path, int] = {}
 
     for doc_path, (metadata, body) in sorted(snapshot.items()):
-        if get_doc_type(doc_path, root_dir) is not DocType.EXEC:
+        if resolve_doc_type(doc_path) is not DocType.EXEC:
             continue
         if wanted and wanted not in extract_feature_tags(metadata.tags):
             continue
@@ -151,8 +155,12 @@ def check_exec_mapping(
         )
 
         if is_ledger_stem(doc_path.stem):
-            step_ids = ledger_step_ids(body)
-            if live_plan_path is not None and _has_native_row(body):
+            # Parsed once. ledger_step_ids and _has_native_row each used to
+            # parse this same body again, so every ledger was scanned three
+            # times over.
+            rows = parse_ledger_rows(body)
+            step_ids = step_ids_from_rows(rows)
+            if live_plan_path is not None and _has_native_row(rows):
                 ledger_plans.add(live_plan_path)
         elif metadata.step_id:
             step_ids = (metadata.step_id,)
@@ -238,16 +246,19 @@ def check_exec_mapping(
     return result
 
 
-def _has_native_row(body: str) -> bool:
-    """Whether a ledger body carries any row ``vault exec log`` wrote.
+def _has_native_row(rows: Sequence[LedgerRow]) -> bool:
+    """Whether a ledger's rows include any that ``vault exec log`` wrote.
 
     A fold recovers ``T`` rows only; the first natively logged row (``A``,
     ``M``, ``D``, ``R``, ``verify:``, ``by:``) marks the plan as one whose
     execution is being logged.
+
+    Takes already-parsed rows rather than the body, so the caller's single
+    parse serves this and the Step-id scan alike.
     """
     return any(
         row.step_id is not None and (row.label is not None or row.op != MIGRATED_OP)
-        for row in parse_ledger_rows(body)
+        for row in rows
     )
 
 

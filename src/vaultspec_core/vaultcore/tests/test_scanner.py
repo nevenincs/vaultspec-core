@@ -109,3 +109,88 @@ class TestGetDocType:
             encoding="utf-8",
         )
         assert get_doc_type(legacy_path, vault_project.root) == DocType.INDEX
+
+
+class TestDocTypeResolver:
+    """The memoizing resolver must answer exactly what ``get_doc_type`` does.
+
+    A document's type is decided by its first path component under the docs
+    directory, so the answer can be reused for every file in a directory.
+    Whole-snapshot loops called ``get_doc_type`` per document instead - 4,739
+    calls per check pass, each a ``relative_to`` and a tuple walk.
+
+    The case the directory does *not* decide is a legacy root-level
+    ``<feature>.index.md`` sitting directly in the docs directory, where the
+    filename classifies it and its neighbours may not be index files at all.
+    Caching by directory there would misclassify them, so those are resolved
+    individually. These tests pin both halves of that.
+    """
+
+    @staticmethod
+    def _docs_dir(root: Path) -> Path:
+        from ...config import get_config
+
+        return root / get_config().docs_dir
+
+    def test_it_agrees_with_get_doc_type_for_every_scanned_file(
+        self, vault_project: CorpusManifest
+    ) -> None:
+        from ..scanner import doc_type_resolver
+
+        root = vault_project.root
+        resolve = doc_type_resolver(root)
+        paths = list(scan_vault(root))
+
+        assert paths, "the fixture produced no documents"
+        for path in paths:
+            assert resolve(path) == get_doc_type(path, root), (
+                f"resolver disagreed with get_doc_type for {path}"
+            )
+
+    def test_a_root_level_legacy_index_is_not_cached_by_its_directory(
+        self, vault_project: CorpusManifest
+    ) -> None:
+        """Two files in the docs directory, only one an index, must differ.
+
+        Caching the docs directory itself would give whichever file was seen
+        first the other's classification.
+        """
+        from ..scanner import doc_type_resolver
+
+        root = vault_project.root
+        docs_dir = self._docs_dir(root)
+
+        legacy_index = docs_dir / "legacy-feature.index.md"
+        legacy_index.write_text("# legacy index" + chr(10), encoding="utf-8")
+        stray = docs_dir / "README.md"
+        stray.write_text("# not an index" + chr(10), encoding="utf-8")
+
+        # Resolve the non-index first, so a directory-keyed cache would have
+        # stored None before the index file is ever asked about.
+        resolve = doc_type_resolver(root)
+        assert resolve(stray) == get_doc_type(stray, root)
+        assert resolve(legacy_index) == DocType.INDEX
+
+        # And in the other order, on a fresh resolver.
+        resolve_again = doc_type_resolver(root)
+        assert resolve_again(legacy_index) == DocType.INDEX
+        assert resolve_again(stray) == get_doc_type(stray, root)
+
+    def test_repeated_calls_in_one_directory_stay_correct(
+        self, vault_project: CorpusManifest
+    ) -> None:
+        """The cached answer must be the answer, not merely the first one."""
+        from ..scanner import doc_type_resolver
+
+        root = vault_project.root
+        adr_dir = self._docs_dir(root) / "adr"
+        adr_dir.mkdir(parents=True, exist_ok=True)
+        made: list[Path] = []
+        for n in range(3):
+            path = adr_dir / f"2026-05-0{n + 1}-cached-{n}-adr.md"
+            path.write_text("# adr" + chr(10), encoding="utf-8")
+            made.append(path)
+
+        resolve = doc_type_resolver(root)
+
+        assert [resolve(path) for path in made] == [DocType.ADR] * 3

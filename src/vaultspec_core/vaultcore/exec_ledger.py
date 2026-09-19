@@ -45,6 +45,7 @@ __all__ = [
     "ledger_step_ids",
     "note_lines",
     "parse_ledger_rows",
+    "step_ids_from_rows",
 ]
 
 #: Filename-stem suffix marking a ledger.
@@ -212,8 +213,24 @@ def ledger_step_ids(body: str) -> tuple[str, ...]:
         id, which a caller should treat as an unlinked record rather than an
         error.
     """
+    return step_ids_from_rows(parse_ledger_rows(body))
+
+
+def step_ids_from_rows(rows: Sequence[LedgerRow]) -> tuple[str, ...]:
+    """Return every distinct Step id in already-parsed ledger *rows*.
+
+    The body-taking :func:`ledger_step_ids` is this plus a parse. Callers that
+    need the rows for something else take this form instead, so one pass over
+    a ledger serves every question asked of it.
+
+    Args:
+        rows: Parsed rows, as :func:`parse_ledger_rows` returns them.
+
+    Returns:
+        The Step identifiers, deduplicated and ordered by first appearance.
+    """
     seen: dict[str, None] = {}
-    for row in parse_ledger_rows(body):
+    for row in rows:
         if row.step_id is not None:
             seen.setdefault(row.step_id, None)
     return tuple(seen)

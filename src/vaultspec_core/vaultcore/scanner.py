@@ -13,12 +13,13 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .exclusions import is_excluded_vault_path
 from .models import DocType
 
 __all__ = [
+    "doc_type_resolver",
     "get_doc_type",
     "get_doc_type_from_tree_path",
     "list_features",
@@ -27,9 +28,12 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+#: Distinguishes "not cached" from a cached ``None`` classification.
+_UNRESOLVED = object()
+
 if TYPE_CHECKING:
     import pathlib
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 
 def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
@@ -198,3 +202,50 @@ def get_doc_type_from_tree_path(tree_path: str, docs_dir_name: str) -> DocType |
         return DocType(rest[0])
     except (ValueError, KeyError):
         return None
+
+
+def doc_type_resolver(
+    root_dir: pathlib.Path,
+) -> Callable[[pathlib.Path], DocType | None]:
+    """Return a :func:`get_doc_type` that remembers its answers per directory.
+
+    A document's type is decided by its first path component under the docs
+    directory, so every file in a given directory classifies the same way and
+    the answer can be reused. The whole-corpus loops that filter a snapshot by
+    type called :func:`get_doc_type` once per document instead: 4,739 calls
+    per pass, each one a :meth:`pathlib.Path.relative_to` and a tuple walk,
+    for an answer with at most a few dozen distinct values.
+
+    The one case the directory does not decide is a legacy root-level
+    ``<feature>.index.md`` sitting directly in the docs directory, where the
+    filename is what classifies it. Files there are therefore resolved
+    individually and never cached.
+
+    The cache lives on the returned closure, not on the module, so it cannot
+    outlive the pass that made it or leak across workspaces with different
+    docs directories.
+
+    Args:
+        root_dir: Project root used to resolve the docs directory prefix.
+
+    Returns:
+        A callable with the same contract as :func:`get_doc_type`, bound to
+        *root_dir*.
+    """
+    from ..config import get_config
+
+    docs_dir = root_dir / get_config().docs_dir
+    by_parent: dict[pathlib.Path, DocType | None] = {}
+
+    def resolve(path: pathlib.Path) -> DocType | None:
+        parent = path.parent
+        if parent == docs_dir:
+            # Classification here depends on the filename, not the directory.
+            return get_doc_type(path, root_dir)
+        cached = by_parent.get(parent, _UNRESOLVED)
+        if cached is _UNRESOLVED:
+            cached = get_doc_type(path, root_dir)
+            by_parent[parent] = cached
+        return cast("DocType | None", cached)
+
+    return resolve

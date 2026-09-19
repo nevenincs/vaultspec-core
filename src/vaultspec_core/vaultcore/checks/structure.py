@@ -368,7 +368,6 @@ def check_structure(
         check name ``"structure"``.
     """
     from ..models import VaultConstants
-    from ..scanner import get_doc_type
 
     result = CheckResult(check_name="structure", supports_fix=True)
     all_renames: list[tuple[str, str]] = []
@@ -404,19 +403,21 @@ def check_structure(
     from ...config import get_config
     from ...core.helpers import advisory_lock
     from ..rename_engine import docs_lock_target
+    from ..scanner import doc_type_resolver
 
     docs_dir = root_dir / get_config().docs_dir
     cascade_lock: AbstractContextManager[object] = (
         advisory_lock(docs_lock_target(docs_dir)) if fix else nullcontext()
     )
 
+    resolve_doc_type = doc_type_resolver(root_dir)
     with cascade_lock:
         for doc_path in snapshot:
             # Skip generated index files (non-standard naming convention)
             if is_generated_index(doc_path):
                 continue
 
-            doc_type = get_doc_type(doc_path, root_dir)
+            doc_type = resolve_doc_type(doc_path)
             errors = VaultConstants.validate_filename(doc_path.name, doc_type)
 
             if errors and fix:
