@@ -113,7 +113,6 @@ from .triggers import triggers_remove as triggers_remove
 from .triggers import triggers_rename as triggers_rename
 from .triggers import triggers_show as triggers_show
 from .triggers import triggers_status as triggers_status
-from .triggers import triggers_sync as triggers_sync
 from .types import CONFIG_HEADER as CONFIG_HEADER
 from .types import McpTarget as McpTarget
 from .types import SyncResult as SyncResult

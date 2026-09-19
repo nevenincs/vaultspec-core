@@ -15,7 +15,6 @@ from typing import Any, cast
 
 from . import types as _t
 from .exceptions import ResourceExistsError, ResourceNotFoundError
-from .types import SyncResult
 
 __all__ = [
     "resolve_trigger_path",
@@ -38,7 +37,7 @@ def resolve_trigger_path(name: str) -> Path:
 
 def triggers_add(
     name: str,
-    event: str = "vault.document.created",
+    event: str = "config.synced",
     command: str = "",
     force: bool = False,
     *,
@@ -280,33 +279,6 @@ def triggers_rename(old_name: str, new_name: str) -> Path:
 
     logger.info("Renamed Trigger '%s' to '%s'.", old_name, new_name)
     return new_path
-
-
-def triggers_sync(dry_run: bool = False, prune: bool = False) -> SyncResult:
-    """Perform validation sync of declarative triggers.
-
-    Since triggers are defined declarative-only and do not output generated
-    provider artifacts, this sync performs load validation.
-
-    Args:
-        dry_run: Unused.
-        prune: Unused.
-
-    Returns:
-        A successful ``SyncResult`` if loaded successfully, otherwise contains errors.
-    """
-    _ = dry_run
-    _ = prune
-    from vaultspec_core.triggers import load_triggers
-
-    result = SyncResult()
-    try:
-        triggers = load_triggers(_t.get_context().triggers_dir)
-        result.skipped = len(triggers)
-    except Exception as e:
-        logger.warning("Failed to validate triggers during sync: %s", e)
-        result.errors.append(str(e))
-    return result
 
 
 def _action_warnings(name: str, actions: object) -> list[str]:
