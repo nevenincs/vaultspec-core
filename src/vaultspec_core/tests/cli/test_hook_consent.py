@@ -66,9 +66,9 @@ def carried_workspace(tmp_path: Path, marker: Path) -> tuple[Path, Path]:
         f"import pathlib; pathlib.Path({str(marker)!r}).write_text('ran')",
         encoding="utf-8",
     )
-    hooks_dir = root / ".vaultspec" / "hooks"
-    hooks_dir.mkdir(parents=True, exist_ok=True)
-    (hooks_dir / "carried.yaml").write_text(
+    triggers_dir = root / ".vaultspec" / "triggers"
+    triggers_dir.mkdir(parents=True, exist_ok=True)
+    (triggers_dir / "carried.yaml").write_text(
         f"event: {EVENT}\n"
         "enabled: true\n"
         "actions:\n"
@@ -83,7 +83,7 @@ def carried_workspace(tmp_path: Path, marker: Path) -> tuple[Path, Path]:
 class TestNonInteractiveRunsFailClosed:
     """No operator means no approval - never an implicit one."""
 
-    def test_hooks_run_without_a_terminal_does_not_execute(
+    def test_triggers_run_without_a_terminal_does_not_execute(
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
         marker = tmp_path / "marker.txt"
@@ -98,7 +98,7 @@ class TestNonInteractiveRunsFailClosed:
 
         assert not marker.exists()
         assert "untrusted" in result.output.lower()
-        assert "spec hooks trust" in result.output
+        assert "spec triggers trust" in result.output
 
     def test_sync_without_a_terminal_does_not_execute_but_still_syncs(
         self, runner: CliRunner, tmp_path: Path

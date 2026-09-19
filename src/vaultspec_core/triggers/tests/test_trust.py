@@ -1,13 +1,13 @@
 """Regression tests for the workspace-hook consent gate (GHSA-w5xf-54cr-fxcq).
 
-Hook definitions live under ``.vaultspec/hooks/`` and are shared through git, so
+Trigger definitions live under ``.vaultspec/hooks/`` and are shared through git, so
 a hook file is content a checkout carries rather than content the operator
 authored. These tests pin the resulting rule: the engine spawns a hook's command
 only when a consent record held outside the workspace vouches for that exact
 file, and every ambiguity resolves to a refusal.
 
 Everything here is real. Real YAML files on disk, the real
-:func:`~vaultspec_core.hooks.engine.trigger`, and real subprocesses whose only
+:func:`~vaultspec_core.triggers.engine.trigger`, and real subprocesses whose only
 effect is to create an inert marker file inside the test's own ``tmp_path``. A
 test that stubbed the spawn would prove nothing, because the spawn is the thing
 being prevented.
@@ -21,16 +21,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from ...hooks import (
-    Hook,
-    HookAction,
+from ...triggers import (
+    Trigger,
+    TriggerAction,
     grant,
     is_trusted,
-    load_hooks,
+    load_triggers,
     revoke,
-    trigger,
     trust_file_path,
 )
+from ..engine import fire
 from ..trust import TRUST_SCHEMA_VERSION, granted_digests
 
 if TYPE_CHECKING:
@@ -48,14 +48,14 @@ def carry_hook(workspace: Path, marker: Path, name: str = "carried") -> Path:
     observable side effect that still proves a process ran: if ``marker``
     exists afterwards, the workspace's command executed.
     """
-    hooks_dir = workspace / ".vaultspec" / "hooks"
-    hooks_dir.mkdir(parents=True, exist_ok=True)
+    triggers_dir = workspace / ".vaultspec" / "hooks"
+    triggers_dir.mkdir(parents=True, exist_ok=True)
     script = workspace / "payload.py"
     script.write_text(
         f"import pathlib; pathlib.Path({str(marker)!r}).write_text('ran')",
         encoding="utf-8",
     )
-    path = hooks_dir / f"{name}.yaml"
+    path = triggers_dir / f"{name}.yaml"
     path.write_text(
         f"event: {EVENT}\n"
         "enabled: true\n"
@@ -79,10 +79,10 @@ class TestUnconsentedHooksNeverRun:
         marker = tmp_path / "marker.txt"
         carry_hook(workspace, marker)
 
-        hooks = load_hooks(workspace / ".vaultspec" / "hooks")
+        hooks = load_triggers(workspace / ".vaultspec" / "hooks")
         assert len(hooks) == 1, "the hook must still load, so listings can show it"
 
-        results = trigger(hooks, EVENT, home=tmp_path / "home")
+        results = fire(hooks, EVENT, home=tmp_path / "home")
 
         assert results == []
         assert not marker.exists(), (
@@ -97,8 +97,8 @@ class TestUnconsentedHooksNeverRun:
         path = carry_hook(workspace, marker)
 
         grant([path], home)
-        hooks = load_hooks(workspace / ".vaultspec" / "hooks")
-        results = trigger(hooks, EVENT, home=home)
+        hooks = load_triggers(workspace / ".vaultspec" / "hooks")
+        results = fire(hooks, EVENT, home=home)
 
         assert len(results) == 1
         assert results[0].success is True
@@ -117,8 +117,8 @@ class TestUnconsentedHooksNeverRun:
             path.read_text(encoding="utf-8") + "# appended\n", encoding="utf-8"
         )
 
-        hooks = load_hooks(workspace / ".vaultspec" / "hooks")
-        assert trigger(hooks, EVENT, home=home) == []
+        hooks = load_triggers(workspace / ".vaultspec" / "hooks")
+        assert fire(hooks, EVENT, home=home) == []
         assert not marker.exists()
 
     def test_revoking_consent_stops_execution(self, tmp_path: Path) -> None:
@@ -131,8 +131,8 @@ class TestUnconsentedHooksNeverRun:
 
         assert revoke(path.parent, home) == 1
 
-        hooks = load_hooks(workspace / ".vaultspec" / "hooks")
-        assert trigger(hooks, EVENT, home=home) == []
+        hooks = load_triggers(workspace / ".vaultspec" / "hooks")
+        assert fire(hooks, EVENT, home=home) == []
         assert not marker.exists()
 
 
@@ -170,7 +170,7 @@ class TestConsentRecordLivesOutsideTheWorkspace:
 
         assert is_trusted(path, home) is True
         assert is_trusted(clone_hook, home) is False
-        assert trigger(load_hooks(clone_hook.parent), EVENT, home=home) == []
+        assert fire(load_triggers(clone_hook.parent), EVENT, home=home) == []
         assert not clone_marker.exists()
 
 
@@ -198,7 +198,7 @@ class TestLedgerFailuresDenyExecution:
         trust_file_path(home).write_text(payload, encoding="utf-8")
 
         assert granted_digests(path.parent, home) == {}
-        assert trigger(load_hooks(path.parent), EVENT, home=home) == []
+        assert fire(load_triggers(path.parent), EVENT, home=home) == []
         assert not marker.exists()
 
     def test_hook_without_a_source_file_is_never_trusted(self, tmp_path: Path) -> None:
@@ -209,11 +209,11 @@ class TestLedgerFailuresDenyExecution:
             f"import pathlib; pathlib.Path({str(marker)!r}).write_text('ran')",
             encoding="utf-8",
         )
-        synthesised = Hook(
+        synthesised = Trigger(
             name="synthesised",
             event=EVENT,
             actions=[
-                HookAction(
+                TriggerAction(
                     action_type="shell",
                     command=(
                         f"{sys.executable.replace(chr(92), '/')} "
@@ -224,5 +224,5 @@ class TestLedgerFailuresDenyExecution:
         )
 
         assert is_trusted(None, tmp_path / "home") is False
-        assert trigger([synthesised], EVENT, home=tmp_path / "home") == []
+        assert fire([synthesised], EVENT, home=tmp_path / "home") == []
         assert not marker.exists()

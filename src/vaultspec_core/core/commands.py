@@ -94,7 +94,7 @@ __all__ = [
 ]
 
 
-def hooks_list_data() -> dict[str, Any]:
+def triggers_list_data() -> dict[str, Any]:
     """Return structured data about all defined hooks.
 
     Returns:
@@ -102,12 +102,12 @@ def hooks_list_data() -> dict[str, Any]:
         - ``"hooks"``: list of dicts with ``"name"``, ``"enabled"``,
           ``"event"``, ``"actions"``, ``"trusted"`` keys.
         - ``"supported_events"``: sorted list of supported event names.
-        - ``"hooks_dir"``: relative path to hooks directory.
+        - ``"triggers_dir"``: relative path to hooks directory.
     """
-    from vaultspec_core.hooks import SUPPORTED_EVENTS, is_trusted, load_hooks
+    from vaultspec_core.triggers import SUPPORTED_EVENTS, is_trusted, load_triggers
 
     ctx = _t.get_context()
-    hooks = load_hooks(ctx.hooks_dir)
+    hooks = load_triggers(ctx.triggers_dir)
     hooks_data: list[dict[str, Any]] = []
     for hook in hooks:
         actions = ", ".join(a.command for a in hook.actions if a.action_type == "shell")
@@ -125,29 +125,30 @@ def hooks_list_data() -> dict[str, Any]:
         )
 
     try:
-        rel = str(ctx.hooks_dir.relative_to(ctx.target_dir))
+        rel = str(ctx.triggers_dir.relative_to(ctx.target_dir))
     except ValueError:
         # HOOKS_DIR may live in the CWD workspace, not under TARGET_DIR,
         # when --target points to a separate directory.
-        rel = str(ctx.hooks_dir)
+        rel = str(ctx.triggers_dir)
     return {
         "hooks": hooks_data,
         "supported_events": sorted(SUPPORTED_EVENTS),
-        "hooks_dir": rel,
+        "triggers_dir": rel,
     }
 
 
-def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
+def triggers_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
     """Trigger hooks for an event.
 
     Returns:
-        A list of result dicts with ``"hook_name"``, ``"action_type"``,
+        A list of result dicts with ``"trigger_name"``, ``"action_type"``,
         ``"success"``, ``"output"``, ``"error"`` keys.
 
     Raises:
         ProviderError: If the event is not in SUPPORTED_EVENTS.
     """
-    from vaultspec_core.hooks import SUPPORTED_EVENTS, load_hooks, trigger
+    from vaultspec_core.triggers import SUPPORTED_EVENTS, load_triggers
+    from vaultspec_core.triggers.engine import fire
 
     from .exceptions import ProviderError
 
@@ -157,7 +158,7 @@ def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
         )
 
     ws_ctx = _t.get_context()
-    hooks = load_hooks(ws_ctx.hooks_dir)
+    hooks = load_triggers(ws_ctx.triggers_dir)
     matching = [h for h in hooks if h.event == event and h.enabled]
     if not matching:
         logger.info("No enabled hooks for event: %s", event)
@@ -168,10 +169,10 @@ def hooks_run(event: str, path: str | None = None) -> list[dict[str, Any]]:
         ctx["path"] = path
 
     logger.info("Triggering %d hook(s) for '%s'...", len(matching), event)
-    results = trigger(hooks, event, ctx)
+    results = fire(hooks, event, ctx)
     return [
         {
-            "hook_name": r.hook_name,
+            "trigger_name": r.trigger_name,
             "action_type": r.action_type,
             "success": r.success,
             "output": r.output,

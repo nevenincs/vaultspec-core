@@ -194,31 +194,52 @@ class TestComposeOwnership:
         assert managed_after == {}
 
 
-class TestLifecycleCoexistence:
-    """Provider hooks and CLI-lifecycle hooks share a directory cleanly."""
+class TestLaneSeparation:
+    """Each loader owns a directory, so a foreign event is an error not a skip.
 
-    def test_lifecycle_loader_silently_skips_provider_events(self, tmp_path: Path):
-        from vaultspec_core.hooks import load_hooks
-        from vaultspec_core.hooks.engine import is_provider_hook_event
+    While the two systems shared a directory, each loader silently skipped the
+    other's events - which meant neither could tell a foreign event from a
+    misspelled one of its own. Separate directories buy the right to complain.
+    """
 
-        assert is_provider_hook_event("session_start") is True
-        assert is_provider_hook_event("vault.document.created") is False
-
-        # A provider hook and a lifecycle hook side by side.
-        (tmp_path / "orient.yaml").write_text(
-            "event: session_start\nactions:\n  - type: shell\n    command: echo hi\n",
-            encoding="utf-8",
-        )
+    def test_provider_loader_ignores_a_lifecycle_event_in_its_directory(
+        self, tmp_path: Path
+    ):
         (tmp_path / "doc.yaml").write_text(
             "event: vault.document.created\n"
             "actions:\n  - type: shell\n    command: echo doc\n",
             encoding="utf-8",
         )
-        # The lifecycle engine loads only its own event; the provider hook is
-        # skipped (not surfaced as an unsupported-event hook).
-        loaded = load_hooks(tmp_path)
-        events = {h.event for h in loaded}
-        assert events == {"vault.document.created"}
+
+        assert load_provider_hook_specs(tmp_path) == []
+
+    def test_trigger_loader_warns_on_a_provider_event_in_its_directory(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ):
+        from vaultspec_core.triggers import load_triggers
+
+        (tmp_path / "orient.yaml").write_text(
+            "event: session_start\nactions:\n  - type: shell\n    command: echo hi\n",
+            encoding="utf-8",
+        )
+
+        with caplog.at_level("WARNING"):
+            loaded = load_triggers(tmp_path)
+
+        assert loaded == []
+        assert "unsupported event" in caplog.text
+        assert "session_start" in caplog.text
+
+    def test_trigger_loader_still_loads_its_own_event(self, tmp_path: Path):
+        from vaultspec_core.triggers import load_triggers
+
+        (tmp_path / "doc.yaml").write_text(
+            "event: vault.document.created\n"
+            "actions:\n  - type: shell\n    command: echo doc\n",
+            encoding="utf-8",
+        )
+
+        assert {t.event for t in load_triggers(tmp_path)} == {"vault.document.created"}
 
 
 class TestEndToEndSync:

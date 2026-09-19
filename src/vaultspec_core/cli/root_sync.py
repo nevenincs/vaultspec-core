@@ -298,8 +298,8 @@ def cmd_sync(
     # Declining, or having no operator to ask, only costs the hooks: the sync
     # itself is a legitimate operation and still completes.
     if provider == "all" and not dry_run and "hooks" not in skip:
-        from vaultspec_core.cli._hook_trust import consent_gate
-        from vaultspec_core.core.provider_sync import target_hooks_dir
+        from vaultspec_core.cli._trigger_trust import consent_gate
+        from vaultspec_core.core.provider_sync import target_triggers_dir
 
         # The same resolver the firing code uses, deliberately. Under
         # ``--target`` the ambient context still reflects the CWD/source split,
@@ -309,7 +309,7 @@ def cmd_sync(
         consent_gate(
             "config.synced",
             json_output=json_output,
-            hooks_dir=target_hooks_dir(sync_target),
+            triggers_dir=target_triggers_dir(sync_target),
         )
 
     from vaultspec_core.core.commands import sync_provider
