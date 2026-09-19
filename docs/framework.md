@@ -287,7 +287,11 @@ the key.
 ### Write a hook
 
 One YAML file per hook, in `.vaultspec/hooks/`. The filename stem is the hook's name.
-There's no command that scaffolds one yet; create the file yourself.
+There's no command that scaffolds one; create the file yourself.
+
+Install creates the directory empty and Core ships no example in it, deliberately. A
+file here is a shell command, and anything bundled would arrive in every install of
+every project — disabled or not, one edit away from running.
 
 ```yaml
 # .vaultspec/hooks/guard-commands.yaml
