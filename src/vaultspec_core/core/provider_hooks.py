@@ -48,6 +48,7 @@ __all__ = [
     "HookEvent",
     "HookSpec",
     "compose_flat_hooks",
+    "hook_targets",
     "load_provider_hook_specs",
     "provider_hooks_sync",
     "render_hooks_payload",
@@ -492,6 +493,39 @@ def _sync_one(
     return result
 
 
+def hook_targets() -> list[tuple[Tool, Path, Path | None]]:
+    """Return every installed provider this sync renders hooks into.
+
+    One entry per hook-capable installed provider, in sync order, as
+    ``(tool, native_config_path, sidecar_path)``. The sidecar is ``None`` for
+    providers that record ownership by owning a named hookset rather than by
+    writing a sidecar beside the native file - currently only antigravity.
+
+    This is the same filter :func:`provider_hooks_sync` iterates, exposed so a
+    status surface reports exactly the set the renderer would write, rather
+    than re-deriving the capability test and drifting from it.
+
+    Returns:
+        Hook-capable installed providers with their resolved paths. Empty when
+        no installed provider declares the ``HOOKS`` capability.
+    """
+    from .manifest import installed_tool_configs
+
+    target_dir = _t.get_context().target_dir
+    targets: list[tuple[Tool, Path, Path | None]] = []
+    for tool, cfg in installed_tool_configs().items():
+        if ProviderCapability.HOOKS not in cfg.capabilities:
+            continue
+        if tool not in _HOOK_FILES:
+            continue
+        subdir, filename = _HOOK_FILES[tool]
+        sidecar = (
+            None if tool is Tool.ANTIGRAVITY else target_dir / subdir / _SIDECAR_NAME
+        )
+        targets.append((tool, target_dir / subdir / filename, sidecar))
+    return targets
+
+
 def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
     """Render provider hooks into every installed hook-capable provider.
 
@@ -507,19 +541,13 @@ def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
         Accumulated :class:`SyncResult`, with per-provider results under
         ``per_tool``.
     """
-    from .manifest import installed_tool_configs
-
     total = SyncResult()
     parse_warnings: list[str] = []
     specs = load_provider_hook_specs(warnings=parse_warnings)
     total.warnings.extend(parse_warnings)
 
     target_dir = _t.get_context().target_dir
-    for tool, cfg in installed_tool_configs().items():
-        if ProviderCapability.HOOKS not in cfg.capabilities:
-            continue
-        if tool not in _HOOK_FILES:
-            continue
+    for tool, _native, _sidecar in hook_targets():
         result = _sync_one(tool, target_dir, specs, dry_run=dry_run)
         total.merge(result)
         total.per_tool[tool.value] = result
