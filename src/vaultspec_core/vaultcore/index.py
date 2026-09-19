@@ -16,8 +16,10 @@ from typing import TYPE_CHECKING, Any, cast
 from .models import vault_today
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
+    from ..graph import VaultGraph
     from ..graph.api import DocNode
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ __all__ = [
     "feature_index_lock_target",
     "generate_feature_index",
     "generate_feature_index_result",
+    "generate_feature_indexes",
 ]
 
 
@@ -120,8 +123,10 @@ def generate_feature_index_result(
     Args:
         root_dir: Project root directory.
         feature: Feature name (without ``#`` prefix).
-        nodes: Explicit nodes for isolated callers and tests. Production callers
-            omit this so membership is refreshed under the index lock.
+        nodes: The feature's membership. Batch callers pass a slice of one
+            shared graph via :func:`generate_feature_indexes`; omitting it
+            builds a whole-vault graph for this single feature, which is only
+            appropriate when one feature is being regenerated on its own.
         date_str: Override date for the index. Defaults to today.
         dry_run: Compute whether the canonical index would change without writing.
 
@@ -148,20 +153,10 @@ def generate_feature_index_result(
         if nodes is None:
             from ..graph import VaultGraph
 
-            # The membership read stays inside the lock: that ordering is the
-            # correctness property, and it is unchanged.
-            #
-            # What changes is `use_cache`. It was disabled here, which meant a
-            # full parse of every document in the vault on every call - and the
-            # repair pipeline calls this once per feature, so the cost was
-            # O(features x documents): 130 rebuilds over 1,229 documents.
-            #
-            # Disabling it was pessimism rather than protection. The cache
-            # validates by file set, per-file size and mtime, and a content
-            # hash for anything whose mtime is not older than the cache, and it
-            # rebuilds on any divergence. It cannot serve a stale membership,
-            # so re-reading under the lock through the cache gives the same
-            # answer the uncached parse gave.
+            # Reached only when a caller regenerates one feature on its
+            # own. A loop that lands here pays a whole-vault graph build per
+            # iteration; batch callers go through generate_feature_indexes,
+            # which reads the corpus once and slices it.
             nodes = VaultGraph(root_dir).get_feature_nodes(feature)
         if not nodes:
             logger.info("No documents found for feature index: %s", feature)
@@ -202,3 +197,65 @@ def generate_feature_index(
     return generate_feature_index_result(
         root_dir, feature, nodes=nodes, date_str=date_str
     ).path
+
+
+def generate_feature_indexes(
+    root_dir: Path,
+    features: Iterable[str],
+    *,
+    graph: VaultGraph | None = None,
+    date_str: str | None = None,
+    dry_run: bool = False,
+) -> list[FeatureIndexResult]:
+    """Regenerate the index of every feature in *features* from one graph read.
+
+    Every batch caller - the ``vault feature index`` verb, the repair
+    pipeline's index phase and preview, and the MCP write tools' post-batch
+    refresh - routes here rather than calling
+    :func:`generate_feature_index_result` in a loop. Looping omits ``nodes``,
+    which makes each call build its own whole-vault
+    :class:`~vaultspec_core.graph.VaultGraph`, and the cost is then
+    ``O(features x documents)``: at 745 features over 4,739 scanned documents
+    the verb took 18m39s to decide that nothing needed writing, against 1.4s
+    for one shared read.
+
+    Slicing one graph is not merely faster, it is the more defensible
+    membership. A loop re-reads the corpus per feature, so a whole-vault
+    regeneration writes indexes derived from as many different vault states as
+    there are features - in that measured run, states eighteen minutes apart.
+    One read gives every index in the batch the same snapshot.
+
+    The per-feature advisory lock is untouched: it is taken inside
+    :func:`generate_feature_index_result` around the read-modify-write of each
+    index file, so concurrent writers of the same index stay serialised. What
+    the lock never provided is atomicity of *membership*, which is decided by
+    ``#feature`` tags in ordinary documents that never take the index
+    sentinel. Within one batch the distinction is moot in any case: an index
+    document is excluded from its own feature's rendered membership (see
+    :func:`_render_index`), so no write this loop performs can change what a
+    later feature in the same loop would read.
+
+    Args:
+        root_dir: Project root directory.
+        features: The feature names to regenerate, without ``#`` prefixes.
+        graph: A already-built graph to slice. One is built when omitted.
+        date_str: Override date for the indexes. Defaults to today.
+        dry_run: Compute what would change without writing.
+
+    Returns:
+        One :class:`FeatureIndexResult` per feature, in iteration order.
+    """
+    if graph is None:
+        from ..graph import VaultGraph as _VaultGraph
+
+        graph = _VaultGraph(root_dir)
+    return [
+        generate_feature_index_result(
+            root_dir,
+            feature,
+            nodes=graph.get_feature_nodes(feature),
+            date_str=date_str,
+            dry_run=dry_run,
+        )
+        for feature in features
+    ]
