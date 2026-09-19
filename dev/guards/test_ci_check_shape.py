@@ -1,12 +1,18 @@
 """Contracts on the pull-request merge gate and the names every workflow shows.
 
 The self-hosted fleet has one Linux runner and one Windows runner, so the pull
-request path is tiered. ``Check: Lint (Linux)`` runs on every push; the two
-full suites run only when the ``ci:full`` label asks for them, or when the
-workflow is called or dispatched; ``Check: Merge gate (Linux)`` is the sole
-required check and always reaches a verdict. This guard pins that topology,
-every recipe each tier runs, and the failure semantics that keep independent
-diagnostics visible after an earlier gate fails.
+request path is tiered, and DRAFT STATE chooses the tier. ``Check: Lint
+(Linux)`` runs on every push; the two full suites run on every push to a
+pull request that is ready for review, on the ``ci:full`` label that proves a
+draft without marking it ready, and whenever the workflow is called or
+dispatched; ``Check: Merge gate (Linux)`` is the sole required check and always
+reaches a verdict. This guard pins that topology, every recipe each tier runs,
+and the failure semantics that keep independent diagnostics visible after an
+earlier gate fails.
+
+The tiering is pinned to the pull request's own state on purpose. A tier that
+only a label can reach is invisible in the checks list, and a contributor who
+does not know the ritual is left with a red required check on a green branch.
 
 It also pins the naming grammar shared across the fleet: a workflow is named
 ``Core <subject>`` and a job ``<Check|Test|Build>: <subject> (<platforms>)``,
@@ -269,8 +275,12 @@ def test_the_gate_runs_on_pull_requests_calls_and_dispatches_only() -> None:
         "opened",
         "reopened",
         "synchronize",
+        "ready_for_review",
         "labeled",
-    }
+    }, (
+        "`ready_for_review` is the event that runs the full suites without a "
+        "label, so a draft marked ready is proven before anyone asks to merge"
+    )
     call_inputs = cast("dict[str, Any]", events["workflow_call"]["inputs"])
     assert call_inputs["ref"]["required"] is True, (
         "a caller must name the ref it wants proven; the default would be the "
@@ -290,12 +300,21 @@ def test_only_release_please_runs_when_main_moves() -> None:
     )
 
 
-def test_the_full_suites_run_only_when_asked() -> None:
-    """A push runs the lint; the label, a call, or a dispatch runs the suites."""
+def test_the_full_suites_run_on_a_ready_pull_request_or_on_demand() -> None:
+    """A draft runs the lint; ready, the label, a call or a dispatch run both.
+
+    The draft clause is what keeps a green branch from stranding: a pull
+    request that is ready to merge proves itself on every push, so the
+    required check reaches a real verdict without anyone applying a label.
+    """
     jobs = _jobs()
     for job_id in (LINUX_JOB, WINDOWS_JOB):
         condition = str(jobs[job_id].get("if", ""))
         assert "github.event_name != 'pull_request'" in condition, condition
+        assert "github.event.pull_request.draft == false" in condition, (
+            f"`{job_id}` must run on a ready pull request without a label; "
+            f"the label is the draft's escape hatch, not the only door"
+        )
         assert "github.event.action == 'labeled'" in condition, condition
         assert f"github.event.label.name == '{FULL_LABEL}'" in condition, condition
         assert "head.repo.full_name == github.repository" in condition, (
