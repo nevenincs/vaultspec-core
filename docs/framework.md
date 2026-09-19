@@ -279,6 +279,11 @@ lifecycle triggers in `.vaultspec/triggers/`, which fire inside Core's own CLI. 
 directory has one owner, so a file in the wrong one is reported rather than silently
 ignored.
 
+The two systems are approved separately, and both `vaultspec-core spec hooks status` and
+`vaultspec-core spec triggers status` report a `hooks_dir` and a `triggers_dir`
+respectively in `--json`. Same shape, different directory: read the command, not just
+the key.
+
 ### Write a hook
 
 One YAML file per hook, in `.vaultspec/hooks/`. The filename stem is the hook's name.
@@ -311,25 +316,31 @@ Write the canonical name. Core translates it to each provider's own spelling. Th
 below is Core's mapping: a dash means Core renders nothing for that provider, and the
 hook is skipped there with a warning naming the hook and the provider.
 
-| Canonical event      | claude             | codex              | antigravity    | gemini         |
-| -------------------- | ------------------ | ------------------ | -------------- | -------------- |
-| `pre_tool_use`       | `PreToolUse`       | `PreToolUse`       | `PreToolUse`   | `BeforeTool`   |
-| `post_tool_use`      | `PostToolUse`      | `PostToolUse`      | `PostToolUse`  | `AfterTool`    |
-| `session_start`      | `SessionStart`     | `SessionStart`     | `SessionStart` | `SessionStart` |
-| `session_end`        | `SessionEnd`       | -                  | `SessionEnd`   | `SessionEnd`   |
-| `stop`               | `Stop`             | `Stop`             | `Stop`         | -              |
-| `user_prompt_submit` | `UserPromptSubmit` | `UserPromptSubmit` | -              | -              |
-| `notification`       | `Notification`     | -                  | `Notification` | `Notification` |
+| Canonical event      | claude             | codex              | antigravity   | gemini         |
+| -------------------- | ------------------ | ------------------ | ------------- | -------------- |
+| `pre_tool_use`       | `PreToolUse`       | `PreToolUse`       | `PreToolUse`  | `BeforeTool`   |
+| `post_tool_use`      | `PostToolUse`      | `PostToolUse`      | `PostToolUse` | `AfterTool`    |
+| `session_start`      | `SessionStart`     | `SessionStart`     | -             | `SessionStart` |
+| `session_end`        | `SessionEnd`       | `SessionEnd`       | -             | `SessionEnd`   |
+| `stop`               | `Stop`             | `Stop`             | `Stop`        | -              |
+| `user_prompt_submit` | `UserPromptSubmit` | `UserPromptSubmit` | -             | -              |
+| `notification`       | `Notification`     | -                  | -             | `Notification` |
 
 A dash is not a statement about the provider. It says only that Core has no mapping, and
 in some cases the provider does have an equivalent Core doesn't use yet. Treat the table
 as what Core does, and each provider's own hooks documentation as what that provider
 supports.
 
-Three mappings above are known to be wrong and are being corrected: Codex does have a
-session-end event, and Antigravity has no session-start, session-end or notification
-event, so hooks bound to those three render for Antigravity and never fire. Until that
-lands, `pre_tool_use` and `post_tool_use` are the only events that work everywhere.
+`pre_tool_use` and `post_tool_use` are the only two events every provider runs. Bind a
+hook that has to work everywhere to one of those.
+
+Antigravity fires five events and Core maps three of them. Its other two,
+`PreInvocation` and `PostInvocation`, are the nearest thing it has to a session
+boundary, but they expect a different response shape, so Core leaves them unmapped
+rather than render something the agent would fail to parse. If you previously bound a
+hook to `session_start` or `session_end` expecting it to reach Antigravity, it never
+did: those names exist nowhere in the `agy` binary, so the hook rendered and was never
+called.
 
 Gemini expresses hook timeouts in milliseconds and every other provider in seconds.
 Write seconds; Core multiplies where it has to.
@@ -342,6 +353,10 @@ Write seconds; Core multiplies where it has to.
 | codex       | `.codex/hooks.json`                  | `.codex/.vaultspec-hooks.json`  |
 | antigravity | `.agents/hooks.json`                 | The `vaultspec` hookset         |
 | gemini      | `.gemini/settings.json`, `hooks` key | `.gemini/.vaultspec-hooks.json` |
+
+Core reads and writes `.codex/hooks.json` only. Codex also accepts an inline `[hooks]`
+table in `.codex/config.toml`; Core neither reads that nor reports it, so hooks you put
+there are invisible to `vaultspec-core spec hooks status`.
 
 Hooks you wrote into those files by hand are preserved. Core records exactly what it
 wrote last sync in the sidecar beside the file, so the next sync removes precisely its

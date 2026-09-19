@@ -45,8 +45,21 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.3`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.2.3`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core spec triggers add`
+- `vaultspec-core spec triggers edit`
+- `vaultspec-core spec triggers list`
+- `vaultspec-core spec triggers remove`
+- `vaultspec-core spec triggers rename`
+- `vaultspec-core spec triggers run`
+- `vaultspec-core spec triggers show`
+- `vaultspec-core spec triggers status`
+- `vaultspec-core spec triggers trust`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -284,21 +297,31 @@ hand-edit between the markers.
 
 #### Hooks
 
-- `vaultspec-core spec hooks list` - List all defined hooks.
-- `vaultspec-core spec hooks add` - Add a new declarative hook under .vaultspec/.
-- `vaultspec-core spec hooks show` - Display a hook's content.
-- `vaultspec-core spec hooks edit` - Open a hook in the configured editor.
-- `vaultspec-core spec hooks rename` - Rename an existing hook atomically.
-- `vaultspec-core spec hooks remove` - Delete a hook.
-- `vaultspec-core spec hooks restore` - Restore a hook to its snapshotted original (not
-  supported for custom hooks).
-- `vaultspec-core spec hooks sync` - Sync only hooks files; use vaultspec-core sync for
-  complete refresh.
-- `vaultspec-core spec hooks status` - Report declarative hooks parsing and taxonomy
-  compliance status.
-- `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
-- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to run their shell
-  commands as you.
+- `vaultspec-core spec hooks list` - List this workspace's hooks and the providers they
+  render into.
+- `vaultspec-core spec hooks show` - Show one hook's source file.
+- `vaultspec-core spec hooks status` - Report parse errors and events no installed
+  provider can run.
+- `vaultspec-core spec hooks sync` - Render this workspace's hooks into each provider's
+  native config.
+- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to be rendered into
+  your agents' configs.
+
+#### Triggers
+
+- `vaultspec-core spec triggers list` - List this workspace's lifecycle triggers.
+- `vaultspec-core spec triggers add` - Add a new lifecycle trigger under
+  .vaultspec/triggers/.
+- `vaultspec-core spec triggers show` - Display a trigger's source file.
+- `vaultspec-core spec triggers edit` - Open a trigger in the configured editor.
+- `vaultspec-core spec triggers rename` - Rename an existing trigger atomically.
+- `vaultspec-core spec triggers remove` - Delete a trigger.
+- `vaultspec-core spec triggers status` - Report trigger parse errors and unsupported
+  events.
+- `vaultspec-core spec triggers run` - Fire this workspace's triggers for one lifecycle
+  event.
+- `vaultspec-core spec triggers trust` - Approve this workspace's triggers to run their
+  shell commands as you.
 
 #### Precommit
 
