@@ -437,7 +437,7 @@ def test_a_workspace_seen_clean_can_still_report_later_drift(
     The notice latch closed on the first *observation*, so an up-to-date
     workspace - or one read before ``vaultspec-core install`` had run in it -
     was silenced for the life of the process.  In the CLI that is one command;
-    in the long-lived ``vaultspec-mcp`` server it is forever, which is the
+    in the long-lived ``vaultspec-core-mcp`` server it is forever, which is the
     exact indefinite-silent-drift failure the notice exists to prevent.
     """
     import logging

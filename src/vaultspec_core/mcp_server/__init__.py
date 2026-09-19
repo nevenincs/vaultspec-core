@@ -2,9 +2,9 @@
 
 Exports :func:`create_server` (factory returning a configured
 :class:`mcp.server.mcpserver.MCPServer` with ``find`` and ``create`` tools) and
-:func:`main` (entry point invoked by the ``vaultspec-mcp`` CLI script).
+:func:`main` (entry point invoked by the ``vaultspec-core-mcp`` CLI script).
 Depends on :mod:`vaultspec_core.core` for resource operations; consumed
-directly by the ``vaultspec-mcp`` console-script entry point.
+directly by the ``vaultspec-core-mcp`` console-script entry point.
 """
 
 from .app import create_server as create_server

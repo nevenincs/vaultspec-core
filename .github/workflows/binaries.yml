@@ -582,7 +582,7 @@ jobs:
       - name: Restore the execute bit
         if: ${{ matrix.isolation != 'proxy' }}
         shell: bash
-        run: chmod +x offline-bundle/vaultspec-core offline-bundle/vaultspec-mcp
+        run: chmod +x offline-bundle/vaultspec-core offline-bundle/vaultspec-core-mcp
 
       # One script for both Linux isolations, so they assert the same things.
       # The extracted bundle directory differs - mounted at /artifacts in a

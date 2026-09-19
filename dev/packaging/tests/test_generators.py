@@ -87,7 +87,7 @@ def test_scoop_manifest_pins_the_release_digests() -> None:
         assert digest == digests[url.rsplit("/", 1)[-1]]
     assert manifest["bin"] == [
         ["vaultspec-core.exe", "vaultspec-core"],
-        ["vaultspec-mcp.exe", "vaultspec-mcp"],
+        ["vaultspec-core-mcp.exe", "vaultspec-core-mcp"],
     ]
 
 
@@ -159,8 +159,8 @@ def test_homebrew_formula_declares_the_expected_ruby_surface() -> None:
     assert f'version "{VERSION}"' in formula
     assert 'license "MIT"' in formula
     assert 'bin.install "vaultspec-core"' in formula
-    assert 'bin.install "vaultspec-mcp"' in formula
-    assert 'resource("vaultspec-mcp")' not in formula
+    assert 'bin.install "vaultspec-core-mcp"' in formula
+    assert 'resource("vaultspec-core-mcp")' not in formula
     assert formula.endswith("end\n")
 
 

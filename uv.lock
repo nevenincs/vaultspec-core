@@ -3,8 +3,8 @@ revision = 3
 requires-python = ">=3.13, <3.15"
 resolution-markers = [
     "(python_full_version >= '3.14' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform == 'win32')",
-    "(python_full_version < '3.14' and sys_platform == 'linux') or (python_full_version < '3.14' and sys_platform == 'win32')",
     "python_full_version >= '3.14' and sys_platform != 'linux' and sys_platform != 'win32'",
+    "(python_full_version < '3.14' and sys_platform == 'linux') or (python_full_version < '3.14' and sys_platform == 'win32')",
     "python_full_version < '3.14' and sys_platform != 'linux' and sys_platform != 'win32'",
 ]
 
@@ -2205,10 +2205,7 @@ dependencies = [
     { name = "rich" },
     { name = "ruamel-yaml" },
     { name = "rustworkx" },
-    { name = "sse-starlette" },
-    { name = "starlette" },
     { name = "typer" },
-    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -2271,11 +2268,8 @@ requires-dist = [
     { name = "ruamel-yaml", specifier = ">=0.18" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.2" },
     { name = "rustworkx", specifier = ">=0.18.0" },
-    { name = "sse-starlette", specifier = ">=3.2.0" },
-    { name = "starlette", specifier = ">=0.52.1" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.15" },
     { name = "typer", specifier = ">=0.12.0" },
-    { name = "uvicorn", specifier = ">=0.41.0" },
 ]
 provides-extras = ["dev"]
 

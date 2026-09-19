@@ -98,9 +98,10 @@ class FindEntry(LeanModel):
         path: The document path relative to the project root (search mode).
         blob_hash: The git blob OID of the document's current bytes, so a
             read-then-edit chain avoids a re-read (search mode).
-        resource_uri: A ``file://`` resource-link URI for the document body,
-            the ``resource_link``-style return with inline ``body`` as the
-            fallback (search mode).
+        resource_uri: A ``file://`` URI locating the document on disk, which
+            the host reads directly; the server registers no resource for it,
+            so it is a locator rather than a protocol ``resource_link``. Set
+            ``body`` to inline the text instead (search mode).
         body: Document text, present when ``body`` is ``excerpt`` or
             ``full`` (search mode).
         body_bytes: The full document size in bytes, so a caller reading an
@@ -904,8 +905,9 @@ def _find_documents(
     """Build the document-search ``find`` result rows.
 
     Each row carries the document's current ``blob_hash`` (so a
-    read-then-edit chain avoids a re-read) and a ``resource_uri``
-    resource-link, with the full ``body`` inlined only when requested.
+    read-then-edit chain avoids a re-read) and a ``resource_uri`` locating
+    the file for the host to read, with the full ``body`` inlined only when
+    requested.
 
     The types are searched in the order given (or the default order) and
     ``limit`` is a single *global* cap applied to the concatenated result, not
@@ -1040,9 +1042,10 @@ def register_document_tools(
         graph-weight score; add ``json`` for the orientation-sourced
         lifecycle status and richer metadata.  With any of ``feature`` /
         ``type`` / ``date`` / ``text``, switches to document search: each
-        result carries
-        the document's current ``blob_hash`` and a ``resource_uri``
-        resource-link, with the full ``body`` inlined only on request.  The
+        result carries the document's current ``blob_hash`` and a
+        ``resource_uri``, a ``file://`` locator the host reads directly
+        rather than a resource this server serves; inline the text instead by
+        setting ``body``.  The
         ``type`` filter defaults to adr, plan, research, reference; exec and
         audit are excluded unless explicitly requested.
 

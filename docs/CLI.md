@@ -23,8 +23,8 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the
 ## Entry points
 
 - `vaultspec-core` - Workspace management, vault operations, resource sync.
-- `vaultspec-mcp` - Console script that launches the stdio Model Context Protocol (MCP)
-  server.
+- `vaultspec-core-mcp` - Console script that launches the stdio Model Context Protocol
+  (MCP) server.
 - `uv run --no-sync python -m vaultspec_core.mcp_server.app` - Module invocation of the
   MCP server (avoids binary locking on Windows; `--no-sync` keeps a client connect from
   mutating the environment). See [MCP reference](./MCP.md).
@@ -3031,8 +3031,8 @@ overridden by the `--target` flag.
 
 - `VAULTSPEC_TARGET_DIR` (path, default cwd) - Root workspace directory (where `.vault/`
   and `.vaultspec/` live). Equivalent to `--target` on the CLI. Also used by
-  `vaultspec-mcp` to locate the workspace. Defaults to the current working directory if
-  unset.
+  `vaultspec-core-mcp` to locate the workspace. Defaults to the current working
+  directory if unset.
 - `VAULTSPEC_DOCS_DIR` (str, default `.vault`) - Vault directory name.
 - `VAULTSPEC_INDEX_DIR` (str, default `index`) - Name of the subdirectory inside the
   vault that holds the auto-generated feature indexes (`<feature>.index.md`).
@@ -3069,7 +3069,7 @@ overridden by the `--target` flag.
   exact value `1` counts; anything else leaves the hints in place.
 - `VAULTSPEC_STDIO_WATCHDOG` (str, default on) - Lifetime watchdog for the MCP server.
   Set it to `0`, `false`, `off`, or `no` to disable it, which leaves the server to exit
-  on stdin EOF alone. Read by `vaultspec-mcp` rather than by the CLI; see the
+  on stdin EOF alone. Read by `vaultspec-core-mcp` rather than by the CLI; see the
   [MCP reference](./MCP.md).
 
 ## See also
