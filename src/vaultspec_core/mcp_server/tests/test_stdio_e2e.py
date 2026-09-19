@@ -134,7 +134,7 @@ async def _drive_session(project: Path) -> None:
         ClientSession(read, write) as session,
     ):
         init_result = await session.initialize()
-        assert init_result.server_info.name == "vaultspec-mcp"
+        assert init_result.server_info.name == "vaultspec-core-mcp"
 
         listed = await session.list_tools()
         names = {tool.name for tool in listed.tools}

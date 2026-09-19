@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build the ``vaultspec-core`` and ``vaultspec-mcp`` release binaries with PyApp.
+"""Build the ``vaultspec-core`` and ``vaultspec-core-mcp`` release binaries with PyApp.
 
 PyApp (https://ofek.dev/pyapp) is a Rust bootstrapper from the Hatch
 ecosystem. It is configured entirely through ``PYAPP_*`` environment
@@ -12,8 +12,8 @@ Two binaries are produced from the same prepared distribution, differing only
 in their execution entry point:
 
 - ``vaultspec-core`` runs ``python -m vaultspec_core`` (PYAPP_EXEC_MODULE).
-- ``vaultspec-mcp`` runs the object reference ``vaultspec_core.mcp_server.app:run``
-  (PYAPP_EXEC_SPEC), matching the ``vaultspec-mcp`` console script.
+- ``vaultspec-core-mcp`` runs the object reference ``vaultspec_core.mcp_server.app:run``
+  (PYAPP_EXEC_SPEC), matching the ``vaultspec-core-mcp`` console script.
 
 The binaries install nothing at launch. Each target's build first assembles a
 *prepared distribution*: the stock python-build-standalone archive for that
@@ -233,7 +233,7 @@ class Binary:
 
 BINARIES = (
     Binary(name="vaultspec-core", exec_module="vaultspec_core"),
-    Binary(name="vaultspec-mcp", exec_spec="vaultspec_core.mcp_server.app:run"),
+    Binary(name="vaultspec-core-mcp", exec_spec="vaultspec_core.mcp_server.app:run"),
 )
 
 

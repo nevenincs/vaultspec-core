@@ -36,8 +36,8 @@ def test_project_scripts_ship_vaultspec_core_and_mcp(pyproject: dict[str, Any]) 
 
     assert "vaultspec-core" in scripts
     assert scripts["vaultspec-core"] == "vaultspec_core.__main__:main"
-    assert "vaultspec-mcp" in scripts
-    assert scripts["vaultspec-mcp"] == "vaultspec_core.mcp_server.app:run"
+    assert "vaultspec-core-mcp" in scripts
+    assert scripts["vaultspec-core-mcp"] == "vaultspec_core.mcp_server.app:run"
     assert "vaultspec" not in scripts
 
 

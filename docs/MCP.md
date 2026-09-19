@@ -28,8 +28,8 @@ Configure your client to launch the server with the project root as its working
 directory, or [set an explicit workspace](#point-the-server-at-a-different-workspace).
 
 Keep the generated `python -m vaultspec_core.mcp_server.app` invocation. On Windows,
-running the `vaultspec-mcp` console executable can keep it locked while the client is
-connected, blocking package updates that replace it.
+running the `vaultspec-core-mcp` console executable can keep it locked while the client
+is connected, blocking package updates that replace it.
 
 In tool mode, the generated entry in Claude's `.mcp.json` and Antigravity's
 `.agents/mcp_config.json` uses this configuration:
@@ -72,7 +72,7 @@ the next sync declines to touch the entry rather than repairing it.
 Use `--read-only` to limit the tools the server advertises:
 
 ```bash
-vaultspec-mcp --read-only
+vaultspec-core-mcp --read-only
 ```
 
 This exposes only `status`, `find`, `check`, and `discover` to connected clients. In
@@ -295,7 +295,10 @@ Behavior notes:
 - Document-search rows report `name` (the file stem), `type`, `feature`, `date`, `path`
   (relative to the vault), `blob_hash` (the git blob object ID (OID) of the document's
   current bytes, or `null` if the file can't be read), `resource_uri` (a `file://`
-  link), and `body` when you set `body` to `excerpt` or `full`.
+  locator), and `body` when you set `body` to `excerpt` or `full`.
+- `resource_uri` is a path for your host to read directly. The server registers no MCP
+  resources, so there is nothing to `resources/read` and the URI is not a protocol
+  `resource_link`. Set `body` when you want the text in the response instead.
 - In search mode, `limit` is a global cap applied across all matched types combined, not
   a per-type cap. If an early type fills the cap, later types can be crowded out
   entirely. Call `find` once per type when you need a fair spread across types.

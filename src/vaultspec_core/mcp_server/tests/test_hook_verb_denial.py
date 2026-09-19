@@ -48,7 +48,7 @@ SHELL_REACHING_VERBS = (
 
 def _gateway_server() -> MCPServer[None]:
     """Build an MCPServer exposing only the two gateway tools."""
-    mcp = MCPServer(name="vaultspec-mcp-hook-denial-test")
+    mcp = MCPServer(name="vaultspec-core-mcp-hook-denial-test")
     register_gateway_tools(mcp)
     return mcp
 
