@@ -261,6 +261,100 @@ deactivate an installed hook.
 **MCP clients.** Check enrollment with `vaultspec-core spec mcps status --json`. See the
 [MCP tool reference](./MCP.md#tools) for the available tools.
 
+**Agent-runtime hooks.** Write a hook once and Core renders it for every coding agent
+you have installed. See [agent-runtime hooks](#agent-runtime-hooks).
+
+## Agent-runtime hooks
+
+Claude Code, Codex, the Antigravity CLI and the Gemini CLI can each run a shell command
+when something happens in a session: before a tool runs, after it returns, when a
+session starts. Each one spells the events differently and keeps them in a different
+file. Write the hook once in `.vaultspec/hooks/`, and `vaultspec-core sync` renders it
+into whichever of those agents this project has installed.
+
+These are the agent's events, not Core's. A hook here fires inside the coding agent
+while you work. It has nothing to do with the
+[pre-commit hooks](#configure-project-integrations) Core scaffolds for Git, or with the
+lifecycle hooks `vaultspec-core spec hooks` manages, which fire inside Core's own CLI.
+
+### Write a hook
+
+One YAML file per hook, in `.vaultspec/hooks/`. The filename stem is the hook's name.
+There's no command that scaffolds one yet; create the file yourself.
+
+```yaml
+# .vaultspec/hooks/guard-commands.yaml
+event: pre_tool_use
+matcher: Bash
+command: "./scripts/audit-command.sh"
+timeout: 30
+enabled: true
+```
+
+| Key       | Required | Meaning                                                         |
+| --------- | -------- | --------------------------------------------------------------- |
+| `event`   | yes      | One of the canonical events below                               |
+| `command` | yes      | The shell command the agent runs                                |
+| `matcher` | no       | Tool-name pattern to filter on; empty matches every tool        |
+| `timeout` | no       | Seconds, always. Core converts to each provider's unit          |
+| `enabled` | no       | Defaults to `true`; `false` parses the file but renders nothing |
+
+`.vaultspec/hooks/` also holds Core's own lifecycle hooks, which are told apart by their
+event name. A file whose `event` isn't one of the canonical names below is left to that
+system, so the two coexist in the directory without either claiming the other's files.
+
+### Canonical events
+
+Write the canonical name. Each provider gets its own spelling, and a provider that has
+no equivalent for an event is skipped for that hook, with a warning naming the hook and
+the provider. Verified mid-2026 against each provider's published hooks documentation.
+
+| Canonical event      | claude             | codex              | antigravity    | gemini         |
+| -------------------- | ------------------ | ------------------ | -------------- | -------------- |
+| `pre_tool_use`       | `PreToolUse`       | `PreToolUse`       | `PreToolUse`   | `BeforeTool`   |
+| `post_tool_use`      | `PostToolUse`      | `PostToolUse`      | `PostToolUse`  | `AfterTool`    |
+| `session_start`      | `SessionStart`     | `SessionStart`     | `SessionStart` | `SessionStart` |
+| `session_end`        | `SessionEnd`       | -                  | `SessionEnd`   | `SessionEnd`   |
+| `stop`               | `Stop`             | `Stop`             | `Stop`         | -              |
+| `user_prompt_submit` | `UserPromptSubmit` | `UserPromptSubmit` | -              | -              |
+| `notification`       | `Notification`     | -                  | `Notification` | `Notification` |
+
+Only Claude Code consumes all seven. If a hook matters everywhere, bind it to
+`pre_tool_use`, `post_tool_use` or `session_start`, which every provider supports.
+
+Gemini expresses hook timeouts in milliseconds and every other provider in seconds.
+Write seconds; Core multiplies where it has to.
+
+### Where they land
+
+| Provider    | Rendered into                        | How Core marks its own entries  |
+| ----------- | ------------------------------------ | ------------------------------- |
+| claude      | `.claude/settings.json`, `hooks` key | `.claude/.vaultspec-hooks.json` |
+| codex       | `.codex/hooks.json`                  | `.codex/.vaultspec-hooks.json`  |
+| antigravity | `.agents/hooks.json`                 | The `vaultspec` hookset         |
+| gemini      | `.gemini/settings.json`, `hooks` key | `.gemini/.vaultspec-hooks.json` |
+
+Hooks you wrote into those files by hand are preserved. Core records exactly what it
+wrote last sync in the sidecar beside the file, so the next sync removes precisely its
+own previous entries and leaves everything else alone. The record sits in a sidecar
+rather than inside the file because some providers reject a hooks file carrying any key
+they don't recognize, and would discard the whole thing.
+
+Antigravity needs no sidecar: it groups hooks under named hooksets, and Core owns the
+one called `vaultspec`.
+
+Don't edit the sidecars. Deleting one makes Core forget what it wrote, so the entries
+from before become indistinguishable from yours. The next sync re-adopts the ones it
+still renders and abandons the rest in place, where nothing will clean them up.
+
+### Turn it off
+
+`vaultspec-core sync --skip hooks` runs every other sync pass and leaves hook rendering
+alone. It doesn't remove hooks an earlier sync already rendered; it declines to
+reconcile them. `vaultspec-core install --skip hooks` does the same during install.
+
+Removing a source file and syncing is the way to withdraw a rendered hook.
+
 <p id="machine-global-runtime-state"></p>
 
 <p id="what-an-absent-managed-file-means"></p>
