@@ -376,7 +376,9 @@ def cmd_hooks_status(
 
     status_str = str(status["status"])
     status_style = (
-        "green" if status_str == "ok" else ("yellow" if status_str == "warn" else "red")
+        "green"
+        if status_str == "ok"
+        else ("yellow" if status_str == "warning" else "red")
     )
     fields = [
         Field("status", status_str, style=status_style),

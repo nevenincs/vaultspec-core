@@ -43,6 +43,7 @@ def isolate_state():
             system_src_dir=_sentinel,
             templates_dir=_sentinel,
             hooks_dir=_sentinel,
+            triggers_dir=_sentinel,
         )
 
     set_context(current)

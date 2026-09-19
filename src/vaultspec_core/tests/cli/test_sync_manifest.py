@@ -51,6 +51,7 @@ def sync_workspace(tmp_path: Path) -> Generator[Path]:
         system_src_dir=tmp_path / ".vaultspec" / "system",
         templates_dir=tmp_path / ".vaultspec" / "templates",
         hooks_dir=tmp_path / ".vaultspec" / "hooks",
+        triggers_dir=tmp_path / ".vaultspec" / "triggers",
         tool_configs=tool_configs,
     )
     token = _t.workspace_ctx.set(ctx)

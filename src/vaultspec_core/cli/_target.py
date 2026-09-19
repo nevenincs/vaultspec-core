@@ -364,6 +364,7 @@ def apply_target_install(target: Path | None) -> Path:
                 system_src_dir=effective,
                 templates_dir=effective,
                 hooks_dir=effective,
+                triggers_dir=effective,
             )
         )
     return effective

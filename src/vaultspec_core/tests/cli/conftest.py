@@ -155,6 +155,7 @@ def isolate_state() -> Generator[None]:
             system_src_dir=_sentinel,
             templates_dir=_sentinel,
             hooks_dir=_sentinel,
+            triggers_dir=_sentinel,
         )
     )
 
