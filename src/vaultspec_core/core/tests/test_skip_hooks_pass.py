@@ -46,13 +46,6 @@ def _isolate_ledger(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
 
 
-def _approve(root: Path) -> None:
-    """Approve every declared hook, as an operator at a terminal would."""
-    from vaultspec_core.triggers.trust import grant
-
-    grant(sorted((root / ".vaultspec" / "hooks").glob("*.yaml")))
-
-
 def _claude_hooks(root: Path) -> dict[str, object]:
     path = root / ".claude" / "settings.json"
     if not path.exists():
@@ -91,7 +84,7 @@ class TestSkipHooksPass:
         _isolate_ledger(tmp_path, monkeypatch)
         factory = WorkspaceFactory(tmp_path).install("all")
         _write_hook(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         assert "PreToolUse" in _claude_hooks(tmp_path)
@@ -121,7 +114,7 @@ class TestSkipHooksPass:
         _isolate_ledger(tmp_path, monkeypatch)
         factory = WorkspaceFactory(tmp_path).install("all")
         _write_hook(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
         assert "PreToolUse" in _claude_hooks(tmp_path)
 

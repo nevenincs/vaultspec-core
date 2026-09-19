@@ -62,40 +62,23 @@ def _agy_target(root: Path) -> HookTarget:
     )
 
 
-#: Stand-in for the operator's home directory. Kept outside the workspace,
-#: because the VaultSpec home is ``~/.vaultspec`` and pointing it at the
-#: workspace root would collide with the workspace's own ``.vaultspec/``.
-_OPERATOR_HOME = "operator-home"
-
-
-def _home(tmp_path: Path) -> Path:
-    """The isolated VaultSpec home this test's consent ledger lives in.
-
-    Matches what ``core_home_layout`` derives from the patched
-    :meth:`Path.home`, so the ledger ``_approve`` writes is the one the
-    renderer reads.
-    """
-    return tmp_path / _OPERATOR_HOME / ".vaultspec"
-
-
 def _installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WorkspaceFactory:
-    """Install, with the operator home redirected away from the real one.
+    """Install with the consent ledger redirected away from the real one.
 
-    ``provider_hooks_sync`` consults the consent ledger under the operator's
-    home, so a test that lets it read the real one would depend on whatever
-    the developer running it has approved.
+    ``provider_hooks_sync`` refuses a hook the ledger does not carry, so a test
+    that let it read the operator's own ledger would pass or fail on whatever
+    that developer had approved. The redirect is at ``trust_file_path``, the one
+    function whose job is locating that file, rather than at ``Path.home``,
+    which pathlib and the CLI runner both depend on. The stand-in home sits
+    outside the workspace, because the VaultSpec home is ``~/.vaultspec`` and
+    aiming it at the workspace root would collide with the workspace's own.
     """
-    operator_home = tmp_path / _OPERATOR_HOME
-    operator_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(Path, "home", classmethod(lambda _cls: operator_home))
+    from vaultspec_core.triggers import trust
+
+    ledger = tmp_path / "operator-home" / ".vaultspec" / trust.TRUST_FILE_NAME
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(trust, "trust_file_path", lambda home=None: ledger)
     return WorkspaceFactory(tmp_path).install("all")
-
-
-def _approve(tmp_path: Path) -> None:
-    """Grant consent for every hook source, as an operator at a terminal would."""
-    from vaultspec_core.triggers.trust import grant
-
-    grant(sorted(_hooks_dir(tmp_path).glob("*.yaml")), _home(tmp_path))
 
 
 def _only(reports: list[ProviderHookReport]) -> ProviderHookReport:
@@ -117,7 +100,7 @@ class TestSidecarProvider:
     ):
         _installed(tmp_path, monkeypatch)
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.NO_SOURCES
 
@@ -126,24 +109,24 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.IN_SYNC
 
     def test_a_source_that_never_synced_reads_not_rendered(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
         # Approved, so consent is not what is missing - only the sync is.
-        _approve(tmp_path)
+        factory.trust_hooks()
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
@@ -152,11 +135,11 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all", skip={"hooks"})
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
@@ -165,12 +148,12 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
         (tmp_path / ".claude" / _SIDECAR).unlink()
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.SIDECAR_MISSING
 
@@ -179,7 +162,7 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         # Change the command without re-syncing. None of what the source now
@@ -192,7 +175,7 @@ class TestSidecarProvider:
             encoding="utf-8",
         )
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.STALE
 
@@ -201,7 +184,7 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         # Remove both the render and the record, leaving a declared source and
@@ -212,7 +195,7 @@ class TestSidecarProvider:
         (tmp_path / ".claude" / ".vaultspec-hooks.json").unlink()
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
@@ -221,14 +204,14 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         source = _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
         source.unlink()
 
         # The source is gone, so nothing should render, but the ownership
         # record still names entries a sync would have to prune.
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.STALE
 
@@ -238,7 +221,7 @@ class TestSidecarProvider:
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path, name="guard")
         _write_source(tmp_path, name="watch", event="post_tool_use")
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         # Remove one event's groups from the config, as a hand edit would.
@@ -249,7 +232,7 @@ class TestSidecarProvider:
         _write(tmp_path / ".claude" / "settings.json", settings)
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.STALE
 
@@ -258,7 +241,7 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         # The render is intact; the record claims an extra event, so a re-sync
@@ -268,7 +251,7 @@ class TestSidecarProvider:
         _write(tmp_path / ".claude" / _SIDECAR, record)
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.SIDECAR_STALE
 
@@ -277,7 +260,7 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         settings = _read(tmp_path / ".claude" / "settings.json")
@@ -287,7 +270,7 @@ class TestSidecarProvider:
         _write(tmp_path / ".claude" / "settings.json", settings)
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.IN_SYNC
 
@@ -296,12 +279,12 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
         (tmp_path / ".claude" / "settings.json").write_text("{ not json", "utf-8")
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.UNREADABLE
 
@@ -310,12 +293,12 @@ class TestSidecarProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
         (tmp_path / ".claude" / _SIDECAR).write_text("[]", encoding="utf-8")
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_claude_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.UNREADABLE
 
@@ -326,24 +309,24 @@ class TestHooksetProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_agy_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_agy_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.IN_SYNC
 
     def test_a_source_that_never_synced_reads_not_rendered(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        _installed(tmp_path, monkeypatch)
+        factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
         # Approved, so consent is not what is missing - only the sync is.
-        _approve(tmp_path)
+        factory.trust_hooks()
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_agy_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_agy_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.NOT_RENDERED
 
@@ -352,12 +335,12 @@ class TestHooksetProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         source = _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
         source.unlink()
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_agy_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_agy_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.STALE
 
@@ -366,7 +349,7 @@ class TestHooksetProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         native = _read(tmp_path / ".agents" / "hooks.json")
@@ -376,7 +359,7 @@ class TestHooksetProvider:
         _write(tmp_path / ".agents" / "hooks.json", native)
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_agy_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_agy_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.STALE
 
@@ -385,7 +368,7 @@ class TestHooksetProvider:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         native = _read(tmp_path / ".agents" / "hooks.json")
@@ -393,7 +376,7 @@ class TestHooksetProvider:
         _write(tmp_path / ".agents" / "hooks.json", native)
 
         reports = collect_provider_hook_reports(
-            _hooks_dir(tmp_path), [_agy_target(tmp_path)], _home(tmp_path)
+            _hooks_dir(tmp_path), [_agy_target(tmp_path)]
         )
         assert _only(reports).signal is ProviderHookSignal.IN_SYNC
 
@@ -404,13 +387,12 @@ class TestUnsupportedEvents:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path, name="ask", event="user_prompt_submit")
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         reports = collect_provider_hook_reports(
             _hooks_dir(tmp_path),
             [_claude_target(tmp_path), _agy_target(tmp_path)],
-            _home(tmp_path),
         )
         by_tool = {report.tool: report for report in reports}
 
@@ -423,7 +405,7 @@ class TestUnsupportedEvents:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path, name="ask", event="user_prompt_submit")
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         # antigravity cannot consume the only hook declared, so there is
@@ -460,7 +442,7 @@ class TestConsent:
 
         report = _only(
             collect_provider_hook_reports(
-                _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+                _hooks_dir(tmp_path), [_claude_target(tmp_path)]
             )
         )
         assert report.signal is ProviderHookSignal.UNTRUSTED
@@ -476,7 +458,7 @@ class TestConsent:
         # the verdict must not be the one whose advice is "run sync".
         report = _only(
             collect_provider_hook_reports(
-                _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+                _hooks_dir(tmp_path), [_claude_target(tmp_path)]
             )
         )
         assert report.signal is not ProviderHookSignal.NOT_RENDERED
@@ -487,12 +469,12 @@ class TestConsent:
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
         factory.sync("all")
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         report = _only(
             collect_provider_hook_reports(
-                _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+                _hooks_dir(tmp_path), [_claude_target(tmp_path)]
             )
         )
         assert report.signal is ProviderHookSignal.IN_SYNC
@@ -502,7 +484,7 @@ class TestConsent:
     ):
         factory = _installed(tmp_path, monkeypatch)
         _write_source(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         # Consent is per digest, so rewriting the file revokes it. The command
@@ -515,7 +497,7 @@ class TestConsent:
         )
         report = _only(
             collect_provider_hook_reports(
-                _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+                _hooks_dir(tmp_path), [_claude_target(tmp_path)]
             )
         )
         assert report.signal is ProviderHookSignal.STALE
@@ -533,7 +515,7 @@ class TestConsent:
 
         report = _only(
             collect_provider_hook_reports(
-                _hooks_dir(tmp_path), [_claude_target(tmp_path)], _home(tmp_path)
+                _hooks_dir(tmp_path), [_claude_target(tmp_path)]
             )
         )
         assert report.signal is ProviderHookSignal.UNTRUSTED
@@ -548,9 +530,7 @@ class TestConsent:
         # the advisory is computed over every declared hook rather than only
         # the approved ones.
         report = _only(
-            collect_provider_hook_reports(
-                _hooks_dir(tmp_path), [_agy_target(tmp_path)], _home(tmp_path)
-            )
+            collect_provider_hook_reports(_hooks_dir(tmp_path), [_agy_target(tmp_path)])
         )
         assert report.unsupported == ("ask (user_prompt_submit)",)
 

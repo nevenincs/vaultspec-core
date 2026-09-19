@@ -48,14 +48,6 @@ def _installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> WorkspaceFact
     return WorkspaceFactory(tmp_path).install("all")
 
 
-def _approve(tmp_path: Path) -> None:
-    """Grant consent for every hook source, as an operator at a terminal would."""
-    from vaultspec_core.triggers.trust import grant
-
-    hooks_dir = tmp_path / ".vaultspec" / "hooks"
-    grant(sorted(hooks_dir.glob("*.yaml")))
-
-
 def _hook_report(factory: WorkspaceFactory) -> list[dict[str, object]]:
     result = factory.run("spec", "doctor", "--json")
     data = json.loads(result.output)["data"]
@@ -90,7 +82,7 @@ class TestUnrenderedHooksAreVisible:
         factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
         # Approved, so consent is not what is missing - only the sync is.
-        _approve(tmp_path)
+        factory.trust_hooks()
 
         result = factory.run("spec", "doctor")
         assert result.exit_code == 1, result.output
@@ -111,7 +103,7 @@ class TestUnrenderedHooksAreVisible:
     ) -> None:
         factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         result = factory.run("spec", "doctor")
@@ -123,7 +115,7 @@ class TestUnrenderedHooksAreVisible:
     ) -> None:
         factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
         (tmp_path / ".claude" / ".vaultspec-hooks.json").unlink()
 
@@ -187,7 +179,7 @@ class TestAwaitingApproval:
         factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
         factory.sync("all")
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         result = factory.run("spec", "doctor")
@@ -211,7 +203,7 @@ class TestUnsupportedEventAdvisory:
     ) -> None:
         factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path, event="user_prompt_submit", name="ask")
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         result = factory.run("spec", "doctor")
@@ -228,7 +220,7 @@ class TestUnsupportedEventAdvisory:
         # pre_tool_use is one of only two events every provider runs, so it
         # is the shape that must produce no advisory.
         _write_hook(tmp_path, event="pre_tool_use", name="guard-all")
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         result = factory.run("spec", "doctor")
@@ -242,7 +234,7 @@ class TestJsonSurface:
     ) -> None:
         factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
         factory.sync("all")
 
         by_tool = {str(r["tool"]): r for r in _hook_report(factory)}
@@ -257,7 +249,7 @@ class TestJsonSurface:
     ) -> None:
         factory = _installed(tmp_path, monkeypatch)
         _write_hook(tmp_path)
-        _approve(tmp_path)
+        factory.trust_hooks()
 
         signals = {str(r["signal"]) for r in _hook_report(factory)}
         assert signals == {"not_rendered"}
