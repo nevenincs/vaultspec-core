@@ -47,6 +47,7 @@ def hooks_dir(tmp_path: Path) -> Iterator[Path]:
         system_src_dir=vs / "rules" / "system",
         templates_dir=vs / "rules" / "templates",
         hooks_dir=hooks,
+        triggers_dir=tmp_path / ".vaultspec" / "triggers",
     )
     token = _types.workspace_ctx.set(ctx)
     try:
