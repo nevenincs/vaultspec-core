@@ -438,6 +438,7 @@ def uninstall_run(
             system_src_dir=path,
             templates_dir=path,
             hooks_dir=path,
+            triggers_dir=path,
         )
     )
     ensure_tool_configs(path)

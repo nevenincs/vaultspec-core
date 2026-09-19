@@ -217,6 +217,53 @@ class VersionFloorSignal(StrEnum):
     BELOW = "below"
 
 
+class ProviderHookSignal(StrEnum):
+    """Agreement between one provider's rendered hooks and their source.
+
+    The subject is a single hook-capable provider: whether what
+    ``.vaultspec/hooks/`` currently renders for it is what its native
+    hook-config file carries, and whether the ownership record that lets a
+    re-sync remove its own entries and nobody else's is intact.
+
+    ``NO_SOURCES`` and ``IN_SYNC`` are the two benign readings, and they say
+    different things: the first that there is nothing to render, the second
+    that everything that should be rendered is. ``UNREADABLE`` says the check
+    could not run, and is weighed as a warning rather than folded into
+    ``IN_SYNC``, because a collector that failed cannot vouch for agreement.
+
+    Members:
+        NO_SOURCES: The workspace declares no hooks this provider could
+            consume, and the provider carries none.
+        IN_SYNC: Every group the current source renders is present, and the
+            ownership record matches it exactly.
+        UNTRUSTED: Every hook this provider would render is awaiting operator
+            approval, so the renderer skipped it. Benign: a hook that does not
+            render because nobody approved it is the consent gate working, and
+            a sync will not change it. The remedy is a decision, not a command.
+        NOT_RENDERED: The source renders groups for this provider and none of
+            them reached its config file. Ordinarily an un-run sync, or one
+            run with ``--skip hooks``.
+        STALE: The config file carries some but not all of what the source
+            renders, or carries managed entries the source no longer renders.
+        SIDECAR_MISSING: The rendered groups are all present but no ownership
+            record accompanies them, so a re-sync can no longer tell its own
+            entries from hand-authored ones.
+        SIDECAR_STALE: An ownership record is present and disagrees with what
+            the source renders, so a re-sync would prune the wrong entries.
+        UNREADABLE: The config file or the ownership record is present and
+            could not be parsed.
+    """
+
+    NO_SOURCES = "no_sources"
+    IN_SYNC = "in_sync"
+    UNTRUSTED = "untrusted"
+    NOT_RENDERED = "not_rendered"
+    STALE = "stale"
+    SIDECAR_MISSING = "sidecar_missing"
+    SIDECAR_STALE = "sidecar_stale"
+    UNREADABLE = "unreadable"
+
+
 class ResolutionAction(StrEnum):
     """Corrective action that a resolver can apply."""
 

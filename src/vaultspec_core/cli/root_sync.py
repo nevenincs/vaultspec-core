@@ -245,7 +245,7 @@ def cmd_sync(
         typer.Option(
             "--skip",
             help=(
-                "Skip a component: core, a provider name, mcp, or "
+                "Skip a component: a provider name, mcp, hooks, or "
                 "precommit. Repeatable."
             ),
         ),
@@ -265,7 +265,9 @@ def cmd_sync(
     Defaults to syncing all providers. Pass a provider name to sync only
     that provider (e.g. 'vaultspec-core sync claude').
     Use --skip to exclude components (e.g. --skip claude --skip precommit);
-    valid targets are core, provider names, mcp, and precommit.
+    valid targets are provider names, mcp, hooks, and precommit. Sync always
+    reconciles core, so core is not a valid skip target here; install accepts
+    it.
     """
     skip = list(skip or [])
     apply_target(target, split_source=True, json_output=json_output)
@@ -292,23 +294,40 @@ def cmd_sync(
 
     # The all-provider sync is the one CLI path that fires the ``config.synced``
     # lifecycle event, so it is the one that must offer the operator the choice
-    # before a workspace hook's shell command could run (GHSA-w5xf-54cr-fxcq).
-    # Declining, or having no operator to ask, only costs the hooks: the sync
-    # itself is a legitimate operation and still completes.
-    if provider == "all" and not dry_run and "hooks" not in skip:
-        from vaultspec_core.cli._hook_trust import consent_gate
-        from vaultspec_core.core.provider_sync import target_hooks_dir
+    # before a workspace trigger's shell command could run (GHSA-w5xf-54cr-fxcq).
+    # Declining, or having no operator to ask, only costs the triggers: the sync
+    # itself is a legitimate operation and still completes. Not guarded by any
+    # skip token, because ``fire_triggers`` is not either - guarding it on
+    # ``hooks`` suppressed the question while the triggers still ran.
+    if provider == "all" and not dry_run:
+        from vaultspec_core.cli._trigger_trust import consent_gate
+        from vaultspec_core.core.provider_sync import target_triggers_dir
 
         # The same resolver the firing code uses, deliberately. Under
         # ``--target`` the ambient context still reflects the CWD/source split,
         # so resolving the directory any other way here would offer the
-        # operator the CWD workspace's hooks while the target workspace's were
-        # the ones about to run.
+        # operator the CWD workspace's triggers while the target workspace's
+        # were the ones about to run.
         consent_gate(
             "config.synced",
             json_output=json_output,
-            hooks_dir=target_hooks_dir(sync_target),
+            triggers_dir=target_triggers_dir(sync_target),
         )
+
+    # Every provider sync reaches the hook renderer, not just the all-provider
+    # one, so this gate is not narrowed to ``provider == "all"``. A rendered
+    # hook outlives the sync that wrote it: the agent runs it on every matching
+    # tool call thereafter.
+    if not dry_run and "hooks" not in skip:
+        from vaultspec_core.cli._hook_trust import hook_consent_gate
+
+        # No target resolver here, unlike the trigger gate above. A trigger
+        # reacts to something that happened *to* a workspace, so it belongs to
+        # the target; a provider hook is source content projected into one,
+        # like a rule, and the renderer reads it from the ambient workspace
+        # even under ``--target``. Asking about the target's hooks would offer
+        # the operator a set that is not the one about to be written.
+        hook_consent_gate(json_output=json_output)
 
     from vaultspec_core.core.commands import sync_provider
     from vaultspec_core.core.exceptions import VaultSpecError

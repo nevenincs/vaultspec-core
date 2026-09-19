@@ -234,7 +234,7 @@ def _tokenize(command: str, source: str) -> list[str]:
     """Split *command* into argv tokens with platform-appropriate quoting.
 
     POSIX mode is disabled on Windows exactly as
-    :mod:`vaultspec_core.hooks.engine` does it, so a Windows path containing
+    :mod:`vaultspec_core.triggers.engine` does it, so a Windows path containing
     backslashes (``C:\\tools\\ed.exe``) is not mangled by POSIX escape
     handling.
 

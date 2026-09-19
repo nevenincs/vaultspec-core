@@ -31,6 +31,7 @@ from .signals import (
 
 if TYPE_CHECKING:
     from .collectors_companion import CompanionCapability
+    from .collectors_provider_hooks import ProviderHookReport
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,18 @@ class ProviderDiagnosis:
 
 @dataclass
 class HomeDiagnosis:
-    """Non-provider diagnostics that may carry structured detail."""
+    """Non-provider diagnostics that may carry structured detail.
+
+    Despite the name, this is not restricted to machine-global state:
+    ``divergent_projections`` has always been workspace state, and
+    ``provider_hooks`` is too. What the fields have in common is that each
+    carries structured detail rather than a single signal, and that
+    :class:`WorkspaceDiagnosis` cannot hold them directly - its attribute
+    budget is documented as ratchet-down-only, so a new top-level field there
+    would be the offender that stops the ratchet. They are reached through
+    forwarding properties on :class:`WorkspaceDiagnosis`, which is where
+    callers should read them; only ``doctor --json`` sees the nesting.
+    """
 
     process_registry: ProcessRegistryDiagnosis = field(
         default_factory=lambda: ProcessRegistryDiagnosis(ProcessRegistrySignal.ABSENT)
@@ -106,6 +118,10 @@ class HomeDiagnosis:
     #: provisioning only - never liveness; the capability names the companion
     #: command that answers health.
     companion: CompanionCapability | None = None
+    #: Per-provider verdicts on hooks rendered from ``.vaultspec/hooks/``.
+    #: Empty when the question could not be asked at all - no active workspace
+    #: context, or no installed provider that consumes hooks.
+    provider_hooks: list[ProviderHookReport] = field(default_factory=list)
 
 
 @dataclass
@@ -194,6 +210,11 @@ class WorkspaceDiagnosis:
         """Machine-global process-registry diagnosis."""
         return self.home.process_registry
 
+    @property
+    def provider_hooks(self) -> list[ProviderHookReport]:
+        """Per-provider verdicts on hooks rendered into provider configs."""
+        return self.home.provider_hooks
+
 
 def _safe_framework_presence(target: Path) -> FrameworkSignal:
     """Collect framework presence, neutral to :attr:`FrameworkSignal.MISSING`."""
@@ -274,6 +295,44 @@ def _safe_precommit_state(target: Path) -> PrecommitSignal:
     except Exception:
         logger.warning("Precommit state collector failed", exc_info=True)
         return PrecommitSignal.UNREADABLE
+
+
+def _safe_provider_hook_reports() -> list[ProviderHookReport]:
+    """Collect each provider's hook-render verdict, or report nothing.
+
+    Returns an empty list when the question cannot be asked at all: no active
+    workspace context, or no installed provider that consumes hooks. That is
+    distinct from a list of benign verdicts, and the doctor renders no row for
+    it rather than vouching for a render it never looked at.
+    """
+    from ..provider_hooks import AGY_HOOKSET_NAME, hook_targets
+    from ..types import get_context
+    from .collectors_provider_hooks import HookTarget, collect_provider_hook_reports
+
+    try:
+        hooks_dir = get_context().hooks_dir
+        targets = [
+            HookTarget(
+                tool=tool,
+                native=native,
+                sidecar=sidecar,
+                hookset=AGY_HOOKSET_NAME if sidecar is None else None,
+            )
+            for tool, native, sidecar in hook_targets()
+        ]
+    except Exception:
+        # A LookupError here is the ordinary no-active-context case; anything
+        # else is a collector fault. Both mean the same thing to the caller.
+        logger.warning("Provider hook targets could not be resolved", exc_info=True)
+        return []
+
+    if not targets:
+        return []
+    try:
+        return collect_provider_hook_reports(hooks_dir, targets)
+    except Exception:
+        logger.warning("Provider hook collector failed", exc_info=True)
+        return []
 
 
 def _safe_stale_mcp_seeds(target: Path) -> list[str]:
@@ -532,7 +591,11 @@ def _collect_layer1_diagnosis(
         version_floor_running=version_floor_running,
         version_floor_minimum=version_floor_minimum,
         packages=_collect_package_diagnoses(target),
-        home=HomeDiagnosis(process_registry=process_registry, companion=companion),
+        home=HomeDiagnosis(
+            process_registry=process_registry,
+            companion=companion,
+            provider_hooks=_safe_provider_hook_reports(),
+        ),
     )
 
 

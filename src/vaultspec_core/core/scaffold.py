@@ -57,6 +57,26 @@ def scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, str
             ensure_dir(d)
         created.append((rel(target, d), "core (.vaultspec)"))
 
+    # Source directories that carry no bundled example, and so are invisible to
+    # the discovery above. They still have to exist: the authoring verbs write
+    # into them, the status surfaces report on them, and the documentation names
+    # them. A directory the docs name and the installer does not create is a
+    # path an operator is told to use and then cannot find.
+    #
+    # Neither ships an example on purpose. Both directories hold shell commands
+    # that run on the operator's machine, so anything seeded here would arrive
+    # in every install of every project. A disabled example is still a command
+    # nobody asked for, one edit away from running.
+    from vaultspec_core.core.enums import Resource
+
+    for resource in (Resource.HOOKS, Resource.TRIGGERS):
+        d = fw_dir / resource.value
+        if d.name in subdirs:
+            continue
+        if not dry_run:
+            ensure_dir(d)
+        created.append((rel(target, d), "core (.vaultspec)"))
+
     from vaultspec_core.vaultcore.models import DocType
 
     for subdir in sorted(dt.value for dt in DocType):

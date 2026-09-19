@@ -15,7 +15,8 @@ This module is the public surface for the ``spec`` command group: the Typer
 app instance and every command implementation live in sibling modules,
 split along resource-group seams (:mod:`.spec_cmd_rules`,
 :mod:`.spec_cmd_skills`, :mod:`.spec_cmd_agents`, :mod:`.spec_cmd_system`,
-:mod:`.spec_cmd_hooks`, :mod:`.spec_cmd_mcps`, :mod:`.spec_cmd_doctor`,
+:mod:`.spec_cmd_hooks`, :mod:`.spec_cmd_git`, :mod:`.spec_cmd_mcps`,
+:mod:`.spec_cmd_doctor`,
 :mod:`.spec_cmd_reference`) plus a shared-helper module
 (:mod:`.spec_cmd_shared`). Importing this module registers every command
 onto :data:`spec_app` and re-exports the full prior public surface so no
@@ -34,12 +35,12 @@ from vaultspec_core.cli.spec_cmd_doctor import (
     logger,
     render_diagnosis_table,
 )
-from vaultspec_core.cli.spec_cmd_hooks import (
+from vaultspec_core.cli.spec_cmd_git import (
     gitattributes_app,
     gitignore_app,
-    hooks_app,
     precommit_app,
 )
+from vaultspec_core.cli.spec_cmd_hooks import hooks_app
 from vaultspec_core.cli.spec_cmd_mcps import mcps_app
 from vaultspec_core.cli.spec_cmd_reference import reference_app
 from vaultspec_core.cli.spec_cmd_rules import rules_app
@@ -58,6 +59,7 @@ from vaultspec_core.cli.spec_cmd_shared import (
 )
 from vaultspec_core.cli.spec_cmd_skills import skills_app
 from vaultspec_core.cli.spec_cmd_system import system_app
+from vaultspec_core.cli.spec_cmd_triggers import triggers_app
 
 # Mount every sub-app and command explicitly, in the original definition
 # order (rules, skills, agents, system, hooks, precommit, mcps, doctor,
@@ -69,6 +71,7 @@ spec_app.add_typer(skills_app, name="skills")
 spec_app.add_typer(agents_app, name="agents")
 spec_app.add_typer(system_app, name="system")
 spec_app.add_typer(hooks_app, name="hooks")
+spec_app.add_typer(triggers_app, name="triggers")
 spec_app.add_typer(precommit_app, name="precommit")
 spec_app.add_typer(gitignore_app, name="gitignore")
 spec_app.add_typer(gitattributes_app, name="gitattributes")

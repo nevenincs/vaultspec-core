@@ -1,16 +1,17 @@
-"""Load, validate, and execute declarative vaultspec hooks.
+"""Load, validate, and execute declarative vaultspec lifecycle triggers.
 
-Runtime for YAML hook definitions under ``.vaultspec/hooks/``. Parses files
-into :class:`Hook` / :class:`HookAction` models, filters by :data:`SUPPORTED_EVENTS`,
-and executes shell actions with re-entrancy guard and 60-second timeout.
-Key exports: :func:`load_hooks`, :func:`trigger`, :func:`fire_hooks`.
-Re-exported via :mod:`vaultspec_core.hooks`; depends on
+Runtime for YAML trigger definitions under ``.vaultspec/triggers/``. Parses
+files into :class:`Trigger` / :class:`TriggerAction` models, filters by
+:data:`SUPPORTED_EVENTS`, and executes shell actions with a re-entrancy guard
+and a 60-second timeout. Key exports: :func:`load_triggers`, :func:`fire`,
+:func:`fire_triggers`.
+Re-exported via :mod:`vaultspec_core.triggers`; depends on
 :func:`vaultspec_core.core.helpers.kill_process_tree` for subprocess cleanup.
 
-Loading a hook and running one are deliberately separate authorities. Hook files
-are shared through git like the rest of ``.vaultspec/``, so :func:`load_hooks`
+Loading a trigger and running one are deliberately separate authorities. Trigger files
+are shared through git like the rest of ``.vaultspec/``, so :func:`load_triggers`
 parses whatever the workspace carries and every listing surface can describe it,
-while :func:`trigger` spawns nothing that :mod:`vaultspec_core.hooks.trust` has
+while :func:`trigger` spawns nothing that :mod:`vaultspec_core.triggers.trust` has
 not matched against an operator consent record held outside the workspace. This
 module is the single choke point for that check: every execution path in the
 product reaches a subprocess through :func:`trigger`.
@@ -35,28 +36,28 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "SUPPORTED_EVENTS",
-    "Hook",
-    "HookAction",
-    "HookResult",
-    "fire_hooks",
-    "is_provider_hook_event",
-    "load_hooks",
+    "Trigger",
+    "TriggerAction",
+    "TriggerResult",
+    "fire",
+    "fire_triggers",
+    "load_triggers",
     "parse_yaml",
-    "trigger",
 ]
 
-SUPPORTED_EVENTS = frozenset(
-    {
-        "vault.document.created",
-        "config.synced",
-        "audit.completed",
-    }
-)
+#: Lifecycle events a trigger may bind to.
+#:
+#: Only what is actually emitted. ``vault.document.created`` and
+#: ``audit.completed`` were declared here for several releases and fired from
+#: nowhere, so a trigger bound to either parsed, listed, and reported as
+#: supported while never running - the failure this set exists to prevent. An
+#: event earns its place here when something emits it.
+SUPPORTED_EVENTS = frozenset({"config.synced"})
 
 
 @dataclass
-class HookAction:
-    """A single action within a hook.
+class TriggerAction:
+    """A single action within a trigger.
 
     Attributes:
         action_type: Kind of action  - currently only ``"shell"`` is supported.
@@ -69,38 +70,38 @@ class HookAction:
 
 
 @dataclass
-class Hook:
-    """A hook definition loaded from YAML.
+class Trigger:
+    """A trigger definition loaded from YAML.
 
     Attributes:
-        name: Stem of the YAML file that defined this hook (used as identifier).
-        event: Event name that triggers this hook (must be in
+        name: Stem of the YAML file that defined this trigger (used as identifier).
+        event: Event name that triggers this trigger (must be in
             :data:`SUPPORTED_EVENTS`).
         actions: Ordered list of actions to execute when the event fires.
-        enabled: When ``False`` the hook is loaded but never triggered.
-        source_path: Filesystem path to the YAML file this hook was loaded from.
+        enabled: When ``False`` the trigger is loaded but never triggered.
+        source_path: Filesystem path to the YAML file this trigger was loaded from.
     """
 
     name: str
     event: str
-    actions: list[HookAction] = field(default_factory=list)
+    actions: list[TriggerAction] = field(default_factory=list)
     enabled: bool = True
     source_path: Path | None = None
 
 
 @dataclass
-class HookResult:
-    """Result of executing a single hook action.
+class TriggerResult:
+    """Result of executing a single trigger action.
 
     Attributes:
-        hook_name: Name of the hook that produced this result.
+        trigger_name: Name of the trigger that produced this result.
         action_type: Type of the action that was executed (``"shell"``).
         success: ``True`` if the action completed without error.
         output: Captured stdout (shell actions).
         error: Captured stderr or exception message on failure.
     """
 
-    hook_name: str
+    trigger_name: str
     action_type: str
     success: bool
     output: str = ""
@@ -121,30 +122,30 @@ def parse_yaml(text: str) -> dict[str, Any]:
     return yaml.safe_load(text) or {}
 
 
-def load_hooks(hooks_dir: Path) -> list[Hook]:
-    """Load all hook definitions from the hooks directory.
+def load_triggers(triggers_dir: Path) -> list[Trigger]:
+    """Load all trigger definitions from the triggers directory.
 
-    Reads ``*.yaml`` and ``*.yml`` files from ``hooks_dir`` in alphabetical
-    order, parses each, and returns valid :class:`Hook` objects.  Files that
+    Reads ``*.yaml`` and ``*.yml`` files from ``triggers_dir`` in alphabetical
+    order, parses each, and returns valid :class:`Trigger` objects.  Files that
     fail to parse or contain unsupported events are skipped with a warning.
 
     Args:
-        hooks_dir: Directory to scan for hook YAML files.
+        triggers_dir: Directory to scan for trigger YAML files.
 
     Returns:
-        List of parsed and validated :class:`Hook` instances.
+        List of parsed and validated :class:`Trigger` instances.
     """
-    hooks: list[Hook] = []
+    triggers: list[Trigger] = []
 
-    if not hooks_dir.exists():
-        return hooks
+    if not triggers_dir.exists():
+        return triggers
 
     seen: dict[str, Path] = {}
     for ext in ("*.yaml", "*.yml"):
-        for path in sorted(hooks_dir.glob(ext)):
+        for path in sorted(triggers_dir.glob(ext)):
             if path.stem in seen:
                 logger.warning(
-                    "Duplicate hook '%s': using %s, ignoring %s",
+                    "Duplicate trigger '%s': using %s, ignoring %s",
                     path.stem,
                     seen[path.stem].name,
                     path.name,
@@ -155,60 +156,40 @@ def load_hooks(hooks_dir: Path) -> list[Hook]:
     for path in seen.values():
         try:
             data = parse_yaml(path.read_text(encoding="utf-8"))
-            hook = _parse_hook(path, data)
-            if hook is not None:
-                hooks.append(hook)
+            trig = _parse_trigger(path, data)
+            if trig is not None:
+                triggers.append(trig)
         except Exception:
-            logger.warning("Failed to parse hook: %s", path.name, exc_info=True)
+            logger.warning("Failed to parse trigger: %s", path.name, exc_info=True)
 
-    return hooks
-
-
-def is_provider_hook_event(event: str) -> bool:
-    """Return ``True`` for canonical provider-hook events handled elsewhere.
-
-    Provider (agent-runtime) hooks live alongside CLI-lifecycle hooks in the
-    same directory but are rendered into per-provider native configs by
-    :mod:`vaultspec_core.core.provider_hooks`. The lifecycle loader must treat
-    their events as "not mine" and skip them silently, never as unsupported.
-    """
-    try:
-        from vaultspec_core.core.provider_hooks import HookEvent
-    except ImportError:
-        return False
-    return event in {member.value for member in HookEvent}
+    return triggers
 
 
-def _parse_hook(path: Path, data: dict[str, Any]) -> Hook | None:
-    """Parse a hook definition dict into a Hook object.
+def _parse_trigger(path: Path, data: dict[str, Any]) -> Trigger | None:
+    """Parse a trigger definition dict into a Trigger object.
 
     Args:
-        path: Source YAML file path (used to derive the hook name and for
+        path: Source YAML file path (used to derive the trigger name and for
             warning messages).
         data: Parsed YAML dict containing ``event`` and ``actions`` keys.
 
     Returns:
-        A populated :class:`Hook` instance, or ``None`` if the definition is
+        A populated :class:`Trigger` instance, or ``None`` if the definition is
         invalid (missing event, unsupported event, etc.).
     """
     event = data.get("event", "")
     if not event:
-        logger.warning("Hook %s missing 'event' field", path.name)
+        logger.warning("Trigger %s missing 'event' field", path.name)
         return None
 
     if event not in SUPPORTED_EVENTS:
-        if is_provider_hook_event(event):
-            # Provider (agent-runtime) hooks share this directory but are
-            # rendered by vaultspec_core.core.provider_hooks, not fired by this
-            # CLI-lifecycle engine. Skip silently rather than warn.
-            return None
-        logger.warning("Hook %s has unsupported event: %s", path.name, event)
+        logger.warning("Trigger %s has unsupported event: %s", path.name, event)
         return None
 
     raw_actions = data.get("actions", [])
     actions = _parse_actions(raw_actions) if isinstance(raw_actions, list) else []
 
-    return Hook(
+    return Trigger(
         name=path.stem,
         event=event,
         actions=actions,
@@ -217,9 +198,9 @@ def _parse_hook(path: Path, data: dict[str, Any]) -> Hook | None:
     )
 
 
-def _parse_actions(raw_actions: Any) -> list[HookAction]:
+def _parse_actions(raw_actions: Any) -> list[TriggerAction]:
     """Parse every valid action from an untyped YAML sequence."""
-    actions: list[HookAction] = []
+    actions: list[TriggerAction] = []
     for raw in raw_actions:
         if isinstance(raw, dict):
             action = _parse_action(raw)
@@ -228,15 +209,15 @@ def _parse_actions(raw_actions: Any) -> list[HookAction]:
     return actions
 
 
-def _parse_action(raw: Any) -> HookAction | None:
-    """Parse a single action dict into a HookAction.
+def _parse_action(raw: Any) -> TriggerAction | None:
+    """Parse a single action dict into a TriggerAction.
 
     Args:
         raw: Dict with at minimum a ``type`` key; ``"shell"`` actions also
             require ``command``.
 
     Returns:
-        A :class:`HookAction` instance, or ``None`` if the dict is missing
+        A :class:`TriggerAction` instance, or ``None`` if the dict is missing
         required fields or has an unknown type.
     """
     action_type = raw.get("type", "")
@@ -247,7 +228,7 @@ def _parse_action(raw: Any) -> HookAction | None:
                 "Skipping action: shell action missing 'command' field (raw=%r)", raw
             )
             return None
-        return HookAction(action_type="shell", command=cmd)
+        return TriggerAction(action_type="shell", command=cmd)
 
     logger.warning("Skipping action: unknown action type %r (raw=%r)", action_type, raw)
     return None
@@ -256,28 +237,28 @@ def _parse_action(raw: Any) -> HookAction | None:
 _triggering: set[str] = set()
 
 
-def trigger(
-    hooks: list[Hook],
+def fire(
+    triggers: list[Trigger],
     event: str,
     context: dict[str, str] | None = None,
     home: Path | None = None,
-) -> list[HookResult]:
-    """Trigger every trusted hook matching the given event.
+) -> list[TriggerResult]:
+    """Trigger every trusted trigger matching the given event.
 
-    Iterates over ``hooks``, filters to those whose ``event`` matches and
+    Iterates over ``triggers``, filters to those whose ``event`` matches and
     ``enabled`` is ``True``, drops any whose command the operator has not
     consented to, and executes the remainder's actions in order.  Guards
     against re-entrant triggers for the same event.
 
-    Consent is the gate this function will not spawn a process without.  A hook
+    Consent is the gate this function will not spawn a process without.  A trigger
     file is committed content that arrives with a clone, so its own contents
-    can never authorise it; :mod:`vaultspec_core.hooks.trust` answers from a
-    ledger kept outside the workspace and denies on every doubt.  Skipped hooks
-    are logged and produce no result, exactly as a non-matching hook does.
+    can never authorise it; :mod:`vaultspec_core.triggers.trust` answers from a
+    ledger kept outside the workspace and denies on every doubt.  Skipped triggers
+    are logged and produce no result, exactly as a non-matching trigger does.
 
     Args:
-        hooks: List of loaded hooks to evaluate.
-        event: Event name to match against hook definitions.
+        triggers: List of loaded triggers to evaluate.
+        event: Event name to match against trigger definitions.
         context: Optional mapping of ``{key}`` placeholder names to
             substitution values used in command and task templates.
         home: Machine-global VaultSpec home holding the consent ledger.
@@ -285,33 +266,33 @@ def trigger(
             own directory so they never read the operator's ledger.
 
     Returns:
-        List of :class:`HookResult` objects, one per executed action.
-        Empty if no hooks matched the event or none of the matches are trusted.
+        List of :class:`TriggerResult` objects, one per executed action.
+        Empty if no triggers matched the event or none of the matches are trusted.
     """
     if event in _triggering:
-        logger.warning("Re-entrant hook trigger blocked: %s", event)
+        logger.warning("Re-entrant trigger trigger blocked: %s", event)
         return []
 
     ctx = context or {}
-    results: list[HookResult] = []
+    results: list[TriggerResult] = []
 
-    candidates = [h for h in hooks if h.event == event and h.enabled]
+    candidates = [h for h in triggers if h.event == event and h.enabled]
     matching, untrusted = partition_by_trust(candidates, home)
-    for hook in untrusted:
+    for trig in untrusted:
         logger.warning(
-            "Hook '%s' is not trusted in this workspace and will not run; "
-            "review it and run 'vaultspec-core spec hooks trust' to allow it",
-            hook.name,
+            "Trigger '%s' is not trusted in this workspace and will not run; "
+            "review it and run 'vaultspec-core spec triggers trust' to allow it",
+            trig.name,
         )
     if not matching:
         return results
 
     _triggering.add(event)
     try:
-        logger.info("Triggering %d hook(s) for event '%s'", len(matching), event)
-        for hook in matching:
-            for action in hook.actions:
-                result = _execute_action(hook.name, action, ctx)
+        logger.info("Triggering %d trigger(s) for event '%s'", len(matching), event)
+        for trig in matching:
+            for action in trig.actions:
+                result = _execute_action(trig.name, action, ctx)
                 results.append(result)
     finally:
         _triggering.discard(event)
@@ -337,49 +318,74 @@ def _interpolate(template: str, ctx: dict[str, str]) -> str:
 
 
 def _execute_action(
-    hook_name: str,
-    action: HookAction,
+    trigger_name: str,
+    action: TriggerAction,
     ctx: dict[str, str],
-) -> HookResult:
-    """Execute a single hook action, dispatching to the correct handler.
+) -> TriggerResult:
+    """Execute a single trigger action, dispatching to the correct handler.
 
     Args:
-        hook_name: Name of the parent hook (used for result attribution).
+        trigger_name: Name of the parent trigger (used for result attribution).
         action: The action to execute.
         ctx: Template interpolation context passed through to the handler.
 
     Returns:
-        A :class:`HookResult` describing the outcome.  Returns a failure
+        A :class:`TriggerResult` describing the outcome.  Returns a failure
         result if ``action.action_type`` is unrecognised.
     """
     if action.action_type == "shell":
-        return _execute_shell(hook_name, action, ctx)
+        return _execute_shell(trigger_name, action, ctx)
 
-    return HookResult(
-        hook_name=hook_name,
+    return TriggerResult(
+        trigger_name=trigger_name,
         action_type=action.action_type,
         success=False,
         error=f"Unknown action type: {action.action_type}",
     )
 
 
+def _split_command(cmd: str) -> list[str]:
+    """Split a command string into argv, correctly on Windows as well.
+
+    POSIX splitting treats a backslash as an escape, which silently destroys
+    every unquoted Windows path - ``C:\tools\run.exe`` arrives as
+    ``C:toolsrun.exe``. Non-POSIX splitting keeps backslashes but also keeps the
+    quote characters inside each token, and ``Popen`` then quotes the token
+    again, so a quoted argument containing a space reached the child wrapped in
+    literal quotes.
+
+    Neither mode is right on Windows alone, so there it splits without POSIX
+    escaping and then strips one matched pair of surrounding quotes per token,
+    which preserves the path and hands ``Popen`` the argument the author wrote.
+    """
+    if os.name != "nt":
+        return shlex.split(cmd, posix=True)
+    tokens = shlex.split(cmd, posix=False)
+    return [
+        token[1:-1]
+        if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'"
+        else token
+        for token in tokens
+    ]
+
+
 def _execute_shell(
-    hook_name: str,
-    action: HookAction,
+    trigger_name: str,
+    action: TriggerAction,
     ctx: dict[str, str],
-) -> HookResult:
+) -> TriggerResult:
     """Execute a shell command action.
 
     Interpolates ``{key}`` placeholders in the command string, then runs it
     via ``subprocess.Popen`` with a 60-second timeout.
 
     Args:
-        hook_name: Name of the parent hook (for result attribution).
+        trigger_name: Name of the parent trigger (for result attribution).
         action: Shell action containing the command template.
         ctx: Template interpolation context.
 
     Returns:
-        A :class:`HookResult` with ``success=True`` when the process exits
+        A :class:`TriggerResult` with ``success=True`` when the process exits
         with code 0.  Captures stdout as ``output`` and stderr as ``error``.
     """
     cmd = _interpolate(action.command, ctx)
@@ -392,13 +398,15 @@ def _execute_shell(
         if target_dir.is_dir():
             cwd: str | None = str(target_dir)
         else:
-            logger.warning("Hook cwd %s does not exist, using process cwd", target_dir)
+            logger.warning(
+                "Trigger cwd %s does not exist, using process cwd", target_dir
+            )
             cwd = None
     except LookupError:
         cwd = None
 
     try:
-        cmd_args = shlex.split(cmd, posix=(os.name != "nt"))
+        cmd_args = _split_command(cmd)
         process = subprocess.Popen(
             cmd_args,
             stdout=subprocess.PIPE,
@@ -413,72 +421,72 @@ def _execute_shell(
             kill_process_tree(process.pid)
             process.kill()
             process.communicate()
-            logger.warning("Shell hook '%s' timed out (60s)", hook_name)
-            return HookResult(
-                hook_name=hook_name,
+            logger.warning("Shell trigger '%s' timed out (60s)", trigger_name)
+            return TriggerResult(
+                trigger_name=trigger_name,
                 action_type="shell",
                 success=False,
-                error="Hook timed out (60s)",
+                error="Trigger timed out (60s)",
             )
-        return HookResult(
-            hook_name=hook_name,
+        return TriggerResult(
+            trigger_name=trigger_name,
             action_type="shell",
             success=process.returncode == 0,
             output=stdout.strip(),
             error=stderr.strip(),
         )
     except Exception as e:
-        logger.error("Shell hook '%s' failed: %s", hook_name, e, exc_info=True)
-        return HookResult(
-            hook_name=hook_name,
+        logger.error("Shell trigger '%s' failed: %s", trigger_name, e, exc_info=True)
+        return TriggerResult(
+            trigger_name=trigger_name,
             action_type="shell",
             success=False,
             error=str(e),
         )
 
 
-def fire_hooks(
+def fire_triggers(
     event: str,
     context: dict[str, str] | None = None,
     *,
-    hooks_dir: Path | None = None,
+    triggers_dir: Path | None = None,
     home: Path | None = None,
 ) -> None:
-    """Fire hooks for a lifecycle event, silently catching all errors.
+    """Fire triggers for a lifecycle event, silently catching all errors.
 
     This is the lifecycle entry point ``sync`` reaches, so it is the
     highest-traffic route into :func:`trigger`'s consent check. It therefore
-    threads ``home`` the same way it threads ``hooks_dir``: without it, the
+    threads ``home`` the same way it threads ``triggers_dir``: without it, the
     consent half of this path could only be exercised against the operator's
     own ledger, and a path that can only be tested destructively is a path
     that does not get tested.
 
     Args:
         event: Event name to trigger.
-        context: Optional context dict passed through to hook actions.
+        context: Optional context dict passed through to trigger actions.
         home: Machine-global VaultSpec home holding the consent ledger.
             Defaults to the operator's real home, which is what every
             production caller wants; real-filesystem tests pass their own so
             they neither read nor write the operator's approvals.
-        hooks_dir: Directory to load hook definitions from. Defaults to the
+        triggers_dir: Directory to load trigger definitions from. Defaults to the
             active :func:`~vaultspec_core.core.types.get_context`'s
-            ``hooks_dir`` when omitted - the right default for a caller
+            ``triggers_dir`` when omitted - the right default for a caller
             operating on a single, ambient workspace. A caller that just
             finished acting on a *different* workspace than the ambient one
             (for example ``sync --target``, which reads its source content
             from the CWD workspace while writing to a separate target) must
-            pass the target's own hooks directory explicitly: hooks react to
+            pass the target's own triggers directory explicitly: triggers react to
             an event that happened *to* a workspace, so they must be the
-            hooks *that* workspace declares, not whichever happens to be
+            triggers *that* workspace declares, not whichever happens to be
             ambient when the event fires.
     """
     try:
-        if hooks_dir is None:
+        if triggers_dir is None:
             from ..core.types import get_context
 
-            hooks_dir = get_context().hooks_dir
+            triggers_dir = get_context().triggers_dir
 
-        hooks = load_hooks(hooks_dir)
-        trigger(hooks, event, context, home)
+        triggers = load_triggers(triggers_dir)
+        fire(triggers, event, context, home)
     except Exception:
-        logger.warning("Hook trigger failed for %s", event, exc_info=True)
+        logger.warning("Trigger trigger failed for %s", event, exc_info=True)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import time
@@ -9,16 +10,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from ...hooks import (
+from ...triggers import (
     SUPPORTED_EVENTS,
-    Hook,
-    HookAction,
-    HookResult,
-    fire_hooks,
+    Trigger,
+    TriggerAction,
+    TriggerResult,
+    fire_triggers,
     grant,
-    load_hooks,
-    trigger,
+    load_triggers,
 )
+from ..engine import fire
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,10 +27,10 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.unit]
 
 
-def write_hook(hooks_dir: Path, name: str, event: str, command: str) -> Path:
+def write_hook(triggers_dir: Path, name: str, event: str, command: str) -> Path:
     """Write one shell hook definition, the way a workspace carries it."""
-    hooks_dir.mkdir(parents=True, exist_ok=True)
-    path = hooks_dir / f"{name}.yaml"
+    triggers_dir.mkdir(parents=True, exist_ok=True)
+    path = triggers_dir / f"{name}.yaml"
     path.write_text(
         f"event: {event}\nactions:\n  - type: shell\n    command: {command}\n",
         encoding="utf-8",
@@ -37,14 +38,14 @@ def write_hook(hooks_dir: Path, name: str, event: str, command: str) -> Path:
     return path
 
 
-def load_trusted(hooks_dir: Path, home: Path) -> list[Hook]:
+def load_trusted(triggers_dir: Path, home: Path) -> list[Trigger]:
     """Load a hooks directory and record consent for every file in it.
 
     Execution tests need a hook the operator has approved. They must never
     reach the real ledger under the operator's home, so *home* is always a
     directory the test owns.
     """
-    hooks = load_hooks(hooks_dir)
+    hooks = load_triggers(triggers_dir)
     grant([h.source_path for h in hooks if h.source_path is not None], home)
     return hooks
 
@@ -55,26 +56,27 @@ class TestSupportedEvents:
     def test_events_is_frozenset(self):
         assert isinstance(SUPPORTED_EVENTS, frozenset)
 
-    def test_expected_events(self):
-        expected = {
-            "vault.document.created",
-            "config.synced",
-            "audit.completed",
-        }
-        assert expected == SUPPORTED_EVENTS
+    def test_only_events_that_are_emitted(self):
+        """A declared event nothing fires is worse than no event at all.
+
+        ``config.synced`` and ``config.synced`` sat here for several
+        releases with no emitter, so a trigger bound to either parsed, listed
+        and reported as supported while never running.
+        """
+        assert {"config.synced"} == SUPPORTED_EVENTS
 
 
 class TestParseAction:
-    """Test action parsing, exercised through load_hooks() (the public entry
+    """Test action parsing, exercised through load_triggers() (the public entry
     point that drives the private action/hook parsers)."""
 
     @staticmethod
-    def _load_single_hook(tmp_path: Path, actions_yaml: str) -> Hook:
+    def _load_single_hook(tmp_path: Path, actions_yaml: str) -> Trigger:
         (tmp_path / "test.yaml").write_text(
             f"event: config.synced\nactions:\n{actions_yaml}",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
         return hooks[0]
 
@@ -101,14 +103,14 @@ class TestParseAction:
 
 
 class TestParseHook:
-    """Test hook parsing from YAML files via load_hooks()."""
+    """Test hook parsing from YAML files via load_triggers()."""
 
     def test_valid_hook(self, tmp_path: Path) -> None:
         (tmp_path / "test.yaml").write_text(
             "event: config.synced\nactions:\n  - type: shell\n    command: echo done\n",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
         hook = hooks[0]
         assert hook.name == "test"
@@ -118,11 +120,11 @@ class TestParseHook:
 
     def test_missing_event(self, tmp_path: Path) -> None:
         (tmp_path / "test.yaml").write_text("enabled: true\n", encoding="utf-8")
-        assert load_hooks(tmp_path) == []
+        assert load_triggers(tmp_path) == []
 
     def test_unsupported_event(self, tmp_path: Path) -> None:
         (tmp_path / "test.yaml").write_text("event: unknown.event\n", encoding="utf-8")
-        assert load_hooks(tmp_path) == []
+        assert load_triggers(tmp_path) == []
 
     def test_disabled_hook(self, tmp_path: Path) -> None:
         (tmp_path / "test.yaml").write_text(
@@ -130,18 +132,18 @@ class TestParseHook:
             "actions:\n  - type: shell\n    command: echo x\n",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
         assert hooks[0].enabled is False
 
     def test_multiple_actions(self, tmp_path: Path) -> None:
         (tmp_path / "test.yaml").write_text(
-            "event: vault.document.created\nactions:\n"
+            "event: config.synced\nactions:\n"
             "  - type: shell\n    command: echo 1\n"
             "  - type: shell\n    command: echo 2\n",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
         assert len(hooks[0].actions) == 2
 
@@ -150,11 +152,11 @@ class TestLoadHooks:
     """Test loading hooks from a directory."""
 
     def test_empty_dir(self, tmp_path: Path) -> None:
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert hooks == []
 
     def test_nonexistent_dir(self, tmp_path: Path) -> None:
-        hooks = load_hooks(tmp_path / "nonexistent")
+        hooks = load_triggers(tmp_path / "nonexistent")
         assert hooks == []
 
     def test_loads_yaml(self, tmp_path: Path) -> None:
@@ -163,7 +165,7 @@ class TestLoadHooks:
             "event: config.synced\nactions:\n  - type: shell\n    command: echo done\n",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
         assert hooks[0].name == "my-hook"
 
@@ -173,7 +175,7 @@ class TestLoadHooks:
             "event: config.synced\nactions:\n  - type: shell\n    command: echo done\n",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
 
     def test_skips_invalid(self, tmp_path: Path) -> None:
@@ -187,13 +189,13 @@ class TestLoadHooks:
             "actions:\n  - type: shell\n    command: echo bad\n",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
         assert hooks[0].name == "good"
 
 
 class TestInterpolate:
-    """Test template variable interpolation, exercised through trigger()
+    """Test template variable interpolation, exercised through fire()
     (the public entry point that drives the private interpolation step)."""
 
     @staticmethod
@@ -210,7 +212,7 @@ class TestInterpolate:
             f"{exe} {script_path} {template}",
         )
         hooks = load_trusted(tmp_path / "hooks", home)
-        results = trigger(hooks, "config.synced", ctx, home=home)
+        results = fire(hooks, "config.synced", ctx, home=home)
         assert len(results) == 1
         assert results[0].success is True
         return results[0].output
@@ -237,26 +239,26 @@ class TestTrigger:
     """Test hook triggering."""
 
     def test_no_matching_hooks(self):
-        hook = Hook(
+        hook = Trigger(
             name="test",
             event="config.synced",
             actions=[
-                HookAction(action_type="shell", command="echo x"),
+                TriggerAction(action_type="shell", command="echo x"),
             ],
         )
-        results = trigger([hook], "vault.index.updated")
+        results = fire([hook], "vault.index.updated")
         assert results == []
 
     def test_disabled_hooks_skipped(self):
-        hook = Hook(
+        hook = Trigger(
             name="test",
             event="config.synced",
             enabled=False,
             actions=[
-                HookAction(action_type="shell", command="echo x"),
+                TriggerAction(action_type="shell", command="echo x"),
             ],
         )
-        results = trigger([hook], "config.synced")
+        results = fire([hook], "config.synced")
         assert results == []
 
     def test_shell_execution(self, tmp_path: Path) -> None:
@@ -268,7 +270,7 @@ class TestTrigger:
             f"{sys.executable.replace('\\', '/')} -V",
         )
         hooks = load_trusted(tmp_path / "hooks", home)
-        results = trigger(hooks, "config.synced", home=home)
+        results = fire(hooks, "config.synced", home=home)
         assert len(results) == 1
         assert results[0].success is True
         assert "Python" in results[0].output
@@ -286,7 +288,7 @@ class TestTrigger:
             f"{exe} {script_path} {{root}}",
         )
         hooks = load_trusted(tmp_path / "hooks", home)
-        results = trigger(
+        results = fire(
             hooks,
             "config.synced",
             {"root": "/tmp/test"},
@@ -304,7 +306,7 @@ class TestTrigger:
         home = tmp_path / "home"
         write_hook(tmp_path / "hooks", "test", "config.synced", f"{exe} {script_path}")
         hooks = load_trusted(tmp_path / "hooks", home)
-        results = trigger(hooks, "config.synced", home=home)
+        results = fire(hooks, "config.synced", home=home)
         assert len(results) == 1
         assert results[0].success is False
 
@@ -321,7 +323,7 @@ class TestDeduplication:
         )
         (tmp_path / "hook.yaml").write_text(yaml_content, encoding="utf-8")
         (tmp_path / "hook.yml").write_text(yml_content, encoding="utf-8")
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 1
         assert hooks[0].source_path is not None
         assert hooks[0].source_path.suffix == ".yaml"
@@ -332,21 +334,21 @@ class TestDeduplication:
             encoding="utf-8",
         )
         (tmp_path / "hook-b.yml").write_text(
-            "event: audit.completed\nactions:\n  - type: shell\n    command: echo b\n",
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo b\n",
             encoding="utf-8",
         )
-        hooks = load_hooks(tmp_path)
+        hooks = load_triggers(tmp_path)
         assert len(hooks) == 2
 
 
 @pytest.mark.serial
 class TestReentrantGuard:
-    """Test that a concurrent trigger() of an in-flight event is blocked, and
+    """Test that a concurrent fire() of an in-flight event is blocked, and
     that the guard is released once the in-flight call completes.
 
-    These exercise the real guard through the public trigger() entry point: a
+    These exercise the real guard through the public fire() entry point: a
     background thread is given a genuinely slow shell action so a second,
-    concurrent trigger() call for the same event observes the guard while the
+    concurrent fire() call for the same event observes the guard while the
     first is still running.
     """
 
@@ -365,10 +367,10 @@ class TestReentrantGuard:
         write_hook(tmp_path / "hooks", "test", "config.synced", f"{exe} {script_path}")
         hooks = load_trusted(tmp_path / "hooks", home)
 
-        outer_results: list[HookResult] = []
+        outer_results: list[TriggerResult] = []
 
         def run_outer() -> None:
-            outer_results.extend(trigger(hooks, "config.synced", home=home))
+            outer_results.extend(fire(hooks, "config.synced", home=home))
 
         outer_thread = threading.Thread(target=run_outer)
         outer_thread.start()
@@ -378,7 +380,7 @@ class TestReentrantGuard:
                 time.sleep(0.02)
             assert marker.exists(), "outer trigger's shell action never started"
 
-            inner_results = trigger(hooks, "config.synced", home=home)
+            inner_results = fire(hooks, "config.synced", home=home)
             assert inner_results == []
         finally:
             outer_thread.join(timeout=5)
@@ -396,7 +398,7 @@ class TestReentrantGuard:
             f"{sys.executable.replace('\\', '/')} -V",
         )
         hooks = load_trusted(tmp_path / "hooks", home)
-        results = trigger(hooks, "config.synced", home=home)
+        results = fire(hooks, "config.synced", home=home)
         assert len(results) == 1
         assert results[0].success is True
 
@@ -407,25 +409,25 @@ class TestReentrantGuard:
         write_hook(
             tmp_path / "hooks",
             "test",
-            "audit.completed",
+            "config.synced",
             f"{sys.executable.replace('\\', '/')} -V",
         )
         hooks = load_trusted(tmp_path / "hooks", home)
-        first = trigger(hooks, "audit.completed", home=home)
+        first = fire(hooks, "config.synced", home=home)
         assert len(first) == 1
         assert first[0].success is True
 
-        second = trigger(hooks, "audit.completed", home=home)
+        second = fire(hooks, "config.synced", home=home)
         assert len(second) == 1
         assert second[0].success is True
 
 
 class TestFireHooksIntegration:
-    """Integration tests for the load_hooks + trigger combination.
+    """Integration tests for the load_triggers + trigger combination.
 
-    fire_hooks() internally uses _t.HOOKS_DIR which requires workspace
+    fire_triggers() internally uses _t.HOOKS_DIR which requires workspace
     initialisation. These tests exercise the same real code path by calling
-    load_hooks(tmp_path) + trigger() directly.
+    load_triggers(tmp_path) + fire() directly.
     """
 
     def test_shell_hook_side_effect(self, tmp_path: Path) -> None:
@@ -438,23 +440,23 @@ class TestFireHooksIntegration:
             encoding="utf-8",
         )
         hook_content = (
-            "event: vault.document.created\n"
+            "event: config.synced\n"
             "actions:\n"
             f"  - type: shell\n"
             f"    command: {sys.executable} {script}\n"
         )
-        hooks_dir = tmp_path / "hooks"
-        hooks_dir.mkdir()
-        (hooks_dir / "marker-hook.yaml").write_text(hook_content, encoding="utf-8")
+        triggers_dir = tmp_path / "hooks"
+        triggers_dir.mkdir()
+        (triggers_dir / "marker-hook.yaml").write_text(hook_content, encoding="utf-8")
 
         home = tmp_path / "home"
-        hooks = load_trusted(hooks_dir, home)
+        hooks = load_trusted(triggers_dir, home)
         assert len(hooks) == 1
 
-        results = trigger(
+        results = fire(
             hooks,
-            "vault.document.created",
-            {"root": str(tmp_path), "event": "vault.document.created"},
+            "config.synced",
+            {"root": str(tmp_path), "event": "config.synced"},
             home=home,
         )
         assert len(results) == 1
@@ -462,19 +464,19 @@ class TestFireHooksIntegration:
         assert marker.exists(), "Shell hook should have created the marker file"
 
     def test_no_hooks_returns_empty(self, tmp_path: Path) -> None:
-        hooks = load_hooks(tmp_path)
-        results = trigger(hooks, "vault.document.created")
+        hooks = load_triggers(tmp_path)
+        results = fire(hooks, "config.synced")
         assert results == []
 
 
 class TestFireHooksExplicitDirectory:
-    """``fire_hooks(hooks_dir=...)`` must load from that directory, not the
+    """``fire_triggers(triggers_dir=...)`` must load from that directory, not the
     ambient workspace context.
 
     Regression coverage for the sync ``--target`` bug where the hook
     definitions loaded came from whichever workspace happened to be
     ambient rather than the one a caller explicitly names. Passing
-    ``hooks_dir`` also means a caller can exercise ``fire_hooks`` without
+    ``triggers_dir`` also means a caller can exercise ``fire_triggers`` without
     workspace initialisation at all.
     """
 
@@ -510,14 +512,14 @@ class TestFireHooksExplicitDirectory:
         grant([hook], home)
 
         # Deliberately do not initialise any workspace context: the whole
-        # point of the explicit hooks_dir parameter is that fire_hooks does
+        # point of the explicit triggers_dir parameter is that fire_triggers does
         # not need one when it is given. Without it, an implementation that
-        # ignored hooks_dir would have no ambient directory to fall back to,
+        # ignored triggers_dir would have no ambient directory to fall back to,
         # so the marker can only appear if this directory was the one read.
-        fire_hooks("config.synced", hooks_dir=explicit_dir, home=home)
+        fire_triggers("config.synced", triggers_dir=explicit_dir, home=home)
 
         assert marker.exists(), (
-            "fire_hooks(hooks_dir=...) must load hooks from the directory it "
+            "fire_triggers(triggers_dir=...) must load hooks from the directory it "
             "was given, and must run an approved hook it finds there"
         )
 
@@ -535,8 +537,52 @@ class TestFireHooksExplicitDirectory:
         explicit_dir = tmp_path / "explicit-hooks"
         _, marker = self._write_marker_hook(explicit_dir, tmp_path)
 
-        fire_hooks("config.synced", hooks_dir=explicit_dir, home=tmp_path / "home")
+        fire_triggers(
+            "config.synced", triggers_dir=explicit_dir, home=tmp_path / "home"
+        )
 
         assert not marker.exists(), (
-            "a hook named by hooks_dir ran without an operator consent record"
+            "a hook named by triggers_dir ran without an operator consent record"
         )
+
+
+class TestCommandSplitting:
+    """Argv splitting has to survive both a Windows path and a quoted space."""
+
+    def test_a_quoted_argument_containing_a_space_arrives_as_one_argument(
+        self, tmp_path: Path
+    ) -> None:
+        home = tmp_path / "home"
+        script = tmp_path / "show.py"
+        script.write_text(
+            "import sys; print(len(sys.argv) - 1, sys.argv[1], sep='|')",
+            encoding="utf-8",
+        )
+        exe = sys.executable.replace(chr(92), "/")
+        target = str(script).replace(chr(92), "/")
+
+        write_hook(
+            tmp_path / "triggers",
+            "quoted",
+            "config.synced",
+            # Single-quoted YAML scalar carrying double-quoted shell args, so
+            # YAML keeps the string intact and the splitter sees the quotes.
+            f"""'"{exe}" "{target}" "one two three"'""",
+        )
+        triggers = load_trusted(tmp_path / "triggers", home)
+        results = fire(triggers, "config.synced", home=home)
+
+        assert len(results) == 1
+        assert results[0].success is True, results[0].error
+        count, seen = results[0].output.strip().split("|")
+        assert count == "1", "the quoted argument must not split on its spaces"
+        assert seen == "one two three"
+
+    def test_an_unquoted_windows_path_keeps_its_separators(self) -> None:
+        """POSIX splitting eats backslashes; an unquoted path must survive."""
+        from vaultspec_core.triggers.engine import _split_command
+
+        if os.name != "nt":
+            pytest.skip("backslash-as-separator is a Windows concern")
+
+        assert _split_command(r"C:\tools\run.exe -V") == [r"C:\tools\run.exe", "-V"]

@@ -14,8 +14,8 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the
 - [Command index](#command-index) - every command, grouped, with a one-line summary.
 - [Workspace commands](#workspace-commands) - install, uninstall, and sync.
 - [Vault commands](#vault-commands) - create, query, and edit vault documents and plans.
-- [Spec commands](#spec-commands) - manage rules, skills, agents, hooks, MCPs, and the
-  system prompt.
+- [Spec commands](#spec-commands) - manage rules, skills, agents, hooks, triggers, MCPs,
+  and the system prompt.
 - [Migration commands](#migration-commands) - inspect and run schema migrations.
 - [Config commands](#config-commands) - read and write local project settings.
 - [Environment variables](#environment-variables) - the `VAULTSPEC_` settings.
@@ -117,8 +117,21 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.3`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.2.3`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core spec triggers add`
+- `vaultspec-core spec triggers edit`
+- `vaultspec-core spec triggers list`
+- `vaultspec-core spec triggers remove`
+- `vaultspec-core spec triggers rename`
+- `vaultspec-core spec triggers run`
+- `vaultspec-core spec triggers show`
+- `vaultspec-core spec triggers status`
+- `vaultspec-core spec triggers trust`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -355,21 +368,31 @@ full options.
 
 #### Hooks
 
-- `vaultspec-core spec hooks list` - List all defined hooks.
-- `vaultspec-core spec hooks add` - Add a new declarative hook under .vaultspec/.
-- `vaultspec-core spec hooks show` - Display a hook's content.
-- `vaultspec-core spec hooks edit` - Open a hook in the configured editor.
-- `vaultspec-core spec hooks rename` - Rename an existing hook atomically.
-- `vaultspec-core spec hooks remove` - Delete a hook.
-- `vaultspec-core spec hooks restore` - Restore a hook to its snapshotted original (not
-  supported for custom hooks).
-- `vaultspec-core spec hooks sync` - Sync only hooks files; use vaultspec-core sync for
-  complete refresh.
-- `vaultspec-core spec hooks status` - Report declarative hooks parsing and taxonomy
-  compliance status.
-- `vaultspec-core spec hooks run` - Trigger hooks for a specific event.
-- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to run their shell
-  commands as you.
+- `vaultspec-core spec hooks list` - List this workspace's hooks and the providers they
+  render into.
+- `vaultspec-core spec hooks show` - Show one hook's source file.
+- `vaultspec-core spec hooks status` - Report parse errors and events no installed
+  provider can run.
+- `vaultspec-core spec hooks sync` - Render this workspace's hooks into each provider's
+  native config.
+- `vaultspec-core spec hooks trust` - Approve this workspace's hooks to be rendered into
+  your agents' configs.
+
+#### Triggers
+
+- `vaultspec-core spec triggers list` - List this workspace's lifecycle triggers.
+- `vaultspec-core spec triggers add` - Add a new lifecycle trigger under
+  .vaultspec/triggers/.
+- `vaultspec-core spec triggers show` - Display a trigger's source file.
+- `vaultspec-core spec triggers edit` - Open a trigger in the configured editor.
+- `vaultspec-core spec triggers rename` - Rename an existing trigger atomically.
+- `vaultspec-core spec triggers remove` - Delete a trigger.
+- `vaultspec-core spec triggers status` - Report trigger parse errors and unsupported
+  events.
+- `vaultspec-core spec triggers run` - Fire this workspace's triggers for one lifecycle
+  event.
+- `vaultspec-core spec triggers trust` - Approve this workspace's triggers to run their
+  shell commands as you.
 
 #### Precommit
 
@@ -2356,23 +2379,29 @@ ______________________________________________________________________
 vaultspec-core spec hooks [OPTIONS] COMMAND [ARGS]...
 ```
 
+Agent-runtime hooks: shell commands your coding agent runs when something happens in a
+session. Authored once in `.vaultspec/hooks/` and rendered into each installed
+provider's native hook config. For the file format, the canonical events and each
+provider's spelling, see [agent-runtime hooks](framework.md#agent-runtime-hooks).
+
+This group does not manage vaultspec's own lifecycle events. Those are
+[triggers](#vaultspec-core-spec-triggers), and they are a separate directory, a separate
+command group, and a separate approval.
+
 #### Subcommands
 
-- `list` - List hooks with name, status, event, and action count.
-- `add [NAME] [--event EVENT] [--command CMD] [--body BODY] [--from-file FILE] [--force] [--dry-run]`
-  \- Add a new custom hook definition.
-- `show NAME` - Display a hook's content.
-- `edit NAME [--editor EDITOR]` - Open a hook in the configured editor.
-- `rename OLD_NAME NEW_NAME` - Rename an existing hook atomically.
-- `remove NAME [--yes|--force]` - Delete a hook.
-- `restore FILENAME` - Restore a hook (not supported for custom hooks, exits with error
-  1).
-- `sync` (`--dry-run`, `--force`) - Sync only hooks files.
-- `status` (`--json`) - Report declarative hooks parsing and taxonomy compliance status.
-- `run EVENT [--path PATH]` - Trigger enabled hooks for the given event. Valid events:
-  `vault.document.created`, `config.synced`, `audit.completed`.
-- `trust [NAME] [--revoke] [--json]` - Approve this workspace's hooks to run their shell
-  commands, or withdraw that approval.
+- `list` (`--json`) - List this workspace's hooks and the providers they render into.
+- `show NAME` - Show one hook's source file.
+- `status` (`--json`) - Report parse errors and events no installed provider can run.
+- `sync` (`--dry-run`, `--force`) - Render this workspace's hooks into each provider's
+  native config.
+- `trust [NAME] [--revoke] [--json]` - Approve this workspace's hooks to be rendered
+  into your agents' configs, or withdraw that approval.
+
+There is no `add`: a hook is a file you write in `.vaultspec/hooks/`.
+`vaultspec-core spec hooks add` and `run` still exist as hidden aliases for the trigger
+verbs of the same name and print a deprecation line naming the replacement; they are
+removed one release from now.
 
 #### Hook trust
 
@@ -2382,92 +2411,155 @@ pull. That makes the file itself the wrong place to record whether its command m
 anyone who can open a pull request could otherwise also grant themselves execution on
 every machine that clones the branch.
 
+A rendered hook raises the stakes over a trigger, because it runs inside your agent's
+session on every matching tool call rather than once per sync.
+
 vaultspec-core therefore treats a workspace's hooks as untrusted until an operator says
 otherwise, and records that decision **outside the workspace** - in the machine-global
 VaultSpec home, `~/.vaultspec/hook-trust.json`. Nothing a checkout, an archive, or a
-clone carries can put an entry there.
+clone carries can put an entry there. That file keeps its name from before hooks and
+triggers were separated; its entries are keyed by resolved path, so the two systems'
+approvals never collide.
 
-Approval is per hook file and pinned to that file's exact contents. Editing a hook, or
+Approval is per file and pinned to that file's exact contents. Editing a hook, or
 pulling a change to one, drops the approval until you grant it again, so a hook you
 approved last month cannot quietly become a different command this month. It also means
 a trusted hook stops running the moment its file changes, which is the intended trade: a
 second `vaultspec-core spec hooks trust` after an intentional edit is cheaper than an
 unnoticed one.
 
-- `vaultspec-core sync` and `vaultspec-core spec hooks run` show you each untrusted
-  hook's command and offer to remember your approval, but only at an interactive
-  terminal.
 - Anywhere without an operator - CI (`CI` is set), `--json` output, redirected input,
   `VAULTSPEC_NON_INTERACTIVE`, or an MCP tool call - the hooks are skipped and the
   reason is written to stderr. There is no flag that auto-approves, because a flag a
   script can pass is a flag a repository can talk a script into passing.
+- The refusal lives in the renderer, not in the prompt, so every route into it is gated
+  and not only the ones that can ask. A hook with no source file on disk is refused for
+  the same reason: nothing about it can be matched against the ledger.
+- You are asked before a sync that would render and before
+  `vaultspec-core install --upgrade`. A fresh install renders nothing, so it does not
+  ask.
 - Declining costs only the hooks. The sync itself still completes.
+- Revoking works end to end: the next sync omits the withdrawn hook and removes the
+  entry it had written, rather than leaving it behind.
 - `vaultspec-core spec hooks list` shows a `trust` column, so an enabled hook that is
   not running never has to be a mystery.
-- The gateway's `invoke` tool cannot reach `vaultspec-core spec hooks add`,
-  `vaultspec-core spec hooks run`, `vaultspec-core spec hooks trust`, or
-  `vaultspec-core sync` at all; they are denied at the MCP surface.
+- The gateway's `invoke` tool cannot reach `vaultspec-core spec hooks sync`,
+  `vaultspec-core spec hooks trust`, `vaultspec-core sync`, or `vaultspec-core install`
+  at all; they are denied at the MCP surface.
+
+`vaultspec-core spec hooks trust` approves provider hooks only. When the workspace also
+has unapproved triggers, it says so and names the verb that approves those, because the
+two grants are separate.
 
 #### Examples
 
-- **Run all hooks registered for the document creation event**:
-
-  ```bash
-  vaultspec-core spec hooks run vault.document.created
-  ```
-
-- **List all registered hooks and their enabled/disabled status**:
+- **List this workspace's hooks and where each one renders**:
 
   ```bash
   vaultspec-core spec hooks list
   ```
 
-- **Add a new custom hook triggered on document creation**:
-
-  ```bash
-  vaultspec-core spec hooks add log-created --event vault.document.created --command "echo Created"
-  ```
-
-- **Display the definition and command block of a hook**:
-
-  ```bash
-  vaultspec-core spec hooks show log-created
-  ```
-
-- **Edit an existing hook definition using a configured editor**:
-
-  ```bash
-  vaultspec-core spec hooks edit log-created
-  ```
-
-- **Rename an existing hook atomically**:
-
-  ```bash
-  vaultspec-core spec hooks rename log-created document-logger
-  ```
-
-- **Remove/delete an obsolete hook**:
-
-  ```bash
-  vaultspec-core spec hooks remove document-logger --force
-  ```
-
-- **Check and report overall parsing and compliance status of hooks**:
+- **See which declared events no installed provider can run**:
 
   ```bash
   vaultspec-core spec hooks status
   ```
 
-- **Synchronize local hook definitions**:
+- **Approve this workspace's hooks, then render them**:
 
   ```bash
+  vaultspec-core spec hooks trust
   vaultspec-core spec hooks sync
   ```
 
-- **Restore a default hook to its original snapshotted version**:
+- **Preview a render without writing**:
 
   ```bash
-  vaultspec-core spec hooks restore some-default-hook.json
+  vaultspec-core spec hooks sync --dry-run
+  ```
+
+- **Withdraw approval; the next sync removes what it rendered**:
+
+  ```bash
+  vaultspec-core spec hooks trust --revoke
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core spec triggers
+
+```bash
+vaultspec-core spec triggers [OPTIONS] COMMAND [ARGS]...
+```
+
+Lifecycle triggers: shell commands bound to vaultspec's own events, fired by the CLI
+rather than by your agent. Source files live in `.vaultspec/triggers/`.
+
+One event fires today, `config.synced`, after an all-provider `vaultspec-core sync`
+completes. Two earlier events were declared but never emitted and have been retired; a
+trigger bound to one is now reported rather than silently ignored.
+
+#### Subcommands
+
+- `list` (`--json`) - List this workspace's lifecycle triggers.
+- `add [NAME] [--event EVENT] [--command CMD] [--body BODY] [--from-file FILE] [--force] [--dry-run]`
+  \- Add a new trigger. `--event` defaults to `config.synced`.
+- `show NAME` - Display a trigger's source file.
+- `edit NAME [--editor EDITOR]` - Open a trigger in the configured editor.
+- `rename OLD_NAME NEW_NAME` - Rename an existing trigger atomically.
+- `remove NAME [--yes|--force]` - Delete a trigger.
+- `status` (`--json`) - Report trigger parse errors and unsupported events.
+- `run EVENT [--path PATH]` - Fire this workspace's triggers for one lifecycle event.
+- `trust [NAME] [--revoke] [--json]` - Approve this workspace's triggers to run their
+  shell commands as you, or withdraw that approval.
+
+#### Trigger trust
+
+Triggers carry the same consent model as hooks, for the same reason and through the same
+machine-global ledger: a trigger file arrives with every clone, so approval is recorded
+outside the workspace and pinned to each file's contents. `vaultspec-core sync` and
+`vaultspec-core spec triggers run` show you each untrusted trigger's command and offer
+to remember your approval, but only at an interactive terminal.
+
+Approval is keyed by resolved path. Upgrading from a version that kept triggers in
+`.vaultspec/hooks/` relocates them, which drops their approval - run
+`vaultspec-core spec triggers trust` once to restore it. The migration says so when it
+moves them.
+
+The gateway's `invoke` tool cannot reach `vaultspec-core spec triggers add`,
+`vaultspec-core spec triggers run`, or `vaultspec-core spec triggers trust`.
+
+#### Examples
+
+- **Add a trigger that checks the vault after every sync**:
+
+  ```bash
+  vaultspec-core spec triggers add post-sync-check --command "vaultspec-core vault check all"
+  ```
+
+- **List this workspace's triggers and their trust state**:
+
+  ```bash
+  vaultspec-core spec triggers list
+  ```
+
+- **Fire the triggers bound to the sync event**:
+
+  ```bash
+  vaultspec-core spec triggers run config.synced
+  ```
+
+- **Report parse errors and events that no longer exist**:
+
+  ```bash
+  vaultspec-core spec triggers status
+  ```
+
+- **Rename a trigger, then withdraw its approval**:
+
+  ```bash
+  vaultspec-core spec triggers rename post-sync-check vault-gate
+  vaultspec-core spec triggers trust vault-gate --revoke
   ```
 
 ______________________________________________________________________

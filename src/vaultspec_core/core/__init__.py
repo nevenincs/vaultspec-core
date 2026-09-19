@@ -54,13 +54,6 @@ from .home import ProcessRegistryDiagnosis as ProcessRegistryDiagnosis
 from .home import ProcessRegistrySignal as ProcessRegistrySignal
 from .home import core_home_layout as core_home_layout
 from .home import diagnose_process_registry as diagnose_process_registry
-from .hooks import hooks_add as hooks_add
-from .hooks import hooks_edit as hooks_edit
-from .hooks import hooks_remove as hooks_remove
-from .hooks import hooks_rename as hooks_rename
-from .hooks import hooks_show as hooks_show
-from .hooks import hooks_status as hooks_status
-from .hooks import hooks_sync as hooks_sync
 from .local_config import (
     KNOWN_KEYS as KNOWN_KEYS,
 )
@@ -114,6 +107,12 @@ from .skills import transform_skill as transform_skill
 from .sync import sync_files as sync_files
 from .system import system_show as system_show
 from .system import system_sync as system_sync
+from .triggers import triggers_add as triggers_add
+from .triggers import triggers_edit as triggers_edit
+from .triggers import triggers_remove as triggers_remove
+from .triggers import triggers_rename as triggers_rename
+from .triggers import triggers_show as triggers_show
+from .triggers import triggers_status as triggers_status
 from .types import CONFIG_HEADER as CONFIG_HEADER
 from .types import McpTarget as McpTarget
 from .types import SyncResult as SyncResult

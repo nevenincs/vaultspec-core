@@ -69,27 +69,43 @@ _COMMAND_SPAN = re.compile(r"`" + re.escape(_EXECUTABLE) + r"\s+([^`]+)`")
 #: uncreatable and uneditable via MCP). Read-only ``spec mcps list`` / ``spec
 #: mcps status`` are intentionally *not* denied.
 #:
-#: The hook lifecycle verbs and ``sync`` are denied for a different reason, and
-#: a security one (GHSA-w5xf-54cr-fxcq). A workspace hook declares a shell
-#: command, so ``spec hooks add``, ``spec hooks run``, ``spec hooks trust`` and
-#: the all-provider ``sync`` that fires the ``config.synced`` event are the only
-#: cataloged verbs whose *declared purpose* is to spawn a command the caller
-#: chose. Every other gateway defence is about argv hygiene and cannot help
-#: here: a well-formed, fully declared invocation of those verbs is exactly the
-#: dangerous one. Because ``discover`` and ``invoke`` are driven by a model
-#: whose context can contain text from a cloned repository, that pairing must
-#: not be reachable from the tool surface at all. Denying ``spec hooks trust``
-#: matters just as much as denying the runner: consent is an operator decision
-#: taken at a terminal, and a tool call is not one. Read-only ``spec hooks
-#: list`` / ``spec hooks show`` / ``spec hooks status`` stay available, so an
-#: agent can still read and explain a workspace's hooks.
+#: The trigger and hook verbs, ``sync`` and ``install`` are denied for a
+#: different reason, and a security one (GHSA-w5xf-54cr-fxcq). Both systems bind
+#: a shell command the caller chose: a trigger fires it inside the vaultspec
+#: runtime, a hook is rendered into a provider config and then runs inside the
+#: agent's own session on every matching tool call. So ``spec triggers add`` /
+#: ``run`` / ``trust``, ``spec hooks sync`` / ``trust``, and the ``sync`` and
+#: ``install`` passes that reach either renderer are the cataloged verbs whose
+#: *declared purpose* is to spawn a command the caller chose. Every other
+#: gateway defence is about argv hygiene and cannot help here: a well-formed,
+#: fully declared invocation of those verbs is exactly the dangerous one.
+#: Because ``discover`` and ``invoke`` are driven by a model whose context can
+#: contain text from a cloned repository, that pairing must not be reachable
+#: from the tool surface at all.
+#:
+#: Denying the two ``trust`` verbs matters just as much as denying the runners:
+#: consent is an operator decision taken at a terminal, and a tool call is not
+#: one. ``spec hooks trust`` is denied in its own right rather than inherited
+#: from the deprecated alias, so it stays denied once the aliases go.
+#:
+#: Read-only ``spec hooks`` and ``spec triggers`` ``list`` / ``show`` /
+#: ``status`` stay available, so an agent can still read and explain what a
+#: workspace would run.
 DENYLIST: frozenset[tuple[str, ...]] = frozenset(
     {
         ("uninstall",),
+        ("install",),
         ("sync",),
+        ("spec", "hooks", "sync"),
+        ("spec", "hooks", "trust"),
+        # The deprecated ``spec hooks add`` / ``run`` aliases delegate to the
+        # trigger implementation, so they carry the same authority and are
+        # removed with the aliases one release from now.
         ("spec", "hooks", "add"),
         ("spec", "hooks", "run"),
-        ("spec", "hooks", "trust"),
+        ("spec", "triggers", "add"),
+        ("spec", "triggers", "run"),
+        ("spec", "triggers", "trust"),
         ("spec", "mcps", "add"),
         ("spec", "mcps", "remove"),
         ("spec", "mcps", "sync"),
