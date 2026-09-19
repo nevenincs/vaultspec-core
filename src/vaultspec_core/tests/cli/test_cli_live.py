@@ -413,12 +413,14 @@ class TestSync:
             f"import pathlib; pathlib.Path({str(marker_target)!r}).touch()",
             encoding="utf-8",
         )
-        (cwd_workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+        for ws in (cwd_workspace, target_workspace):
+            (ws / ".vaultspec" / "triggers").mkdir(parents=True, exist_ok=True)
+        (cwd_workspace / ".vaultspec" / "triggers" / "marker.yaml").write_text(
             "event: config.synced\nenabled: true\nactions:\n"
             f"  - type: shell\n    command: {sys.executable} {script_cwd}\n",
             encoding="utf-8",
         )
-        (target_workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+        (target_workspace / ".vaultspec" / "triggers" / "marker.yaml").write_text(
             "event: config.synced\nenabled: true\nactions:\n"
             f"  - type: shell\n    command: {sys.executable} {script_target}\n",
             encoding="utf-8",
@@ -507,7 +509,8 @@ class TestSync:
             (cwd_workspace, "cwd-only-token"),
             (target_workspace, "target-only-token"),
         ):
-            (workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+            (workspace / ".vaultspec" / "triggers").mkdir(parents=True, exist_ok=True)
+            (workspace / ".vaultspec" / "triggers" / "marker.yaml").write_text(
                 "event: config.synced\nenabled: true\nactions:\n"
                 f"  - type: shell\n    command: {sys.executable} -c {tag}\n",
                 encoding="utf-8",
