@@ -274,8 +274,10 @@ into whichever of those agents this project has installed.
 
 These are the agent's events, not Core's. A hook here fires inside the coding agent
 while you work. It has nothing to do with the
-[pre-commit hooks](#configure-project-integrations) Core scaffolds for Git, or with the
-lifecycle hooks `vaultspec-core spec hooks` manages, which fire inside Core's own CLI.
+[pre-commit hooks](#configure-project-integrations) Core scaffolds for Git, nor with the
+lifecycle triggers in `.vaultspec/triggers/`, which fire inside Core's own CLI. Each
+directory has one owner, so a file in the wrong one is reported rather than silently
+ignored.
 
 ### Write a hook
 
@@ -299,15 +301,15 @@ enabled: true
 | `timeout` | no       | Seconds, always. Core converts to each provider's unit          |
 | `enabled` | no       | Defaults to `true`; `false` parses the file but renders nothing |
 
-`.vaultspec/hooks/` also holds Core's own lifecycle hooks, which are told apart by their
-event name. A file whose `event` isn't one of the canonical names below is left to that
-system, so the two coexist in the directory without either claiming the other's files.
+This directory holds agent-runtime hooks only. Core's own lifecycle triggers live in
+`.vaultspec/triggers/`, and a file whose `event` isn't one of the canonical names below
+doesn't belong here.
 
 ### Canonical events
 
 Write the canonical name. Each provider gets its own spelling, and a provider that has
 no equivalent for an event is skipped for that hook, with a warning naming the hook and
-the provider. Verified mid-2026 against each provider's published hooks documentation.
+the provider.
 
 | Canonical event      | claude             | codex              | antigravity    | gemini         |
 | -------------------- | ------------------ | ------------------ | -------------- | -------------- |
