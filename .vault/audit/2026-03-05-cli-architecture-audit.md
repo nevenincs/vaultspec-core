@@ -3,8 +3,8 @@ tags:
   - '#audit'
   - '#cli-architecture'
 date: 2026-03-05
-modified: '2026-06-13'
-body_hash: 'sha256:84b36ada02359424535dd4910a9c6a593cc5077c6765b66aa8aa5c4d4915a994'
+modified: '2026-09-19'
+body_hash: 'sha256:6e13b534546eeca778121e979614b70eb73a357019eb5cc6ee64d8560aa1f755'
 related:
 ---
 
@@ -524,7 +524,7 @@ agent-related codebase findings, as any code referencing eam, server, subagent, 
 - **Execution Constraint:** The --target refactoring plan MUST be executed **after** the
   gent-removal plan has successfully completed Phase 4 (Verification). Attempting to
   refactor --root to --target while aultspec-complex-executor is concurrently gutting
-  __main__.py, config.py, and cli_common.py will guarantee severe merge conflicts and
+  `__main__.py`, config.py, and cli_common.py will guarantee severe merge conflicts and
   execution failures.
 
 ## Cycle 13: Core CLI Extensibility & Surviving Subcommands
@@ -549,9 +549,9 @@ ules_sync / skills_sync Paths
 - **Detail:** The sync functions rely heavily on esolve_workspace() generating absolute
   paths for WorkspaceLayout. We need to ensure that the collection functions
   (collect_rules(), collect_skills()) strictly map their glob searches starting from
-  \_t.RULES_SRC_DIR and _t.SKILLS_SRC_DIR, and NEVER fallback to Path.cwd(). An audit of
-  src/vaultspec/core/rules.py and skills.py shows that collect_\* correctly relies on
-  the globally instantiated \_t paths.
+  `_t.RULES_SRC_DIR` and `_t.SKILLS_SRC_DIR`, and NEVER fallback to Path.cwd(). An audit
+  of src/vaultspec/core/rules.py and skills.py shows that collect\_\* correctly relies
+  on the globally instantiated \_t paths.
 
 - **Triage:** Clear/No-Issue - The underlying architecture correctly abstracts physical
   paths behind the ypes.py global singletons. Once esolve_workspace honors --target, the
@@ -560,7 +560,7 @@ ules_sync / skills_sync Paths
 
 #### 29. [Detected] CLI Import Sequence Brittleness
 
-- **Issue:** src/vaultspec/__main__.py uses lazy loading for namespace execution (e.g.,
+- **Issue:** `src/vaultspec/__main__.py` uses lazy loading for namespace execution (e.g.,
   rom .vault_cli import main as run), but standard commands fall through to
   spec_cli.main().
 - **Detail:** The surviving structure will route aultspec vault to ault_cli.py and
@@ -577,10 +577,10 @@ ules_sync / skills_sync Paths
 
 #### 30. [Detected] Inconsistent --version Handling
 
-- **Issue:** The --version flag is handled manually in __main__.py via if sys.argv[1] in
+- **Issue:** The --version flag is handled manually in `__main__.py` via if sys.argv[1] in
   ("-V", "--version"):, bypassing rgparse.
 - **Detail:** cli_common.py defines --version inside dd_common_args(), but because
-  __main__.py intercepts it first, the standard argparse version action is never
+  `__main__.py` intercepts it first, the standard argparse version action is never
   reached. This leads to duplicate definitions and inconsistent help menus across the
   surviving subcommands.
 - **Triage:** Low - A minor cleanliness issue, but standardizing on Python's built-in
@@ -616,7 +616,7 @@ with the aultspec-writer agent and strictly adheres to the .vault execution sta
   1. Wait for gent-removal execution to finish.
   1. **Phase 1: Config Layer Overhaul** (workspace.py, config.py deprecating
      root/content for target).
-  1. **Phase 2: CLI Engine Refactor** (cli_common.py, __main__.py removing early
+  1. **Phase 2: CLI Engine Refactor** (cli_common.py, `__main__.py` removing early
      intercepts, fixing rgparse inheritance, migrating module-level loads into main()).
   1. **Phase 3: Initialization Upgrade** (commands.py updating init_run to properly
      scaffold --providers including .gemini and .claude, resolving the chicken-and-egg
@@ -821,7 +821,7 @@ Translate findings into a final checklist for aultspec-writer.
   1. Wait for gent-removal to finish.
   1. **Phase 1: Config Layer Overhaul** (workspace.py, config.py deprecating
      root/content for target).
-  1. **Phase 2: CLI Engine Refactor** (cli_common.py, __main__.py removing early
+  1. **Phase 2: CLI Engine Refactor** (cli_common.py, `__main__.py` removing early
      intercepts, fixing rgparse inheritance, migrating module-level loads into main()).
   1. **Phase 3: Initialization Upgrade** (commands.py updating init_run to properly
      scaffold --providers including .gemini and .claude, resolving the chicken-and-egg
@@ -1144,7 +1144,7 @@ target (like an absolute global operation) but currently does, or vice versa.
 
 - **Issue:** mcp_server/app.py has no rgparse configuration whatsoever.
 - **Detail:** As briefly noted in Cycle 8, if a user tries aultspec mcp --target
-  /some/repo, the script __main__.py routes this to mcp_server.app.main(). Since pp.py
+  /some/repo, the script `__main__.py` routes this to mcp_server.app.main(). Since pp.py
   does not use rgparse, it will completely ignore the --target flag in sys.argv, falling
   back to the VAULTSPEC_MCP_ROOT_DIR environment variable, or crashing.
 - **Triage:** High - Breaks interface consistency entirely.
@@ -1165,7 +1165,7 @@ target (like an absolute global operation) but currently does, or vice versa.
   unless both modules are strictly synchronized.
 
 - **Proposed Action:** The --target refactoring should push the esolve_args_workspace
-  call higher up the chain (ideally into __main__.py or a dedicated wrapper) so that the
+  call higher up the chain (ideally into `__main__.py` or a dedicated wrapper) so that the
   workspace layout is resolved *once*, uniformly, for all CLI entry points before the
   specific command handlers are invoked.
 
@@ -1300,27 +1300,27 @@ configuration, to ensure a consistent user experience across all subcommands.
 ### Scope
 
 Audit how unhandled exceptions are caught and displayed at the highest execution levels
-(__main__.py) and verify if standard debug flags (--debug) correctly expose tracebacks
+(`__main__.py`) and verify if standard debug flags (--debug) correctly expose tracebacks
 when failures occur.
 
 ### Findings
 
-#### 63. [Detected] Exception Swallowing in __main__.py
+#### 63. [Detected] Exception Swallowing in `__main__.py`
 
 - **Issue:** Unhandled exceptions in the CLI are caught by a generic try/except block in
-  __main__.py, which explicitly prints the exception string to sys.stderr and swallows
+  `__main__.py`, which explicitly prints the exception string to sys.stderr and swallows
   the traceback, ignoring the --debug flag.
-- **Detail:** At src/vaultspec/__main__.py:122 and 132, the code catches (ImportError,
+- **Detail:** At `src/vaultspec/__main__.py:122` and 132, the code catches (ImportError,
   Exception) as exc: and just executes print(f"Error: {exc}", file=sys.stderr). If the
   user passes --debug expecting to see why a subcommand failed, they get zero traceback
   information, making the CLI incredibly hostile to debugging.
 - **Triage:** High (UX/DevEx) - The --debug flag must be universally respected. If a
   command crashes, --debug should emit the full stack trace.
-- **Proposed Action:** Refactor __main__.py to import and utilize the cli_error_handler
+- **Proposed Action:** Refactor `__main__.py` to import and utilize the cli_error_handler
   context manager from src/vaultspec/cli_common.py, which is explicitly designed to
   handle unhandled exceptions cleanly and print tracebacks if the debug flag is present.
-  Since --debug might not be parsed by rgparse at the __main__.py intercept layer yet,
-  __main__.py should at least check sys.argv for --debug to pass into the handler, or
+  Since --debug might not be parsed by rgparse at the `__main__.py` intercept layer yet,
+  `__main__.py` should at least check sys.argv for --debug to pass into the handler, or
   better yet, push the exception handling down into the respective main() functions
   where the parsed arguments are available.
 
@@ -1343,7 +1343,7 @@ various CLI entry points.
   handlers (e.g., handle_create(args)). If any core logic throws an unexpected
   ValueError, KeyError, or internal assertion failure, the raw Python stack trace is
   vomited to the terminal regardless of whether --debug is set, degrading the CLI
-  experience for regular users. Conversely, as found in Cycle 29, __main__.py catches
+  experience for regular users. Conversely, as found in Cycle 29, `__main__.py` catches
   *everything* and prints a blank string, breaking debugging.
 - **Triage:** High (UX/DevEx) - The error handling architecture is defined but
   completely disconnected.
@@ -1406,12 +1406,12 @@ rgparse, which could potentially misroute or mangle flags like --target.
 
 ### Findings
 
-#### 67. [Detected] Unsafe sys.argv Rewrite in __main__.py
+#### 67. [Detected] Unsafe sys.argv Rewrite in `__main__.py`
 
-- **Issue:** When routing namespace commands, __main__.py literally rewrites the system
+- **Issue:** When routing namespace commands, `__main__.py` literally rewrites the system
   arguments to fake the program name for rgparse.
 
-- **Detail:** In __main__.py:104, it does sys.argv = \[f"vaultspec {first_arg}",
+- **Detail:** In `__main__.py:104`, it does sys.argv = \[f"vaultspec {first_arg}",
   \*sys.argv[2:]\]. This attempts to merge the binary name and the first argument so
   rgparse prints usage: vaultspec vault ... instead of usage: python .... However, if a
   user specifies --target *before* the subcommand (e.g., aultspec --target /foo vault
@@ -1422,7 +1422,7 @@ rgparse, which could potentially misroute or mangle flags like --target.
   *always* come first. Standard CLI design allows global flags *before* subcommands.
   This breaks the --target refactor fundamentally if users type naturally.
 
-- **Proposed Action:** The --target refactor in Phase 2 MUST eliminate __main__.py
+- **Proposed Action:** The --target refactor in Phase 2 MUST eliminate `__main__.py`
   string-matching routing. It must use a unified root rgparse.ArgumentParser that
   defines the global flags, creates subparsers for the namespaces (ault, ules, hooks,
   mcp, etc.), and uses set_defaults(func=...) to route execution, allowing rgparse to
@@ -1448,12 +1448,12 @@ be structured to support aultspec --target /foo vault audit versus aultspec va
   *individual* sub-parser (ault_cli.py, spec_cli.py). This means --root is bound to the
   sub-command level (e.g., aultspec vault --root /foo audit), but passing it *before*
   the subcommand (aultspec --root /foo vault) causes the root string-matcher in
-  __main__.py to crash.
+  `__main__.py` to crash.
 - **Triage:** High - Moving to a unified root parser (as suggested in Finding #67)
   requires careful merging of the ault_cli, spec_cli, and hooks parsers into a single
   tree.
 - **Proposed Action:** In Phase 2 of the execution plan, instruct the engineer to:
-  1. Create a master ArgumentParser in __main__.py (or a dedicated cli.py).
+  1. Create a master ArgumentParser in `__main__.py` (or a dedicated cli.py).
   1. Call cli_common.add_common_args(master_parser) ONCE.
   1. Create subparsers on the master parser.
   1. Have ault_cli.\_make_parser(subparsers),
@@ -1887,7 +1887,7 @@ echo or Rich's Console routing.
   core library (src/vaultspec/core/\* or aultcore/\*) that might bypass Typer/Rich and
   accidentally pollute the terminal output (or worse, the MCP JSON-RPC stream)?
 - **Detail:** A global regex search for sys.stdout and sys.stderr returned matches ONLY
-  in logging_config.py and __main__.py. The core business logic correctly uses Python's
+  in logging_config.py and `__main__.py`. The core business logic correctly uses Python's
   logging.getLogger() or the printer.py wrapper (which we are already migrating to
   yper.echo/rich.print).
 - **Triage:** Clear/No-Issue - The core business engine is surprisingly well-behaved
@@ -1933,7 +1933,7 @@ framework, mapping the full scope of yper.echo replacements required for IO gove
 - skills.py (skills list)
 - sync.py (various list/sync operations)
 - system.py (system show)
-- __main__.py (help/error intercepts)
+- `__main__.py` (help/error intercepts)
 - **Triage:** High - This completely defeats the --quiet flag. If a user runs aultspec
   rules list --quiet, printer.out() stays silent, but print() will forcefully write to
   the terminal. In an automated CI/CD pipeline, this makes aultspec spammy and
@@ -2267,9 +2267,9 @@ and standard input blocking, finalizing the absolute bounds of the refactor.
 
 #### 104. [Validation] sys.argv Eradication
 
-- **Issue:** Are there any hidden sys.argv hacks outside of __main__.py that would
+- **Issue:** Are there any hidden sys.argv hacks outside of `__main__.py` that would
   defeat the Typer migration?
-- **Detail:** A final audit of sys.argv usage reveals it is only present in __main__.py
+- **Detail:** A final audit of sys.argv usage reveals it is only present in `__main__.py`
   (the router hack we are deleting), ault_cli.py (a default parameter rgv: list[str] |
   None = None mapping to sys.argv[1:] for tests), and est_hooks.py (mocking).
 - **Triage:** Clear/No-Issue - The codebase is structurally clean enough to rip out
@@ -2305,7 +2305,7 @@ functioning during the drafting phase.
   'AGENTS_SRC_DIR' from 'vaultspec.core.types'. This indicates that the gent-removal
   plan was executed partially or sloppily by the previous execution agent. They deleted
   AGENTS_SRC_DIR from core/types.py but failed to clean up the import statements in
-  core/__init__.py.
+  `core/__init__.py`.
 - **Triage:** Critical Blocker - We cannot dispatch the aultspec-writer agent using the
   native aultspec subagent command because the framework itself is broken.
 - **Proposed Action:** We must either pause and fix the ImportError manually (so the CLI
@@ -2329,7 +2329,7 @@ the current ImportError and AttributeError.
 - **Issue:** The repository is currently hard-broken. uv run vaultspec crashes on
   startup.
 - **Detail:**
-  1. src/vaultspec/core/__init__.py attempts to import AGENTS_SRC_DIR from .types, but
+  1. `src/vaultspec/core/__init__.py` attempts to import AGENTS_SRC_DIR from .types, but
      it was deleted from types.py.
   1. src/vaultspec/core/types.py still references Resource.AGENTS.value in
      \_create_tool_cfg, but AGENTS was deleted from the Resource enum in enums.py.
@@ -2337,7 +2337,7 @@ the current ImportError and AttributeError.
      AGENTS was deleted from the Tool enum.
 - **Triage:** Critical Blocker - The framework is non-functional.
 - **Proposed Action:** (Immediately added to Phase 0 of the plan)
-  - Remove AGENTS_SRC_DIR from src/vaultspec/core/__init__.py.
+  - Remove AGENTS_SRC_DIR from `src/vaultspec/core/__init__.py`.
   - Delete the gents_dir line from src/vaultspec/core/types.py:\_create_tool_cfg.
   - Remove the Tool.AGENTS checks from src/vaultspec/core/rules.py:transform_rule.
 
@@ -2479,7 +2479,7 @@ missed by the gent-removal plan.
 
 - **Issue:** src/vaultspec/tests/cli/test_main_cli.py still asserts that aultspec team,
   aultspec subagent, and aultspec agents namespaces show help.
-- **Triage:** High - These namespaces are being removed from __main__.py.
+- **Triage:** High - These namespaces are being removed from `__main__.py`.
 - **Proposed Action:** Remove these assertions.
 
 ## Cycle 58: Protocol Layer Semantic Alignment
