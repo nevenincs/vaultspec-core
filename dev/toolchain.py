@@ -947,8 +947,14 @@ CI = Verb(
         # same reason.
         Target(
             "all",
-            "Lint, dependency audit, vault checks, and the broad test suite.",
+            "Lockfile, lint, dependency audit, vault checks, and every test lane.",
             (
+                # First, because every stage below resolves dependencies
+                # from the lockfile: a lockfile that disagrees with
+                # pyproject.toml makes each later verdict one about an
+                # environment nobody else will get.
+                Echo("=== dependencies ==="),
+                Cmd(("uv", "run", "--no-sync", "python", "-m", "dev", "deps", "check")),
                 Echo("=== lint ==="),
                 Cmd(("uv", "run", "--no-sync", "python", "-m", "dev", "lint", "all")),
                 Echo("=== dependency audit ==="),
@@ -957,8 +963,21 @@ CI = Verb(
                 Cmd(
                     ("uv", "run", "--no-sync", "python", "-m", "dev", "vault", "check")
                 ),
+                # `test all`, not `test broad`. The broad lane is the package
+                # suite; the harness and repository-health guards live outside
+                # it, and the pull-request path runs all three. A local gate
+                # that runs one of the three teaches the wrong thing about
+                # what "green" means, and did: a monkeypatch the test-doubles
+                # guard forbids and a docs-vs-CLI contract break both survived
+                # four green local runs and were found only after the label
+                # put the full suite on the pull request. Naming the aggregate
+                # rather than its members is what keeps a lane added later
+                # from needing someone to remember this line, and is worth the
+                # one overlap it brings: `vault-repair` re-runs two files the
+                # broad lane already collected, which is five seconds against
+                # a list that goes stale silently.
                 Echo("=== tests ==="),
-                Cmd(("uv", "run", "--no-sync", "python", "-m", "dev", "test", "broad")),
+                Cmd(("uv", "run", "--no-sync", "python", "-m", "dev", "test", "all")),
                 # BUILD IS PART OF CI. It was not, and the consequence is one
                 # this fleet has measured: a break on the release path
                 # surfaces at release, when the tag is already cut and the
