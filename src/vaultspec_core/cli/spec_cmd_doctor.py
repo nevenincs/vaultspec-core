@@ -28,7 +28,11 @@ if TYPE_CHECKING:
         GitattributesSignal,
         GitignoreSignal,
         ProviderDiagnosis,
+        ProviderHookSignal,
         WorkspaceDiagnosis,
+    )
+    from vaultspec_core.core.diagnosis.collectors_provider_hooks import (
+        ProviderHookReport,
     )
 
 __all__ = [
@@ -174,6 +178,65 @@ def _append_companion_row(
             "detail": detail,
         }
     )
+
+
+def _append_provider_hook_rows(
+    rows: list[dict[str, object]], diag: "WorkspaceDiagnosis"
+) -> None:
+    """Append the agent-runtime hook rows, when there is a provider to report on.
+
+    An empty report list means the question could not be asked - no active
+    workspace context, or no installed provider that consumes hooks - and a
+    row that vouches for a render nothing looked at is worse than no row.
+    """
+    from vaultspec_core.cli.rendering import Cell
+    from vaultspec_core.core.diagnosis import ProviderHookSignal
+    from vaultspec_core.core.diagnosis.collectors_provider_hooks import (
+        worst_hook_signal,
+    )
+
+    if not diag.provider_hooks:
+        return
+
+    ph_signal = worst_hook_signal(diag.provider_hooks)
+    ph_status, ph_style = _signal_status(
+        ph_signal,
+        {
+            ProviderHookSignal.NO_SOURCES: ("info", "dim"),
+            ProviderHookSignal.IN_SYNC: ("ok", "green"),
+            ProviderHookSignal.UNTRUSTED: ("info", "dim"),
+            ProviderHookSignal.NOT_RENDERED: ("warn", "yellow"),
+            ProviderHookSignal.STALE: ("warn", "yellow"),
+            ProviderHookSignal.SIDECAR_MISSING: ("warn", "yellow"),
+            ProviderHookSignal.SIDECAR_STALE: ("warn", "yellow"),
+            ProviderHookSignal.UNREADABLE: ("warn", "yellow"),
+        },
+    )
+    rows.append(
+        {
+            "component": "hooks",
+            "status": Cell(ph_status, style=ph_style),
+            "detail": _provider_hook_detail(diag.provider_hooks, ph_signal),
+        }
+    )
+
+    # Advisory: a source hook bound to an event some provider cannot
+    # consume is skipped for that provider. Expected, and otherwise silent.
+    unsupported = sorted(
+        {
+            f"{entry} not supported by {report.tool}"
+            for report in diag.provider_hooks
+            for entry in report.unsupported
+        }
+    )
+    if unsupported:
+        rows.append(
+            {
+                "component": "hook events",
+                "status": Cell("info", style="dim"),
+                "detail": "; ".join(unsupported),
+            }
+        )
 
 
 def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> None:
@@ -483,6 +546,8 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         }
     )
 
+    _append_provider_hook_rows(rows, diag)
+
     # Stale package-bundled MCP seed advisory (warn-only): core cannot refresh
     # these; only the owning package's installer can.
     if diag.stale_mcp_seeds:
@@ -610,6 +675,54 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
     )
 
 
+def _provider_hook_detail(
+    reports: "list[ProviderHookReport]", worst: "ProviderHookSignal"
+) -> str:
+    """Describe the hook-render state the summary row reports.
+
+    A benign verdict is stated once for the whole fleet. Anything else names
+    the providers it applies to, because the remediation differs per provider
+    and a bare status gives the reader nowhere to look.
+    """
+    from vaultspec_core.core.diagnosis import ProviderHookSignal
+
+    if worst is ProviderHookSignal.NO_SOURCES:
+        return "no hooks declared in .vaultspec/hooks/"
+    if worst is ProviderHookSignal.IN_SYNC:
+        return f"rendered and recorded for {len(reports)} provider(s)"
+    if worst is ProviderHookSignal.UNTRUSTED:
+        return (
+            "declared hooks are awaiting approval on this machine, so none "
+            "render - review them and run 'vaultspec-core spec hooks trust'"
+        )
+
+    explanations = {
+        ProviderHookSignal.NOT_RENDERED: (
+            "declared hooks never rendered - run 'vaultspec-core sync'"
+        ),
+        ProviderHookSignal.STALE: (
+            "rendered hooks disagree with their source - run 'vaultspec-core sync'"
+        ),
+        ProviderHookSignal.SIDECAR_MISSING: (
+            "ownership record absent, so a re-sync cannot tell its own "
+            "entries from yours - run 'vaultspec-core sync'"
+        ),
+        ProviderHookSignal.SIDECAR_STALE: (
+            "ownership record disagrees with the source, so a re-sync would "
+            "prune the wrong entries - run 'vaultspec-core sync'"
+        ),
+        ProviderHookSignal.UNREADABLE: (
+            "hook config or ownership record could not be read; this check did not run"
+        ),
+    }
+    parts: list[str] = []
+    for signal, explanation in explanations.items():
+        tools = sorted(r.tool for r in reports if r.signal is signal)
+        if tools:
+            parts.append(f"{', '.join(tools)}: {explanation}")
+    return "; ".join(parts) or str(worst)
+
+
 def _signal_status[SignalT: StrEnum](
     signal: SignalT,
     mapping: dict[SignalT, tuple[str, str]],
@@ -669,6 +782,25 @@ def _gitattributes_weight(signal: "GitattributesSignal") -> tuple[bool, bool]:
             GitattributesSignal.UNREADABLE,
         ),
     )
+
+
+def _provider_hooks_weigh_warn(reports: "list[ProviderHookReport]") -> bool:
+    """Whether any provider's hook-render verdict is worth warning about.
+
+    Every non-benign verdict warns. A render that never happened, one whose
+    ownership record no longer describes it, and one the collector could not
+    read are all actionable, and nothing else in the report mentions them.
+    """
+    from vaultspec_core.core.diagnosis import ProviderHookSignal
+
+    benign = (
+        ProviderHookSignal.IN_SYNC,
+        ProviderHookSignal.NO_SOURCES,
+        # A hook that does not render because nobody approved it is the
+        # consent gate working as designed, not a fault to weigh.
+        ProviderHookSignal.UNTRUSTED,
+    )
+    return any(report.signal not in benign for report in reports)
 
 
 def _gitignore_weight(signal: "GitignoreSignal") -> tuple[bool, bool]:
@@ -747,6 +879,7 @@ def doctor_exit_code(
         PrecommitSignal.UNREADABLE,
     ):
         has_warn = True
+    has_warn = has_warn or _provider_hooks_weigh_warn(diag.provider_hooks)
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True
     elif diag.builtin_version == BuiltinVersionSignal.MODIFIED:

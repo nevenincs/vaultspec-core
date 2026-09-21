@@ -55,6 +55,7 @@ def vaultspec(tmp_path: Path) -> Iterator[Path]:
         system_src_dir=vs / "rules" / "system",
         templates_dir=vs / "rules" / "templates",
         hooks_dir=vs / "rules" / "hooks",
+        triggers_dir=vs / "rules" / "triggers",
     )
     token = _types.workspace_ctx.set(ctx)
     try:

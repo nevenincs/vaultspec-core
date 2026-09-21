@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 #: Re-exported for every CRUD surface that reaches into this module's
-#: containment guard: :mod:`vaultspec_core.core.hooks`,
+#: containment guard: :mod:`vaultspec_core.core.triggers`,
 #: :mod:`vaultspec_core.core.resources`, :mod:`vaultspec_core.vaultcore.batch_archive`,
 #: :mod:`vaultspec_core.vaultcore.exec_recovery`, and
 #: :mod:`vaultspec_core.vaultcore.query_rename`.

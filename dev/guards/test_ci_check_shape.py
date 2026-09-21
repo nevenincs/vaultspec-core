@@ -104,6 +104,11 @@ _JOB_NAME = re.compile(
 _WORKFLOW_NAME = re.compile(r"^Core [A-Z][A-Za-z0-9 ]*$")
 _MATRIX_REF = re.compile(r"\$\{\{\s*matrix\.(?P<key>[\w-]+)\s*\}\}")
 
+#: How the registry dispatches into itself. The ``ci`` pipeline composes the
+#: other verbs with this prefix rather than with ``Ref``, because they are
+#: separate verbs and a ``Ref`` addresses a sibling target.
+DEV_CALL = ("uv", "run", "--no-sync", "python", "-m", "dev")
+
 #: How a recipe prefix is spelled in the registry. The gating verb is ``lint``
 #: in the table and ``check`` at the recipe, because a contributor reaches for
 #: "check the types". Every other prefix spells the same on both sides.
@@ -214,6 +219,49 @@ def _check_names(job: dict[str, Any], job_id: str) -> list[str]:
     return names
 
 
+def _target_leaves(verb_name: str, target_name: str) -> set[tuple[str, ...]]:
+    """Expand one registry target to the argv of every command it finally runs.
+
+    A ``Cmd`` that re-enters this registry - ``python -m dev <verb> <target>``,
+    which is how the ``ci`` pipeline composes the other verbs - is FOLLOWED
+    rather than recorded. Stopping at the dispatch line would compare a shell
+    invocation against the gates it stands for, and every such comparison would
+    come out empty.
+    """
+    leaves: set[tuple[str, ...]] = set()
+    start = (verb_name, target_name)
+    pending = [start]
+    seen = {start}
+    while pending:
+        current_verb, current_target = pending.pop()
+        verb = find_verb(current_verb)
+        target = verb.find(current_target) if verb is not None else None
+        if verb is None or target is None:
+            continue
+        for step in target.steps:
+            if isinstance(step, Ref):
+                referenced = (current_verb, step.target)
+                if referenced not in seen:
+                    seen.add(referenced)
+                    pending.append(referenced)
+            elif isinstance(step, Cmd):
+                argv = tuple(step.argv)
+                called = _dev_call(argv)
+                if called is None:
+                    leaves.add(argv)
+                elif called not in seen:
+                    seen.add(called)
+                    pending.append(called)
+    return leaves
+
+
+def _dev_call(argv: tuple[str, ...]) -> tuple[str, str] | None:
+    """Return the `(verb, target)` an argv dispatches into, or None."""
+    if argv[: len(DEV_CALL)] != DEV_CALL or len(argv) != len(DEV_CALL) + 2:
+        return None
+    return argv[-2], argv[-1]
+
+
 def _leaf_commands(recipe: str) -> set[tuple[str, ...]]:
     """Expand ``just <recipe>`` to the argv of every command it finally runs.
 
@@ -224,27 +272,9 @@ def _leaf_commands(recipe: str) -> set[tuple[str, ...]]:
     exactly how the dependency audit came to run twice.
     """
     prefix, _, target_name = recipe.partition("-")
-    verb = find_verb(RECIPE_VERB.get(prefix, prefix))
-    if verb is None or not target_name:
+    if not target_name:
         return set()
-    target = verb.find(target_name)
-    if target is None:
-        return set()
-    leaves: set[tuple[str, ...]] = set()
-    pending = [target]
-    seen = {target.name}
-    while pending:
-        for step in pending.pop().steps:
-            if isinstance(step, Ref):
-                if step.target in seen:
-                    continue
-                seen.add(step.target)
-                referenced = verb.find(step.target)
-                if referenced is not None:
-                    pending.append(referenced)
-            elif isinstance(step, Cmd):
-                leaves.add(tuple(step.argv))
-    return leaves
+    return _target_leaves(RECIPE_VERB.get(prefix, prefix), target_name)
 
 
 def test_the_gate_has_exactly_its_tiered_jobs() -> None:
@@ -648,4 +678,39 @@ def test_a_release_run_of_the_gate_is_never_superseded() -> None:
     )
     assert "github.event.label.name" in group, (
         "an unrelated label would cancel the full run in flight"
+    )
+
+
+def test_the_local_gate_runs_every_gate_the_pull_request_runs() -> None:
+    """`just ci` covers every gate the merge gate will later run.
+
+    This repository's recurring defect is a correct check that never executes
+    where the work happens. `test-repo` was the instance: the pull-request
+    path ran it, `just ci` ran `test broad` alone, and a forbidden monkeypatch
+    and a docs-vs-CLI contract break survived four green local runs before the
+    `ci:full` label found them. Comparing leaf commands rather than recipe
+    names is what makes this hold when the local gate reaches a lane through
+    an aggregate and the workflow names it directly.
+    """
+    covered = _target_leaves("ci", "all")
+    assert covered, (
+        "`dev ci all` resolved to no leaf command; the registry walk broke "
+        "and this comparison would pass vacuously"
+    )
+
+    uncovered: list[str] = []
+    for job_id, job in _jobs().items():
+        for step in job.get("steps", []):
+            run = str(step.get("run", "")).strip()
+            # Provisioning is how a fresh runner gets an environment a
+            # contributor already has; it is not a gate that can go unrun.
+            if not run.startswith("just ") or run in PROVISIONING:
+                continue
+            recipe = run.removeprefix("just ").split()[0]
+            for argv in sorted(_leaf_commands(recipe) - covered):
+                uncovered.append(f"`{job_id}` runs `just {recipe}` -> {' '.join(argv)}")
+    assert not uncovered, (
+        "these gates run on a pull request but not in `just ci`, so a "
+        "contributor's green is not the merge gate's green:\n  "
+        + "\n  ".join(sorted(set(uncovered)))
     )

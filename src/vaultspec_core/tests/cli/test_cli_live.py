@@ -87,6 +87,7 @@ _COMMANDS_EXIT_0: list[tuple[str, list[str]]] = [
     ("spec-system-sync-dry", ["spec", "system", "sync", "--dry-run"]),
     # spec hooks
     ("spec-hooks-list", ["spec", "hooks", "list"]),
+    ("spec-triggers-list", ["spec", "triggers", "list"]),
     # vault query
     ("vault-stats", ["vault", "stats"]),
     ("vault-stats-feature", ["vault", "stats", "--feature", "dispatch"]),
@@ -213,7 +214,8 @@ _HELP_SURFACES: list[list[str]] = [
     ["spec", "system", "show", "--help"],
     ["spec", "system", "sync", "--help"],
     ["spec", "hooks", "list", "--help"],
-    ["spec", "hooks", "run", "--help"],
+    ["spec", "hooks", "sync", "--help"],
+    ["spec", "triggers", "run", "--help"],
     ["vault", "--help"],
     ["vault", "add", "--help"],
     ["vault", "stats", "--help"],
@@ -413,12 +415,14 @@ class TestSync:
             f"import pathlib; pathlib.Path({str(marker_target)!r}).touch()",
             encoding="utf-8",
         )
-        (cwd_workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+        for ws in (cwd_workspace, target_workspace):
+            (ws / ".vaultspec" / "triggers").mkdir(parents=True, exist_ok=True)
+        (cwd_workspace / ".vaultspec" / "triggers" / "marker.yaml").write_text(
             "event: config.synced\nenabled: true\nactions:\n"
             f"  - type: shell\n    command: {sys.executable} {script_cwd}\n",
             encoding="utf-8",
         )
-        (target_workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+        (target_workspace / ".vaultspec" / "triggers" / "marker.yaml").write_text(
             "event: config.synced\nenabled: true\nactions:\n"
             f"  - type: shell\n    command: {sys.executable} {script_target}\n",
             encoding="utf-8",
@@ -453,7 +457,7 @@ class TestSync:
         # reason, so the markers speak only about which workspace was read.
         for workspace in (cwd_workspace, target_workspace):
             approved = _run_cli(
-                "spec", "hooks", "trust", "--target", str(workspace), cwd=workspace
+                "spec", "triggers", "trust", "--target", str(workspace), cwd=workspace
             )
             assert approved.returncode == 0, approved.stdout + approved.stderr
 
@@ -507,7 +511,8 @@ class TestSync:
             (cwd_workspace, "cwd-only-token"),
             (target_workspace, "target-only-token"),
         ):
-            (workspace / ".vaultspec" / "hooks" / "marker.yaml").write_text(
+            (workspace / ".vaultspec" / "triggers").mkdir(parents=True, exist_ok=True)
+            (workspace / ".vaultspec" / "triggers" / "marker.yaml").write_text(
                 "event: config.synced\nenabled: true\nactions:\n"
                 f"  - type: shell\n    command: {sys.executable} -c {tag}\n",
                 encoding="utf-8",
@@ -897,7 +902,7 @@ class TestSpecHooks:
         self, cli: CliRunner, synthetic_project: Path
     ) -> None:
         result = _run(
-            cli, synthetic_project, "spec", "hooks", "run", "nonexistent.event"
+            cli, synthetic_project, "spec", "triggers", "run", "nonexistent.event"
         )
         assert result.exit_code != 0
 

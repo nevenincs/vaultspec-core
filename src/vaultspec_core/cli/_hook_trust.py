@@ -1,138 +1,125 @@
-"""The operator-facing consent gate for workspace hooks.
+"""Ask the operator before a provider hook is rendered into an agent's config.
 
-:func:`vaultspec_core.hooks.engine.trigger` already refuses to spawn a command
-that :mod:`vaultspec_core.hooks.trust` has not matched against a consent record,
-so nothing here is what makes the product safe. What this module adds is the
-only thing a refusal is missing: a way for the operator to say yes, and an
-explanation of what they are saying yes to.
+The engine already refuses to render a hook that
+:mod:`vaultspec_core.triggers.trust` has not matched against a consent record,
+so this module is the *asking* half: it runs at the CLI, where a human may be
+present, and never inside the renderer, where one may not.
 
-The gate is deliberately a CLI concern rather than an engine one. Asking is an
-interactive act at a terminal, and the engine runs in contexts - CI, the MCP
-server, ``--json`` pipelines - that have no operator behind them. Keeping the
-question here means the enforcement path has no branch that could ever answer it
-automatically: when this module cannot reach a human it explains the refusal and
-returns, and the hooks simply do not run.
+A provider hook is the more dangerous of the two consent surfaces. A lifecycle
+trigger runs once, when vaultspec fires its event. A provider hook is written
+into ``.claude/settings.json`` and its equivalents, and from then on the agent
+runs it in its own session on every matching tool call, with no further sync
+and nothing on screen. Approval is therefore recorded per file and per content
+digest, and pulling a change to an approved hook asks again.
 
-Key exports: :func:`consent_gate`, :func:`describe_hook`,
-:func:`operator_present`.
+Separate from :mod:`._trigger_trust`, which asks about ``.vaultspec/triggers/``.
+The two grants are independent: approving one directory says nothing about the
+other, because the commands, the directories and the blast radius all differ.
 """
 
 from __future__ import annotations
 
-import os
-import sys
 from typing import TYPE_CHECKING
 
 import typer
 
+from vaultspec_core.cli._trigger_trust import operator_present
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from vaultspec_core.hooks import Hook
+    from vaultspec_core.core.provider_hooks import HookSpec
 
-__all__ = ["consent_gate", "describe_hook", "operator_present"]
+__all__ = ["describe_hook", "hook_consent_gate"]
 
-#: Environment variables whose mere presence means no operator is watching.
-#: ``CI`` is the near-universal convention; the VaultSpec-specific name lets an
-#: operator assert the same thing for a wrapper script that CI does not set.
-_NON_INTERACTIVE_ENV = ("CI", "VAULTSPEC_NON_INTERACTIVE")
-
-#: Why a hook needs approval, in the terms that make the decision answerable:
-#: what runs, as whom, and why the repository itself cannot vouch for it. A
-#: prompt the operator does not understand is a prompt they click through.
 _RATIONALE = (
     "Each of these hook files ships with this repository and declares a shell "
-    "command that would run now, on this machine, as you - with your "
-    "environment, your credentials, and this workspace as its working "
-    "directory. A repository cannot approve its own hooks, so approval is "
-    "recorded outside it and is tied to each file's current contents; editing "
-    "a hook, or pulling a change to one, asks again."
+    "command. Approving one writes it into your agents' own configuration, "
+    "where the agent runs it as you - with your environment, your credentials, "
+    "and this workspace as its working directory - on every matching tool "
+    "call, not once per sync. A repository cannot approve its own hooks, so "
+    "approval is recorded outside it and is tied to each file's current "
+    "contents; editing a hook, or pulling a change to one, asks again."
 )
 
 
-def describe_hook(hook: Hook, target_dir: Path | None = None) -> list[str]:
-    """Render one untrusted hook as the lines an operator needs to judge it.
+def describe_hook(spec: HookSpec, target_dir: Path | None = None) -> list[str]:
+    """Render one unapproved hook as the lines an operator needs to judge it.
 
-    The commands are shown verbatim and unwrapped. An approval prompt that
+    The command is shown verbatim and unwrapped. An approval prompt that
     summarises or truncates the command is worse than no prompt, because it
     invites a yes to something other than what will run.
     """
-    location = hook.source_path
+    location = spec.source_path
     label = str(location) if location is not None else "<no file>"
     if location is not None and target_dir is not None:
         try:
             label = str(location.relative_to(target_dir))
         except ValueError:
             label = str(location)
-    lines = [f"  {hook.name}  ({label})"]
-    lines.extend(
-        f"    {action.action_type}: {action.command}" for action in hook.actions
-    )
-    return lines
+    matcher = f" [{spec.matcher}]" if spec.matcher else ""
+    return [
+        f"  {spec.name}  ({label})",
+        f"    on {spec.event.value}{matcher}: {spec.command}",
+    ]
 
 
-def consent_gate(
-    event: str,
+def hook_consent_gate(
     *,
     json_output: bool = False,
     hooks_dir: Path | None = None,
     home: Path | None = None,
 ) -> list[str]:
-    """Offer the operator the choice to trust the hooks an event would run.
+    """Offer the operator the choice to approve the hooks a sync would render.
 
-    Loads the workspace's hooks for ``event``, and for any that carry no
-    consent record either asks for one (at an interactive terminal) or explains
-    why they will be skipped (anywhere else). Granting writes the consent
-    record; declining, redirected input, and ``--json`` all leave it unwritten.
+    Loads the workspace's hook specs and, for any carrying no consent record,
+    either asks for one (at an interactive terminal) or explains why they will
+    be skipped (anywhere else). Granting writes the consent record; declining,
+    redirected input, and ``--json`` all leave it unwritten.
 
     Args:
-        event: The lifecycle event whose hooks are about to be considered.
         json_output: Whether the calling command is emitting a JSON envelope.
             A machine-readable run has no operator to ask and must not have its
             stdout disturbed, so it never prompts.
-        hooks_dir: The directory whose hooks the caller is about to fire. It
-            must be the same directory the firing code will read, which is not
-            always the ambient one: ``sync --target`` reads its source content
-            from the CWD workspace but fires the *target* workspace's hooks.
-            Asking about one workspace's hooks while another's are the ones
-            about to run would show the operator commands that will not run and
-            withhold the ones that will. Defaults to the ambient context's
-            ``hooks_dir``, which is right for every caller with no such split.
+        hooks_dir: The directory whose hooks the caller is about to render. It
+            must be the same directory the renderer will read, which is not
+            always the ambient one under ``--target``. Defaults to the ambient
+            context's ``hooks_dir``.
         home: Machine-global VaultSpec home holding the consent ledger; tests
             pass their own so they never touch the operator's.
 
     Returns:
-        The names of the hooks that remain untrusted, and will therefore be
-        skipped. Empty when every hook for ``event`` may run.
+        The names of the hooks that remain unapproved, and will therefore be
+        skipped. Empty when every hook may be rendered.
     """
+    from vaultspec_core.core.provider_hooks import (
+        load_provider_hook_specs,
+        trusted_specs,
+    )
     from vaultspec_core.core.types import get_context
-    from vaultspec_core.hooks import grant, load_hooks, partition_by_trust
+    from vaultspec_core.triggers import grant
 
     try:
         ctx = get_context()
     except LookupError:
         return []
 
-    candidates = [
-        hook
-        for hook in load_hooks(ctx.hooks_dir if hooks_dir is None else hooks_dir)
-        if hook.event == event and hook.enabled
-    ]
-    _, untrusted = partition_by_trust(candidates, home)
-    if not untrusted:
+    specs = load_provider_hook_specs(hooks_dir)
+    _trusted, refused = trusted_specs([spec for spec in specs if spec.enabled], home)
+    if not refused:
         return []
 
-    names = [hook.name for hook in untrusted]
+    names = [spec.name for spec in refused]
     detail: list[str] = []
-    for hook in untrusted:
-        detail.extend(describe_hook(hook, ctx.target_dir))
+    for spec in refused:
+        detail.extend(describe_hook(spec, ctx.target_dir))
 
     if json_output or not operator_present():
         _explain_refusal(names, detail)
         return names
 
     typer.echo("")
-    typer.echo(f"Untrusted workspace hooks for '{event}':")
+    typer.echo("Unapproved provider hooks in this workspace:")
     for line in detail:
         typer.echo(line)
     typer.echo("")
@@ -140,40 +127,23 @@ def consent_gate(
     typer.echo("")
     try:
         approved = typer.confirm(
-            "Run these hooks, and remember this approval?", default=False
+            "Render these hooks into your agents' configs, and remember this approval?",
+            default=False,
         )
     except (typer.Abort, EOFError, KeyboardInterrupt):
         # An interrupt or an exhausted stream is not an answer. It reaches here
         # when a stream that claimed to be a terminal turns out not to carry
         # one, which some Windows shells arrange for a redirected run - the
         # exact case that must never be read as consent. Treat it as a refusal
-        # and let the caller continue without the hooks, rather than letting an
-        # Abort tear down a sync that is otherwise legitimate.
+        # and let the sync continue without the hooks.
         approved = False
     if not approved:
         typer.echo("", err=True)
         _explain_refusal(names, [])
         return names
 
-    grant([h.source_path for h in untrusted if h.source_path is not None], home)
+    grant([s.source_path for s in refused if s.source_path is not None], home)
     return []
-
-
-def operator_present() -> bool:
-    """Report whether there is a human at a terminal who could answer.
-
-    Three independent signals must all agree before this module will ask a
-    question: an interactive stdin to read the answer from, an interactive
-    stdout to show the hook commands on, and no environment marker declaring an
-    unattended run. Any one of them dissenting means the answer is no, because
-    a prompt nobody sees is a prompt nobody consented to.
-    """
-    if any(name in os.environ for name in _NON_INTERACTIVE_ENV):
-        return False
-    try:
-        return sys.stdin.isatty() and sys.stdout.isatty()
-    except (AttributeError, ValueError):
-        return False
 
 
 def _explain_refusal(names: list[str], detail: list[str]) -> None:
@@ -184,10 +154,7 @@ def _explain_refusal(names: list[str], detail: list[str]) -> None:
     because the operator is the only one who can act on it.
     """
     listed = ", ".join(names)
-    typer.echo(
-        f"Skipped {len(names)} untrusted workspace hook(s): {listed}",
-        err=True,
-    )
+    typer.echo(f"Skipped {len(names)} unapproved provider hook(s): {listed}", err=True)
     for line in detail:
         typer.echo(line, err=True)
     typer.echo(f"  {_RATIONALE}", err=True)

@@ -192,3 +192,34 @@ def workspace_templates(tmp_path_factory: pytest.TempPathFactory) -> WorkspaceTe
     per worker rather than once per test - twelve times instead of hundreds.
     """
     return WorkspaceTemplates(tmp_path_factory.mktemp("workspace-templates"))
+
+
+@pytest.fixture
+def operator_home(tmp_path: Path) -> Iterator[Path]:
+    """Point the machine-global VaultSpec home at a directory the test owns.
+
+    The consent ledger lives under ``~/.vaultspec``, so a test that let it
+    resolve normally would read and write the developer's own approvals and
+    would pass or fail on what they happened to have trusted.
+
+    ``core_home_layout`` reads ``Path.home()`` at call time, so setting the
+    environment really does move the home - for in-process code and for a
+    subprocess alike - rather than standing in for the resolution under test.
+    The environment is restored afterwards. The home sits outside any
+    workspace, because ``~/.vaultspec`` would otherwise collide with a
+    workspace's own ``.vaultspec/``.
+    """
+    home = tmp_path / "operator-home"
+    home.mkdir(parents=True, exist_ok=True)
+    keys = ("HOME", "USERPROFILE")
+    previous = {key: os.environ.get(key) for key in keys}
+    for key in keys:
+        os.environ[key] = str(home)
+    try:
+        yield home
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value

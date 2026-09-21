@@ -273,6 +273,7 @@ class Resource(StrEnum):
     SYSTEM = "system"
     TEMPLATES = "templates"
     HOOKS = "hooks"
+    TRIGGERS = "triggers"
     WORKFLOWS = "workflows"
     MCPS = "mcps"
 

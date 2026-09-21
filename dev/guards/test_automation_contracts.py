@@ -166,7 +166,24 @@ def _colocated_test_dirs() -> set[str]:
         path.relative_to(ROOT).as_posix()
         for tree in included
         for path in (ROOT / tree).rglob("tests")
-        if path.is_dir() and "__pycache__" not in path.parts
+        # The walk reads the FILESYSTEM, not the index, so a directory git
+        # stopped tracking survives as whatever untracked debris is left in
+        # it - and `__pycache__` is always left. Without the source test,
+        # renaming a co-located test package demanded an exemption for a
+        # directory that no longer exists: red on the working tree where the
+        # rename was correct, green on CI's fresh checkout. A gate that is red
+        # only where the work happens teaches people to stop reading it. The
+        # emptiness of this inner glob is an ANSWER, not an accident; the
+        # corpus it feeds is proven non-empty by the assert below.
+        #
+        # The question is what basedpyright ANALYSES, which is source on disk,
+        # so stubs count too. `git ls-files` would be the wrong instrument
+        # despite being the one that knows what is tracked: a test file
+        # written but not yet added is analysed, needs the exemption, and is
+        # invisible to the index.
+        if path.is_dir()
+        and "__pycache__" not in path.parts
+        and any(child.suffix in {".py", ".pyi"} for child in path.rglob("*"))
     }
     # The caller subtracts this set from the exemption list and asserts the
     # remainder is empty, so an empty set here passes unconditionally - a

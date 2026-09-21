@@ -311,8 +311,8 @@ def _stamp_last_synced(target_dir: Path, candidates: Iterable[str]) -> None:
         write_manifest_data(target_dir, mdata)
 
 
-def target_hooks_dir(target_dir: Path) -> Path:
-    """Return *target_dir*'s own ``.vaultspec/hooks`` directory.
+def target_triggers_dir(target_dir: Path) -> Path:
+    """Return *target_dir*'s own ``.vaultspec/triggers`` directory.
 
     ``sync --target`` reads its source content (rules, skills, agents) from
     the CWD workspace while writing to *target_dir* - the correct model for
@@ -334,24 +334,24 @@ def target_hooks_dir(target_dir: Path) -> Path:
     operator could be shown - and could approve - one workspace's hooks while
     a different workspace's were the ones about to run.
 
-    Falls back to the ambient context's ``hooks_dir`` if resolution fails
-    for any reason: ``fire_hooks`` itself is a best-effort, silently-caught
-    side effect of a sync (see its docstring), and a hooks-directory
+    Falls back to the ambient context's ``triggers_dir`` if resolution fails
+    for any reason: ``fire_triggers`` itself is a best-effort, silently-caught
+    side effect of a sync (see its docstring), and a triggers-directory
     resolution problem must degrade the same way rather than fail a sync
     that otherwise completed.
     """
     from ..config import resolve_workspace
 
     try:
-        return resolve_workspace(target_override=target_dir).vaultspec_dir / "hooks"
+        return resolve_workspace(target_override=target_dir).vaultspec_dir / "triggers"
     except Exception:
         logger.warning(
-            "Could not resolve %s's own hooks directory; falling back to the "
+            "Could not resolve %s's own triggers directory; falling back to the "
             "ambient workspace context",
             target_dir,
             exc_info=True,
         )
-        return _t.get_context().hooks_dir
+        return _t.get_context().triggers_dir
 
 
 def _sync_all_providers(
@@ -371,12 +371,12 @@ def _sync_all_providers(
         logger.info("Syncing all resources...")
         results = _run_all_syncs(skip=skip, dry_run=dry_run, force=force)
         if not dry_run:
-            from vaultspec_core.hooks import fire_hooks
+            from vaultspec_core.triggers import fire_triggers
 
-            fire_hooks(
+            fire_triggers(
                 "config.synced",
                 {"root": str(ctx.target_dir), "event": "config.synced"},
-                hooks_dir=target_hooks_dir(ctx.target_dir),
+                triggers_dir=target_triggers_dir(ctx.target_dir),
             )
             logger.info("Done.")
         return results

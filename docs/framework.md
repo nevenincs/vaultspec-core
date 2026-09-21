@@ -261,6 +261,170 @@ deactivate an installed hook.
 **MCP clients.** Check enrollment with `vaultspec-core spec mcps status --json`. See the
 [MCP tool reference](./MCP.md#tools) for the available tools.
 
+**Agent-runtime hooks.** Write a hook once and Core renders it for every coding agent
+you have installed. See [agent-runtime hooks](#agent-runtime-hooks).
+
+## Agent-runtime hooks
+
+Claude Code, Codex, the Antigravity CLI and the Gemini CLI can each run a shell command
+when something happens in a session: before a tool runs, after it returns, when a
+session starts. Each one spells the events differently and keeps them in a different
+file. Write the hook once in `.vaultspec/hooks/`, and `vaultspec-core sync` renders it
+into whichever of those agents this project has installed.
+
+These are the agent's events, not Core's. A hook here fires inside the coding agent
+while you work. It has nothing to do with the
+[pre-commit hooks](#configure-project-integrations) Core scaffolds for Git, nor with the
+lifecycle triggers in `.vaultspec/triggers/`, which fire inside Core's own CLI. Each
+directory has one owner, so a file in the wrong one is reported rather than silently
+ignored.
+
+The two systems are approved separately, and both `vaultspec-core spec hooks status` and
+`vaultspec-core spec triggers status` report a `hooks_dir` and a `triggers_dir`
+respectively in `--json`. Same shape, different directory: read the command, not just
+the key.
+
+### Write a hook
+
+One YAML file per hook, in `.vaultspec/hooks/`. The filename stem is the hook's name.
+There's no command that scaffolds one; create the file yourself.
+
+Install creates the directory empty and Core ships no example in it, deliberately. A
+file here is a shell command, and anything bundled would arrive in every install of
+every project — disabled or not, one edit away from running.
+
+```yaml
+# .vaultspec/hooks/guard-commands.yaml
+event: pre_tool_use
+matcher: Bash
+command: "./scripts/audit-command.sh"
+timeout: 30
+enabled: true
+```
+
+| Key       | Required | Meaning                                                         |
+| --------- | -------- | --------------------------------------------------------------- |
+| `event`   | yes      | One of the canonical events below                               |
+| `command` | yes      | The shell command the agent runs                                |
+| `matcher` | no       | Tool-name pattern to filter on; empty matches every tool        |
+| `timeout` | no       | Seconds, always. Core converts to each provider's unit          |
+| `enabled` | no       | Defaults to `true`; `false` parses the file but renders nothing |
+
+This directory holds agent-runtime hooks only. Core's own lifecycle triggers live in
+`.vaultspec/triggers/`, and a file whose `event` isn't one of the canonical names below
+doesn't belong here.
+
+### Canonical events
+
+Write the canonical name. Core translates it to each provider's own spelling. The table
+below is Core's mapping: a dash means Core renders nothing for that provider, and the
+hook is skipped there with a warning naming the hook and the provider.
+
+| Canonical event      | claude             | codex              | antigravity   | gemini         |
+| -------------------- | ------------------ | ------------------ | ------------- | -------------- |
+| `pre_tool_use`       | `PreToolUse`       | `PreToolUse`       | `PreToolUse`  | `BeforeTool`   |
+| `post_tool_use`      | `PostToolUse`      | `PostToolUse`      | `PostToolUse` | `AfterTool`    |
+| `session_start`      | `SessionStart`     | `SessionStart`     | -             | `SessionStart` |
+| `session_end`        | `SessionEnd`       | `SessionEnd`       | -             | `SessionEnd`   |
+| `stop`               | `Stop`             | `Stop`             | `Stop`        | -              |
+| `user_prompt_submit` | `UserPromptSubmit` | `UserPromptSubmit` | -             | -              |
+| `notification`       | `Notification`     | -                  | -             | `Notification` |
+
+A dash is not a statement about the provider. It says only that Core has no mapping, and
+in some cases the provider does have an equivalent Core doesn't use yet. Treat the table
+as what Core does, and each provider's own hooks documentation as what that provider
+supports.
+
+`pre_tool_use` and `post_tool_use` are the only two events every provider runs. Bind a
+hook that has to work everywhere to one of those.
+
+Antigravity fires five events and Core maps three of them. Its other two,
+`PreInvocation` and `PostInvocation`, are the nearest thing it has to a session
+boundary, but they expect a different response shape, so Core leaves them unmapped
+rather than render something the agent would fail to parse. If you previously bound a
+hook to `session_start` or `session_end` expecting it to reach Antigravity, it never
+did: those names exist nowhere in the `agy` binary, so the hook rendered and was never
+called.
+
+Gemini expresses hook timeouts in milliseconds and every other provider in seconds.
+Write seconds; Core multiplies where it has to.
+
+### Where they land
+
+| Provider    | Rendered into                        | How Core marks its own entries  |
+| ----------- | ------------------------------------ | ------------------------------- |
+| claude      | `.claude/settings.json`, `hooks` key | `.claude/.vaultspec-hooks.json` |
+| codex       | `.codex/hooks.json`                  | `.codex/.vaultspec-hooks.json`  |
+| antigravity | `.agents/hooks.json`                 | The `vaultspec` hookset         |
+| gemini      | `.gemini/settings.json`, `hooks` key | `.gemini/.vaultspec-hooks.json` |
+
+Core reads and writes `.codex/hooks.json` only. Codex also accepts an inline `[hooks]`
+table in `.codex/config.toml`; Core neither reads that nor reports it, so hooks you put
+there are invisible to `vaultspec-core spec hooks status`.
+
+Under `--target`, hooks and triggers resolve differently, and it isn't an oversight.
+Hooks are source content, like rules and skills: they're read from the workspace you run
+the command in and written into the target. Triggers are read from the target, because a
+trigger reacts to something that happened to that workspace.
+
+Hooks you wrote into those files by hand are preserved. Core records exactly what it
+wrote last sync in the sidecar beside the file, so the next sync removes precisely its
+own previous entries and leaves everything else alone. The record sits in a sidecar
+rather than inside the file because some providers reject a hooks file carrying any key
+they don't recognize, and would discard the whole thing.
+
+Antigravity needs no sidecar: it groups hooks under named hooksets, and Core owns the
+one called `vaultspec`.
+
+Don't edit the sidecars. Deleting one makes Core forget what it wrote, so the entries
+from before become indistinguishable from yours. The next sync re-adopts the ones it
+still renders and abandons the rest in place, where nothing will clean them up.
+
+### Approve before they render
+
+A hook file travels with the repository, and rendering one writes a command into your
+agent's own configuration, where it runs as you on every matching tool call rather than
+once per sync. So Core renders nothing until you have approved it on this machine.
+
+You are asked before any sync that would render, and before
+`vaultspec-core install --upgrade`. Not on a fresh install, which has nothing to render
+yet, and never under `--skip hooks`. For each unapproved hook you see its name, its
+path, the event, the matcher, and the command exactly as written, then a single prompt
+that defaults to no.
+
+Declining costs only the hooks. The sync itself completes, the hook isn't rendered, and
+stderr names the files it skipped and the command that approves them.
+
+Approval is recorded outside the workspace, in `~/.vaultspec/hook-trust.json`, and
+pinned to each file's current contents. Editing an approved hook, or pulling a change to
+one, withdraws the approval until you grant it again. Nothing a clone or an archive
+carries can add an entry there.
+
+Where there is no operator to ask, nothing renders. `--json` output, `CI`, a redirected
+stream, `VAULTSPEC_NON_INTERACTIVE`, and MCP tool calls all skip the prompt, skip the
+rendering, and write nothing to the ledger. There's no flag that approves on your
+behalf, because a flag a script can pass is a flag a repository can talk a script into
+passing. The refusal lives in the renderer rather than in the prompt, so a route that
+never reaches a prompt still cannot render an unapproved hook.
+
+To withdraw approval, run `vaultspec-core spec hooks trust --revoke` and sync: the next
+sync removes the entries it had written, so the hook leaves the provider's config rather
+than lingering there unapproved.
+
+Triggers are approved separately, with
+[`vaultspec-core spec triggers trust`](CLI.md#vaultspec-core-spec-triggers). Approving
+one system never approves the other.
+
+### Turn it off
+
+`vaultspec-core sync --skip hooks` runs every other sync pass and leaves hook rendering
+alone. It doesn't remove hooks an earlier sync already rendered; it declines to
+reconcile them. `vaultspec-core install --skip hooks` does the same during install.
+
+Removing a source file and syncing is the way to withdraw a rendered hook. A config file
+that held nothing but hooks Core wrote is removed along with them rather than left
+behind empty; one that carries your own settings keeps them and loses only the hooks.
+
 <p id="machine-global-runtime-state"></p>
 
 <p id="what-an-absent-managed-file-means"></p>

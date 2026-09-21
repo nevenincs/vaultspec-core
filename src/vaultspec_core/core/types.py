@@ -183,7 +183,8 @@ class WorkspaceContext:
         agents_src_dir: Source directory for agent files.
         system_src_dir: Source directory for system prompt files.
         templates_dir: Source directory for template files.
-        hooks_dir: Source directory for hook files.
+        hooks_dir: Source directory for provider hook files.
+        triggers_dir: Source directory for lifecycle trigger files.
         tool_configs: Per-tool configuration mapping.
     """
 
@@ -195,6 +196,7 @@ class WorkspaceContext:
     system_src_dir: Path
     templates_dir: Path
     hooks_dir: Path
+    triggers_dir: Path
     mcps_src_dir: Path | None = None
     tool_configs: dict[Tool, ToolConfig] = field(default_factory=dict)
 
@@ -269,6 +271,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
     system_src_dir = vaultspec / Resource.SYSTEM.value
     templates_dir = vaultspec / Resource.TEMPLATES.value
     hooks_dir = vaultspec / Resource.HOOKS.value
+    triggers_dir = vaultspec / Resource.TRIGGERS.value
     mcps_src_dir = vaultspec / Resource.MCPS.value
     shared_agents_root = target / DirName.ANTIGRAVITY.value
 
@@ -376,6 +379,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
         system_src_dir=system_src_dir,
         templates_dir=templates_dir,
         hooks_dir=hooks_dir,
+        triggers_dir=triggers_dir,
         mcps_src_dir=mcps_src_dir,
         tool_configs=tool_configs,
     )

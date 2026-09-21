@@ -4,7 +4,7 @@ Exports :func:`app` (the root :class:`typer.Typer` instance) and :func:`run`
 (the ``__main__`` entry point). Subgroups: ``root`` (install/uninstall/sync),
 ``vault_cmd`` (vault stats/list/add/feature/check), and ``spec_cmd``
 (spec rules/skills/agents/system/hooks). Depends on :mod:`vaultspec_core.config`
-and :mod:`vaultspec_core.hooks`.
+and :mod:`vaultspec_core.triggers`.
 """
 
 from .root import app, run

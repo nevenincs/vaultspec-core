@@ -1,16 +1,16 @@
 """Author agent-runtime hooks once and render them per provider.
 
-This module is distinct from :mod:`vaultspec_core.hooks`, which handles
+This module is distinct from :mod:`vaultspec_core.triggers`, which handles
 vaultspec's own CLI-lifecycle events (``vault.document.created`` etc.) that
 fire inside the vaultspec runtime. *Provider hooks* are agent-runtime
 tool-lifecycle hooks (pre/post tool use, session start/stop, ...) consumed by
 the coding agents themselves - Claude Code, OpenAI Codex, the Antigravity CLI
 (``agy``), and the Gemini CLI.
 
-Every provider verified (mid-2026) shares the same structural shape - an event
-maps to a list of matcher groups, each with a list of ``{"type": "command",
-"command": ...}`` handlers - but the providers disagree on event names, file
-location, and packaging:
+Providers broadly share one structural shape - an event maps to a list of
+matcher groups, each with a list of ``{"type": "command", "command": ...}``
+handlers - but they disagree on event names, file location, packaging, and, in
+agy's case, on the shape itself for non-tool events:
 
 ============  ==========================================  ==================
 Provider      File                                        Pre/post tool event
@@ -25,6 +25,12 @@ Authors write a canonical :class:`HookEvent`; each provider renderer maps it to
 the native name (or drops it, with a warning, when the provider lacks an
 equivalent), converts the timeout to the provider's unit, and emits the native
 structure.
+
+A mapping to an event a provider does not actually fire is the failure mode
+this module is most exposed to: the file is written, the sync reports success,
+and the hook never runs. The tables below were checked against each provider's
+published hook reference; claude, codex, gemini and antigravity were verified,
+and a table cell is only as good as that check.
 """
 
 from __future__ import annotations
@@ -44,14 +50,17 @@ from .types import SyncResult
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "AGY_HOOKSET_NAME",
     "PROVIDER_EVENT_NAMES",
     "HookEvent",
     "HookSpec",
     "compose_flat_hooks",
+    "hook_targets",
     "load_provider_hook_specs",
     "provider_hooks_sync",
     "render_hooks_payload",
     "supported_events",
+    "trusted_specs",
 ]
 
 
@@ -91,17 +100,22 @@ PROVIDER_EVENT_NAMES: dict[Tool, dict[HookEvent, str]] = {
         HookEvent.POST_TOOL_USE: "PostToolUse",
         HookEvent.USER_PROMPT_SUBMIT: "UserPromptSubmit",
         HookEvent.SESSION_START: "SessionStart",
+        HookEvent.SESSION_END: "SessionEnd",
         HookEvent.STOP: "Stop",
-        # Codex has no SessionEnd or Notification hook events.
+        # Codex has no Notification hook event.
     },
     Tool.ANTIGRAVITY: {
         HookEvent.PRE_TOOL_USE: "PreToolUse",
         HookEvent.POST_TOOL_USE: "PostToolUse",
-        HookEvent.SESSION_START: "SessionStart",
-        HookEvent.SESSION_END: "SessionEnd",
         HookEvent.STOP: "Stop",
-        HookEvent.NOTIFICATION: "Notification",
-        # agy has no UserPromptSubmit hook event.
+        # agy fires exactly five events: PreInvocation, PostInvocation,
+        # PreToolUse, PostToolUse, Stop. SessionStart, SessionEnd and
+        # Notification were mapped here and exist nowhere in the binary, so
+        # those hooks rendered into .agents/hooks.json under names nothing
+        # fires - no error, no warning, and no execution. PreInvocation and
+        # PostInvocation are the nearest thing to a session boundary, but they
+        # carry a different response contract, so they stay unmapped rather
+        # than trading three silent no-ops for one malformed reply.
     },
     Tool.GEMINI: {
         HookEvent.PRE_TOOL_USE: "BeforeTool",
@@ -117,8 +131,17 @@ PROVIDER_EVENT_NAMES: dict[Tool, dict[HookEvent, str]] = {
 # every other provider in seconds. Authors always write seconds.
 _MILLISECOND_TIMEOUT_TOOLS = frozenset({Tool.GEMINI})
 
+#: agy events whose value is a flat list of handlers rather than a list of
+#: matcher groups. Its tool events take the matcher-group shape every other
+#: provider uses; its non-tool events do not, and a matcher group written under
+#: one is not a handler agy can run.
+_AGY_FLAT_EVENTS = frozenset({"PreInvocation", "PostInvocation", "Stop"})
+
 # The named hookset agy groups vaultspec-managed hooks under in hooks.json.
-_AGY_HOOKSET_NAME = "vaultspec"
+# Public: agy records ownership by owning this hookset rather than by writing a
+# sidecar, so a status surface needs the name to find a stale one left behind
+# when nothing renders any more and no payload can name it for pruning.
+AGY_HOOKSET_NAME = "vaultspec"
 
 
 @dataclass(frozen=True)
@@ -134,6 +157,9 @@ class HookSpec:
             non-tool events but preserved verbatim.
         timeout: Optional timeout in seconds (converted per provider).
         enabled: When ``False`` the hook is parsed but never rendered.
+        source_path: File this spec was parsed from. Consent is keyed by
+            resolved path and content digest, so a spec with no source path
+            cannot be matched against the ledger and is never trusted.
     """
 
     name: str
@@ -142,6 +168,7 @@ class HookSpec:
     matcher: str = ""
     timeout: int | None = None
     enabled: bool = True
+    source_path: Path | None = None
 
 
 def supported_events(tool: Tool) -> frozenset[HookEvent]:
@@ -219,7 +246,15 @@ def render_hooks_payload(
         return None
 
     if tool is Tool.ANTIGRAVITY:
-        return {_AGY_HOOKSET_NAME: {"enabled": True, **grouped}}
+        shaped: dict[str, Any] = {}
+        for native, groups in grouped.items():
+            if native in _AGY_FLAT_EVENTS:
+                shaped[native] = [
+                    handler for group in groups for handler in group["hooks"]
+                ]
+            else:
+                shaped[native] = groups
+        return {AGY_HOOKSET_NAME: {"enabled": True, **shaped}}
     return dict(grouped)
 
 
@@ -260,7 +295,7 @@ def load_provider_hook_specs(
     Reads ``*.yaml``/``*.yml`` files whose ``event`` is a canonical
     :class:`HookEvent`. Files whose event is not canonical are ignored here -
     they belong to the CLI-lifecycle hook system in
-    :mod:`vaultspec_core.hooks`. Returns specs sorted by source filename stem
+    :mod:`vaultspec_core.triggers`. Returns specs sorted by source filename stem
     for deterministic output.
 
     Args:
@@ -312,9 +347,47 @@ def load_provider_hook_specs(
                 matcher=matcher.strip() if isinstance(matcher, str) else "",
                 timeout=timeout if isinstance(timeout, int) else None,
                 enabled=bool(data.get("enabled", True)),
+                source_path=path,
             )
         )
     return specs
+
+
+def trusted_specs(
+    specs: list[HookSpec] | None = None, home: Path | None = None
+) -> tuple[list[HookSpec], list[HookSpec]]:
+    """Split hook specs into ``(trusted, refused)`` by consent-ledger lookup.
+
+    Hook files arrive through git like the rest of ``.vaultspec/``, and a
+    rendered hook runs inside the agent's own session on every matching tool
+    call rather than once per sync. Rendering one is therefore gated on the
+    same operator consent ledger the lifecycle triggers use, keyed by resolved
+    path and content digest, so editing an approved hook or pulling a change to
+    one withdraws the approval until it is granted again.
+
+    :func:`provider_hooks_sync` calls this to decide what it renders, so a
+    status surface that calls it reports the set the renderer actually skipped
+    rather than reconstructing the decision and drifting from it.
+
+    Args:
+        specs: Specs to partition. Loads the workspace's own when omitted.
+        home: Machine-global VaultSpec home holding the ledger. Defaults to the
+            operator's real home; tests pass their own.
+
+    Returns:
+        ``(trusted, refused)``. A spec with no ``source_path`` is refused,
+        because nothing can be matched against the ledger for it.
+    """
+    from ..triggers.trust import is_trusted
+
+    if specs is None:
+        specs = load_provider_hook_specs()
+    trusted: list[HookSpec] = []
+    refused: list[HookSpec] = []
+    for spec in specs:
+        ok = spec.source_path is not None and is_trusted(spec.source_path, home)
+        (trusted if ok else refused).append(spec)
+    return trusted, refused
 
 
 # ---------------------------------------------------------------------------
@@ -407,9 +480,9 @@ def _compose_agy_hooks(
     """Compose the next ``.agents/hooks.json`` dict (named-hookset ownership)."""
     out = dict(existing)
     if payload:
-        out[_AGY_HOOKSET_NAME] = payload[_AGY_HOOKSET_NAME]
+        out[AGY_HOOKSET_NAME] = payload[AGY_HOOKSET_NAME]
     else:
-        out.pop(_AGY_HOOKSET_NAME, None)
+        out.pop(AGY_HOOKSET_NAME, None)
     return out
 
 
@@ -492,7 +565,40 @@ def _sync_one(
     return result
 
 
-def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
+def hook_targets() -> list[tuple[Tool, Path, Path | None]]:
+    """Return every installed provider this sync renders hooks into.
+
+    One entry per hook-capable installed provider, in sync order, as
+    ``(tool, native_config_path, sidecar_path)``. The sidecar is ``None`` for
+    providers that record ownership by owning a named hookset rather than by
+    writing a sidecar beside the native file - currently only antigravity.
+
+    This is the same filter :func:`provider_hooks_sync` iterates, exposed so a
+    status surface reports exactly the set the renderer would write, rather
+    than re-deriving the capability test and drifting from it.
+
+    Returns:
+        Hook-capable installed providers with their resolved paths. Empty when
+        no installed provider declares the ``HOOKS`` capability.
+    """
+    from .manifest import installed_tool_configs
+
+    target_dir = _t.get_context().target_dir
+    targets: list[tuple[Tool, Path, Path | None]] = []
+    for tool, cfg in installed_tool_configs().items():
+        if ProviderCapability.HOOKS not in cfg.capabilities:
+            continue
+        if tool not in _HOOK_FILES:
+            continue
+        subdir, filename = _HOOK_FILES[tool]
+        sidecar = (
+            None if tool is Tool.ANTIGRAVITY else target_dir / subdir / _SIDECAR_NAME
+        )
+        targets.append((tool, target_dir / subdir / filename, sidecar))
+    return targets
+
+
+def provider_hooks_sync(dry_run: bool = False, home: Path | None = None) -> SyncResult:
     """Render provider hooks into every installed hook-capable provider.
 
     Loads canonical hook specs once and renders them into each installed
@@ -502,24 +608,36 @@ def provider_hooks_sync(dry_run: bool = False) -> SyncResult:
 
     Args:
         dry_run: When ``True``, compute actions without writing.
+        home: Machine-global VaultSpec home holding the consent ledger.
+            Defaults to the operator's real home, which is what every
+            production caller wants; real-filesystem tests pass their own so
+            they neither read nor write the operator's approvals.
 
     Returns:
         Accumulated :class:`SyncResult`, with per-provider results under
         ``per_tool``.
     """
-    from .manifest import installed_tool_configs
-
     total = SyncResult()
     parse_warnings: list[str] = []
     specs = load_provider_hook_specs(warnings=parse_warnings)
     total.warnings.extend(parse_warnings)
 
+    # Enforcement lives here rather than at the CLI, so every route into the
+    # renderer is gated and not just the ones that can prompt. Refusing costs
+    # the hook, never the sync: the rest of the sync is a legitimate operation
+    # and still completes.
+    specs, refused = trusted_specs(specs, home)
+    for spec in refused:
+        where = spec.source_path.name if spec.source_path else spec.name
+        msg = (
+            f"Hook {where!r} is not approved for this machine; not rendering it. "
+            "Review it and run 'vaultspec-core spec hooks trust' to allow it."
+        )
+        logger.warning(msg)
+        total.warnings.append(msg)
+
     target_dir = _t.get_context().target_dir
-    for tool, cfg in installed_tool_configs().items():
-        if ProviderCapability.HOOKS not in cfg.capabilities:
-            continue
-        if tool not in _HOOK_FILES:
-            continue
+    for tool, _native, _sidecar in hook_targets():
         result = _sync_one(tool, target_dir, specs, dry_run=dry_run)
         total.merge(result)
         total.per_tool[tool.value] = result

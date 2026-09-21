@@ -34,6 +34,10 @@ Some printed warnings are informational and don't affect the exit code. See the
 [workspace diagnostic reference](./CLI.md#vaultspec-core-spec-doctor) for the checks and
 warning rules.
 
+In `--json` output, the `home` object holds any check that reports structured detail
+rather than a single verdict, whatever that detail is about. Not everything under it is
+machine-global state.
+
 <p id="checking-only-the-vault"></p>
 <p id="repairing-what-can-be-repaired"></p>
 <p id="what-to-run-and-when"></p>

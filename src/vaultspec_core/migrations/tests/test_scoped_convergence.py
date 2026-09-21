@@ -93,18 +93,25 @@ class TestRegistryClassification:
             f"registry entries must declare scope= explicitly: {undeclared}"
         )
 
-    def test_write_placement_is_confined_to_the_index_relocation(self) -> None:
-        """The entitlement an authoring verb receives is one entry wide.
+    def test_write_placement_is_confined_to_the_two_relocations(self) -> None:
+        """The entitlement an authoring verb receives is two entries wide.
 
         Not a name list being restated - the point is the size of the set. If
         a future entry declares ``WRITE_PLACEMENT`` it joins what every
         ``vault add`` runs unattended, and that has to be a change somebody
         makes on purpose and defends here.
+
+        ``trigger_split`` is defended on the same ground as
+        ``index_subfolder``: it decides which directory a freshly authored
+        lifecycle trigger lands in, so an authoring verb that ran without it
+        would write to the pre-split location. It relocates within
+        ``.vaultspec/`` by rename, reaches no ``.vault/`` document, and
+        deletes nothing - its preview is empty by construction.
         """
         placement = [
             m.name for m in REGISTRY if m.scope is MigrationScope.WRITE_PLACEMENT
         ]
-        assert placement == ["index_subfolder"]
+        assert placement == ["index_subfolder", "trigger_split"]
 
     def test_no_entry_that_removes_documents_is_write_placement(self) -> None:
         """The folds are what an authoring verb must never reach.

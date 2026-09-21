@@ -12,11 +12,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from vaultspec_core.core.enums import Tool
+from vaultspec_core.core.enums import ProviderCapability, Tool
 from vaultspec_core.core.provider_hooks import (
     HookEvent,
     HookSpec,
     compose_flat_hooks,
+    hook_targets,
     load_provider_hook_specs,
     render_hooks_payload,
     supported_events,
@@ -73,6 +74,40 @@ class TestRenderPayload:
         payload = render_hooks_payload([_spec(HookEvent.POST_TOOL_USE)], Tool.GEMINI)
         assert payload is not None and "AfterTool" in payload
 
+    def test_antigravity_maps_only_events_the_binary_fires(self):
+        """agy fires five events; three we once mapped are not among them.
+
+        A hook rendered under a name agy never fires is written, reported as
+        synced, and silently never runs - so the map is asserted exactly rather
+        than by spot check.
+        """
+        assert supported_events(Tool.ANTIGRAVITY) == {
+            HookEvent.PRE_TOOL_USE,
+            HookEvent.POST_TOOL_USE,
+            HookEvent.STOP,
+        }
+
+    def test_antigravity_non_tool_events_are_a_flat_handler_list(self):
+        """agy's Stop takes handlers directly; a matcher group there is inert."""
+        payload = render_hooks_payload([_spec(HookEvent.STOP)], Tool.ANTIGRAVITY)
+        assert payload is not None
+        stop = payload["vaultspec"]["Stop"]
+        assert stop == [{"type": "command", "command": "echo x"}]
+
+    def test_antigravity_tool_events_keep_the_matcher_group(self):
+        payload = render_hooks_payload(
+            [_spec(HookEvent.PRE_TOOL_USE, matcher="run_command")], Tool.ANTIGRAVITY
+        )
+        assert payload is not None
+        group = payload["vaultspec"]["PreToolUse"][0]
+        assert group["matcher"] == "run_command"
+        assert group["hooks"] == [{"type": "command", "command": "echo x"}]
+
+    def test_codex_supports_session_end(self):
+        """Verified against Codex's published hook reference."""
+        assert HookEvent.SESSION_END in supported_events(Tool.CODEX)
+        assert HookEvent.NOTIFICATION not in supported_events(Tool.CODEX)
+
     def test_antigravity_wraps_in_named_hookset(self):
         payload = render_hooks_payload(
             [_spec(HookEvent.PRE_TOOL_USE)], Tool.ANTIGRAVITY
@@ -115,6 +150,7 @@ class TestRenderPayload:
         assert HookEvent.STOP not in supported_events(Tool.GEMINI)
         assert HookEvent.NOTIFICATION not in supported_events(Tool.CODEX)
         assert HookEvent.USER_PROMPT_SUBMIT not in supported_events(Tool.ANTIGRAVITY)
+        assert HookEvent.SESSION_START not in supported_events(Tool.ANTIGRAVITY)
 
 
 class TestLoader:
@@ -125,8 +161,7 @@ class TestLoader:
         )
         # A CLI-lifecycle hook (non-canonical event) must be ignored here.
         (tmp_path / "lifecycle.yaml").write_text(
-            "event: vault.document.created\n"
-            "actions:\n  - type: shell\n    command: echo doc\n",
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo doc\n",
             encoding="utf-8",
         )
         specs = load_provider_hook_specs(tmp_path)
@@ -193,35 +228,57 @@ class TestComposeOwnership:
         assert managed_after == {}
 
 
-class TestLifecycleCoexistence:
-    """Provider hooks and CLI-lifecycle hooks share a directory cleanly."""
+class TestLaneSeparation:
+    """Each loader owns a directory, so a foreign event is an error not a skip.
 
-    def test_lifecycle_loader_silently_skips_provider_events(self, tmp_path: Path):
-        from vaultspec_core.hooks import load_hooks
-        from vaultspec_core.hooks.engine import is_provider_hook_event
+    While the two systems shared a directory, each loader silently skipped the
+    other's events - which meant neither could tell a foreign event from a
+    misspelled one of its own. Separate directories buy the right to complain.
+    """
 
-        assert is_provider_hook_event("session_start") is True
-        assert is_provider_hook_event("vault.document.created") is False
+    def test_provider_loader_ignores_a_lifecycle_event_in_its_directory(
+        self, tmp_path: Path
+    ):
+        (tmp_path / "doc.yaml").write_text(
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo doc\n",
+            encoding="utf-8",
+        )
 
-        # A provider hook and a lifecycle hook side by side.
+        assert load_provider_hook_specs(tmp_path) == []
+
+    def test_trigger_loader_warns_on_a_provider_event_in_its_directory(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ):
+        from vaultspec_core.triggers import load_triggers
+
         (tmp_path / "orient.yaml").write_text(
             "event: session_start\nactions:\n  - type: shell\n    command: echo hi\n",
             encoding="utf-8",
         )
+
+        with caplog.at_level("WARNING"):
+            loaded = load_triggers(tmp_path)
+
+        assert loaded == []
+        assert "unsupported event" in caplog.text
+        assert "session_start" in caplog.text
+
+    def test_trigger_loader_still_loads_its_own_event(self, tmp_path: Path):
+        from vaultspec_core.triggers import load_triggers
+
         (tmp_path / "doc.yaml").write_text(
-            "event: vault.document.created\n"
-            "actions:\n  - type: shell\n    command: echo doc\n",
+            "event: config.synced\nactions:\n  - type: shell\n    command: echo doc\n",
             encoding="utf-8",
         )
-        # The lifecycle engine loads only its own event; the provider hook is
-        # skipped (not surfaced as an unsupported-event hook).
-        loaded = load_hooks(tmp_path)
-        events = {h.event for h in loaded}
-        assert events == {"vault.document.created"}
+
+        assert {t.event for t in load_triggers(tmp_path)} == {"config.synced"}
 
 
 class TestEndToEndSync:
-    def test_sync_writes_native_files_per_provider(self, tmp_path: Path):
+    def test_sync_writes_native_files_per_provider(
+        self, tmp_path: Path, operator_home: Path
+    ):
+        # operator_home moves the consent ledger off this developer's account.
         factory = WorkspaceFactory(tmp_path).install("all")
         hooks_dir = tmp_path / ".vaultspec" / "hooks"
         hooks_dir.mkdir(parents=True, exist_ok=True)
@@ -229,7 +286,7 @@ class TestEndToEndSync:
             "event: pre_tool_use\nmatcher: run_command\ncommand: echo GUARD\n",
             encoding="utf-8",
         )
-        factory.sync("all")
+        factory.trust_hooks().sync("all")
 
         agy = json.loads(
             (tmp_path / ".agents" / "hooks.json").read_text(encoding="utf-8")
@@ -256,3 +313,46 @@ class TestEndToEndSync:
             (tmp_path / ".gemini" / "settings.json").read_text(encoding="utf-8")
         )
         assert "BeforeTool" in gemini["hooks"]
+
+
+class TestHookTargets:
+    """The set a status surface reports must be the set the renderer writes."""
+
+    def test_targets_match_the_files_sync_actually_writes(
+        self, tmp_path: Path, operator_home: Path
+    ):
+        # operator_home moves the consent ledger off this developer's account.
+        factory = WorkspaceFactory(tmp_path).install("all")
+        hooks_dir = tmp_path / ".vaultspec" / "hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        (hooks_dir / "guard.yaml").write_text(
+            "event: pre_tool_use\ncommand: echo GUARD\n", encoding="utf-8"
+        )
+
+        factory.trust_hooks().sync("all")
+        targets = hook_targets()
+
+        assert targets, "an all-provider install has hook-capable providers"
+        for _tool, native, _sidecar in targets:
+            assert native.exists(), f"{native} was reported but never written"
+
+    def test_only_antigravity_has_no_sidecar(self, tmp_path: Path):
+        WorkspaceFactory(tmp_path).install("all").sync("all")
+
+        by_tool = {tool: sidecar for tool, _native, sidecar in hook_targets()}
+
+        assert by_tool[Tool.ANTIGRAVITY] is None, "agy owns a named hookset"
+        assert all(
+            sidecar is not None
+            for tool, sidecar in by_tool.items()
+            if tool is not Tool.ANTIGRAVITY
+        )
+
+    def test_every_target_declares_the_hooks_capability(self, tmp_path: Path):
+        from vaultspec_core.core.manifest import installed_tool_configs
+
+        WorkspaceFactory(tmp_path).install("all").sync("all")
+        configs = installed_tool_configs()
+
+        for tool, _native, _sidecar in hook_targets():
+            assert ProviderCapability.HOOKS in configs[tool].capabilities

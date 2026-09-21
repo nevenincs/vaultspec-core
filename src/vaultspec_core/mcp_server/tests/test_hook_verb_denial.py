@@ -40,9 +40,25 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: approves one, or fires the event that runs them.
 SHELL_REACHING_VERBS = (
     "sync",
+    "install",
+    "spec hooks sync",
+    "spec hooks trust",
     "spec hooks add",
     "spec hooks run",
-    "spec hooks trust",
+    "spec triggers add",
+    "spec triggers run",
+    "spec triggers trust",
+)
+
+#: Both systems' read surfaces. Denying the runners must not cost an agent the
+#: ability to say what a workspace would run.
+READ_ONLY_VERBS = (
+    "spec hooks list",
+    "spec hooks show",
+    "spec hooks status",
+    "spec triggers list",
+    "spec triggers show",
+    "spec triggers status",
 )
 
 
@@ -131,7 +147,18 @@ async def test_read_only_hook_verbs_remain_reachable(vault_root: Path) -> None:
     """Denying the runner must not blind an agent to what a workspace declares."""
     mcp = _gateway_server()
     async with Client(mcp) as client:
+        # Only the hook verbs are asserted live. The catalog is parsed from the
+        # generated CLI reference, so `spec triggers` becomes invokable when
+        # that reference is regenerated; until then a live call here would
+        # assert against the generator's schedule rather than the denylist.
+        # `test_read_only_verbs_are_not_denied` covers both systems statically.
         result = await client.call_tool("invoke", {"verb": "spec hooks list"})
         payload = data_of(result)
         assert payload["ok"] is True
         assert payload["exit_code"] == 0
+
+
+def test_read_only_verbs_are_not_denied() -> None:
+    """The read surfaces stay out of the denylist, for both systems."""
+    for verb in READ_ONLY_VERBS:
+        assert tuple(verb.split()) not in DENYLIST, verb
