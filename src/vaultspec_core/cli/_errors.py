@@ -46,8 +46,8 @@ def handle_error(exc: Exception, *, json_output: bool = False) -> None:
     raise exc
 
 
-def run_app(app: typer.Typer) -> None:
-    """Invoke *app*, reporting a domain error that escaped a command body.
+def run_app(app: typer.Typer, *, prog_name: str | None = None) -> None:
+    """Invoke *app* as *prog_name*, reporting a domain error that escaped.
 
     Every command that can raise :class:`VaultSpecError` from its own body
     already routes it through :func:`handle_error`. This is the backstop for
@@ -62,8 +62,20 @@ def run_app(app: typer.Typer) -> None:
     line the user actually needs: the manifest is corrupt, delete it and
     re-run install. The exit code is 1, matching :func:`handle_error`.
 
+    *prog_name* is the command the user typed, and it is passed explicitly
+    because no launch path this product ships can be trusted to supply it.
+    Click derives the name from ``sys.argv[0]``, which the release binaries
+    do not set to the executable: PyApp starts the CLI with ``python -m
+    vaultspec_core`` and the MCP server with ``python -c``, so the help of a
+    binary a user installed as ``vaultspec-core`` announced itself as ``python
+    -m vaultspec_core``, and the MCP server's as ``-c``. Both named something
+    the user cannot type.
+
     Args:
         app: The root Typer application to invoke.
+        prog_name: The command name to render in usage and help. ``None``
+            is Click's own default and restores its ``sys.argv[0]``
+            derivation, which is correct only when something already set it.
 
     Raises:
         SystemExit: With code 1 when a :class:`VaultSpecError` escapes.
@@ -71,7 +83,7 @@ def run_app(app: typer.Typer) -> None:
     from vaultspec_core.core.exceptions import VaultSpecError
 
     try:
-        app()
+        app(prog_name=prog_name)
     except VaultSpecError as exc:
         typer.echo(f"Error: {exc}", err=True)
         if getattr(exc, "hint", ""):

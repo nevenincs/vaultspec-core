@@ -20,7 +20,15 @@ import typer
 
 from vaultspec_core.cli._metavar import install_canonical_argument_metavars
 
-__all__ = ["make_app"]
+#: The command names this distribution installs, as ``[project.scripts]``
+#: declares them. They are stated here because Click cannot discover them:
+#: the release binaries launch through ``python -m`` and ``python -c``, so
+#: ``sys.argv[0]`` names the launcher rather than the command a user typed.
+#: ``dev/guards`` asserts these against ``pyproject.toml``.
+CLI_PROG_NAME = "vaultspec-core"
+MCP_PROG_NAME = "vaultspec-core-mcp"
+
+__all__ = ["CLI_PROG_NAME", "MCP_PROG_NAME", "make_app"]
 
 
 def make_app(**kwargs: Any) -> typer.Typer:

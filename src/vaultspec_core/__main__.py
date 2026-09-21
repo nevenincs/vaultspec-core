@@ -6,6 +6,7 @@ share the same command surface.
 """
 
 from vaultspec_core.cli import app
+from vaultspec_core.cli._app import CLI_PROG_NAME
 from vaultspec_core.cli._errors import run_app
 from vaultspec_core.console import configure_stdio
 
@@ -14,7 +15,7 @@ def main() -> None:
     # Make typer.echo safe on legacy Windows codepages (cp1252) before any
     # command runs; see vaultspec_core.console.configure_stdio (issue #111).
     configure_stdio()
-    run_app(app)
+    run_app(app, prog_name=CLI_PROG_NAME)
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 
 from vaultspec_core import __version__
-from vaultspec_core.cli._app import make_app
+from vaultspec_core.cli._app import MCP_PROG_NAME, make_app
 
 from .tools import (
     register_document_tools,
@@ -248,7 +248,7 @@ def main(
 
 def run() -> None:
     """Console-script entrypoint for the packaged MCP executable."""
-    app()
+    app(prog_name=MCP_PROG_NAME)
 
 
 if __name__ == "__main__":
