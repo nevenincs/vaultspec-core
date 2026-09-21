@@ -117,21 +117,8 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.3`. What follows is on this branch and not in that
-release, so it cannot be installed yet. This list is generated from the recorded surface
-of that release; it is never hand-maintained.
-
-Commands:
-
-- `vaultspec-core spec triggers add`
-- `vaultspec-core spec triggers edit`
-- `vaultspec-core spec triggers list`
-- `vaultspec-core spec triggers remove`
-- `vaultspec-core spec triggers rename`
-- `vaultspec-core spec triggers run`
-- `vaultspec-core spec triggers show`
-- `vaultspec-core spec triggers status`
-- `vaultspec-core spec triggers trust`
+The latest published release is `0.2.4`, and every command, flag, and tool documented
+here is in it.
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
