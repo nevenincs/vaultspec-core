@@ -207,6 +207,29 @@ def _first_word(command: str) -> str:
     return command.split(maxsplit=1)[0] if command.split() else ""
 
 
+#: A workflow step may provision `just` through a composite action stored in
+#: this repository rather than inline. The pin then lives in that action's
+#: `action.yml`, not in the workflow, and a per-file text search cannot see it.
+#: Reading the local actions a workflow `uses:` is what makes the install rule
+#: measure provisioning rather than proximity: a repository that pins the tool
+#: once in a shared action satisfies the rule more strongly than one repeating
+#: the pin in every workflow, and must not be reported for doing so.
+_LOCAL_ACTION_USES = re.compile(r"uses:\s*\./(\.github/actions/[^\s#]+)")
+
+
+def _local_action_texts(text: str, root: Path) -> list[str]:
+    """Return the text of every local composite action ``text`` uses."""
+    texts: list[str] = []
+    for relative in dict.fromkeys(_LOCAL_ACTION_USES.findall(text)):
+        directory = root / relative
+        for name in ("action.yml", "action.yaml"):
+            candidate = directory / name
+            if candidate.is_file():
+                texts.append(candidate.read_text(encoding="utf-8"))
+                break
+    return texts
+
+
 def audit(root: Path) -> list[Finding]:
     """Return every contract violation under `root/.github/workflows`."""
     github = root / ".github"
@@ -232,7 +255,8 @@ def audit(root: Path) -> list[Finding]:
             _first_word(command) == "just" for _, _, command in _run_commands(text)
         )
         if calls_just:
-            if JUST_INSTALL_USES not in text:
+            provisioning = "\n".join([text, *_local_action_texts(text, root)])
+            if JUST_INSTALL_USES not in provisioning:
                 findings.append(
                     Finding(
                         path,
@@ -241,7 +265,7 @@ def audit(root: Path) -> list[Finding]:
                         f"calls `just`, but installs it without {JUST_INSTALL_USES}",
                     )
                 )
-            elif JUST_INSTALL_TOOL not in text:
+            elif JUST_INSTALL_TOOL not in provisioning:
                 findings.append(
                     Finding(
                         path,
