@@ -361,15 +361,27 @@ jobs:
           brew untrust --formula nevenincs/tap/vaultspec-core || true
           brew untrust nevenincs/tap || true
           brew untap nevenincs/tap || true
-          # VACUITY GUARD. Every assertion below is about what a machine with no
-          # prior grant does. If a grant survived the teardown, the install
+          # VACUITY GUARD. Every assertion below is about what a machine with
+          # no prior grant does. If a grant survived the teardown, the install
           # would pass for the wrong reason.
-          if grep -q 'nevenincs/tap' "${HOME}/.homebrew/trust.json" 2>/dev/null; then
+          #
+          # The path is DERIVED, not assumed: `brew trust` writes to
+          # ${XDG_CONFIG_HOME}/homebrew/trust.json when that is set and
+          # ~/.homebrew/trust.json otherwise. Hardcoding the second one makes
+          # this guard read a file that is never written on a host with XDG
+          # set, and a guard that reads the wrong file passes vacuously - which
+          # is the failure it exists to prevent, reintroduced inside itself.
+          if [ -n "${XDG_CONFIG_HOME:-}" ]; then
+            trust="${XDG_CONFIG_HOME}/homebrew/trust.json"
+          else
+            trust="${HOME}/.homebrew/trust.json"
+          fi
+          if [ -e "${trust}" ] && grep -q 'nevenincs/tap' "${trust}"; then
             echo "::error::a nevenincs/tap trust entry survived teardown; this leg cannot conclude anything about a clean machine"
-            cat "${HOME}/.homebrew/trust.json" >&2
+            cat "${trust}" >&2
             exit 1
           fi
-          echo "confirmed: no nevenincs/tap grant on this machine"
+          echo "confirmed: no nevenincs/tap grant in ${trust}"
 
       # THE PUBLISHED COMMAND, verbatim from docs/channels.md, on a machine
       # with no grant. The tap-qualified name is load-bearing and not a
