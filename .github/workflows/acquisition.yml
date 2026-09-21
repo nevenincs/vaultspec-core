@@ -307,6 +307,184 @@ jobs:
         if: always()
         run: rm -rf "${RUNNER_TEMP}/acq" "${RUNNER_TEMP}/fresh-home" "${RUNNER_TEMP}/proj" || true
 
+  # THE DOCUMENTED macOS INSTALL PATH, which until now nothing ran.
+  #
+  # `acquire-macos` above downloads the tarball with curl and strips the
+  # quarantine attribute, so it proves the BINARY starts. It cannot prove the
+  # channel a user is told to use still works, and the two are not the same
+  # claim: Homebrew 7.0 began refusing to load a formula from a non-official
+  # tap, so `brew tap` followed by `brew install` - the sequence docs/channels.md
+  # published - stopped installing anything while every check in this repository
+  # stayed green. A correct check placed where it does not execute is this
+  # repository's most common defect, and the install path having no check at all
+  # is the same defect with the check missing rather than misplaced.
+  #
+  # This leg runs the published sequence verbatim on a machine that has had the
+  # tap, the trust and the formula removed first. It gates nothing - acquisition
+  # runs after publication - so a queue on the power-gated host costs only time.
+  acquire-homebrew:
+    timeout-minutes: 45
+    name: "Test: Release acquisition (macOS, Homebrew)"
+    # Same power-gated host as acquire-macos, and the same reasoning: this job
+    # may queue rather than fail, which is acceptable for a check that gates
+    # nothing.
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      # Homebrew is not on a non-interactive PATH on this host, and a login
+      # shell is not guaranteed. Resolve the prefix explicitly rather than
+      # assuming /opt/homebrew, so an Intel host with /usr/local also works.
+      - name: Put Homebrew on PATH
+        run: |
+          set -eu
+          for prefix in /opt/homebrew /usr/local; do
+            if [ -x "${prefix}/bin/brew" ]; then
+              echo "${prefix}/bin" >> "$GITHUB_PATH"
+              exit 0
+            fi
+          done
+          echo "::error::no brew found in /opt/homebrew or /usr/local"
+          exit 1
+
+      # A COLD acquisition. A self-hosted mac keeps whatever the last run
+      # left, and an already-installed formula or an already-trusted tap would
+      # let this job pass on a previous run's evidence.
+      #
+      # ORDER MATTERS. `brew untrust --formula` has to resolve the formula, so
+      # it must run while the tap is still tapped; untapping first leaves the
+      # trust entry behind and the next step then measures nothing. That is not
+      # hypothetical - it is how this leg was first written, and it reported a
+      # clean install from a machine that was still carrying the trust.
+      - name: Remove every trace of a previous install
+        run: |
+          set -eux
+          brew uninstall --force vaultspec-core || true
+          brew untrust --formula nevenincs/tap/vaultspec-core || true
+          brew untrust nevenincs/tap || true
+          brew untap nevenincs/tap || true
+          # VACUITY GUARD. Every assertion below is about what a machine with no
+          # prior grant does. If a grant survived the teardown, the install
+          # would pass for the wrong reason.
+          if grep -q 'nevenincs/tap' "${HOME}/.homebrew/trust.json" 2>/dev/null; then
+            echo "::error::a nevenincs/tap trust entry survived teardown; this leg cannot conclude anything about a clean machine"
+            cat "${HOME}/.homebrew/trust.json" >&2
+            exit 1
+          fi
+          echo "confirmed: no nevenincs/tap grant on this machine"
+
+      # THE PUBLISHED COMMAND, verbatim from docs/channels.md, on a machine
+      # with no grant. The tap-qualified name is load-bearing and not a
+      # stylistic choice: Homebrew 7.0 refuses a formula from an explicitly
+      # added tap, so `brew tap` followed by `brew install vaultspec-core` -
+      # what that document used to publish - installs nothing. Installing by
+      # the qualified name taps as it installs and is not refused.
+      #
+      # If this line and docs/channels.md ever disagree, one of them is wrong.
+      - name: Install exactly the way the documentation says to
+        run: brew install nevenincs/tap/vaultspec-core
+
+      # WHY THE DOCUMENTED COMMAND IS QUALIFIED, asserted rather than trusted
+      # to prose. Without this, the step above passes just as happily if
+      # Homebrew stops refusing the bare name, and the document keeps warning
+      # about a refusal that no longer happens.
+      #
+      # A WARNING, not a failure. That the documented install works is
+      # fail-closed above; whether Homebrew still gates the bare name is a
+      # statement about Homebrew, and it may relax it. If it does, this says so
+      # - which is the signal that docs/channels.md now over-warns - without
+      # failing a release that installs correctly.
+      - name: The bare name is still refused, which is what the docs explain
+        run: |
+          set -eu
+          brew uninstall --force vaultspec-core
+          brew tap nevenincs/tap
+          if brew install vaultspec-core > bare.log 2>&1; then
+            echo "::warning::the bare formula name installed from an untapped-trust machine; Homebrew no longer gates it and docs/channels.md now over-warns"
+          elif grep -q 'untrusted tap' bare.log; then
+            echo "confirmed: Homebrew refuses the bare name, as documented"
+          else
+            echo "::error::the bare-name install failed for a reason that is not the trust gate:"
+            cat bare.log >&2
+            exit 1
+          fi
+          rm -f bare.log
+          # Restore the state the remaining steps assert against: the
+          # documented command, from the same clean grant as above.
+          brew untap nevenincs/tap || true
+          brew untrust --formula nevenincs/tap/vaultspec-core || true
+          brew install nevenincs/tap/vaultspec-core
+
+      # Placement, not just exit status. `bin.install` naming one executable and
+      # shipping two is a formula bug that a passing `brew install` hides.
+      - name: Both executables are on PATH where Homebrew put them
+        run: |
+          set -eu
+          for command in vaultspec-core vaultspec-core-mcp; do
+            resolved=$(command -v "${command}") || {
+              echo "::error::${command} is not on PATH after brew install"
+              exit 1
+            }
+            echo "${command} -> ${resolved}"
+          done
+
+      # THE ASSERTION THIS LEG ADDS over acquire-macos: no attribute was
+      # stripped to get here. `brew` fetches the archive itself rather than
+      # through a browser, which is the whole reason docs/channels.md calls
+      # Homebrew the supported macOS path. If a future formula acquired the
+      # attribute - a `url` served in a way Gatekeeper tags, say - that claim
+      # would be false and users would meet the dialog the documentation
+      # promises they will not.
+      #
+      # com.apple.provenance is EXPECTED and is not quarantine: macOS 13+ tags
+      # executables it has run. Only com.apple.quarantine gates launching.
+      - name: Nothing Homebrew installed is quarantined
+        run: |
+          set -eu
+          quarantined=0
+          for command in vaultspec-core vaultspec-core-mcp; do
+            target=$(readlink -f "$(command -v "${command}")")
+            if xattr "${target}" 2>/dev/null | grep -q com.apple.quarantine; then
+              echo "::error::${target} carries com.apple.quarantine; Homebrew is no longer the path that avoids Gatekeeper"
+              quarantined=1
+            fi
+          done
+          [ "${quarantined}" -eq 0 ] || exit 1
+          echo "confirmed: no com.apple.quarantine on either executable"
+
+      # A COLD START in a home directory nothing has written, then real work.
+      # `--version` can be answered without importing much; `install` and
+      # `vault check` pull the dependency closure the binary carries.
+      - name: Use it the way a new user would
+        run: |
+          set -eux
+          export HOME="${RUNNER_TEMP}/brew-home"
+          proj="${RUNNER_TEMP}/brew-proj"
+          rm -rf "$HOME" "${proj}"
+          mkdir -p "$HOME" "${proj}"
+
+          vaultspec-core --version
+
+          cd "${proj}"
+          git init -q
+          git config user.email acquisition@example.invalid
+          git config user.name "Acquisition Check"
+
+          vaultspec-core install
+          [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
+          vaultspec-core vault check all
+
+      # The formula's own test block, which nothing else in this repository
+      # runs. It asserts the installed binary reports the version the formula
+      # claims, so a pointer generated against the wrong release fails here.
+      - name: The formula's test block passes
+        run: brew test vaultspec-core
+
+      - name: Clean up
+        if: always()
+        run: |
+          brew uninstall --force vaultspec-core || true
+          brew untap nevenincs/tap || true
+          rm -rf "${RUNNER_TEMP}/brew-home" "${RUNNER_TEMP}/brew-proj" || true
+
   acquire-windows:
     timeout-minutes: 60
     name: "Test: Release acquisition (Windows)"

@@ -119,6 +119,21 @@ acquisition.yml:Acquire the published binary
 acquisition.yml:The published binary starts on a machine that has never run it
 acquisition.yml:Use it the way a new user would
 
+# The Homebrew leg of the same lane, and the entries `test-acquisition` will
+# have to absorb with it. These drive `brew` on the host rather than the
+# product, so there is no local recipe they could be hiding: a recipe that
+# tapped, trusted and installed from a published tap would only be runnable on
+# the one machine this job already runs on. What the eventual recipe owns is
+# the shape - teardown, documented command, placement, quarantine, use - not
+# the `brew` calls themselves.
+acquisition.yml:Put Homebrew on PATH
+acquisition.yml:Remove every trace of a previous install
+acquisition.yml:Install exactly the way the documentation says to
+acquisition.yml:The bare name is still refused, which is what the docs explain
+acquisition.yml:Both executables are on PATH where Homebrew put them
+acquisition.yml:Nothing Homebrew installed is quarantined
+acquisition.yml:The formula's test block passes
+
 # --- discharged -------------------------------------------------------------
 # The pull-request workflow needed no recipe to leave this list. All
 # three of its entries were shell steps asserting facts about committed files -
