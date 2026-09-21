@@ -464,7 +464,20 @@ jobs:
     # quietly when there is nothing to check - is a job that reports success
     # having checked nothing, which is the shape this file refuses in four
     # other places.
-    if: ${{ !cancelled() }}
+    #
+    # AND NOT WHEN THERE WAS NO BUILD AT ALL. `needs.build.result != 'skipped'`
+    # is the difference between a leg that FAILED and a matrix that never ran.
+    # When preflight gates the matrix, this job's macOS leg QUEUES on the very
+    # runner preflight just declared offline - unbounded, because a queued job
+    # is not bounded by `timeout-minutes`. That is the pathology preflight
+    # exists to refuse, re-entering one job below it.
+    #
+    # The cost is not just a hung run. The run keeps `binaries-<tag>` held, and
+    # this workflow never cancels its own group, so the REPAIR dispatch for that
+    # tag queues behind the wreck it was dispatched to repair. vaultspec-core
+    # v0.2.3 and the first v0.2.4 attempt both had to be cancelled BY HAND
+    # before they could be re-dispatched; v0.2.3 never was, and shipped nothing.
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
     strategy:
       fail-fast: false
       matrix:
