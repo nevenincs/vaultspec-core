@@ -54,6 +54,7 @@ def test_build_bundle_has_stable_contents_and_manifest(
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "LICENSE").write_text("license\n", encoding="utf-8")
+    (repo / "README.md").write_text("# project readme\n", encoding="utf-8")
     raw = _raw_outputs(tmp_path, target)
 
     archive = build_bundle(
@@ -84,7 +85,7 @@ def test_build_bundle_has_stable_contents_and_manifest(
 
     expected = {
         "LICENSE",
-        "README.txt",
+        "README.md",
         "manifest.json",
         *(
             VAULTSPEC_CORE.executable_name(executable, target)
@@ -95,6 +96,7 @@ def test_build_bundle_has_stable_contents_and_manifest(
     manifest = json.loads(contents["manifest.json"])
     assert manifest["archive"]["name"] == archive.name
     assert manifest["display_name"] == "Vaultspec Core"
+    assert manifest["description"] == VAULTSPEC_CORE.description
     assert manifest["publisher"] == "Gergely Wootsch"
     assert manifest["legal_copyright"] == "Copyright (c) Gergely Wootsch"
     assert manifest["target"] == target
@@ -117,6 +119,7 @@ def test_build_bundle_is_deterministic(tmp_path: Path, target: str) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "LICENSE").write_text("license\n", encoding="utf-8")
+    (repo / "README.md").write_text("# project readme\n", encoding="utf-8")
     raw = _raw_outputs(tmp_path, target)
     output = tmp_path / "bundles"
 
@@ -136,6 +139,7 @@ def test_build_bundle_rejects_a_missing_executable(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "LICENSE").write_text("license\n", encoding="utf-8")
+    (repo / "README.md").write_text("# project readme\n", encoding="utf-8")
 
     with pytest.raises(BundleError, match="missing finalized executable"):
         build_bundle(
@@ -164,6 +168,7 @@ def test_verify_bundle_rejects_missing_contract_metadata(
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "LICENSE").write_text("license\n", encoding="utf-8")
+    (repo / "README.md").write_text("# project readme\n", encoding="utf-8")
     raw = _raw_outputs(tmp_path, "x86_64-pc-windows-msvc")
     archive = build_bundle(
         VAULTSPEC_CORE,
