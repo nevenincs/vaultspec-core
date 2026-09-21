@@ -192,7 +192,7 @@ jobs:
           # Behaviour, not exit codes: the install has to leave a vault behind,
           # and the tool has to be able to read back what it just wrote.
           [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
-          /opt/acq/vaultspec-core vault check all
+          /opt/acq/bundle/vaultspec-core vault check all
 
       - name: Return the workspace to the runner's user
         if: always()
