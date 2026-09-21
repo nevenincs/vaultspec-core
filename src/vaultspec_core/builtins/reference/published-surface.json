@@ -107,40 +107,18 @@
       "--target"
     ],
     "spec hooks add": [
-      "--body",
       "--command",
-      "--dry-run",
       "--event",
       "--force",
-      "--from-file",
       "--json",
-      "--target"
-    ],
-    "spec hooks edit": [
-      "--editor",
       "--target"
     ],
     "spec hooks list": [
       "--json",
       "--target"
     ],
-    "spec hooks remove": [
-      "--force",
-      "--json",
-      "--target",
-      "--yes"
-    ],
-    "spec hooks rename": [
-      "--json",
-      "--target"
-    ],
-    "spec hooks restore": [
-      "--json",
-      "--target"
-    ],
     "spec hooks run": [
       "--json",
-      "--path",
       "--target"
     ],
     "spec hooks show": [
@@ -153,7 +131,6 @@
     ],
     "spec hooks sync": [
       "--dry-run",
-      "--force",
       "--json",
       "--target"
     ],
@@ -320,6 +297,52 @@
       "--dry-run",
       "--force",
       "--json",
+      "--target"
+    ],
+    "spec triggers add": [
+      "--body",
+      "--command",
+      "--dry-run",
+      "--event",
+      "--force",
+      "--from-file",
+      "--json",
+      "--target"
+    ],
+    "spec triggers edit": [
+      "--editor",
+      "--target"
+    ],
+    "spec triggers list": [
+      "--json",
+      "--target"
+    ],
+    "spec triggers remove": [
+      "--force",
+      "--json",
+      "--target",
+      "--yes"
+    ],
+    "spec triggers rename": [
+      "--json",
+      "--target"
+    ],
+    "spec triggers run": [
+      "--json",
+      "--path",
+      "--target"
+    ],
+    "spec triggers show": [
+      "--json",
+      "--target"
+    ],
+    "spec triggers status": [
+      "--json",
+      "--target"
+    ],
+    "spec triggers trust": [
+      "--json",
+      "--revoke",
       "--target"
     ],
     "status": [
@@ -943,5 +966,5 @@
     "status"
   ],
   "schema": 1,
-  "version": "0.2.3"
+  "version": "0.2.4"
 }
