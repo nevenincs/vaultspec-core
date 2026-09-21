@@ -50,9 +50,38 @@ scoop install vaultspec-core
 macOS and Linux with Homebrew:
 
 ```sh
-brew tap nevenincs/tap https://github.com/nevenincs/homebrew-tap
-brew install vaultspec-core
+brew install nevenincs/tap/vaultspec-core
 ```
+
+One command, and the tap-qualified name is the whole of why. It taps as it installs, so
+no `brew tap` is needed first, and Homebrew records the formula as trusted on the way
+through.
+
+Do not add the tap separately and install by bare name. Homebrew 7.0 refuses to load a
+formula from a tap outside its official set, and an explicitly added tap is outside that
+set whether or not you pass its URL:
+
+```console
+$ brew tap nevenincs/tap
+$ brew install vaultspec-core
+Error: Refusing to load formula nevenincs/tap/vaultspec-core from untrusted tap nevenincs/tap.
+```
+
+That refusal is what the tap-qualified form avoids, and it is not cleared by having
+installed the formula before - only `brew trust nevenincs/tap`, which records the whole
+tap in `~/.homebrew/trust.json`, makes the bare name work. Prefer the one command above;
+reach for `brew trust` only if you want `vaultspec-core` to resolve unqualified.
+
+Upgrading needs neither, because the formula is already trusted by then:
+
+```sh
+brew upgrade vaultspec-core
+```
+
+Homebrew is the supported path on macOS for a second reason. `brew` fetches the archive
+itself rather than through a browser, so nothing it installs carries the
+`com.apple.quarantine` attribute and Gatekeeper never interposes. See [macOS](#macos)
+for what a direct download meets instead.
 
 ## Direct release downloads
 
@@ -67,9 +96,11 @@ version, and Rust target; its extracted command names do not vary by platform.
 | Linux x86-64   | `vaultspec-core-v<version>-x86_64-unknown-linux-gnu.tar.gz`  |
 | Linux arm64    | `vaultspec-core-v<version>-aarch64-unknown-linux-gnu.tar.gz` |
 
-Each archive contains `vaultspec-core`, `vaultspec-core-mcp`, `LICENSE`, `README.txt`,
-and `manifest.json`. On Windows the executables end in `.exe`. The manifest records the
-archive contract, target, runtime, platform floor, and SHA-256 for each member.
+Each archive contains `vaultspec-core`, `vaultspec-core-mcp`, `LICENSE`, `README.md`,
+and `manifest.json`. On Windows the executables end in `.exe`. `README.md` is this
+project's own README, shipped as-is; its images and relative links resolve against the
+repository rather than the archive. The manifest records the archive contract, target,
+runtime, platform floor, product description, and SHA-256 for each member.
 
 Extract the asset for your target, then run the stable command name:
 

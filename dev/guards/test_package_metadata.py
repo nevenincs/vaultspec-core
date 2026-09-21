@@ -41,6 +41,28 @@ def test_project_scripts_ship_vaultspec_core_and_mcp(pyproject: dict[str, Any]) 
     assert "vaultspec" not in scripts
 
 
+def test_the_prog_names_are_the_commands_the_distribution_installs(
+    pyproject: dict[str, Any],
+) -> None:
+    """The names rendered in help must be names a user can actually type.
+
+    Click derives the program name from ``sys.argv[0]``, and no launch path
+    this product ships sets it to the command: the release binaries start the
+    CLI with ``python -m vaultspec_core`` and the MCP server with ``python
+    -c``, so their help announced ``python -m vaultspec_core`` and ``-c``
+    respectively. The names are therefore stated in the source, which makes
+    them capable of drifting from ``[project.scripts]`` - the one place that
+    decides what a user has on PATH. This is the check that they cannot.
+    """
+    from vaultspec_core.cli._app import CLI_PROG_NAME, MCP_PROG_NAME
+
+    scripts: dict[str, str] = pyproject["project"]["scripts"]
+    assert CLI_PROG_NAME in scripts
+    assert MCP_PROG_NAME in scripts
+    assert scripts[CLI_PROG_NAME] == "vaultspec_core.__main__:main"
+    assert scripts[MCP_PROG_NAME] == "vaultspec_core.mcp_server.app:run"
+
+
 def test_the_runtime_badge_names_every_supported_interpreter_and_no_other(
     pyproject: dict[str, Any], repo_root: Path
 ) -> None:

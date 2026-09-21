@@ -26,7 +26,12 @@ from dev.packaging.products import VAULTSPEC_CORE, Product, is_windows_target
 
 MANIFEST_NAME = "manifest.json"
 LICENSE_NAME = "LICENSE"
-README_NAME = "README.txt"
+#: The project's own README, copied from the checkout rather than generated.
+#: Until this release it was a `README.txt` rendered from product metadata,
+#: restating the target and the executable list and nothing else - every fact
+#: in it already carried by `manifest.json` beside it. It cost a reader the one
+#: document they went looking for and told them nothing the manifest did not.
+README_NAME = "README.md"
 MANIFEST_SCHEMA = "vaultspec.release-bundle.v1"
 
 
@@ -66,24 +71,6 @@ def source_revision(repo_root: Path) -> str:
     return revision
 
 
-def _readme(product: Product, version: str, target: str) -> bytes:
-    """Return the short usage note shipped beside the executables."""
-    lines = [
-        f"{product.display_name or product.name} {version}",
-        "",
-        f"Target: {target}",
-        "",
-        "Executables:",
-        *(
-            f"  {product.executable_name(executable, target)} - {executable.summary}"
-            for executable in product.executables
-        ),
-        "",
-        "Run vaultspec-core --version to verify the installed command.",
-    ]
-    return ("\n".join(lines) + "\n").encode()
-
-
 def _manifest(
     product: Product,
     version: str,
@@ -107,6 +94,7 @@ def _manifest(
         "schema": MANIFEST_SCHEMA,
         "product": product.name,
         "display_name": product.display_name or product.name,
+        "description": product.description,
         "publisher": product.publisher or None,
         "legal_copyright": product.legal_copyright or None,
         "version": version,
@@ -172,7 +160,6 @@ def _tar_archive(destination: Path, files: tuple[BundleFile, ...]) -> None:
 
 def _stage_files(
     product: Product,
-    version: str,
     target: str,
     raw_dir: Path,
     repo_root: Path,
@@ -190,16 +177,13 @@ def _stage_files(
             destination.chmod(0o755)
         members.append(BundleFile(destination, destination.name, "executable"))
 
-    license_source = repo_root / LICENSE_NAME
-    if not license_source.is_file():
-        raise BundleError(f"missing release license: {license_source}")
-    license_destination = root / LICENSE_NAME
-    shutil.copy2(license_source, license_destination)
-    members.append(BundleFile(license_destination, LICENSE_NAME, "license"))
-
-    readme = root / README_NAME
-    readme.write_bytes(_readme(product, version, target))
-    members.append(BundleFile(readme, README_NAME, "readme"))
+    for name, role in ((LICENSE_NAME, "license"), (README_NAME, "readme")):
+        source = repo_root / name
+        if not source.is_file():
+            raise BundleError(f"missing release {role}: {source}")
+        destination = root / name
+        shutil.copy2(source, destination)
+        members.append(BundleFile(destination, name, role))
     return tuple(members)
 
 
@@ -221,7 +205,7 @@ def build_bundle(
     with tempfile.TemporaryDirectory(prefix="bundle-", dir=output_dir) as temporary:
         root = Path(temporary) / "contents"
         root.mkdir()
-        members = _stage_files(product, version, target, raw_dir, repo_root, root)
+        members = _stage_files(product, target, raw_dir, repo_root, root)
         manifest_path = root / MANIFEST_NAME
         manifest_path.write_bytes(
             _manifest(product, version, target, archive_name, revision, members)
@@ -321,6 +305,7 @@ def verify_bundle(archive: Path, product: Product, version: str, target: str) ->
         "schema": MANIFEST_SCHEMA,
         "product": product.name,
         "display_name": product.display_name or product.name,
+        "description": product.description,
         "publisher": product.publisher or None,
         "legal_copyright": product.legal_copyright or None,
         "version": version,
