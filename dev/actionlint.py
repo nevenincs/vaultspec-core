@@ -60,12 +60,11 @@ VERSION = "1.7.12"
 #: workflow blocks this file replaces; bump the version and every digest
 #: together, never one of them.
 #:
-#: ONLY the two platforms whose digests this fleet has actually verified are
-#: listed. macOS and Windows are absent on purpose rather than filled in from
-#: memory: a digest nobody checked is not a verification, and the honest
-#: failure for an unlisted platform is the refusal below - which says exactly
-#: what to add and where to get it. Workflow linting runs on the Linux cells
-#: in all five repos, so nothing is currently blocked by the gap.
+#: Every entry is read from `actionlint_<VERSION>_checksums.txt` on the
+#: release, never filled in from memory: a digest nobody checked is not a
+#: verification. Every platform a runner has must be listed, because init's
+#: tools phase provisions actionlint on all of them and an unlisted platform
+#: is refused - which is the honest failure, and says what to add.
 ARCHIVES: dict[tuple[str, str], tuple[str, str]] = {
     ("linux", "x86_64"): (
         "linux_amd64.tar.gz",
@@ -79,11 +78,11 @@ ARCHIVES: dict[tuple[str, str], tuple[str, str]] = {
         "darwin_amd64.tar.gz",
         "5b44c3bc2255115c9b69e30efc0fecdf498fdb63c5d58e17084fd5f16324c644",
     ),
-    ("darwin", "arm64"): (
+    ("darwin", "aarch64"): (
         "darwin_arm64.tar.gz",
         "aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f",
     ),
-    ("windows", "amd64"): (
+    ("windows", "x86_64"): (
         "windows_amd64.zip",
         "6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9",
     ),
@@ -110,10 +109,6 @@ def _platform_key() -> tuple[str, str]:
     machine = {"amd64": "x86_64", "x64": "x86_64", "arm64": "aarch64"}.get(
         machine, machine
     )
-    if system == "windows":
-        machine = "amd64" if machine == "x86_64" else machine
-    if system == "darwin":
-        machine = "arm64" if machine == "aarch64" else machine
     return system, machine
 
 
