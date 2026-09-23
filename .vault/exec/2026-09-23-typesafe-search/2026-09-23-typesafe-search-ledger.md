@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:4fca81b68a093c995d0fa4709f9e6bcc9fdadd628478c70345e05ee9c6b6792f'
+body_hash: 'sha256:903e28ec891d324b5c1e743470cec2334b23bb95620c07010e02cbb232511650'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -95,3 +95,9 @@ related:
 - `S09` `M` `dev/toolchain.py`
 - `S09` `A` `src/vaultspec_core/search/tests/test_live.py`
 - `S09` `verify:` `tmp/typesafe-search-eval/run_product_eval.py` -> `pass`
+- `S06` `A` `src/vaultspec_core/search/_remediation.py`
+- `S06` `A` `src/vaultspec_core/search/tests/test_remediation.py`
+- `S06` `M` `src/vaultspec_core/search/_service.py`
+- `S07` `M` `src/vaultspec_core/search/_questions.py`
+- `S07` `M` `src/vaultspec_core/search/__init__.py`
+
