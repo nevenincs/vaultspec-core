@@ -7,6 +7,7 @@ to the agent-level fallback. It never calls vaultspec-rag.
 
 from __future__ import annotations
 
+from ._credential import hosted_search_config as hosted_search_config
 from ._models import DEFAULT_RESULTS as DEFAULT_RESULTS
 from ._models import MAX_RESULTS as MAX_RESULTS
 from ._models import CredentialSource as CredentialSource
@@ -29,4 +30,5 @@ __all__ = [
     "SearchStatus",
     "SearchUsage",
     "UnavailableReason",
+    "hosted_search_config",
 ]
