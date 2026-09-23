@@ -30,11 +30,14 @@ For each cluster of decisions on a shared concept:
   `remaining`, and `stopped` in the audit; the next sweep repeats the selector with
   `--after <next_after>` on the orchestrator's go-ahead. On `not_configured`, run the
   next step the reply names. On `stopped`, report the reason; a sweep stopped on time or
-  a transient failure is resumed later, and one stopped on refusals needs the provider
-  checked first. A source that is `unavailable` inside a sweep that did not stop was
-  refused on its own text: record it. Each `link` verdict is a candidate missing link;
-  each `weak` verdict is a declared link judged below the threshold. The `relation`
-  label says which pairs to read in full; it does not classify the pair for you.
+  a transient failure is resumed later, and one stopped on refusals means the provider
+  refused several ADRs in a row: cross-reference one other ADR on its own, and if that
+  is judged, the refused ADRs are their own; resume with `--after` set to the last of
+  them and record them. A source that is `unavailable` inside a sweep that did not stop
+  was refused on its own text: record it. Each `link` verdict is a candidate missing
+  link; each `weak` verdict is a declared link judged below the threshold. The
+  `relation` label says which pairs to read in full; it does not classify the pair for
+  you.
 - Surface the cluster by meaning. Search decisions and vault facts with
   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
   run the next step its reply names. Semantic recall finds same-topic ADRs that share no
