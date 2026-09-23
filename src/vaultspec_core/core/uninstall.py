@@ -32,7 +32,7 @@ from .manifest import (
     remove_provider,
     write_manifest_data,
 )
-from .precommit import ALL_MANAGED_HOOK_IDS, strip_managed_precommit_hooks
+from .precommit import managed_strip_outcome, strip_managed_precommit_hooks
 from .prek_boundary import existing_precommit_configs
 from .provider_registry import (
     PROVIDER_TO_TOOLS,
@@ -175,11 +175,9 @@ def _uninstall_precommit_hooks(
     stripped = False
     for precommit_path in existing_precommit_configs(root):
         if dry_run:
-            try:
-                raw = precommit_path.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            if any(f"id: {hid}" in raw for hid in ALL_MANAGED_HOOK_IDS):
+            # The same parse and strip rule the real run applies, so the
+            # preview names exactly the files the run would change.
+            if managed_strip_outcome(precommit_path) in ("delete", "rewrite"):
                 removed.append((rel(root, precommit_path), "precommit"))
             continue
         if strip_managed_precommit_hooks(precommit_path):

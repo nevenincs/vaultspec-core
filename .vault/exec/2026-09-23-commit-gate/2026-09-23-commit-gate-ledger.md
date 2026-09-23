@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:63f73a05fcc05a72541f070230689ee1deda7aeba013751f980cbe9a9b635cff'
+body_hash: 'sha256:b1dad1ed4cc88ce7fa0b88e7e5a12ee5f55a2357f427d894720baf33d1700355'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -119,6 +119,13 @@ related:
 - `S13` `M` `src/vaultspec_core/cli/spec_cmd_doctor.py`
 - `S13` `M` `src/vaultspec_core/tests/cli/test_precommit_hook_set.py`
 - `S13` `verify:` `ty check` -> `pass`
+- `S14` `M` `src/vaultspec_core/core/precommit.py`
+- `S14` `M` `src/vaultspec_core/core/prek_boundary.py`
+- `S14` `M` `src/vaultspec_core/core/diagnosis/collectors_precommit.py`
+- `S14` `M` `src/vaultspec_core/core/diagnosis/collectors_config.py`
+- `S14` `M` `src/vaultspec_core/core/uninstall.py`
+- `S14` `A` `src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py`
+- `S14` `verify:` `pytest test_doctor_aggregates_canonical_checks against the prior modules` -> `fail`
 
 ## Notes
 

@@ -98,6 +98,9 @@ class PrekBoundaryState:
         managed_blocks: How many vaultspec-managed blocks the file carries.
         canonical_listings: How many hook entries in the local repos carry a
             canonical id, inside or outside the managed blocks.
+        unowned_duplicate: The operator-owned part of the file - everything
+            outside the managed blocks - itself lists a canonical hook more
+            than once, which no vaultspec repair may clear.
     """
 
     config_exists: bool
@@ -106,6 +109,7 @@ class PrekBoundaryState:
     entries_canonical: bool = False
     managed_blocks: int = 0
     canonical_listings: int = 0
+    unowned_duplicate: bool = False
 
     @property
     def owns_boundary(self) -> bool:
@@ -185,6 +189,8 @@ def collect_prek_boundary(
         return PrekBoundaryState(config_exists=True, parse_error=True)
 
     hooks = _local_hooks(data)
+    lines = raw.splitlines()
+    operator_ids = _operator_canonical_ids(lines)
     found = frozenset(
         str(h.get("id")) for h in hooks if h.get("id") in CANONICAL_HOOK_IDS
     )
@@ -202,8 +208,9 @@ def collect_prek_boundary(
         config_exists=True,
         hook_ids_present=found,
         entries_canonical=entries_canonical,
-        managed_blocks=len(_managed_spans(raw.splitlines())),
+        managed_blocks=len(_managed_spans(lines)),
         canonical_listings=sum(1 for h in hooks if h.get("id") in CANONICAL_HOOK_IDS),
+        unowned_duplicate=len(operator_ids) > len(set(operator_ids)),
     )
 
 
@@ -345,6 +352,23 @@ def _without_spans(lines: list[str], spans: list[tuple[int, int]]) -> list[str]:
     return [line for index, line in enumerate(lines) if index not in dropped]
 
 
+def _operator_canonical_ids(lines: list[str]) -> list[str]:
+    """Return the canonical hook ids listed outside every managed block.
+
+    The one reading of "what the operator wrote" that both the boundary
+    assessment and the block refresh use, so the two can never disagree about
+    whether a copy of the gate is vaultspec's or the operator's.
+    """
+    from .commands import CANONICAL_HOOK_IDS
+
+    outside = "\n".join(_without_spans(lines, _managed_spans(lines)))
+    try:
+        hooks = _local_hooks(tomllib.loads(outside))
+    except tomllib.TOMLDecodeError:
+        return []
+    return [str(h.get("id")) for h in hooks if h.get("id") in CANONICAL_HOOK_IDS]
+
+
 def refresh_managed_prek_block(
     target: Path, *, mode: InstallMode | None = None, dry_run: bool = False
 ) -> str | None:
@@ -375,7 +399,6 @@ def refresh_managed_prek_block(
         A short description of the change made (or, under *dry_run*, due),
         or ``None`` when the managed block is already the one canonical copy.
     """
-    from .commands import CANONICAL_HOOK_IDS
     from .helpers import atomic_write
     from .workspace_mode import resolve_render_mode
 
@@ -392,12 +415,7 @@ def refresh_managed_prek_block(
     if not spans:
         return None
 
-    outside = "\n".join(_without_spans(lines, spans))
-    try:
-        operator_hooks = _local_hooks(tomllib.loads(outside))
-    except tomllib.TOMLDecodeError:
-        operator_hooks = []
-    if any(h.get("id") in CANONICAL_HOOK_IDS for h in operator_hooks):
+    if _operator_canonical_ids(lines):
         kept = _without_spans(lines, spans)
         change = (
             "removed vaultspec's managed block; the canonical hook written "
@@ -436,32 +454,6 @@ UNOWNED_DUPLICATE_DETAIL = (
 )
 
 
-def unowned_duplicate(target: Path) -> bool:
-    """Whether ``prek.toml`` lists a canonical hook twice outside vaultspec's block.
-
-    Answered from the file as it stands, ignoring every managed block, so it
-    says what no repair can clear without writing anything first.
-
-    Args:
-        target: Workspace root directory.
-
-    Returns:
-        ``True`` when the operator-owned part of ``prek.toml`` itself lists a
-        canonical hook more than once.
-    """
-    from .commands import CANONICAL_HOOK_IDS
-
-    try:
-        raw = (target / PREK_CONFIG_NAME).read_bytes().decode("utf-8")
-        lines = raw.splitlines()
-        outside = tomllib.loads("\n".join(_without_spans(lines, _managed_spans(lines))))
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
-        return False
-    hooks = _local_hooks(outside)
-    ids = [str(h.get("id")) for h in hooks if h.get("id") in CANONICAL_HOOK_IDS]
-    return len(ids) > len(set(ids))
-
-
 def repair_managed_prek_block(target: Path) -> None:
     """Repair vaultspec's block in ``prek.toml`` and say what is left undone.
 
@@ -476,7 +468,7 @@ def repair_managed_prek_block(target: Path) -> None:
     change = refresh_managed_prek_block(target)
     if change:
         logger.warning("prek.toml: %s", change)
-    if unowned_duplicate(target):
+    if collect_prek_boundary(target).unowned_duplicate:
         logger.warning("%s", UNOWNED_DUPLICATE_DETAIL)
 
 
@@ -602,7 +594,7 @@ def migrate_hooks_to_prek(
         if boundary.hooks_present
         else None
     )
-    if boundary.hooks_present and unowned_duplicate(target):
+    if boundary.hooks_present and boundary.unowned_duplicate:
         detail = UNOWNED_DUPLICATE_DETAIL
         if change:
             detail = f"{change} in prek.toml; {detail}"

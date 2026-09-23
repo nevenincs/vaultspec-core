@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:737398d1829aee7853d7c49fdb11c3939c231d731b35175114188b200230ae8e'
+body_hash: 'sha256:bc5d9620dd72653c8c222d04e33a1b4f36668df89b1701f7619c0aab0b53046d'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
   - "[[2026-09-23-commit-gate-adr]]"
@@ -168,6 +168,30 @@ Acceptance is now the user's to give.
 
 Result of the S11 review: PASS. The medium and the first low are fixed with failing-first
 tests; the second low awaits the user's acceptance of the proposed record.
+
+### s13-uninstalled-hook-weighted-as-warning | low | doctor's reworded advice called an uninstalled hook a legitimate choice while still counting it as a warning
+
+The S13 text offers the hook, but `_precommit_weight` in
+`src/vaultspec_core/cli/spec_cmd_doctor.py` still weighed `NOT_INSTALLED` as a warning, so
+a repository that runs its checks explicitly got exit 1. Fixed under reopened S13: the row
+renders as info and weighs nothing. The guard in
+`src/vaultspec_core/tests/cli/test_precommit_hook_set.py` failed against the old weighting
+and passes now.
+
+### s14-doctor-reimplemented-hook-checks | medium | doctor parsed the hook config itself and could disagree with the scaffold it reports on
+
+`collectors_precommit.py` had its own PyYAML reading of the local hooks, its own duplicate
+detector, and its own completeness rules. The vault-content row counted annotations with its
+own probe. Uninstall's dry run matched hook ids by string, so a comment mentioning a retired
+id previewed a removal that the real run did not make. Fixed in S14:
+`assess_precommit_yaml` in `src/vaultspec_core/core/precommit.py` runs the scaffold's own
+parse and reconcile without writing. Doctor maps its change kinds onto signals, and mode
+detection reads its canonical entries. The prek boundary computes `unowned_duplicate` in its
+single parse. The content row reports `check_annotations` and `check_encoding` counts.
+Uninstall previews with `managed_strip_outcome`. One behaviour changes: the gate beside a
+leftover retired hook now reads `INCOMPLETE`, because sync would remove the retired hook.
+`src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py` gave 3 failures on
+the old modules and passes now.
 
 ## Recommendations
 

@@ -9,7 +9,7 @@ related:
   - '[[2026-09-23-commit-gate-duplicate-listings-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:4bd1ec689ce85e315a6e6da7f802d22524d2d38cb8572bd2aaf9fd5837b3c7da'
+body_hash: 'sha256:9c8e363cac5e514d5ee167e45699b3f7b196afb31daca969325429bdcd504479'
 ---
 
 # `commit-gate` plan
@@ -20,7 +20,7 @@ Replace the three whole-vault commit hooks with one staged-document gate, and st
 
 Approved 2026-09-23
 
-Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too. After the plan closed, the user asked on 2026-09-23 that the hook changes be enrolled in the per-release schema migrations; S10 does that under the amended convergence clause of the ADR. The user then asked that duplicate hook listings be surfaced, as a warning for copies prek does not read and as a repaired error for live duplicates. S11 implements the recommended design recorded in the proposed `2026-09-23-commit-gate-duplicate-listings-adr`. It executed ahead of that record's acceptance because the user's answer to the design question did not arrive, and it is withdrawn if the record is rejected.
+Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too. After the plan closed, the user asked on 2026-09-23 that the hook changes be enrolled in the per-release schema migrations; S10 does that under the amended convergence clause of the ADR. The user then asked that duplicate hook listings be surfaced, as a warning for copies prek does not read and as a repaired error for live duplicates. S11 implements the recommended design recorded in the proposed `2026-09-23-commit-gate-duplicate-listings-adr`. It executed ahead of that record's acceptance because the user's answer to the design question did not arrive, and it is withdrawn if the record is rejected. On 2026-09-23 the user also approved S14: doctor must aggregate the canonical checks rather than reimplement them. It is a behaviour-preserving refactor involving no costly decision, so no ADR governs it.
 
 Decision coverage:
 
@@ -50,7 +50,8 @@ Issues addressed:
 - [x] `S10` - enroll the hook retirement as the 0.2.5 schema migration, converging YAML configs that carry vaultspec hooks and existing managed prek.toml blocks, never touching declined or hook-free configs; `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py (new), src/vaultspec_core/migrations/__init__.py, src/vaultspec_core/core/prek_boundary.py`.
 - [x] `S11` - surface duplicate vaultspec hook listings: warn on copies in configs prek does not read, and report as an error and repair the gate listed more than once in the config prek reads; `src/vaultspec_core/core/diagnosis/collectors_precommit.py, core/prek_boundary.py, core/precommit.py, core/provider_sync.py, cli/spec_cmd_doctor.py`.
 - [x] `S12` - reword the builtin system clauses that told agents to learn conventions from, and gate commits on, a commit hook the gate no longer runs linters in, and re-seed core's deployed copies; `src/vaultspec_core/builtins/system/01-core.md, src/vaultspec_core/builtins/system/02-operations.md, .vaultspec/system/`.
-- [x] `S13` - reword doctor's uninstalled-hook advice to offer the hook instead of ordering an install, so a repository that runs its checks explicitly is not told it is broken; `src/vaultspec_core/cli/spec_cmd_doctor.py`.
+- [ ] `S13` - reword doctor's uninstalled-hook advice to offer the hook instead of ordering an install, and report that state as information that never moves the exit code, so a repository that runs its checks explicitly is not told it is broken; `src/vaultspec_core/cli/spec_cmd_doctor.py, src/vaultspec_core/tests/cli/test_precommit_hook_set.py`.
+- [x] `S14` - make doctor aggregate canonical checks: one hook-config assessment built from the scaffold's own reconcile and the prek boundary, consumed by doctor, sync, uninstall and mode detection, and the annotation row via check_annotations; `src/vaultspec_core/core/precommit.py, core/prek_boundary.py, core/diagnosis/collectors_precommit.py, core/diagnosis/collectors_config.py, core/uninstall.py, tests/cli/test_doctor_aggregates_canonical_checks.py`.
 
 ## Parallelization
 
