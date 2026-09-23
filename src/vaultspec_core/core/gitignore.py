@@ -8,7 +8,11 @@ from pathlib import Path
 from .enums import ManagedState, Tool
 from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write_bytes
-from .prek_boundary import PREK_CONFIG_NAME
+from .prek_boundary import (
+    PRECOMMIT_CONFIG_NAMES,
+    PREK_CONFIG_NAME,
+    precommit_config_path,
+)
 from .workspace_mode import read_hooks_declaration
 
 logger = logging.getLogger(__name__)
@@ -26,11 +30,12 @@ DEFAULT_ENTRIES = [".vaultspec/"]
 # Root-level files vaultspec locks via ``advisory_lock`` irrespective of which
 # providers are enrolled.  Provider-native configurations are NOT listed here;
 # they are derived from ``resolve_mcp_targets`` so that enrolling a new provider
-# cannot silently reintroduce an uncovered sentinel.
+# cannot silently reintroduce an uncovered sentinel.  Both YAML hook-config
+# spellings are listed because the scaffold locks whichever one prek reads.
 _ROOT_LOCK_SUBJECTS: tuple[str, ...] = (
     ".gitignore",
     ".mcp.json",
-    ".pre-commit-config.yaml",
+    *PRECOMMIT_CONFIG_NAMES,
 )
 
 
@@ -77,28 +82,32 @@ def _lock_subjects(target: Path) -> tuple[Path, ...]:
 def _retired_lock_subjects(target: Path) -> frozenset[Path]:
     """Return the lock subjects Core will not lock again in *target*.
 
-    ``.pre-commit-config.yaml`` is locked only by the hook scaffold, which
-    never runs once the workspace declares ``hooks.pre_commit`` false or
-    ``prek.toml`` owns the hook boundary. Its sentinel then has no producer, so
-    it is neither worth an ignore line nor worth keeping on disk. The subject
-    stays in :func:`_lock_subjects` because a sentinel committed before the
-    retirement is still Core's to disown.
+    The YAML hook configs are locked only by the hook scaffold, and only the one
+    prek reads (:func:`~vaultspec_core.core.prek_boundary.precommit_config_path`),
+    so the other spelling is always retired. Both are retired once the
+    workspace declares ``hooks.pre_commit`` false or ``prek.toml`` owns the hook
+    boundary, because the scaffold then never runs. A retired sentinel has no
+    producer, so it is neither worth an ignore line nor worth keeping on disk.
+    The subjects stay in :func:`_lock_subjects` because a sentinel committed
+    before the retirement is still Core's to disown.
 
     A malformed declaration makes the scaffold refuse loudly rather than skip,
-    so it retires nothing here: listing a sentinel that never appears costs one
-    inert line, and pruning must not act on a policy nobody could read.
+    so it retires nothing beyond the unread spelling: listing a sentinel that
+    never appears costs one inert line, and pruning must not act on a policy
+    nobody could read.
 
     Args:
         target: Workspace root directory.
     """
-    config = target / ".pre-commit-config.yaml"
+    configs = frozenset(target / name for name in PRECOMMIT_CONFIG_NAMES)
+    unread = configs - {precommit_config_path(target)}
     if (target / PREK_CONFIG_NAME).exists():
-        return frozenset({config})
+        return configs
     try:
         declined = not read_hooks_declaration(target).pre_commit
     except VaultSpecError:
-        return frozenset()
-    return frozenset({config}) if declined else frozenset()
+        return unread
+    return configs if declined else unread
 
 
 def _is_within(path: Path, root: Path) -> bool:
@@ -195,11 +204,11 @@ def get_recommended_entries(target: Path) -> list[str]:
     advisory-lock sentinels, the install manifest, and the vault's local
     caches. Authored content is never added here.
 
-    The one entry that is not a runtime by-product is
-    ``/.pre-commit-config.yaml``, and it appears only when the workspace has
-    declared it does not want that file. A config the workspace declined is not
-    policy a teammate should inherit, so the sharing rule that keeps it out of
-    the block does not apply to it.
+    The one entry pair that is not a runtime by-product is
+    ``/.pre-commit-config.yaml`` and ``/.pre-commit-config.yml``, and it appears
+    only when the workspace has declared it does not want that file. A config
+    the workspace declined is not policy a teammate should inherit, so the
+    sharing rule that keeps it out of the block does not apply to it.
 
     Args:
         target: Workspace root directory.
@@ -274,9 +283,10 @@ def get_recommended_entries(target: Path) -> list[str]:
         # inherit, and until it is ignored a sweep-style ``git add -A`` recommits
         # the hooks the declaration just refused - which is how the file kept
         # coming back before the opt-out existed.  Anchored with a leading slash
-        # so it matches only at the workspace root.
+        # so it matches only at the workspace root, and both YAML spellings are
+        # covered because prek reads either.
         if framework_installed and not read_hooks_declaration(target).pre_commit:
-            entries.add("/.pre-commit-config.yaml")
+            entries.update(f"/{name}" for name in PRECOMMIT_CONFIG_NAMES)
 
     except Exception:
         # Fallback for very early bootstrap or corruption

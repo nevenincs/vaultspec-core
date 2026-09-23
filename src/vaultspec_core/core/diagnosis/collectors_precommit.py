@@ -56,7 +56,11 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.DECLINED`,
     or
     :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.DECLINED_LEFTOVER`
-    when a ``.pre-commit-config.yaml`` is still on disk. Nothing is deleted.
+    when a YAML hook config (``.yaml`` or ``.yml``) is still on disk. Nothing is
+    deleted.
+
+    The YAML config read is the one prek would read, per
+    :func:`~vaultspec_core.core.prek_boundary.precommit_config_path`.
 
     Args:
         target: Workspace root directory.
@@ -68,11 +72,11 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     Raises:
         VaultSpecError: If the workspace declaration is malformed.
     """
-    from ..prek_boundary import collect_prek_boundary
+    from ..prek_boundary import collect_prek_boundary, existing_precommit_configs
     from ..workspace_mode import read_hooks_declaration
 
     if not read_hooks_declaration(target).pre_commit:
-        if (target / ".pre-commit-config.yaml").exists():
+        if existing_precommit_configs(target):
             return PrecommitSignal.DECLINED_LEFTOVER
         return PrecommitSignal.DECLINED
 
@@ -82,7 +86,7 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
             target, _collect_precommit_yaml_state(target)
         )
     if boundary.hooks_present:
-        if (target / ".pre-commit-config.yaml").exists():
+        if existing_precommit_configs(target):
             return PrecommitSignal.ORPHANED
         return _reassess_against_installation(target, PrecommitSignal.COMPLETE)
     return PrecommitSignal.UNREFRESHABLE
@@ -216,6 +220,7 @@ def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:
 def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     """Assess ``.pre-commit-config.yaml`` hook state, ignoring ``prek.toml``."""
     from ..commands import CANONICAL_HOOK_IDS, canonical_hook_entries_for_mode
+    from ..prek_boundary import precommit_config_path
     from ..workspace_mode import resolve_render_mode
 
     # Derive the expected hook entries from the workspace's resolved mode so a
@@ -225,7 +230,7 @@ def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     # expectations. P04 layers a dedicated mode-mismatch signal on top of this.
     expected_entries = canonical_hook_entries_for_mode(resolve_render_mode(target))
 
-    config_path = target / ".pre-commit-config.yaml"
+    config_path = precommit_config_path(target)
     local_hooks = _local_precommit_hooks(config_path)
     if local_hooks is None:
         # `_local_precommit_hooks` answers None both for an absent file and for
@@ -291,13 +296,14 @@ def observed_precommit_mode(
     """
     from ..commands import CANONICAL_HOOK_IDS, entry_prefix_for_mode
     from ..enums import InstallMode
+    from ..prek_boundary import precommit_config_path
     from ..workspace_mode import CORE_DISTRIBUTION_NAME, canonical_distribution_name
 
     pkg = package if package is not None else CORE_DISTRIBUTION_NAME
     if canonical_distribution_name(pkg) != CORE_DISTRIBUTION_NAME:
         return None
 
-    local_hooks = _local_precommit_hooks(target / ".pre-commit-config.yaml")
+    local_hooks = _local_precommit_hooks(precommit_config_path(target))
     if local_hooks is None:
         return None
 

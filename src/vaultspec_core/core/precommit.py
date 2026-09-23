@@ -18,7 +18,12 @@ from ruamel.yaml import YAML, YAMLError
 
 from .enums import InstallMode, PrecommitHook, render_mode
 from .helpers import advisory_lock, atomic_write
-from .prek_boundary import PrekBoundaryState, collect_prek_boundary
+from .prek_boundary import (
+    PrekBoundaryState,
+    collect_prek_boundary,
+    existing_precommit_configs,
+    precommit_config_path,
+)
 from .workspace_mode import (
     CORE_DISTRIBUTION_NAME,
     read_hooks_declaration,
@@ -314,16 +319,16 @@ def _log_prek_boundary_status(target: Path, boundary: PrekBoundaryState) -> None
     needs to move, and flags a co-present, now-superseded YAML config in
     either case.
     """
-    config_file = target / ".pre-commit-config.yaml"
+    leftovers = existing_precommit_configs(target)
     if boundary.hooks_present:
         logger.info(
             "prek.toml at %s already carries the vaultspec-core hooks; "
             "skipping .pre-commit-config.yaml scaffold.",
             target,
         )
-        if config_file.exists():
+        if leftovers:
             logger.info(
-                "A superseded .pre-commit-config.yaml is still present at %s. "
+                "A superseded YAML hook config is still present at %s. "
                 "prek reads prek.toml exclusively; remove the YAML config "
                 "once nothing else consumes it.",
                 target,
@@ -335,9 +340,9 @@ def _log_prek_boundary_status(target: Path, boundary: PrekBoundaryState) -> None
         "transplant the vaultspec-core hooks into prek.toml.",
         target,
     )
-    if config_file.exists():
+    if leftovers:
         logger.warning(
-            "Both prek.toml and .pre-commit-config.yaml are present at "
+            "Both prek.toml and a YAML hook config are present at "
             "%s and prek.toml lacks the vaultspec-core hooks. prek "
             "reads prek.toml exclusively; vaultspec will not refresh "
             "the YAML hooks. Run 'vaultspec-core spec precommit "
@@ -451,6 +456,11 @@ def scaffold_precommit(
     patterns.  Existing hooks with matching IDs are updated to the
     canonical entry; missing hooks are appended.
 
+    The file is the one prek would read
+    (:func:`~vaultspec_core.core.prek_boundary.precommit_config_path`): an
+    existing ``.pre-commit-config.yml`` is managed in place rather than joined
+    by a ``.yaml`` that would take precedence over it.
+
     The entry each hook is rendered with follows the resolved provisioning
     mode: dependency mode keeps the ``uv run --no-sync vaultspec-core`` prefix,
     tool mode uses ``uvx --from vaultspec-core vaultspec-core``. When *mode* is
@@ -499,9 +509,9 @@ def scaffold_precommit(
         _log_prek_boundary_status(target, boundary)
         return []
 
-    config_file = target / ".pre-commit-config.yaml"
+    config_file = precommit_config_path(target)
     handler = _precommit_yaml()
-    result = [(".pre-commit-config.yaml", "precommit")]
+    result = [(config_file.name, "precommit")]
 
     with nullcontext() if dry_run else advisory_lock(config_file):
         if not config_file.exists():

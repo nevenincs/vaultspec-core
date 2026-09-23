@@ -35,6 +35,48 @@ logger = logging.getLogger(__name__)
 #: Filename of prek's native configuration at the workspace root.
 PREK_CONFIG_NAME = "prek.toml"
 
+#: The YAML hook-config filenames prek reads, in its discovery order. prek
+#: stops at the first file present (after ``prek.toml``) and only warns about
+#: the rest, so core manages whichever of these prek would actually run.
+PRECOMMIT_CONFIG_NAMES: tuple[str, ...] = (
+    ".pre-commit-config.yaml",
+    ".pre-commit-config.yml",
+)
+
+
+def precommit_config_path(target: Path) -> Path:
+    """Return the YAML hook config prek would read at *target*.
+
+    The first of :data:`PRECOMMIT_CONFIG_NAMES` that exists wins, matching
+    prek's discovery order; with neither present the ``.yaml`` spelling is the
+    one a scaffold creates.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The path of the effective YAML config, which may not exist.
+    """
+    for name in PRECOMMIT_CONFIG_NAMES:
+        candidate = target / name
+        if candidate.exists():
+            return candidate
+    return target / PRECOMMIT_CONFIG_NAMES[0]
+
+
+def existing_precommit_configs(target: Path) -> list[Path]:
+    """Return every YAML hook config present at *target*, in discovery order.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The existing config paths; empty when there is none.
+    """
+    return [
+        target / name for name in PRECOMMIT_CONFIG_NAMES if (target / name).exists()
+    ]
+
 
 @dataclass(frozen=True)
 class PrekBoundaryState:
@@ -231,7 +273,7 @@ class PrekMigrationResult:
             (some canonical hook IDs exist outside the managed block;
             refusing to duplicate or overwrite operator-authored hooks).
         detail: Human-readable elaboration for the CLI surface.
-        yaml_removed: The superseded ``.pre-commit-config.yaml`` was
+        yaml_removed: The superseded YAML hook config (``.yaml`` or ``.yml``) was
             deleted as part of this run.
     """
 
@@ -298,16 +340,17 @@ def migrate_hooks_to_prek(
 
     A workspace whose committed declaration sets ``hooks.pre_commit`` to
     ``false`` has refused the hooks, so nothing is transplanted and the
-    status is ``declined``. ``remove_yaml`` still deletes a leftover
-    ``.pre-commit-config.yaml`` in that state: the declaration already says
-    the file is unwanted, and the operator asked for the removal.
+    status is ``declined``. ``remove_yaml`` still deletes any leftover YAML
+    hook config in that state: the declaration already says the file is
+    unwanted, and the operator asked for the removal.
 
     Args:
         target: Workspace root directory.
         mode: Provisioning mode to render entries for; resolved from the
             workspace declaration when ``None``.
         dry_run: Report the outcome without writing anything.
-        remove_yaml: Also delete the superseded ``.pre-commit-config.yaml``
+        remove_yaml: Also delete every superseded YAML hook config
+            (``.pre-commit-config.yaml`` and ``.pre-commit-config.yml``)
             once the canonical hooks are verifiably present in
             ``prek.toml``, or when the workspace declined the hooks.
             Deletion is refused in every other state; prek silently ignores
@@ -321,7 +364,6 @@ def migrate_hooks_to_prek(
     from .workspace_mode import read_hooks_declaration, resolve_render_mode
 
     config_path = target / PREK_CONFIG_NAME
-    yaml_path = target / ".pre-commit-config.yaml"
 
     if not read_hooks_declaration(target).pre_commit:
         detail = (
@@ -329,12 +371,15 @@ def migrate_hooks_to_prek(
             "transplanted (run 'vaultspec-core spec precommit enable' to "
             "restore them)"
         )
-        if remove_yaml and yaml_path.exists():
+        leftovers = existing_precommit_configs(target)
+        if remove_yaml and leftovers:
             if not dry_run:
-                yaml_path.unlink()
+                for leftover in leftovers:
+                    leftover.unlink()
+            names = ", ".join(p.name for p in leftovers)
             return PrekMigrationResult(
                 status="declined",
-                detail=detail + "; removed leftover .pre-commit-config.yaml",
+                detail=f"{detail}; removed leftover {names}",
                 yaml_removed=True,
             )
         return PrekMigrationResult(status="declined", detail=detail)
@@ -395,16 +440,19 @@ def migrate_hooks_to_prek(
     # hooks are present - or, on this run, just became present - in
     # prek.toml. Re-assess from disk before the destructive step as a
     # final guard against a concurrent rewrite.
+    superseded = existing_precommit_configs(target)
     if (
         remove_yaml
-        and yaml_path.exists()
+        and superseded
         and (dry_run or collect_prek_boundary(target, mode=mode).hooks_present)
     ):
         if not dry_run:
-            yaml_path.unlink()
+            for config in superseded:
+                config.unlink()
+        names = ", ".join(p.name for p in superseded)
         result = PrekMigrationResult(
             status=result.status,
-            detail=result.detail + "; removed superseded .pre-commit-config.yaml",
+            detail=f"{result.detail}; removed superseded {names}",
             yaml_removed=True,
         )
     return result

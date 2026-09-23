@@ -545,7 +545,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         ),
         PrecommitSignal.DECLINED_LEFTOVER: (
             "declined by the workspace declaration (hooks.pre_commit = false), "
-            "but a .pre-commit-config.yaml is still on disk - delete it by "
+            "but a pre-commit YAML config is still on disk - delete it by "
             "hand if nothing else uses it, or run 'vaultspec-core spec "
             "precommit migrate --remove-yaml'"
         ),
