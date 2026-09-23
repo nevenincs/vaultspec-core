@@ -11,11 +11,18 @@ the corpus and stay with the combined pass.
 Link targets are resolved against a listing of document names, never a parse
 of the corpus, so the cost is the size of the staged set plus one directory
 walk.
+
+:func:`gate_staged_documents` adds attribution: it checks each document's
+committed version the same way and blocks only on error-level findings the
+commit introduces, so an author never answers for a defect they inherited.
 """
 
 from __future__ import annotations
 
+import logging
+import subprocess
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ._base import CheckDiagnostic, CheckResult, Severity
@@ -27,7 +34,14 @@ if TYPE_CHECKING:
     from ...graph.models import EncodingIssue
     from ._base import VaultSnapshot
 
-__all__ = ["DOCUMENT_CHECK_NAMES", "check_staged_documents"]
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "DOCUMENT_CHECK_NAMES",
+    "StagedGateOutcome",
+    "check_staged_documents",
+    "gate_staged_documents",
+]
 
 #: The checkers the staged pass runs, by their ``check_name``. Each one reads
 #: only the document it reports on (plus workspace-global attestation data),
@@ -73,10 +87,13 @@ def _staged_documents(root_dir: Path, paths: Iterable[Path | str]) -> list[Path]
     return sorted(selected)
 
 
-def _ingest(
-    documents: Iterable[Path],
+def _decode(
+    sources: Mapping[Path, bytes | OSError],
 ) -> tuple[dict[Path, tuple[str, bool]], list[EncodingIssue]]:
-    """Read each document once, the way the graph's ingress read does.
+    """Decode each document's bytes the way the graph's ingress read does.
+
+    Args:
+        sources: Each document's raw bytes, or the error reading them raised.
 
     Returns:
         The ``(normalised text, source_had_crlf)`` map for every document that
@@ -86,20 +103,69 @@ def _ingest(
 
     raw_texts: dict[Path, tuple[str, bool]] = {}
     issues: list[EncodingIssue] = []
-    for path in documents:
-        try:
-            raw_bytes = path.read_bytes()
-        except OSError as exc:
-            issues.append(EncodingIssue(path, "read", str(exc), None))
+    for path, raw in sources.items():
+        if isinstance(raw, OSError):
+            issues.append(EncodingIssue(path, "read", str(raw), None))
             continue
         try:
-            decoded = raw_bytes.decode("utf-8")
+            decoded = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
             issues.append(EncodingIssue(path, "decode", exc.reason, exc.start))
             continue
         crlf = "\r\n" in decoded
         raw_texts[path] = (decoded.replace("\r\n", "\n").replace("\r", "\n"), crlf)
     return raw_texts, issues
+
+
+def _read_working_tree(documents: Iterable[Path]) -> dict[Path, bytes | OSError]:
+    sources: dict[Path, bytes | OSError] = {}
+    for path in documents:
+        try:
+            sources[path] = path.read_bytes()
+        except OSError as exc:
+            sources[path] = exc
+    return sources
+
+
+def _read_committed(
+    root_dir: Path, documents: Iterable[Path], ref: str
+) -> dict[Path, bytes | OSError]:
+    """Read each document's blob at *ref* from the object database.
+
+    One ``git cat-file --batch`` call serves every document. A document absent
+    at *ref* (new, or renamed in this commit) is left out, as is everything
+    when *root_dir* is not a repository or *ref* does not resolve (a first
+    commit has no ``HEAD``).
+    """
+    documents = list(documents)
+    if not documents:
+        return {}
+    names = [path.relative_to(root_dir).as_posix() for path in documents]
+    request = "".join(f"{ref}:{name}\n" for name in names).encode()
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root_dir), "cat-file", "--batch"],
+            input=request,
+            capture_output=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+        logger.debug("No committed baseline for the staged documents: %s", exc)
+        return {}
+
+    out = completed.stdout
+    committed: dict[Path, bytes | OSError] = {}
+    cursor = 0
+    for path in documents:
+        header_end = out.index(b"\n", cursor)
+        header = out[cursor:header_end].split()
+        cursor = header_end + 1
+        if len(header) != 3 or header[1] != b"blob":
+            continue
+        size = int(header[2])
+        committed[path] = out[cursor : cursor + size]
+        cursor += size + 1
+    return committed
 
 
 class _LinkIndex:
@@ -113,19 +179,35 @@ class _LinkIndex:
     """
 
     def __init__(self, root_dir: Path) -> None:
-        from ...config import get_config
-        from ..scanner import doc_type_resolver, scan_vault
+        import os
+        from pathlib import Path
 
-        by_stem: dict[str, list[Path]] = defaultdict(list)
-        for path in scan_vault(root_dir):
-            by_stem[path.stem].append(path)
+        from ...config import get_config
+        from ..exclusions import EXCLUDED_VAULT_DIR_NAMES
+        from ..scanner import doc_type_resolver
+
+        # The same walk and exclusions as ``scan_vault``, but collecting bare
+        # strings: building and sorting a ``Path`` per document is most of that
+        # function's cost on a large vault, and only colliding stems ever need
+        # one here.
+        docs_dir = root_dir / get_config().docs_dir
+        dirs_by_stem: dict[str, list[str]] = defaultdict(list)
+        for dirpath, dirnames, filenames in os.walk(docs_dir):
+            dirnames[:] = [d for d in dirnames if d not in EXCLUDED_VAULT_DIR_NAMES]
+            for name in filenames:
+                if name.endswith(".md"):
+                    dirs_by_stem[name[:-3]].append(dirpath)
+        by_stem: dict[str, list[Path]] = {
+            stem: [Path(d, f"{stem}.md") for d in dirs]
+            for stem, dirs in dirs_by_stem.items()
+            if len(dirs) > 1
+        }
         resolve_type = doc_type_resolver(root_dir)
-        self._stems = frozenset(by_stem)
+        self._stems = frozenset(dirs_by_stem)
         self._qualified = frozenset(
             f"{doc_type.value if (doc_type := resolve_type(path)) else 'unknown'}"
             f"/{stem}"
             for stem, stem_paths in by_stem.items()
-            if len(stem_paths) > 1
             for path in stem_paths
         )
         self._archive_dir = root_dir / get_config().docs_dir / "_archive"
@@ -142,7 +224,9 @@ class _LinkIndex:
 
 
 def _check_dangling(
-    root_dir: Path, raw_texts: Mapping[Path, tuple[str, bool]]
+    root_dir: Path,
+    raw_texts: Mapping[Path, tuple[str, bool]],
+    index: Callable[[], _LinkIndex],
 ) -> CheckResult:
     """Report wiki-links from *raw_texts* documents that resolve to nothing.
 
@@ -155,7 +239,7 @@ def _check_dangling(
     result = CheckResult(check_name="dangling", supports_fix=True)
     if not raw_texts:
         return result
-    index = _LinkIndex(root_dir)
+    links = index()
     for path, (text, _crlf) in raw_texts.items():
         frontmatter, body = parse_frontmatter(text)
         related = frontmatter.get("related", [])
@@ -163,7 +247,7 @@ def _check_dangling(
         if isinstance(related, list):
             targets.update(extract_related_links(related))
         rel_path = path.relative_to(root_dir)
-        for target in sorted(t for t in targets if not index.resolves(t)):
+        for target in sorted(t for t in targets if not links.resolves(t)):
             result.diagnostics.append(
                 CheckDiagnostic(
                     path=rel_path,
@@ -176,15 +260,18 @@ def _check_dangling(
     return result
 
 
-def _document_checkers(
+def _run_checks(
     root_dir: Path,
-    snapshot: VaultSnapshot,
-    raw_texts: Mapping[Path, tuple[str, bool]],
-) -> list[Callable[[], CheckResult]]:
+    sources: Mapping[Path, bytes | OSError],
+    index: Callable[[], _LinkIndex],
+) -> list[CheckResult]:
+    """Run every admitted checker over *sources*, keeping their own findings."""
+    from ..parser import parse_vault_metadata
     from .adr_status import check_adr_status
     from .annotations import check_annotations
     from .body_links import check_body_links
     from .body_sections import check_body_sections
+    from .encoding import encoding_issue_result
     from .frontmatter import check_frontmatter
     from .links import check_links
     from .markdown import check_markdown
@@ -192,19 +279,46 @@ def _document_checkers(
     from .placeholders import check_placeholders
     from .structure import check_structure
 
-    return [
-        lambda: check_structure(root_dir, snapshot=snapshot),
-        lambda: check_frontmatter(root_dir, snapshot=snapshot),
-        lambda: check_annotations(root_dir, raw_texts=raw_texts),
-        lambda: check_markdown(root_dir, raw_texts=raw_texts),
-        lambda: check_links(root_dir, snapshot=snapshot),
-        lambda: _check_dangling(root_dir, raw_texts),
-        lambda: check_body_links(root_dir, snapshot=snapshot),
-        lambda: check_placeholders(root_dir, snapshot=snapshot),
-        lambda: check_body_sections(root_dir, snapshot=snapshot),
-        lambda: check_adr_status(root_dir, snapshot=snapshot),
-        lambda: check_modified_stamp(root_dir, snapshot=snapshot),
+    raw_texts, issues = _decode(sources)
+    snapshot: VaultSnapshot = {
+        path: parse_vault_metadata(text) for path, (text, _crlf) in raw_texts.items()
+    }
+    # The graph keeps a node for a document it could not read, with empty
+    # metadata, so the combined pass reports its missing frontmatter as well
+    # as the encoding failure. Matching that keeps both passes in agreement.
+    for issue in issues:
+        snapshot[issue.path] = parse_vault_metadata("")
+
+    results = [
+        check_structure(root_dir, snapshot=snapshot),
+        check_frontmatter(root_dir, snapshot=snapshot),
+        check_annotations(root_dir, raw_texts=raw_texts),
+        check_markdown(root_dir, raw_texts=raw_texts),
+        check_links(root_dir, snapshot=snapshot),
+        _check_dangling(root_dir, raw_texts, index),
+        check_body_links(root_dir, snapshot=snapshot),
+        check_placeholders(root_dir, snapshot=snapshot),
+        check_body_sections(root_dir, snapshot=snapshot),
+        check_adr_status(root_dir, snapshot=snapshot),
+        check_modified_stamp(root_dir, snapshot=snapshot),
+        encoding_issue_result(root_dir, issues),
     ]
+
+    checked = {path.relative_to(root_dir) for path in sources}
+    for result in results:
+        result.diagnostics = [d for d in result.diagnostics if d.path in checked]
+    return results
+
+
+def _cached_index(root_dir: Path) -> Callable[[], _LinkIndex]:
+    built: list[_LinkIndex] = []
+
+    def index() -> _LinkIndex:
+        if not built:
+            built.append(_LinkIndex(root_dir))
+        return built[0]
+
+    return index
 
 
 def check_staged_documents(
@@ -226,25 +340,66 @@ def check_staged_documents(
         One :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` per
         name in :data:`DOCUMENT_CHECK_NAMES`, in that order.
     """
-    from ..parser import parse_vault_metadata
-    from .encoding import encoding_issue_result
-
     root_dir = root_dir.resolve()
     documents = _staged_documents(root_dir, paths)
-    raw_texts, issues = _ingest(documents)
-    snapshot: VaultSnapshot = {
-        path: parse_vault_metadata(text) for path, (text, _crlf) in raw_texts.items()
+    return _run_checks(root_dir, _read_working_tree(documents), _cached_index(root_dir))
+
+
+@dataclass(frozen=True)
+class StagedGateOutcome:
+    """What the commit gate found in the staged vault documents.
+
+    Attributes:
+        results: Every finding in the staged documents, per checker, in
+            :data:`DOCUMENT_CHECK_NAMES` order.
+        blocking: The error-level findings the commit introduces - those the
+            same document's committed version does not already carry. Only
+            these fail the gate.
+    """
+
+    results: list[CheckResult]
+    blocking: list[tuple[str, CheckDiagnostic]]
+
+
+def _finding_key(check_name: str, diagnostic: CheckDiagnostic) -> tuple[str, str, str]:
+    return (check_name, str(diagnostic.path), diagnostic.message)
+
+
+def gate_staged_documents(
+    root_dir: Path, paths: Iterable[Path | str], *, baseline_ref: str = "HEAD"
+) -> StagedGateOutcome:
+    """Check the staged vault documents and decide which findings block.
+
+    Each staged document's version at *baseline_ref* is checked by the same
+    checkers, from the object database, so the gate can tell an error the
+    commit introduces from one the document already had. A document with no
+    version at *baseline_ref* - new, renamed, or a first commit - has nothing
+    to inherit, so all of its errors block. Warnings never block.
+
+    Args:
+        root_dir: Project root directory.
+        paths: Candidate paths, typically the files a commit stages.
+        baseline_ref: The commit the staged documents are compared against.
+
+    Returns:
+        The findings and the subset that blocks.
+    """
+    root_dir = root_dir.resolve()
+    documents = _staged_documents(root_dir, paths)
+    index = _cached_index(root_dir)
+    results = _run_checks(root_dir, _read_working_tree(documents), index)
+
+    committed = _read_committed(root_dir, documents, baseline_ref)
+    inherited = {
+        _finding_key(result.check_name, diagnostic)
+        for result in _run_checks(root_dir, committed, index)
+        for diagnostic in result.diagnostics
     }
-    # The graph keeps a node for a document it could not read, with empty
-    # metadata, so the combined pass reports its missing frontmatter as well
-    # as the encoding failure. Matching that keeps both passes in agreement.
-    for issue in issues:
-        snapshot[issue.path] = parse_vault_metadata("")
-
-    results = [run() for run in _document_checkers(root_dir, snapshot, raw_texts)]
-    results.append(encoding_issue_result(root_dir, issues))
-
-    checked = {path.relative_to(root_dir) for path in documents}
-    for result in results:
-        result.diagnostics = [d for d in result.diagnostics if d.path in checked]
-    return results
+    blocking = [
+        (result.check_name, diagnostic)
+        for result in results
+        for diagnostic in result.diagnostics
+        if diagnostic.severity is Severity.ERROR
+        and _finding_key(result.check_name, diagnostic) not in inherited
+    ]
+    return StagedGateOutcome(results=results, blocking=blocking)
