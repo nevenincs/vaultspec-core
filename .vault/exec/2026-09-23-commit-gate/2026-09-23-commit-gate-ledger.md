@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:6b9071539cc4e02fa08f3ffb90f5947b081449ebe76a0ff46c70c0319646871f'
+body_hash: 'sha256:63f73a05fcc05a72541f070230689ee1deda7aeba013751f980cbe9a9b635cff'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -116,6 +116,9 @@ related:
 - `S12` `verify:` `vaultspec-core spec doctor builtins` -> `pass`
 - `S11` `A` `.vault/adr/2026-09-23-commit-gate-duplicate-listings-adr.md`
 - `S11` `M` `src/vaultspec_core/tests/cli/test_precommit_duplicates.py`
+- `S13` `M` `src/vaultspec_core/cli/spec_cmd_doctor.py`
+- `S13` `M` `src/vaultspec_core/tests/cli/test_precommit_hook_set.py`
+- `S13` `verify:` `ty check` -> `pass`
 
 ## Notes
 

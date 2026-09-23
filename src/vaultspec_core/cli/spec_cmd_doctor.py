@@ -535,10 +535,14 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "precommit migrate --remove-yaml')"
         ),
         PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
+        # States the fact and both legitimate responses. A repository may
+        # keep the config and run its checks explicitly, so an unconditional
+        # "install the hook" would contradict that choice.
         PrecommitSignal.NOT_INSTALLED: (
-            "every hook is configured and none of them runs - git has no "
-            "pre-commit hook installed, so a commit executes nothing. Run "
-            "'prek install' (or 'pre-commit install') in this checkout"
+            "the hooks are configured but git has no pre-commit hook installed, "
+            "so nothing is checked at commit time - run the project's checks "
+            "yourself, or install the hook ('prek install' or 'pre-commit "
+            "install') if this repository wants commit-time checks"
         ),
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
         PrecommitSignal.UNREADABLE: ("could not be read; this check did not run"),

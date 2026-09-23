@@ -199,3 +199,34 @@ def test_an_uninstalled_hook_is_not_a_sync_repair(
 
     assert plan.steps == []
     assert not caplog.records
+
+
+def test_an_uninstalled_hook_is_reported_without_ordering_an_install(
+    tmp_path: Path,
+) -> None:
+    """Running the checks explicitly is a legitimate choice, not a defect to fix.
+
+    The row still says nothing runs at commit time; it offers the hook rather
+    than instructing the reader to install one.
+    """
+    import os
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    from vaultspec_core.tests.cli.conftest import run_vaultspec
+    from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
+
+    null = "NUL" if os.name == "nt" else "/dev/null"
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": null, "GIT_CONFIG_SYSTEM": null}
+    subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True, env=env)
+    WorkspaceFactory(tmp_path).install()
+
+    result = run_vaultspec(
+        CliRunner(env={"NO_COLOR": "1"}), "spec", "doctor", target=tmp_path
+    )
+
+    row = " ".join(result.output.split())
+    assert "nothing is checked at commit time" in row
+    assert "run the project's checks yourself" in row
+    assert "if this repository wants commit-time checks" in row
