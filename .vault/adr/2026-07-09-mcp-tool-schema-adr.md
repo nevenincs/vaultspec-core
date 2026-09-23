@@ -6,10 +6,11 @@ date: '2026-07-09'
 related:
   - "[[2026-07-09-mcp-tool-schema-research]]"
   - '[[2026-09-23-typesafe-search-adr]]'
+  - '[[2026-09-23-adr-crossref-adr]]'
 supersedes:
   - '2026-02-22-mcp-consolidation-adr'
 modified: '2026-09-23'
-body_hash: 'sha256:c46f63f2c59fdafbbc7972e4c39eb968a872854540008b5bc3d91b7b58bfa001'
+body_hash: 'sha256:b6996e76b65089990fb329f4f266bea61d9d6f8c665f95cfde695964f09669a4'
 ---
 
 # `mcp-tool-schema` adr: tiered hot-tool surface with a stateless discover/invoke gateway | (**status:** `accepted`)
@@ -73,6 +74,8 @@ The redesigned surface is nine first-class tools, replacing and extending the cu
 The catalog module parses the generated command-inventory markers at server start, applies the static denylist, and backs both gateway tools from one in-memory structure. Error handling migrates to protocol `isError` for whole-call failures with per-item success arrays inside batch results. All tools declare output schemas and return structured content; all handlers keep the copied-context isolation wrapper. The registry definition, console script, and package location are unchanged.
 
 **Amendment note, 2026-09-23**: `2026-09-23-typesafe-search-adr` adds a first-class, read-only `search` tool: ranked vault records with verbatim excerpts, always registered, returning a typed `not_configured` outcome when no hosted-search credential is set. The single-digits-plus-gateway rule of this record still holds.
+
+**Amendment note, 2026-09-23, ADR cross-referencing**: `2026-09-23-adr-crossref-adr` adds `crossref` as the tenth hot tool: the ADRs one decision should link, judged within fixed request, time and reply ceilings, always registered, returning a typed `not_configured` outcome when no hosted-search credential is set. The hot-tool ceiling of this record becomes ten tools plus the two gateway tools. `crossref` is non-read-only, non-destructive, idempotent and open-world on the full surface, since it can write `related:` links.
 
 ## Rationale
 

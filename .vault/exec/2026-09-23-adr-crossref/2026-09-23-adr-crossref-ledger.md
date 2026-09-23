@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:d65b8e70a42d4b185fe87fb764c45b9f39af764f490015255fd7ae05a9318e1f'
+body_hash: 'sha256:0d360b7060a10abf5a28d2e0a37d61e0b09d0003a86ea74f58d53241a8cbd5b3'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -67,7 +67,11 @@ related:
 - `S06` `verify:` `pytest test_cli_reference_drift test_corpus_contracts test_discovery_guidance test_cli_language_contract test_template_annotations` -> `pass`
 - `S07` `A` `src/vaultspec_core/crossref/tests/test_live.py`
 - `S07` `verify:` `pytest src/vaultspec_core/crossref/tests/test_live.py -m typesafe (three runs)` -> `pass`
+- `S08` `M` `.vault/adr/2026-07-09-mcp-tool-schema-adr.md`
+- `S08` `M` `.vault/adr/2026-08-01-mcp-read-only-adr.md`
+- `S08` `verify:` `vaultspec-core vault check all` -> `pass`
 
 ## Notes
 
 - `S06` S06: vaultspec-core sync previewed no changes; this repository refreshes its tracked .vaultspec snapshots in a separate framework commit, so only the builtin sources changed.
+- `S08` S08: dogfooded vault adr crossref on the new ADR; four declared links confirmed, the one new candidate (2026-05-17-cli-memory-lifecycle-adr, 0.52) read and declined as topic adjacency.
