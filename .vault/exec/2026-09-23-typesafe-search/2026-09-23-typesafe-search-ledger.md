@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:f2631f87ff91fb6deba99fd03da8abc43aa26a8169e0e13115452e771ddb7245'
+body_hash: 'sha256:724f0a6d4bf8ac49b20faa25128a2c6f03b6a6d7402b8089ef2c98d77ea7ce79'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -174,3 +174,6 @@ related:
 - `S12` `M` `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`
 - `S12` `A` `src/vaultspec_core/vaultcore/tests/test_frontmatter_render.py`
 - `S12` `verify:` `pytest targeted vaultcore/core` -> `pass`
+- `S03` `M` `src/vaultspec_core/search/_credential.py`
+- `S03` `M` `src/vaultspec_core/search/tests/test_credential.py`
+- `S03` `verify:` `pytest search/tests/test_credential.py` -> `pass`

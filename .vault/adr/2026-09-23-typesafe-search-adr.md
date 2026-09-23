@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:a024925f046860f5add1c30ceed5bd28d58771a2433c26335535851b1750ab1e'
+body_hash: 'sha256:0dca69ca669f7381a3f01d38c92de3421c41bbfe7f5f59621820d69a72548ae3'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -13,6 +13,7 @@ related:
   - '[[2026-08-01-mcp-read-only-adr]]'
   - '[[2026-08-23-envelope-optimization-adr]]'
   - '[[2026-02-16-environment-variable-adr]]'
+  - '[[2026-09-23-typesafe-search-audit]]'
 ---
 
 # `typesafe-search` adr: `hosted vault search on TypeSafe Jev, with rag as the agent-level fallback` | (**status:** `accepted`)
@@ -111,9 +112,11 @@ search feature as drafted.
 
 - **Credential.** Enrollment is `VAULTSPEC_CORE_TYPESAFE_API_KEY` alone.
   - The generic `TYPESAFE_API_KEY` and rag's variable never enrol core.
-  - The key is read from the process environment. Only when it is absent there, and
-    the workspace declares DEPENDENCY or DEV install mode, is it read from the
-    workspace-root `.env`, and only that one variable.
+  - The key is read from the process environment. Only when it is absent there, core
+    runs from the workspace's own environment (the running interpreter lives inside
+    the workspace), and the workspace declares DEPENDENCY or DEV install mode, is it
+    read from the workspace-root `.env`, and only that one variable. The declaration
+    alone never suffices, because the repository writes it.
   - The endpoint, model and every other setting are code constants that no `.env`
     can change.
   - The key never appears in output, logs, diagnostics or errors. Surfaces report only
@@ -135,13 +138,19 @@ search feature as drafted.
   keys, finite probabilities, and options.
 - **Separate failure types.** Credential rejection, content rejection, rate limiting,
   transport failure and deadline expiry are distinguished.
-  - A content rejection makes only that record unscored.
+  - A content rejection is an edge-firewall block, recognised by a non-JSON 403; it
+    makes only that record, or the part of it, unscored, and the count is reported.
+    A JSON 403 is an account failure. When every record is refused, the search is
+    unavailable, and no surface claims the vault holds no answer while records went
+    unscored.
   - Any other failure yields a typed unavailable outcome, never partial rankings mixed
     with unscored records.
 - **Envelope.** Replies fit the discovery budget of
-  `2026-08-23-envelope-optimization-adr`. The default is 5 results, with a hard
-  ceiling. Excerpts are bounded at a line boundary, and every reply carries a total
-  and a truncation marker.
+  `2026-08-23-envelope-optimization-adr`. The default is 4 results; the ceiling is
+  every record a search reads in full, so raising the limit reaches the whole ranking
+  and the page needs no offset. Excerpts, titles and headings are bounded by encoded
+  bytes, at a line boundary where one falls, and every reply carries a total and a
+  truncation marker.
 - **Dependencies.** No new runtime dependency.
 - **Tests.** The default suite needs no network or key. Live evaluation runs only on
   explicit selection.
@@ -160,7 +169,8 @@ A search package in core owns five layers, top to bottom.
     summaries, each with a `none` option, packed into bounded requests run
     concurrently. A Choice classifying the kind of record the query needs rides in one
     of those requests, because it asks about the same state.
-  - The shortlist is the leaders per type, plus an in-process lexical top-N.
+  - The shortlist is the leaders per record group, plus an in-process lexical top-N.
+    Reference and audit records share one group and its cap, as evaluated.
   - Stage 2 reads each shortlisted record in full, in windows under the state bound.
     For each window it asks whether the record answers the query, whether it is about
     the query's subject, and whether it contradicts a premise of the query (Nouls).
@@ -192,6 +202,15 @@ discovery guidance is regenerated to route agents to core's search when it is
 configured, and to rag otherwise. On acceptance, this decision amends the tool
 enumeration of `2026-07-09-mcp-tool-schema-adr` and the restricted allowlist of
 `2026-08-01-mcp-read-only-adr`, each by adding `search`.
+
+**Amendment note, 2026-09-23**: the plan-close review
+(`2026-09-23-typesafe-search-audit`) corrected four statements above to what was
+built and measured. The workspace `.env` additionally requires the workspace's own
+interpreter. Content rejection is told apart by a non-JSON 403 and cannot produce a false
+"nothing answers" verdict. The default page is 4 results, with byte-bounded excerpts,
+because a 5-hit worst case exceeded the discovery budget and multi-byte text broke a
+character cap. Reference and audit records share one stage-one group, as the evaluated
+prototype did. None reverses the decision.
 
 ## Rationale
 

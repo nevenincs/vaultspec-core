@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:6acce11d93fa278eaaf4cddfaa653d3774474eca0497dd8d843fdd8558d6cf8e'
+body_hash: 'sha256:49219c9eac5a23deb3c6f632933643b2770474866b5e37b8932604ef6055b268'
 related:
   - '[[2026-08-26-rag-search-exposure-adr]]'
   - '[[2026-08-23-envelope-optimization-adr]]'
@@ -94,7 +94,8 @@ non-template headings. Each Choice also has a `none` option. The summaries total
 84k tokens and are split into requests of about 22k tokens, run in parallel. One more
 Choice classifies which kind of record the query needs.
 
-**Stage 2 (full read).** Candidates are the top records per type, at most 4 per type
+**Stage 2 (full read).** Candidates are the top records per record group (reference
+and audit share one group), at most 4 per group
 with probability at least 0.02 and 8 in total, plus the BM25 top 3. Each candidate gets
 one request over its full text, split into paragraph blocks, asking:
 
