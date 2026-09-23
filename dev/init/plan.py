@@ -78,7 +78,7 @@ NODE = Phase(
 # restore. The gates run in CI and on demand instead.
 TOOLS = Phase(
     name="tools",
-    summary="Enroll the Vaultspec framework.",
+    summary="Enroll the Vaultspec framework and provision actionlint.",
     steps=(
         Step(
             name="framework-install",
@@ -91,6 +91,19 @@ TOOLS = Phase(
                 "--force",
             ),
             summary="Rebuild .vaultspec/providers.json from the tracked config.",
+        ),
+        Step(
+            name="actionlint-install",
+            argv=(
+                "uv",
+                "run",
+                "--no-sync",
+                "python",
+                "-m",
+                "dev.actionlint",
+                "--install",
+            ),
+            summary="Provision the pinned actionlint the workflow check uses.",
         ),
     ),
     inputs=("uv.lock",),
