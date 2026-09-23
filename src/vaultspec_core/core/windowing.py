@@ -42,7 +42,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-__all__ = ["Window", "apply_window", "elision_line", "windowed_section"]
+__all__ = ["Window", "apply_window", "clip_text", "elision_line", "windowed_section"]
 
 #: Rows returned when a caller names no limit. Chosen to sit inside the
 #: listing budget for a row of typical width rather than to be a round
@@ -204,3 +204,32 @@ def elision_line(window: Window, noun: str) -> str | None:
         f"... {hidden:,} more {noun} "
         f"({window.total:,} total; --offset {window.next_offset} for the next page)"
     )
+
+
+def clip_text(text: str, limit: int) -> str:
+    """Return the leading slice of *text* that fits in *limit* characters.
+
+    The text-shaped counterpart of :func:`apply_window`: a surface that carries
+    document text bounds it the same way on every surface. The cut falls on a
+    line boundary when one lies in the second half of the budget, so a clipped
+    passage does not end mid-word and read as corrupted content; without one,
+    the cut is at the limit. Whether text was dropped is ``len(result) <
+    len(text)``, which the caller reports as its truncation marker.
+
+    Args:
+        text: The full text.
+        limit: Maximum characters to keep; must be positive.
+
+    Returns:
+        *text* unchanged when it fits, otherwise its clipped leading slice.
+
+    Raises:
+        ValueError: If *limit* is not positive.
+    """
+    if limit < 1:
+        raise ValueError(f"clip limit must be positive, got {limit}")
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    newline = cut.rfind("\n")
+    return cut[:newline] if newline > limit // 2 else cut

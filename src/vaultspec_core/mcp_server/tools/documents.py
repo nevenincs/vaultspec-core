@@ -36,6 +36,7 @@ from pydantic import Field
 
 from ...cli._migration_hook import ensure_migrated
 from ...core.types import get_context as _get_ctx
+from ...core.windowing import clip_text
 from ...vaultcore.markdown import iter_headings
 from ...vaultcore.models import DocType, vault_today
 from ...vaultcore.parser import split_frontmatter
@@ -833,25 +834,6 @@ _FULL_BODY_MAX_ROWS = 5
 _EXCERPT_CHARS = 600
 
 
-def _excerpt(text: str) -> str:
-    """Return the leading slice of *text* used for an excerpt body.
-
-    Cuts on a line boundary where one falls near the limit, so an excerpt does
-    not end mid-word and read as corrupted content.
-
-    Args:
-        text: The full document text.
-
-    Returns:
-        The excerpt, or the whole text when it already fits.
-    """
-    if len(text) <= _EXCERPT_CHARS:
-        return text
-    cut = text[:_EXCERPT_CHARS]
-    newline = cut.rfind("\n")
-    return cut[:newline] if newline > _EXCERPT_CHARS // 2 else cut
-
-
 def _matches_text(doc: Any, needle: str) -> bool:
     """Return whether *doc*'s stem or feature contains *needle*.
 
@@ -943,7 +925,7 @@ def _find_documents(
         if body != "none":
             text = raw.decode("utf-8", errors="replace") if raw is not None else ""
             if body == "excerpt":
-                entry.body = _excerpt(text)
+                entry.body = clip_text(text, _EXCERPT_CHARS)
                 entry.body_bytes = len(text.encode("utf-8"))
                 entry.body_truncated = len(entry.body) < len(text)
             else:

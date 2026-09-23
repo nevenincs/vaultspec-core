@@ -20,6 +20,7 @@ from vaultspec_core.core.windowing import (
     MAX_LIMIT,
     Window,
     apply_window,
+    clip_text,
     elision_line,
 )
 
@@ -120,3 +121,25 @@ def test_window_fields_never_promise_more_than_they_know() -> None:
     assert Window(total=10, returned=10, offset=0).truncated is False
     assert Window(total=10, returned=5, offset=0).truncated is True
     assert Window(total=10, returned=5, offset=5).truncated is False
+
+
+def test_clip_text_keeps_text_that_fits() -> None:
+    assert clip_text("alpha\nbeta", 10) == "alpha\nbeta"
+
+
+def test_clip_text_cuts_on_a_late_line_boundary() -> None:
+    text = "first line of the passage\nsecond line\nthird"
+    clipped = clip_text(text, 40)
+    assert clipped == "first line of the passage\nsecond line"
+    assert text.startswith(clipped)
+
+
+def test_clip_text_cuts_at_the_limit_without_a_late_boundary() -> None:
+    text = "ab\n" + "x" * 50
+    assert clip_text(text, 20) == text[:20]
+
+
+@pytest.mark.parametrize("limit", [0, -3])
+def test_clip_text_refuses_a_non_positive_limit(limit: int) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        clip_text("text", limit)
