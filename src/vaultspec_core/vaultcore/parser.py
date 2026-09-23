@@ -18,15 +18,19 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
 from .models import DocumentMetadata
 
 __all__ = [
     "FrontmatterSplit",
+    "RelatedBlock",
+    "RelatedEntry",
     "SafeLoader",
     "parse_frontmatter",
     "parse_vault_metadata",
+    "related_block",
+    "rerender_frontmatter",
     "split_frontmatter",
 ]
 
@@ -423,3 +427,197 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
                 metadata.promoted_to.append(val)
 
     return metadata, body
+
+
+#: Keys :func:`rerender_frontmatter` writes from the metadata model. ``feature``
+#: is modelled into ``tags``, so it is known but never written back.
+_MODELLED_KEYS = frozenset(
+    {
+        "tags",
+        "date",
+        "related",
+        "feature",
+        "supersedes",
+        "superseded_by",
+        "derived_from",
+        "promoted_to",
+        "archived",
+    }
+)
+
+#: The CLI-owned stamps, written either from the model or carried verbatim.
+_STAMP_KEYS = frozenset({"modified", "body_schema", "body_hash"})
+
+
+def _block_list(key: str, values: Sequence[str], quote: str) -> list[str]:
+    """Render a YAML block list, or nothing for an empty one."""
+    if not values:
+        return []
+    return [f"{key}:", *(f"  - {quote}{value}{quote}" for value in values)]
+
+
+def _scalar(key: str, value: str | None) -> list[str]:
+    """Render a single-quoted scalar line, or nothing for an empty value."""
+    return [f"{key}: '{value}'"] if value else []
+
+
+def _unmodelled_lines(yaml_block: str, known: frozenset[str]) -> list[str]:
+    """Return the verbatim lines of every top-level key outside *known*.
+
+    A key's lines are its key line, its list items, and any further
+    non-blank continuation line; a blank line ends it.
+    """
+    kept: list[str] = []
+    in_unknown = False
+    for line in yaml_block.split("\n"):
+        stripped = line.strip()
+        if ":" in stripped and not stripped.startswith("-"):
+            in_unknown = stripped.split(":", 1)[0].strip() not in known
+            if in_unknown:
+                kept.append(line)
+            continue
+        if stripped.startswith("-"):
+            if in_unknown:
+                kept.append(line)
+            continue
+        if in_unknown and stripped:
+            kept.append(line)
+        in_unknown = False
+    return kept
+
+
+def rerender_frontmatter(
+    content: str,
+    metadata: DocumentMetadata,
+    *,
+    render_stamps: bool,
+    quote_date: bool,
+    tag_lines: Sequence[str] | None = None,
+) -> str | None:
+    """Return *content* with its frontmatter rebuilt from *metadata*.
+
+    The modelled fields are written in canonical order - ``tags``, ``date``,
+    the stamps when rendered, ``related``, ``supersedes``, ``superseded_by``,
+    ``derived_from``, ``promoted_to``, ``archived`` - followed verbatim by
+    every key the model does not carry, in their original order. The text
+    before the opening fence and the body are kept; the frontmatter is
+    joined with ``\\n``, so *content* should be ``\\n``-normalised.
+
+    Args:
+        content: The full document text.
+        metadata: The (possibly mutated) metadata to write.
+        render_stamps: Write ``modified``, ``body_schema`` and ``body_hash``
+            from *metadata* after ``date``; otherwise carry their original
+            lines verbatim with the other unmodelled keys.
+        quote_date: Write the date single-quoted rather than bare.
+        tag_lines: Lines to write for ``tags`` in place of rendering
+            ``metadata.tags``.
+
+    Returns:
+        The rebuilt document, or ``None`` when *content* has no frontmatter.
+    """
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
+        return None
+    date = metadata.date
+    lines = [
+        "---",
+        *(
+            tag_lines
+            if tag_lines is not None
+            else _block_list("tags", metadata.tags, '"')
+        ),
+        *([f"date: '{date}'" if quote_date else f"date: {date}"] if date else []),
+    ]
+    if render_stamps:
+        lines += _scalar("modified", metadata.modified)
+        lines += _scalar("body_schema", metadata.body_schema)
+        lines += _scalar("body_hash", metadata.body_hash)
+    lines += [
+        *_block_list("related", metadata.related, '"'),
+        *_block_list("supersedes", metadata.supersedes, "'"),
+        *_scalar("superseded_by", metadata.superseded_by),
+        *_block_list("derived_from", metadata.derived_from, "'"),
+        *_block_list("promoted_to", metadata.promoted_to, "'"),
+        *_scalar("archived", metadata.archived),
+    ]
+    known = _MODELLED_KEYS | _STAMP_KEYS if render_stamps else _MODELLED_KEYS
+    lines += _unmodelled_lines(split.yaml_block, known)
+    lines.append("---")
+    if split.body:
+        lines.append(split.body)
+    return content[: split.frontmatter_start] + "\n".join(lines)
+
+
+#: A ``related:`` list entry: the text before its wiki-link target, the
+#: target (anchor and alias included), and the rest of the line.
+_RELATED_ENTRY_RE = re.compile(r"""^(\s*-\s*["']?\[\[)(.+?)(\]\]["']?.*)$""")
+
+
+@dataclass(frozen=True)
+class RelatedEntry:
+    """One wiki-link entry of the ``related:`` list, located for rewriting.
+
+    Attributes:
+        index: The entry's index among the YAML lines scanned.
+        prefix: The line up to the link target, ``[[`` included.
+        target: The link target, with any ``#anchor`` or ``|alias``.
+        suffix: The rest of the line from ``]]`` on, so ``prefix + target +
+            suffix`` is the line.
+    """
+
+    index: int
+    prefix: str
+    target: str
+    suffix: str
+
+
+@dataclass(frozen=True)
+class RelatedBlock:
+    """The ``related:`` key of a frontmatter and its wiki-link entries.
+
+    Attributes:
+        key_index: The index of the ``related:`` key line, or ``None`` when
+            the frontmatter has no such key.
+        inline: The value written on the key line itself, stripped (``[]``
+            or a flow sequence), or ``""`` for a block list.
+        entries: The block list's wiki-link entries, in order.
+    """
+
+    key_index: int | None
+    inline: str
+    entries: tuple[RelatedEntry, ...]
+
+
+def related_block(lines: Sequence[str]) -> RelatedBlock:
+    """Locate the ``related:`` key and its list entries.
+
+    The key may be indented. Its list runs to the next line that starts at
+    the margin with anything but a ``-`` item; blank lines, indented lines
+    and ``-`` items at the margin all belong to it.
+
+    Args:
+        lines: The frontmatter's YAML lines, without line endings.
+
+    Returns:
+        The :class:`RelatedBlock`. A repeated key reopens the list, and the
+        key reported is the last one.
+    """
+    key_index: int | None = None
+    inline = ""
+    in_list = False
+    entries: list[RelatedEntry] = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("related:"):
+            key_index = index
+            inline = stripped[len("related:") :].strip()
+            in_list = True
+            continue
+        if stripped and not line.startswith((" ", "\t", "-")):
+            in_list = False
+        match = _RELATED_ENTRY_RE.match(line) if in_list else None
+        if match is not None:
+            prefix, target, suffix = match.groups()
+            entries.append(RelatedEntry(index, prefix, target, suffix))
+    return RelatedBlock(key_index=key_index, inline=inline, entries=tuple(entries))

@@ -16,30 +16,13 @@ from ..vaultcore import (
     vault_today,
 )
 from ..vaultcore.markdown import iter_headings
-from ..vaultcore.parser import split_frontmatter
+from ..vaultcore.parser import rerender_frontmatter, split_frontmatter
 from . import types as _t
 from .enums import AdrStatus
 from .exceptions import ResourceNotFoundError, VaultSpecError
 from .helpers import atomic_write
 
 logger = logging.getLogger(__name__)
-
-#: Frontmatter keys ``adr_supersede`` understands and rebuilds explicitly; any other
-#: key in an ADR's frontmatter block is preserved verbatim, in place, by
-#: :func:`_preserve_unknown_frontmatter_keys`.
-_KNOWN_ADR_FRONTMATTER_KEYS = frozenset(
-    {
-        "tags",
-        "date",
-        "related",
-        "feature",
-        "supersedes",
-        "superseded_by",
-        "derived_from",
-        "promoted_to",
-        "archived",
-    }
-)
 
 #: The status marker that ends an ADR's H1, ``| (**status:** `accepted`)``,
 #: with the backtick quoting optional so a bare token is still read (and can
@@ -136,83 +119,6 @@ def rewrite_adr_status(
     return document[: split.body_start] + "\n".join(lines)
 
 
-def _preserve_unknown_frontmatter_keys(yaml_block: str) -> list[str]:
-    """Return the raw lines of frontmatter keys not covered by known ADR fields.
-
-    Args:
-        yaml_block: The original YAML frontmatter block (without the ``---``
-            fences).
-
-    Returns:
-        The lines belonging to unrecognized top-level keys, verbatim, so the
-        frontmatter rebuild in :func:`_rewrite_adr_frontmatter` can append them
-        unchanged.
-    """
-    preserved: list[str] = []
-    in_unknown_key = False
-    for line in yaml_block.split("\n"):
-        stripped = line.strip()
-        if ":" in stripped and not stripped.startswith("-"):
-            key = stripped.split(":", 1)[0].strip()
-            in_unknown_key = key not in _KNOWN_ADR_FRONTMATTER_KEYS
-            if in_unknown_key:
-                preserved.append(line)
-            continue
-        if stripped.startswith("-"):
-            if in_unknown_key:
-                preserved.append(line)
-            continue
-        if in_unknown_key and stripped:
-            preserved.append(line)
-        in_unknown_key = False
-    return preserved
-
-
-def _rebuild_frontmatter_lines(meta: DocumentMetadata, yaml_block: str) -> list[str]:
-    """Rebuild an ADR's frontmatter lines from its known metadata fields.
-
-    Args:
-        meta: The parsed (and possibly mutated) document metadata.
-        yaml_block: The original YAML frontmatter block, used to recover any
-            keys not modeled by :class:`DocumentMetadata`.
-
-    Returns:
-        The rebuilt frontmatter lines, opening ``---`` fence included and
-        closing fence omitted (the caller appends body content before closing
-        the block).
-    """
-    fm_lines = ["---"]
-    if meta.tags:
-        fm_lines.append("tags:")
-        for tag in meta.tags:
-            fm_lines.append(f'  - "{tag}"')
-    if meta.date:
-        fm_lines.append(f"date: '{meta.date}'")
-    if meta.related:
-        fm_lines.append("related:")
-        for link in meta.related:
-            fm_lines.append(f'  - "{link}"')
-    if meta.supersedes:
-        fm_lines.append("supersedes:")
-        for stem in meta.supersedes:
-            fm_lines.append(f"  - '{stem}'")
-    if meta.superseded_by:
-        fm_lines.append(f"superseded_by: '{meta.superseded_by}'")
-    if meta.derived_from:
-        fm_lines.append("derived_from:")
-        for stem in meta.derived_from:
-            fm_lines.append(f"  - '{stem}'")
-    if meta.promoted_to:
-        fm_lines.append("promoted_to:")
-        for rule in meta.promoted_to:
-            fm_lines.append(f"  - '{rule}'")
-    if meta.archived:
-        fm_lines.append(f"archived: '{meta.archived}'")
-
-    fm_lines.extend(_preserve_unknown_frontmatter_keys(yaml_block))
-    return fm_lines
-
-
 def _rewrite_adr_frontmatter(
     normalized: str, meta: DocumentMetadata, source_file: Path
 ) -> str:
@@ -229,17 +135,12 @@ def _rewrite_adr_frontmatter(
     Raises:
         VaultSpecError: If ``normalized`` has no parseable frontmatter block.
     """
-    split = split_frontmatter(normalized)
-    if split.yaml_block is None:
+    rendered = rerender_frontmatter(
+        normalized, meta, render_stamps=False, quote_date=True
+    )
+    if rendered is None:
         raise VaultSpecError(f"Could not parse frontmatter of ADR '{source_file}'.")
-    leading = normalized[: split.frontmatter_start]
-
-    fm_lines = _rebuild_frontmatter_lines(meta, split.yaml_block)
-    fm_lines.append("---")
-    if split.body:
-        fm_lines.append(split.body)
-
-    return leading + "\n".join(fm_lines)
+    return rendered
 
 
 def adr_supersede(

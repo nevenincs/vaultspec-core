@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from ..core.helpers import atomic_write
-from .parser import split_frontmatter
+from .parser import FrontmatterSplit, related_block, split_frontmatter
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from .checks._base import CheckResult
 
 __all__ = [
+    "count_related_rewrites",
     "find_rewrite_targets",
     "rename_document_path",
     "rewrite_incoming_refs",
@@ -165,7 +166,6 @@ def rename_document_path(src: Path, dst: Path) -> bool:
     return True
 
 
-_RELATED_ENTRY_RE = re.compile(r'^(\s*-\s*["\']?\[\[)(.+?)(\]\]["\']?.*)$')
 _MARKDOWN_SUFFIX = ".md"
 
 
@@ -291,7 +291,6 @@ def _scan_related_block(
         ``(dropped, target, new_target)`` triples in line order and
         ``drop_idx`` holds the indices of duplicate lines to delete.
     """
-    in_related = False
     # Tracks wiki-link targets already present in the ``related:`` block so
     # duplicate lines the rewrite would otherwise introduce can be dropped
     # (e.g. when two sources collapse onto the same terminal or when the
@@ -300,23 +299,8 @@ def _scan_related_block(
     drop_idx: list[int] = []
     events: list[tuple[bool, str, str]] = []
 
-    for idx, pair in enumerate(pairs):
-        line = pair[0]
-        if line.strip().startswith("related:"):
-            in_related = True
-            continue
-
-        if in_related and line and not line.startswith((" ", "\t", "-")):
-            in_related = False
-
-        if not in_related:
-            continue
-
-        match = _RELATED_ENTRY_RE.match(line)
-        if not match:
-            continue
-
-        target = match.group(2)
+    for entry in related_block([pair[0] for pair in pairs]).entries:
+        target = entry.target
         stem_only, trailer = _split_link_target(target)
         final_stem = _resolve_renamed_stem(stem_only, rename_map, rename_map_lower)
         if final_stem is None:
@@ -333,15 +317,102 @@ def _scan_related_block(
         # earlier line in this related: block, drop this line to avoid
         # emitting a duplicate entry.
         if new_target in seen_targets:
-            drop_idx.append(idx)
+            drop_idx.append(entry.index)
             events.append((True, target, new_target))
             continue
 
-        pair[0] = f"{match.group(1)}{new_target}{match.group(3)}"
+        pairs[entry.index][0] = f"{entry.prefix}{new_target}{entry.suffix}"
         seen_targets.add(new_target)
         events.append((False, target, new_target))
 
     return events, drop_idx
+
+
+def _scan_document(
+    content: str, rename_map: dict[str, str], rename_map_lower: dict[str, str]
+) -> tuple[FrontmatterSplit, list[list[str]], list[tuple[bool, str, str]], list[int]]:
+    """Scan *content*'s ``related:`` list for the rewrites a rename set makes.
+
+    The single scan behind the rewrite, its lock-target preview, and the
+    dry-run count, so the three agree on every document.
+
+    Args:
+        content: The full document text.
+        rename_map: Exact-case ``old_stem`` -> terminal ``new_stem`` map.
+        rename_map_lower: Lowercased mirror of *rename_map*.
+
+    Returns:
+        ``(split, pairs, events, drop_idx)``: the frontmatter split, the
+        YAML lines as ``[content, ending]`` pairs with rewritten entries
+        applied, and :func:`_scan_related_block`'s events and drop indices.
+        A document with no frontmatter yields no pairs and no events.
+    """
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
+        return split, [], [], []
+    # Model each YAML line as a mutable ``[content, ending]`` pair so the
+    # rewrite touches only the content of the lines it targets and every other
+    # byte - a byte-order mark, exotic in-line separators, and a CR-only or
+    # absent trailing terminator - survives verbatim.
+    pairs = split_keepends(content[split.yaml_start : split.yaml_end])
+    events, drop_idx = _scan_related_block(pairs, rename_map, rename_map_lower)
+    return split, pairs, events, drop_idx
+
+
+def _rename_maps(
+    renames: list[tuple[str, str]],
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Return the collapsed rename map for *renames* and its lowercased mirror.
+
+    The mirror serves case-insensitive fallback lookups: Obsidian resolves
+    wiki-links case-insensitively (``[[My-Doc]]`` hits ``my-doc.md``) while a
+    Linux filesystem is case-sensitive, so the exact-case lookup is tried
+    first to preserve intent.
+    """
+    raw_map = {old: new for old, new in renames if old != new}
+    rename_map = _collapse_rename_chains(raw_map) if raw_map else {}
+    return rename_map, {k.lower(): v for k, v in rename_map.items()}
+
+
+def count_related_rewrites(
+    root_dir: Path,
+    renames: list[tuple[str, str]],
+    *,
+    exclude_dirs: frozenset[str] = frozenset(),
+    removed: frozenset[Path] = frozenset(),
+) -> int:
+    """Return how many ``related:`` entries a rename would rewrite.
+
+    Counts exactly what :func:`rewrite_incoming_refs` rewrites for the same
+    arguments: the same documents, rename map and scan, with entries dropped
+    as duplicates left out, so a dry run reports what the rename then does.
+
+    Args:
+        root_dir: Project root (the caller's workspace).
+        renames: ``(old_stem, new_stem)`` pairs.
+        exclude_dirs: Further top-level ``<docs_dir>`` subdirectories to
+            skip, as :func:`rewrite_incoming_refs` takes them.
+        removed: Documents the rename deletes before its rewrite runs, whose
+            links are therefore never rewritten.
+
+    Returns:
+        The number of entries that would be rewritten.
+    """
+    rename_map, rename_map_lower = _rename_maps(renames)
+    if not rename_map:
+        return 0
+    total = 0
+    for path in _rewrite_candidates(root_dir, exclude_dirs):
+        if path in removed:
+            continue
+        content = _read_document_text(path)
+        if content is None:
+            continue
+        _split, _pairs, events, _drop = _scan_document(
+            content, rename_map, rename_map_lower
+        )
+        total += sum(1 for dropped, _target, _new in events if not dropped)
+    return total
 
 
 def _rewrite_document_refs(
@@ -363,7 +434,9 @@ def _rewrite_document_refs(
     except ValueError:
         rel = md_path
 
-    split = split_frontmatter(content)
+    split, pairs, events, drop_idx = _scan_document(
+        content, rename_map, rename_map_lower
+    )
     if split.unclosed:
         # Frontmatter whose fence never closes has no known extent: rewriting
         # it could corrupt body lines. Surface it only when it links a renamed
@@ -381,15 +454,6 @@ def _rewrite_document_refs(
                 )
             )
         return
-    if split.yaml_block is None:
-        return
-
-    # Model each YAML line as a mutable ``[content, ending]`` pair so the
-    # rewrite touches only the content of the lines it targets and every other
-    # byte - a byte-order mark, exotic in-line separators, and a CR-only or
-    # absent trailing terminator - survives verbatim.
-    pairs = split_keepends(content[split.yaml_start : split.yaml_end])
-    events, drop_idx = _scan_related_block(pairs, rename_map, rename_map_lower)
 
     for dropped, target, new_target in events:
         if dropped:
@@ -471,31 +535,18 @@ def find_rewrite_targets(
         a rename is not a self-referencing rewrite - so a caller that also
         needs the renamed document locked adds it separately.
     """
-    raw_map = {old: new for old, new in renames if old != new}
-    if not raw_map:
+    rename_map, rename_map_lower = _rename_maps(renames)
+    if not rename_map:
         return []
-    rename_map = _collapse_rename_chains(raw_map)
-
-    from ..config import get_config
-
-    vault_root = root_dir / get_config().docs_dir
-    if not vault_root.is_dir():
-        return []
-
-    rename_map_lower = {k.lower(): v for k, v in rename_map.items()}
-    non_schema_dirs = frozenset({"data", "logs"}) | exclude_dirs
 
     targets: list[Path] = []
-    for md_path in sorted(vault_root.rglob("*.md")):
-        if _is_skipped_document(md_path, vault_root, non_schema_dirs):
-            continue
+    for md_path in _rewrite_candidates(root_dir, exclude_dirs):
         content = _read_document_text(md_path)
         if content is None:
             continue
-        if content.startswith("﻿"):
-            content = content[1:]
-        pairs = split_keepends(content)
-        events, *_rest = _scan_related_block(pairs, rename_map, rename_map_lower)
+        _split, _pairs, events, _drop = _scan_document(
+            content, rename_map, rename_map_lower
+        )
         if events:
             targets.append(md_path)
     return targets
@@ -546,36 +597,40 @@ def rewrite_incoming_refs(
     if not renames:
         return
 
-    raw_map = {old: new for old, new in renames if old != new}
-    if not raw_map:
+    rename_map, rename_map_lower = _rename_maps(renames)
+    if not rename_map:
         return
 
-    rename_map = _collapse_rename_chains(raw_map)
+    for md_path in _rewrite_candidates(root_dir, exclude_dirs):
+        _rewrite_document_refs(md_path, root_dir, rename_map, rename_map_lower, result)
 
+
+def _rewrite_candidates(root_dir: Path, exclude_dirs: frozenset[str]) -> list[Path]:
+    """Return the documents a ``related:`` rewrite reads, in sorted order.
+
+    Top-level vault subdirectories are expected to hold schema-conforming
+    documents. Non-schema directories such as ``data/`` and ``logs/``
+    (recommended for gitignore by
+    :func:`vaultspec_core.core.gitignore.get_recommended_entries`) are skipped
+    to avoid scanning large or non-vault files, and hidden directories
+    (``.obsidian/``, ``.trash/``, ...) by the dot-prefix filter in
+    :func:`_is_skipped_document`.
+
+    Args:
+        root_dir: Project root (the caller's workspace).
+        exclude_dirs: Further top-level ``<docs_dir>`` subdirectories to skip.
+
+    Returns:
+        The candidate paths; empty when the docs directory does not exist.
+    """
     from ..config import get_config
 
     vault_root = root_dir / get_config().docs_dir
     if not vault_root.is_dir():
-        return
-
-    # Build a case-insensitive mirror of ``rename_map`` for fallback
-    # lookups.  Obsidian resolves wiki-links case-insensitively
-    # (``[[My-Doc]]`` hits ``my-doc.md``) but the filesystem on Linux
-    # is case-sensitive.  We try the exact-case lookup first to
-    # preserve intent and only fall back to lowercase when no exact
-    # match exists.
-    rename_map_lower = {k.lower(): v for k, v in rename_map.items()}
-
-    # Top-level vault subdirectories that are expected to contain
-    # schema-conforming documents.  Non-schema directories such as
-    # ``data/`` and ``logs/`` (explicitly recommended for gitignore
-    # by :func:`vaultspec_core.core.gitignore.get_recommended_entries`)
-    # are skipped to avoid scanning large or non-vault files.  Hidden
-    # directories (``.obsidian/``, ``.trash/``, ...) are skipped
-    # by the dot-prefix filter in :func:`_is_skipped_document`.
+        return []
     non_schema_dirs = frozenset({"data", "logs"}) | exclude_dirs
-
-    for md_path in sorted(vault_root.rglob("*.md")):
-        if _is_skipped_document(md_path, vault_root, non_schema_dirs):
-            continue
-        _rewrite_document_refs(md_path, root_dir, rename_map, rename_map_lower, result)
+    return [
+        md_path
+        for md_path in sorted(vault_root.rglob("*.md"))
+        if not _is_skipped_document(md_path, vault_root, non_schema_dirs)
+    ]

@@ -14,14 +14,13 @@ so no drift can develop between them.
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, cast
 
 import yaml
 
 from ..core.helpers import atomic_write_bytes
 from .models import refresh_modified_stamp, vault_today
-from .parser import split_frontmatter
+from .parser import related_block, split_frontmatter
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -33,10 +32,6 @@ __all__ = [
     "read_preserve_newlines",
     "remove_related_entries",
 ]
-
-# Matches a YAML list entry of the form:  - "[[some-target]]"
-# Captures the inner stem (without the [[ ]] delimiters and optional quotes).
-_RELATED_ENTRY_RE = re.compile(r'^\s*-\s*["\']?\[\[(.+?)\]\]["\']?\s*$')
 
 
 def read_preserve_newlines(path: Path) -> tuple[str, str]:
@@ -117,38 +112,22 @@ def remove_related_entries(path: Path, targets: list[str]) -> int:
     prefix, lines, suffix = parts
     target_set = {t.lower() for t in targets}
 
-    in_related = False
-    related_idx: int | None = None
-    new_lines: list[str] = []
-    removed = 0
-
-    for line in lines:
-        if line.startswith("related:"):
-            in_related = True
-            related_idx = len(new_lines)
-            new_lines.append(line)
-            continue
-
-        # Exit the related block on any non-indented key
-        if in_related and line and line[0] not in (" ", "\t"):
-            in_related = False
-
-        if in_related:
-            m = _RELATED_ENTRY_RE.match(line)
-            if m and m.group(1).lower() in target_set:
-                removed += 1
-                continue
-
-        new_lines.append(line)
-
-    if not removed:
+    block = related_block(lines)
+    dropped = {
+        entry.index for entry in block.entries if entry.target.lower() in target_set
+    }
+    if not dropped:
         return 0
+    removed = len(dropped)
+    new_lines = [line for index, line in enumerate(lines) if index not in dropped]
 
     # If all entries were removed, emit `related: []` so the YAML stays valid.
+    # Removed lines all follow the key, so its index is unchanged.
+    related_idx = block.key_index
     if related_idx is not None:
         after_idx = related_idx + 1
         after = new_lines[after_idx] if after_idx < len(new_lines) else ""
-        if not (after.startswith((" ", "\t")) and after.lstrip().startswith("-")):
+        if not after.lstrip().startswith("-"):
             new_lines[related_idx] = "related: []"
 
     new_content = _rejoin(prefix, new_lines, suffix, source_newline)
@@ -252,42 +231,27 @@ def _append_in_block(
     Returns:
         The reassembled document, or ``None`` when the entry already exists.
     """
-    in_related = False
-    related_idx: int | None = None
-    last_related_item_idx: int | None = None
-    last_related_indent: str | None = None
-    inline_value: str | None = None
+    block = related_block(lines)
+    related_idx = block.key_index
+    # An inline value on the key line: `related: []` (empty) or
+    # `related: ['[[a]]']` (a flow sequence requiring normalisation).
+    inline_value = block.inline if block.inline not in ("", "[]") else None
 
-    for i, line in enumerate(lines):
-        if line.startswith("related:"):
-            in_related = True
-            related_idx = i
-            # Capture any inline value: `related: []` (empty) or
-            # `related: ['[[a]]']` (a flow sequence requiring normalisation).
-            stripped = line[len("related:") :].strip()
-            inline_value = stripped if stripped not in ("", "[]") else None
-            continue
-
-        if not in_related:
-            continue
-
-        if line and line[0] not in (" ", "\t"):
-            # New top-level key; block ended
-            in_related = False
-            continue
-
-        m = _RELATED_ENTRY_RE.match(line)
-        if not m:
-            continue
-
-        # Idempotency check on the bare stem: an aliased existing entry
-        # (`[[foo|Foo]]`) must dedupe against a plain `[[foo]]` append, so
-        # compare only the stem left of any `|` alias pipe.
-        existing_stem = m.group(1).split("|", 1)[0].strip()
-        if existing_stem.lower() == stem.lower():
-            return None
-        last_related_item_idx = i
-        last_related_indent = line[: len(line) - len(line.lstrip())]
+    # Idempotency check on the bare stem: an aliased existing entry
+    # (`[[foo|Foo]]`) must dedupe against a plain `[[foo]]` append, so
+    # compare only the stem left of any `|` alias pipe.
+    if any(
+        entry.target.split("|", 1)[0].strip().lower() == stem.lower()
+        for entry in block.entries
+    ):
+        return None
+    last_entry = block.entries[-1] if block.entries else None
+    last_related_item_idx = last_entry.index if last_entry is not None else None
+    last_related_indent = (
+        last_entry.prefix[: len(last_entry.prefix) - len(last_entry.prefix.lstrip())]
+        if last_entry is not None
+        else None
+    )
 
     # Match the existing block's indentation so the appended item cannot
     # introduce a mixed-indent block sequence - invalid under strict YAML yet

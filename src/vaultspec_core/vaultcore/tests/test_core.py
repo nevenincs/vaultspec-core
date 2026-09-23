@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 from ...protocol.providers import GeminiModels
 from .. import parse_frontmatter, parse_vault_metadata
-from ..parser import SafeLoader, split_frontmatter
+from ..parser import SafeLoader, related_block, split_frontmatter
 
 pytestmark = [pytest.mark.unit]
 
@@ -203,6 +203,48 @@ class TestSplitFrontmatter:
         assert unclosed.yaml_block is None
         assert unclosed.unclosed is True
         assert split_frontmatter("text\n---\na: 1\n").unclosed is False
+
+
+class TestRelatedBlock:
+    """The one reading of a frontmatter's ``related:`` list."""
+
+    def test_entries_run_to_the_next_key(self):
+        lines = [
+            "tags:",
+            "  - '#a'",
+            "related:",
+            "  - '[[x]]'",
+            '  - "[[y|Y]]"  # note',
+            "",
+            "- '[[z]]'",
+            "date: '2026-01-01'",
+            "  - '[[after-the-list]]'",
+        ]
+        block = related_block(lines)
+        assert block.key_index == 2
+        assert block.inline == ""
+        assert [(e.index, e.target) for e in block.entries] == [
+            (3, "x"),
+            (4, "y|Y"),
+            (6, "z"),
+        ]
+        for entry in block.entries:
+            assert entry.prefix + entry.target + entry.suffix == lines[entry.index]
+
+    def test_indented_key_is_found(self):
+        block = related_block(["date: x", "  related:", "    - '[[a]]'"])
+        assert block.key_index == 1
+        assert [e.target for e in block.entries] == ["a"]
+
+    def test_inline_value_is_reported_without_entries(self):
+        block = related_block(["related: ['[[a]]']"])
+        assert block.inline == "['[[a]]']"
+        assert block.entries == ()
+
+    def test_no_key(self):
+        block = related_block(["tags:", "  - '[[looks-like-a-link]]'"])
+        assert block.key_index is None
+        assert block.entries == ()
 
 
 class TestParseVaultMetadataBOM:
