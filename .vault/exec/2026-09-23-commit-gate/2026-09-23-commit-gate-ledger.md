@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:b1dad1ed4cc88ce7fa0b88e7e5a12ee5f55a2357f427d894720baf33d1700355'
+body_hash: 'sha256:6d6c916dc6022e727cbc7dc466ce6d577140673a9f2119ed2416707c3611170f'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -126,6 +126,7 @@ related:
 - `S14` `M` `src/vaultspec_core/core/uninstall.py`
 - `S14` `A` `src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py`
 - `S14` `verify:` `pytest test_doctor_aggregates_canonical_checks against the prior modules` -> `fail`
+- `S13` `verify:` `pytest test_an_uninstalled_hook_weighs_nothing_in_the_exit_code against the warn weighting` -> `fail`
 
 ## Notes
 

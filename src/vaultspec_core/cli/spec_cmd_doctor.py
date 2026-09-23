@@ -511,7 +511,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             PrecommitSignal.UNREFRESHABLE: ("warn", "yellow"),
             PrecommitSignal.ORPHANED: ("info", "dim"),
             PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
-            PrecommitSignal.NOT_INSTALLED: ("warn", "yellow"),
+            PrecommitSignal.NOT_INSTALLED: ("info", "dim"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
             PrecommitSignal.UNREADABLE: ("warn", "yellow"),
             PrecommitSignal.DECLINED: ("info", "dim"),
@@ -836,7 +836,13 @@ def _provider_hooks_weigh_warn(reports: "list[ProviderHookReport]") -> bool:
 
 
 def _precommit_weight(signal: "PrecommitSignal") -> tuple[bool, bool]:
-    """Return ``(error, warn)`` for the pre-commit row."""
+    """Return ``(error, warn)`` for the pre-commit row.
+
+    ``NOT_INSTALLED`` weighs nothing. A complete config that no git hook runs
+    is reported, because nothing is checked at commit time, but running the
+    project's checks explicitly instead is a legitimate choice rather than a
+    fault, and a warning would call it one.
+    """
     from vaultspec_core.core.diagnosis import PrecommitSignal
 
     return (
@@ -847,9 +853,6 @@ def _precommit_weight(signal: "PrecommitSignal") -> tuple[bool, bool]:
             PrecommitSignal.INCOMPLETE,
             PrecommitSignal.NON_CANONICAL,
             PrecommitSignal.NO_HOOKS,
-            # A perfect config that nothing executes is the failure this whole
-            # row exists to report, so it warns exactly as a broken config does.
-            PrecommitSignal.NOT_INSTALLED,
             # Content-verified genuine stranding: prek.toml owns the boundary
             # and lacks the canonical hooks, so nothing runs them anywhere.
             PrecommitSignal.UNREFRESHABLE,

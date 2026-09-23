@@ -230,3 +230,17 @@ def test_an_uninstalled_hook_is_reported_without_ordering_an_install(
     assert "nothing is checked at commit time" in row
     assert "run the project's checks yourself" in row
     assert "if this repository wants commit-time checks" in row
+
+
+def test_an_uninstalled_hook_weighs_nothing_in_the_exit_code() -> None:
+    """Reported for the reader, never counted as a fault."""
+    from vaultspec_core.cli.spec_cmd_doctor import doctor_exit_code
+    from vaultspec_core.core.diagnosis.diagnosis import WorkspaceDiagnosis
+    from vaultspec_core.core.diagnosis.signals import FrameworkSignal, PrecommitSignal
+
+    def code(signal: PrecommitSignal) -> int:
+        return doctor_exit_code(
+            WorkspaceDiagnosis(framework=FrameworkSignal.PRESENT, precommit=signal)
+        )
+
+    assert code(PrecommitSignal.NOT_INSTALLED) == code(PrecommitSignal.COMPLETE)
