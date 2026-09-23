@@ -4,9 +4,9 @@ tags:
   - '#index'
   - '#mcp-tool-schema'
 date: '2026-07-31'
-modified: '2026-09-19'
+modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:852d2221d6cac5dfe9551704684a13975031b422cff3b496153f97fe4ffc3185'
+body_hash: 'sha256:84b747f67df1574f69c1bdbc93aced96b61f56ccb813b4d8a489d4243a404ccc'
 related:
   - '[[2026-07-09-mcp-tool-schema-adr]]'
   - '[[2026-07-09-mcp-tool-schema-audit]]'
@@ -29,7 +29,7 @@ Auto-generated index of all documents tagged with `#mcp-tool-schema`.
 ### adr
 
 - `2026-07-09-mcp-tool-schema-adr` - `mcp-tool-schema` adr: tiered hot-tool surface with a stateless discover/invoke gateway | (**status:** `accepted`)
-- `2026-09-19-mcp-tool-schema-invoke-read-split-adr` - `mcp-tool-schema` adr: `Proposed amendment: a read-only gateway executor alongside invoke` | (**status:** `{proposed|accepted|rejected|superseded|deprecated}`)
+- `2026-09-19-mcp-tool-schema-invoke-read-split-adr` - `mcp-tool-schema` adr: `Proposed amendment: a read-only gateway executor alongside invoke` | (**status:** `proposed`)
 
 ### audit
 
