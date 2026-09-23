@@ -533,10 +533,11 @@ cut, since a reply carries at most 80 verdict rows. A source also carries
 for links `apply` could not write, and, when it was not judged, `next_step` and
 `remediation`: the search to run instead, which is the `vaultspec-rag` search when rag
 is provisioned and the ADR listing otherwise. The totals `judged`, `links`, and
-`written` follow, then `remaining`, `next_after` when sources remain, `stopped` when a
-sweep ended early, and `usage` (requests, input tokens, and `unscored`, the requests the
-provider refused to read) when anything was sent. A source whose every pair was refused
-is `unavailable` with `content_rejected`, never a source with no links.
+`written` follow, then `remaining`, `next_after` when sources remain and one was
+processed (without it, a resume starts from the beginning), `stopped` when a sweep ended
+early, and `usage` (requests, input tokens, and `unscored`, the requests the provider
+refused to read) when anything was sent. A source whose every pair was refused is
+`unavailable` with `content_rejected`, never a source with no links.
 
 ______________________________________________________________________
 

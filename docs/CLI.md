@@ -1634,8 +1634,9 @@ rows were cut has `truncated` set. A source also carries `unjudged_declared` whe
 declared links were beyond the judged ceiling, `write_failed` for links `--apply` could
 not write, and, when it was not judged, its `reason`, `next_step`, and `remediation`.
 `data` also carries the totals `judged`, `links`, and `written`, the number of sources
-`remaining`, `next_after` when sources remain, `stopped` when a sweep ended early, and
-`usage` when anything was sent.
+`remaining`, `next_after` when sources remain and one was processed (without it, a
+resume starts from the beginning), `stopped` when a sweep ended early, and `usage` when
+anything was sent.
 
 Exit codes:
 
