@@ -50,6 +50,7 @@ from ..vaultcore.markdown import (
 )
 from ..vaultcore.parser import split_frontmatter
 from ..vaultcore.query_listing import docs_from_graph
+from ._models import EXCERPT_BYTES
 from ._questions import RECORD_GROUPS
 
 if TYPE_CHECKING:
@@ -363,6 +364,6 @@ def read_version(record: Record) -> RecordVersion | None:
             line_start=block.line_start + offset,
             line_end=block.line_end + offset,
         )
-        for block in paragraph_blocks(split.body)
+        for block in paragraph_blocks(split.body, max_chars=EXCERPT_BYTES)
     )
     return RecordVersion(blob_hash=git_blob_oid(raw), blocks=blocks)

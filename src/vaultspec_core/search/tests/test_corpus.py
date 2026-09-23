@@ -19,6 +19,7 @@ from vaultspec_core.search._corpus import (
     summary_card,
     template_headings,
 )
+from vaultspec_core.search._models import EXCERPT_BYTES
 from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 from vaultspec_core.vaultcore.body_schema import BODY_SCHEMA_REGISTRY
 from vaultspec_core.vaultcore.models import DocType
@@ -224,6 +225,20 @@ class TestBlocks:
         paths = {block.heading_path for block in blocks_of(record)}
 
         assert ("Cache layout on disk", "Fingerprint manifest") in paths
+
+    def test_a_block_fits_the_excerpt_it_is_returned_in(self, tmp_path: Path) -> None:
+        # One paragraph of wrapped lines, twice the excerpt: a block cut
+        # larger than the excerpt would lose its closing lines to the clip.
+        line = "The cache key is the content fingerprint of every file listed."
+        lines = [line] * (2 * EXCERPT_BYTES // len(line))
+        write_record(tmp_path, "adr", "2026-01-02-cache-adr", "\n".join(lines) + "\n")
+
+        (record,) = load_records(tmp_path)
+        blocks = blocks_of(record)
+
+        assert len(blocks) > 1
+        assert all(len(block.text.encode()) <= EXCERPT_BYTES for block in blocks)
+        assert sum(b.line_end - b.line_start + 1 for b in blocks) == len(lines)
 
     def test_empty_body_has_no_blocks(self, tmp_path: Path) -> None:
         write_record(tmp_path, "plan", "2026-01-02-demo-plan", "")

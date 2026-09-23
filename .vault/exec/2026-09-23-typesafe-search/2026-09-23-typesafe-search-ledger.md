@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:e7c04b9e13af1bfb87edf0677394349a3ce15c247250603f41bbf5ac7706faab'
+body_hash: 'sha256:98125bc797203927307dcda89dc4ea317457ffcd2a04f3a06baefc3ba7a0b8d1'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -223,3 +223,5 @@ related:
 - `S11` `M` `src/vaultspec_core/cli/edit_cmd.py`
 - `S11` `M` `src/vaultspec_core/vaultcore/tests/test_rename_concurrency.py`
 - `S11` `verify:` `rename-and-edit load test 40 serial runs` -> `pass`
+- `S05` `M` `.vault/research/2026-09-23-typesafe-search-research.md`
+- `S05` `verify:` `run_product_eval live: excerpt 19/21 dev, 12/18 held-out` -> `pass`

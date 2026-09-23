@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:49219c9eac5a23deb3c6f632933643b2770474866b5e37b8932604ef6055b268'
+body_hash: 'sha256:26c0b250940b25e8e83b18eb021552c086ff45b2775b93262c6dd2cda3826240'
 related:
   - '[[2026-08-26-rag-search-exposure-adr]]'
   - '[[2026-08-23-envelope-optimization-adr]]'
@@ -221,6 +221,32 @@ correct excerpt on each set.
 **Kind question.** The record-kind Choice asks about the same state as stage 1. Carrying
 it inside a stage-1 request, the skill's fan-out advice, saved one request per search
 (15.3 against 16.3) at unchanged latency.
+
+### The shipped search keeps the prototype's ranking once blocks fit the byte-bounded excerpt
+
+`search_vault` itself was measured on both labelled sets with
+`tmp/typesafe-search-eval/run_product_eval.py` against this vault on 2026-09-23. The
+sets are small: one case moves dev hit@1 by 0.05 and held-out hit@1 by 0.06.
+
+| shipped code                                       | dev hit@1 | dev excerpt | held-out hit@1 | held-out excerpt | median latency | cost per search |
+| -------------------------------------------------- | --------- | ----------- | -------------- | ---------------- | -------------- | --------------- |
+| 900-character excerpt, 1,400-character blocks      | 0.86      | 19/21       | 0.89           | 15/18            | about 1.4 s    | about $0.005    |
+| 700-byte excerpt, 1,400-character blocks           | 0.95      | 15/21       | 0.89           | 11/18            | 1,806 ms       | $0.0052         |
+| 700-byte excerpt, blocks of at most 700 characters | 0.90      | 19/21       | 0.94           | 12/18            | 1,778 ms       | $0.0052         |
+
+**Clipped blocks.** Bounding excerpts by bytes, which the reply ceiling requires
+(`src/vaultspec_core/search/_models.py:85`), shrank the excerpt below the block size. The
+clip keeps a block's leading lines (`src/vaultspec_core/search/_engine.py:796`), so an
+answer that closed its block was cut away. In four of the six cases that smaller blocks
+recovered, the evidence sat one to four lines below the returned range. Cutting blocks
+at the excerpt size (`src/vaultspec_core/search/_corpus.py:367`) makes the block the
+provider picks the text returned, at unchanged cost and latency.
+
+**Remaining misses.** Of the eight misses left:
+
+- Two are single lines longer than 700 bytes, with the evidence past the cap.
+- Five are a neighbouring or unrelated block chosen by the excerpt Choice.
+- One is the recall miss described above.
 
 ### Cloudflare in front of the API rejects 2.8% of vault records unless text is sanitised
 
