@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from vaultspec_core.search._corpus import Record
+from vaultspec_core.search._corpus import SECTION_BYTES, TITLE_BYTES, Record
 from vaultspec_core.search._engine import (
     MAX_CHOICE_OPTIONS,
     Judgment,
     Meter,
     Question,
+    bounded_excerpt,
     build_wide_questions,
     build_windows,
     excerpt_blocks,
@@ -21,8 +22,10 @@ from vaultspec_core.search._engine import (
     option_keys,
     pack_requests,
     rank,
+    search_hit,
     shortlist,
 )
+from vaultspec_core.search._models import EXCERPT_BYTES, SUPPORTING_BYTES
 from vaultspec_core.search._questions import (
     KIND_WEIGHT,
     MODEL,
@@ -46,6 +49,13 @@ pytestmark = [pytest.mark.unit]
 #: The typographic stand-ins the transport maps angle brackets to.
 LA = "\N{SINGLE LEFT-POINTING ANGLE QUOTATION MARK}"
 RA = "\N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK}"
+
+#: One CJK ideograph (three UTF-8 bytes) and one emoji (four).
+CJK = "\N{CJK UNIFIED IDEOGRAPH-4E2D}"
+EMOJI = "\N{GRINNING FACE}"
+
+#: A blob id; engine logic only carries it.
+BLOB = "0123456789abcdef0123456789abcdef01234567"
 
 
 def record(
@@ -286,7 +296,7 @@ class TestExcerptBlocks:
 
 
 def judgment(r: Record, answers: float, about: float = 0.5) -> Judgment:
-    return Judgment(r, answers, about, 0.0, None, None)
+    return Judgment(r, answers, about, 0.0, None, None, BLOB)
 
 
 class TestRank:
@@ -317,8 +327,89 @@ class TestRank:
         assert [j.record for j, _ in ranked] == [a, b, c, d]
 
 
+def lines_block(
+    lines: list[str], *, start: int = 40, path: tuple[str, ...] = ()
+) -> Block:
+    """A block of *lines* starting at file line *start*."""
+    return Block(
+        heading_path=path,
+        line_start=start,
+        line_end=start + len(lines) - 1,
+        text="\n".join(lines),
+    )
+
+
+class TestBoundedExcerpt:
+    def test_a_block_within_the_cap_is_carried_whole(self) -> None:
+        block = lines_block(["one", "two"], path=("Decision",))
+
+        excerpt = bounded_excerpt(block, 100)
+
+        assert excerpt is not None
+        assert (excerpt.text, excerpt.line_start, excerpt.line_end) == (
+            "one\ntwo",
+            40,
+            41,
+        )
+        assert excerpt.section == "Decision"
+        assert excerpt.truncated is False
+
+    def test_a_long_block_keeps_whole_lines_and_moves_its_last_line(self) -> None:
+        lines = [CJK * 10 for _ in range(6)]
+        block = lines_block(lines)
+
+        # Two 30-byte lines and their newline fit 70 bytes; a third does not.
+        excerpt = bounded_excerpt(block, 70)
+
+        assert excerpt is not None
+        assert excerpt.text == "\n".join(lines[:2])
+        assert (excerpt.line_start, excerpt.line_end) == (40, 41)
+        assert excerpt.truncated is True
+        assert len(excerpt.text.encode("utf-8")) <= 70
+
+    def test_a_first_line_over_the_cap_keeps_its_leading_characters(self) -> None:
+        block = lines_block([EMOJI * 50, "second"])
+
+        excerpt = bounded_excerpt(block, 10)
+
+        assert excerpt is not None
+        assert excerpt.text == EMOJI * 2
+        assert excerpt.line_end == excerpt.line_start == 40
+        assert excerpt.truncated is True
+
+    def test_each_heading_of_the_section_is_bounded_in_bytes(self) -> None:
+        path = tuple(CJK * SECTION_BYTES for _ in range(5))
+
+        excerpt = bounded_excerpt(lines_block(["x"], path=path), 100)
+
+        assert excerpt is not None
+        heading = CJK * (SECTION_BYTES // 3)
+        assert excerpt.section == " > ".join([heading] * 5)
+
+    def test_no_block_is_no_excerpt(self) -> None:
+        assert bounded_excerpt(None, 100) is None
+
+
+class TestSearchHit:
+    def test_title_and_both_excerpts_are_bounded_in_bytes(self) -> None:
+        r = record("2026-01-02-x-adr", title=EMOJI * TITLE_BYTES)
+        answer = lines_block([EMOJI * 10] * 100)
+        support = lines_block([EMOJI * 10] * 100, start=200)
+
+        hit = search_hit(Judgment(r, 0.9, 0.5, 0.1, answer, support, BLOB), score=1.2)
+
+        assert hit.title == EMOJI * (TITLE_BYTES // 4)
+        assert hit.excerpt is not None
+        assert hit.supporting is not None
+        assert len(hit.excerpt.text.encode("utf-8")) <= EXCERPT_BYTES
+        assert len(hit.supporting.text.encode("utf-8")) <= SUPPORTING_BYTES
+        assert hit.excerpt.truncated is True
+        assert hit.supporting.truncated is True
+        assert hit.blob_hash == BLOB
+
+
 class TestMeter:
-    def test_refusal_is_cleared_by_a_later_read(self) -> None:
+    def test_refusal_is_cleared_by_a_later_whole_read(self) -> None:
         meter = Meter()
         first, second = record("2026-01-02-a-adr"), record("2026-01-02-b-adr")
 

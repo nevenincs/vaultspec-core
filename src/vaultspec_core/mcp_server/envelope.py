@@ -81,12 +81,16 @@ class _Summariser(Protocol):
 #: into the tool description re-sent on every turn of every conversation.
 _DROPPED_SECTIONS = ("Returns:", "Raises:", "Yields:")
 
-#: Matches the ``ctx`` entry inside an ``Args:`` block.
+#: Matches the ``ctx`` entry inside an ``Args:`` block: its line and every
+#: continuation line indented deeper than it, stopping at the next argument.
 #:
 #: ``ctx`` is the MCP request context: a parameter of the Python function that
 #: appears in no ``inputSchema``, so documenting it describes an argument the
 #: model cannot pass. Two tools spend a full sentence explaining it is unused.
-_CTX_ARG = re.compile(r"\n\s*ctx:.*?(?=\n\s{8}\w+:|\Z)", re.S)
+#: The entry is found by indentation relative to its own line, not by a fixed
+#: width: ``inspect.getdoc`` dedents the docstring, so a fixed width read the
+#: next argument as a continuation and removed every argument after ``ctx``.
+_CTX_ARG = re.compile(r"\n(?P<indent>[ \t]*)ctx:[^\n]*(?:\n(?P=indent)[ \t]+[^\n]*)*")
 
 #: An ``Args:`` heading left with nothing under it after the ctx removal.
 _EMPTY_ARGS = re.compile(r"\n\s*Args:\s*(?=\Z)")

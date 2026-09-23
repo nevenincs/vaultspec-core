@@ -68,7 +68,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-__all__ = ["DocNode", "GraphMetrics", "VaultGraph"]
+__all__ = ["DocNode", "GraphMetrics", "VaultGraph", "decode_document"]
+
+
+def decode_document(raw: bytes) -> str:
+    """Decode a vault document's bytes the way the graph reads every document.
+
+    Strict UTF-8, with ``\\r\\n`` and ``\\r`` normalised to ``\\n`` as
+    ``read_text``'s universal-newline mode would. A reader that must hold a
+    file's bytes itself - to hash the same version it parses - decodes them
+    here, so its text is the text every graph consumer parses.
+
+    Raises:
+        UnicodeDecodeError: If *raw* is not UTF-8.
+    """
+    return raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+
 
 # ---------------------------------------------------------------------------
 # VaultGraph
@@ -326,12 +341,11 @@ class VaultGraph:
     def _ingest_document(self, path: pathlib.Path) -> str | None:
         """Read *path* once, recording its raw text and any encoding issue.
 
-        The single ingress read: the file's bytes are read exactly once,
-        decoded as UTF-8, and newline-normalised the way ``read_text``'s
-        universal-newline mode would (``\\r\\n`` and ``\\r`` become ``\\n``)
-        so the parse consumes identical input to the previous per-consumer
-        reads.  The normalised text and the source's CRLF convention are
-        retained in :attr:`raw_texts` for content-consuming checks, and a
+        The single ingress read: the file's bytes are read exactly once and
+        decoded by :func:`decode_document`, so the parse consumes identical
+        input to the previous per-consumer reads.  The normalised text and
+        the source's CRLF convention are retained in :attr:`raw_texts` for
+        content-consuming checks, and a
         read or decode failure is recorded in :attr:`encoding_issues`
         instead of being silently dropped.
 
@@ -351,16 +365,14 @@ class VaultGraph:
         # time - 3.2 s of the 11 s cold rebuild on a 4,739-document vault.
         self._content_hashes[path] = hashlib.sha256(raw_bytes).hexdigest()
         try:
-            decoded = raw_bytes.decode("utf-8")
+            content = decode_document(raw_bytes)
         except UnicodeDecodeError as e:
             self._encoding_issues.append(
                 EncodingIssue(path, "decode", e.reason, e.start)
             )
             logger.warning("Failed to read metadata from %s: %s", path, e)
             return None
-        crlf = "\r\n" in decoded
-        content = decoded.replace("\r\n", "\n").replace("\r", "\n")
-        self._raw_texts[path] = (content, crlf)
+        self._raw_texts[path] = (content, b"\r\n" in raw_bytes)
         return content
 
     def ensure_raw_texts(self) -> None:

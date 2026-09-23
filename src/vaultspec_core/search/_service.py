@@ -13,7 +13,10 @@ decisions that sit above the ranking itself.
   so a slow provider ends the search on time instead of per request.
 - **All or nothing.** A provider failure other than a content rejection
   yields ``unavailable`` with its reason and never a partial ranking; a
-  content rejection only leaves the records it refused unscored.
+  content rejection only leaves the records it refused unscored. When those
+  refusals leave nothing ranked, the outcome is ``unavailable`` with
+  ``content_rejected``: an empty ``ok`` page would read as "nothing answers"
+  about records that were never read.
 - **Bounded page.** The ranking is cut to the caller's limit, clamped to
   :data:`~vaultspec_core.search.MAX_RESULTS`, and the cut is described by the
   shared window vocabulary, so a caller always sees the total.
@@ -32,6 +35,7 @@ from ._models import (
     DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
+    InvalidQueryError,
     SearchOutcome,
     SearchStatus,
     UnavailableReason,
@@ -90,12 +94,13 @@ def search_vault(
         credential is available, or ``unavailable`` with its reason.
 
     Raises:
-        ValueError: If *query* is blank or longer than :data:`MAX_QUERY_CHARS`.
+        InvalidQueryError: If *query* is blank or longer than
+            :data:`MAX_QUERY_CHARS`.
     """
     if not query.strip():
-        raise ValueError("the search query must not be blank")
+        raise InvalidQueryError("the search query must not be blank")
     if len(query) > MAX_QUERY_CHARS:
-        raise ValueError(
+        raise InvalidQueryError(
             f"the search query must be at most {MAX_QUERY_CHARS} characters"
         )
     credential = resolve_credential(root, environ)
@@ -141,6 +146,14 @@ def search_vault(
     finally:
         if owned:
             client.close()
+    usage = meter.usage()
+    if not ranking.hits and usage.unscored:
+        return SearchOutcome(
+            status=SearchStatus.UNAVAILABLE,
+            query=query,
+            reason=UnavailableReason.CONTENT_REJECTED,
+            usage=usage,
+        )
     hits, window = apply_window(ranking.hits, limit=size, pageable=False)
     return SearchOutcome(
         status=SearchStatus.OK,
@@ -148,5 +161,5 @@ def search_vault(
         answered=ranking.answered,
         hits=tuple(hits),
         window=window,
-        usage=meter.usage(),
+        usage=usage,
     )

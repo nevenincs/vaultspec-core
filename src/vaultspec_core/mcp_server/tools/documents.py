@@ -832,13 +832,15 @@ def _find_features(limit: int, want_json: bool) -> list[FindEntry]:
 _FULL_BODY_MAX_ROWS = 5
 
 
-#: Characters of document text carried by an ``excerpt`` body request.
+#: UTF-8 bytes of document text carried by an ``excerpt`` body request.
 #:
 #: Enough to recognise a document and decide whether to fetch it; not enough
 #: for twenty of them to fill a context window. Measured, twenty adr documents
 #: at ``body="full"`` cost 197,490 bytes - the default limit, on a healthy
-#: vault, past a 50k-token budget for a single exploratory call.
-_EXCERPT_CHARS = 600
+#: vault, past a 50k-token budget for a single exploratory call. Counted in
+#: bytes, as the reply budget is, so text in a multi-byte script costs no more
+#: than ASCII does.
+_EXCERPT_BYTES = 600
 
 
 def _matches_text(doc: Any, needle: str) -> bool:
@@ -932,7 +934,7 @@ def _find_documents(
         if body != "none":
             text = raw.decode("utf-8", errors="replace") if raw is not None else ""
             if body == "excerpt":
-                entry.body = clip_text(text, _EXCERPT_CHARS)
+                entry.body = clip_text(text, _EXCERPT_BYTES)
                 entry.body_bytes = len(text.encode("utf-8"))
                 entry.body_truncated = len(entry.body) < len(text)
             else:

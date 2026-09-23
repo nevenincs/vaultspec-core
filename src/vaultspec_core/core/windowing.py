@@ -45,7 +45,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-__all__ = ["Window", "apply_window", "clip_text", "elision_line", "windowed_section"]
+__all__ = [
+    "Window",
+    "apply_window",
+    "clip_lines",
+    "clip_text",
+    "elision_line",
+    "windowed_section",
+]
 
 #: Rows returned when a caller names no limit. Chosen to sit inside the
 #: listing budget for a row of typical width rather than to be a round
@@ -225,19 +232,47 @@ def elision_line(window: Window, noun: str) -> str | None:
     )
 
 
+def _encoded(text: str, limit: int) -> bytes:
+    """Return *text* as UTF-8, refusing a limit no text can be clipped to.
+
+    Raises:
+        ValueError: If *limit* is not positive.
+    """
+    if limit < 1:
+        raise ValueError(f"clip limit must be positive, got {limit}")
+    return text.encode("utf-8")
+
+
+def _code_point_end(encoded: bytes, limit: int) -> int:
+    """Return the largest cut at or below *limit* that splits no code point.
+
+    *encoded* is longer than *limit*, so the byte at *limit* exists. A byte of
+    the form ``10xxxxxx`` continues the code point before it; the cut steps
+    back past those to the byte that starts the code point.
+    """
+    end = limit
+    while end > 0 and encoded[end] & 0xC0 == 0x80:
+        end -= 1
+    return end
+
+
 def clip_text(text: str, limit: int) -> str:
-    """Return the leading slice of *text* that fits in *limit* characters.
+    """Return the leading slice of *text* that fits in *limit* UTF-8 bytes.
 
     The text-shaped counterpart of :func:`apply_window`: a surface that carries
-    document text bounds it the same way on every surface. The cut falls on a
-    line boundary when one lies in the second half of the budget, so a clipped
-    passage does not end mid-word and read as corrupted content; without one,
-    the cut is at the limit. Whether text was dropped is ``len(result) <
-    len(text)``, which the caller reports as its truncation marker.
+    document text bounds it the same way on every surface. The bound is in
+    encoded bytes because reply budgets are: a character bound lets text in a
+    multi-byte script cost three or four times what the same count of ASCII
+    does. The cut never splits a code point. It falls on a line boundary when
+    one lies in the second half of the budget, so a clipped passage does not
+    end mid-word and read as corrupted content; without one, the cut is at the
+    last whole code point within the limit. Whether text was dropped is
+    ``len(result) < len(text)``, which the caller reports as its truncation
+    marker.
 
     Args:
         text: The full text.
-        limit: Maximum characters to keep; must be positive.
+        limit: Maximum UTF-8 bytes to keep; must be positive.
 
     Returns:
         *text* unchanged when it fits, otherwise its clipped leading slice.
@@ -245,10 +280,42 @@ def clip_text(text: str, limit: int) -> str:
     Raises:
         ValueError: If *limit* is not positive.
     """
-    if limit < 1:
-        raise ValueError(f"clip limit must be positive, got {limit}")
-    if len(text) <= limit:
+    encoded = _encoded(text, limit)
+    if len(encoded) <= limit:
         return text
-    cut = text[:limit]
-    newline = cut.rfind("\n")
-    return cut[:newline] if newline > limit // 2 else cut
+    end = _code_point_end(encoded, limit)
+    newline = encoded.rfind(b"\n", 0, end)
+    if newline > limit // 2:
+        end = newline
+    return encoded[:end].decode("utf-8")
+
+
+def clip_lines(text: str, limit: int) -> str:
+    """Return the leading whole lines of *text* that fit in *limit* UTF-8 bytes.
+
+    The verbatim counterpart of :func:`clip_text`, for text a caller addresses
+    by line number: the result is a run of whole lines of *text*, so a caller
+    that reports the line the text starts on can report the line it now ends
+    on. One exception keeps the result from being empty: a first line longer
+    than the whole budget is cut the way :func:`clip_text` cuts, at the last
+    whole code point within the limit, and the result is then a prefix of that
+    one line.
+
+    Args:
+        text: The full text, lines separated by ``\\n``.
+        limit: Maximum UTF-8 bytes to keep; must be positive.
+
+    Returns:
+        *text* unchanged when it fits, otherwise its leading whole lines, or
+        the leading part of its first line when that line alone exceeds the
+        limit.
+
+    Raises:
+        ValueError: If *limit* is not positive.
+    """
+    encoded = _encoded(text, limit)
+    if len(encoded) <= limit:
+        return text
+    newline = encoded.rfind(b"\n", 0, limit + 1)
+    end = newline if newline != -1 else _code_point_end(encoded, limit)
+    return encoded[:end].decode("utf-8")

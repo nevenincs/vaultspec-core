@@ -10,12 +10,12 @@ from vaultspec_core.search._corpus import (
     CARD_SECTIONS,
     LEAD_CHARS,
     SEARCHABLE_TYPES,
-    SECTION_CHARS,
-    blob_hash,
+    SECTION_BYTES,
+    TITLE_BYTES,
     card_title,
     load_records,
+    read_version,
     readable,
-    record_blocks,
     summary_card,
     template_headings,
 )
@@ -26,10 +26,16 @@ from vaultspec_core.vaultcore.models import DocType
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from vaultspec_core.search._corpus import Record
+    from vaultspec_core.vaultcore.markdown import Block
+
 pytestmark = [pytest.mark.unit]
 
 #: The UTF-8 byte-order mark some editors write first.
 BOM = "\N{ZERO WIDTH NO-BREAK SPACE}"
+
+#: One CJK ideograph: one character, three UTF-8 bytes.
+CJK = "\N{CJK UNIFIED IDEOGRAPH-4E2D}"
 
 
 def write_record(
@@ -175,6 +181,13 @@ class TestLoadRecords:
         assert [r.name for r in load_records(tmp_path)] == ["2026-01-02-good-adr"]
 
 
+def blocks_of(record: Record) -> tuple[Block, ...]:
+    """The excerpt blocks of *record*'s file as it is on disk now."""
+    version = read_version(record)
+    assert version is not None
+    return version.blocks
+
+
 class TestBlocks:
     @pytest.mark.parametrize(
         ("newline", "bom"), [("\n", False), ("\r\n", False), ("\n", True)]
@@ -187,7 +200,7 @@ class TestBlocks:
         )
 
         (record,) = load_records(tmp_path)
-        blocks = record_blocks(record)
+        blocks = blocks_of(record)
 
         assert blocks
         for block in blocks:
@@ -200,7 +213,7 @@ class TestBlocks:
 
         # Seven frontmatter lines and one blank line precede the title.
         assert record.body_line == 9
-        first = record_blocks(record)[0]
+        first = blocks_of(record)[0]
         assert first.line_start == 11
         assert first.text.startswith("| field |")
 
@@ -208,7 +221,7 @@ class TestBlocks:
         write_record(tmp_path, "adr", "2026-01-02-cache-adr", ADR_BODY)
 
         (record,) = load_records(tmp_path)
-        paths = {block.heading_path for block in record_blocks(record)}
+        paths = {block.heading_path for block in blocks_of(record)}
 
         assert ("Cache layout on disk", "Fingerprint manifest") in paths
 
@@ -217,7 +230,7 @@ class TestBlocks:
 
         (record,) = load_records(tmp_path)
 
-        assert record_blocks(record) == []
+        assert blocks_of(record) == ()
 
 
 class TestCards:
@@ -270,8 +283,18 @@ class TestCards:
         (record,) = load_records(tmp_path)
 
         assert summary_card(record)["sections"] == [
-            f"Topic {i} {'x' * 120}"[:SECTION_CHARS] for i in range(CARD_SECTIONS)
+            f"Topic {i} {'x' * 120}"[:SECTION_BYTES] for i in range(CARD_SECTIONS)
         ]
+
+    def test_title_and_sections_are_bounded_in_bytes(self, tmp_path: Path) -> None:
+        body = f"# {CJK * TITLE_BYTES}\n\n## {CJK * SECTION_BYTES}\n\ntext\n"
+        write_record(tmp_path, "research", "2026-01-02-r-research", body)
+
+        (record,) = load_records(tmp_path)
+        card = summary_card(record)
+
+        assert card["title"] == CJK * (TITLE_BYTES // 3)
+        assert card["sections"] == [CJK * (SECTION_BYTES // 3)]
 
     def test_card_without_prose_or_sections_is_just_the_title(
         self, tmp_path: Path
@@ -306,23 +329,51 @@ class TestTemplateHeadings:
         assert "Changes" not in template_headings(DocType.ADR)
 
 
-class TestBlobHash:
+class TestReadVersion:
     def test_hash_is_the_git_blob_id_of_the_file_on_disk(self, tmp_path: Path) -> None:
         path = write_record(tmp_path, "adr", "2026-01-02-cache-adr", ADR_BODY)
         (record,) = load_records(tmp_path)
 
-        before = blob_hash(record)
-        path.write_bytes(path.read_bytes() + b"\nappended\n")
-        after = blob_hash(record)
+        version = read_version(record)
 
-        assert after == git_blob_oid(path.read_bytes())
-        assert before is not None
-        assert before != after
+        assert version is not None
+        assert version.blob_hash == git_blob_oid(path.read_bytes())
 
-    def test_missing_file_has_no_hash(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("newline", ["\n", "\r\n"])
+    def test_hash_and_blocks_name_the_version_on_disk_after_an_edit(
+        self, tmp_path: Path, newline: str
+    ) -> None:
+        # The records were listed before the edit: the blocks must come from
+        # the bytes that were hashed, not from the listing's text.
+        path = write_record(tmp_path, "adr", "2026-01-02-cache-adr", ADR_BODY)
+        (record,) = load_records(tmp_path)
+        edited = ADR_BODY.replace(
+            "## Problem Statement", "Two lines\ninserted above.\n\n## Problem Statement"
+        )
+        path = write_record(
+            tmp_path, "adr", "2026-01-02-cache-adr", edited, newline=newline
+        )
+
+        version = read_version(record)
+
+        assert version is not None
+        assert version.blob_hash == git_blob_oid(path.read_bytes())
+        for block in version.blocks:
+            assert block.text == file_lines(path, block.line_start, block.line_end)
+        assert any("inserted above." in block.text for block in version.blocks)
+
+    def test_missing_file_has_no_version(self, tmp_path: Path) -> None:
         path = write_record(tmp_path, "adr", "2026-01-02-cache-adr", ADR_BODY)
         (record,) = load_records(tmp_path)
 
         path.unlink()
 
-        assert blob_hash(record) is None
+        assert read_version(record) is None
+
+    def test_file_no_longer_utf8_has_no_version(self, tmp_path: Path) -> None:
+        path = write_record(tmp_path, "adr", "2026-01-02-cache-adr", ADR_BODY)
+        (record,) = load_records(tmp_path)
+
+        path.write_bytes(path.read_bytes() + b"\xff\xfe")
+
+        assert read_version(record) is None

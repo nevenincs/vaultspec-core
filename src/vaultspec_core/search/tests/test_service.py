@@ -18,10 +18,11 @@ from vaultspec_core.search import (
     DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
+    InvalidQueryError,
     SearchStatus,
     UnavailableReason,
 )
-from vaultspec_core.search._corpus import SECTION_CHARS, TITLE_CHARS
+from vaultspec_core.search._corpus import SECTION_BYTES, TITLE_BYTES
 from vaultspec_core.search._credential import CREDENTIAL_VARIABLE
 from vaultspec_core.search._engine import KIND_QID
 from vaultspec_core.search._questions import (
@@ -292,8 +293,8 @@ class TestRanking:
     def test_title_and_excerpt_location_are_bounded(
         self, tmp_path: Path, provider: ScriptedProvider, client: JevClient
     ) -> None:
-        long_title = "t" * (TITLE_CHARS * 3)
-        long_heading = "h" * (SECTION_CHARS * 3)
+        long_title = "t" * (TITLE_BYTES * 3)
+        long_heading = "h" * (SECTION_BYTES * 3)
         body = CACHE_ADR.replace(
             "# `cache` adr: `graph cache`", f"# `cache` adr: `{long_title}`"
         ).replace("## Validation detail", f"## {long_heading}")
@@ -301,9 +302,9 @@ class TestRanking:
 
         top = search(tmp_path, client).hits[0]
 
-        assert len(top.title) == TITLE_CHARS
+        assert len(top.title) == TITLE_BYTES
         assert top.excerpt is not None
-        assert top.excerpt.section == long_heading[:SECTION_CHARS]
+        assert top.excerpt.section == long_heading[:SECTION_BYTES]
 
     def test_usage_reports_what_the_provider_billed(
         self, tmp_path: Path, provider: ScriptedProvider, client: JevClient
@@ -382,6 +383,7 @@ class TestRanking:
 
         assert outcome.status is SearchStatus.OK
         assert outcome.answered is False
+        assert outcome.abstained is True
         assert outcome.hits
         assert all(hit.answers < ANSWERED_THRESHOLD for hit in outcome.hits)
 
@@ -556,6 +558,105 @@ class TestContentRejection:
         assert top.score == pytest.approx(top.answers + KIND_WEIGHT * 0.9)
         assert "2026-01-02-alpha-adr" not in [hit.name for hit in outcome.hits]
 
+    def test_a_query_the_firewall_refuses_is_unavailable_not_unanswered(
+        self, tmp_path: Path, provider: ScriptedProvider, client: JevClient
+    ) -> None:
+        cache_vault(tmp_path)
+
+        outcome = search_vault(
+            tmp_path, f"{QUERY} {BLOCKED}", environ=ENV, client=client
+        )
+
+        assert outcome.status is SearchStatus.UNAVAILABLE
+        assert outcome.reason is UnavailableReason.CONTENT_REJECTED
+        assert outcome.hits == ()
+        assert outcome.answered is False
+        assert outcome.abstained is False
+        assert outcome.usage is not None
+        assert outcome.usage.unscored == 3
+        # With the query refused, no record is read in full: that would only
+        # send the refused query again.
+        assert stage_two(provider) == []
+
+    def test_every_shortlisted_record_refused_is_unavailable(
+        self, tmp_path: Path, client: JevClient
+    ) -> None:
+        body = (
+            f"# blocked adr\n\nThe {RECALL} record.\n\n## Detail\n\n{FILLER}\n\n"
+            f"It quotes {BLOCKED} deep in its body.\n"
+        )
+        write_record(tmp_path, "adr", "2026-01-02-blocked-adr", body)
+
+        outcome = search(tmp_path, client)
+
+        assert outcome.status is SearchStatus.UNAVAILABLE
+        assert outcome.reason is UnavailableReason.CONTENT_REJECTED
+        assert outcome.usage is not None
+        assert outcome.usage.unscored == 1
+
+    def test_a_record_refused_in_part_is_ranked_and_counted(
+        self, tmp_path: Path, provider: ScriptedProvider, client: JevClient
+    ) -> None:
+        # Enough filler for two stage-two windows: the first carries the
+        # refused text, the second the answer.
+        filler = "\n\n".join(f"{i:03d} {FILLER} {FILLER} {FILLER}" for i in range(90))
+        body = (
+            f"# partial adr\n\nThe {RECALL} record.\n\n## Detail\n\n"
+            f"It quotes {BLOCKED} here.\n\n{filler}\n\n## Answer\n\n"
+            f"It says {ANSWER}.\n"
+        )
+        path = write_record(tmp_path, "adr", "2026-01-02-partial-adr", body)
+
+        outcome = search(tmp_path, client)
+
+        assert len(stage_two(provider)) >= 1
+        assert outcome.status is SearchStatus.OK
+        (hit,) = outcome.hits
+        assert hit.answers == pytest.approx(0.95)
+        assert_verbatim(path, hit.excerpt)
+        assert outcome.usage is not None
+        assert outcome.usage.unscored == 1
+
+    def test_unanswered_with_a_record_unscored_is_no_verdict_on_the_vault(
+        self, tmp_path: Path, client: JevClient
+    ) -> None:
+        filler = "\n\n".join(f"{i:03d} {FILLER} {FILLER} {FILLER}" for i in range(90))
+        body = (
+            f"# partial adr\n\nThe {RECALL} record.\n\n## Detail\n\n"
+            f"It quotes {BLOCKED} here.\n\n{filler}\n"
+        )
+        write_record(tmp_path, "adr", "2026-01-02-partial-adr", body)
+
+        outcome = search(tmp_path, client)
+
+        assert outcome.status is SearchStatus.OK
+        assert outcome.hits
+        assert outcome.answered is False
+        assert outcome.unscored == 1
+        assert outcome.abstained is False
+
+
+class TestOversizeLine:
+    def test_a_window_over_the_request_bound_is_left_unscored(
+        self, tmp_path: Path, provider: ScriptedProvider, client: JevClient
+    ) -> None:
+        body = (
+            f"# oversize adr\n\nThe {RECALL} record.\n\n## Data\n\n"
+            f"{'x' * 120_000}\n\n## Answer\n\nIt says {ANSWER}.\n"
+        )
+        path = write_record(tmp_path, "adr", "2026-01-02-oversize-adr", body)
+
+        outcome = search(tmp_path, client)
+
+        assert outcome.status is SearchStatus.OK
+        (hit,) = outcome.hits
+        assert hit.answers == pytest.approx(0.95)
+        assert_verbatim(path, hit.excerpt)
+        assert outcome.usage is not None
+        assert outcome.usage.unscored == 1
+        # The oversize window was refused before sending, never sent.
+        assert all(len(r.body) < 100_000 for r in provider.received)
+
 
 class TestExcerptLines:
     @pytest.mark.parametrize(
@@ -594,6 +695,39 @@ def f():
         assert_verbatim(path, hit.excerpt)
         assert_verbatim(path, hit.supporting)
         assert hit.blob_hash == git_blob_oid(path.read_bytes())
+
+    def test_hash_and_lines_name_one_version_when_edited_mid_search(
+        self, tmp_path: Path, judge: Judge
+    ) -> None:
+        path = write_record(
+            tmp_path, "adr", "2026-01-02-cache-adr", CACHE_ADR, feature="cache"
+        )
+        edited = CACHE_ADR.replace(
+            "## Validation detail",
+            "An edit made\nwhile the search ran.\n\n## Validation detail",
+        )
+        edits: list[str] = []
+
+        def edit_during_recall(received: Received) -> Reply:
+            # The first request is stage one; the full read comes after it.
+            if not edits:
+                edits.append("edited")
+                write_record(
+                    tmp_path, "adr", "2026-01-02-cache-adr", edited, feature="cache"
+                )
+            return judge(received)
+
+        with (
+            ScriptedProvider(responder=edit_during_recall) as server,
+            JevClient(KEY, endpoint=server.endpoint, max_attempts=1) as jev,
+        ):
+            (hit,) = search(tmp_path, jev).hits
+
+        judge.check()
+        assert edits == ["edited"]
+        assert hit.blob_hash == git_blob_oid(path.read_bytes())
+        assert_verbatim(path, hit.excerpt)
+        assert_verbatim(path, hit.supporting)
 
 
 class TestPage:
@@ -648,11 +782,11 @@ class TestPage:
 class TestQuery:
     @pytest.mark.parametrize("query", ["", "   \n"])
     def test_blank_query_is_refused(self, tmp_path: Path, query: str) -> None:
-        with pytest.raises(ValueError, match="blank"):
+        with pytest.raises(InvalidQueryError, match="blank"):
             search_vault(tmp_path, query, environ=ENV)
 
     def test_overlong_query_is_refused_before_anything_is_sent(
         self, tmp_path: Path
     ) -> None:
-        with pytest.raises(ValueError, match=str(MAX_QUERY_CHARS)):
+        with pytest.raises(InvalidQueryError, match=str(MAX_QUERY_CHARS)):
             search_vault(tmp_path, "q" * (MAX_QUERY_CHARS + 1), environ=ENV)

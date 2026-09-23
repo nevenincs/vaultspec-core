@@ -9,8 +9,9 @@ any connection opens. The ranking itself is covered by the search package's
 own tests.
 
 The rendering tests build real outcomes from the search package's own types
-and check what each surface carries: the caps, the truncation markers, the
-window, and the keys a caller can derive or already supplied.
+and check what each surface carries: the excerpts as the search bounded them,
+the truncation markers, the verdict, the window, the keys a caller can derive
+or already supplied, and the size of the worst-case ``--json`` reply.
 """
 
 from __future__ import annotations
@@ -23,20 +24,31 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.cli.rendering import TRUNCATE_MARKER
-from vaultspec_core.cli.vault_search_cmd import _outcome_lines, _outcome_payload
+from vaultspec_core.cli.vault_search_cmd import (
+    _json_text,
+    _outcome_lines,
+    _outcome_payload,
+)
 from vaultspec_core.core.discovery_guidance import SEARCH_ADR
 from vaultspec_core.core.windowing import apply_window
 from vaultspec_core.search import (
     CREDENTIAL_VARIABLE,
-    EXCERPT_CHARS,
+    DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
     PREMISE_CONFLICT_THRESHOLD,
-    SUPPORTING_CHARS,
     Excerpt,
     SearchHit,
     SearchOutcome,
     SearchStatus,
+    SearchUsage,
+)
+from vaultspec_core.search.tests.reply_budget import (
+    BYTES_PER_TOKEN,
+    DISCOVERY_BUDGET,
+    REPLY_CEILING,
+    WORST_SHAPES,
+    worst_case_ranking,
 )
 from vaultspec_core.vaultcore.models import DocType
 
@@ -75,8 +87,20 @@ def _workspace(root: Path) -> Path:
 
 
 def _search(root: Path, *args: str, key: str = "") -> Result:
-    """Run ``vault search`` against *root* with *key* as the only credential."""
-    runner = CliRunner(env={"NO_COLOR": "1", CREDENTIAL_VARIABLE: key})
+    """Run ``vault search`` against *root* with *key* as the only credential.
+
+    ``NO_COLOR`` alone leaves bold and dim codes in the output of a console
+    forced to act as a terminal (``FORCE_COLOR`` set, as CI sets it); a dumb
+    terminal emits none, so the assertions read plain text everywhere.
+    """
+    runner = CliRunner(
+        env={
+            "NO_COLOR": "1",
+            "TERM": "dumb",
+            "COLUMNS": "200",
+            CREDENTIAL_VARIABLE: key,
+        }
+    )
     return runner.invoke(app, ["-t", str(root), "vault", "search", *args])
 
 
@@ -235,9 +259,8 @@ class TestConfiguredWithoutSending:
 # Rendering of a ranked page
 # ---------------------------------------------------------------------------
 
-#: A passage longer than the excerpt cap, one short line after another, so the
-#: clip lands on a line boundary.
-_LONG = "\n".join(f"line {n:03d} of the answering passage" for n in range(80))
+#: The leading lines the search kept of a longer block, as it hands them over.
+_KEPT = "\n".join(f"line {n:03d} of the answering passage" for n in range(20))
 
 
 def _hit(
@@ -263,25 +286,31 @@ def _hit(
     )
 
 
-def _page() -> SearchOutcome:
-    """Two shown hits of three ranked; the first has a long and a short excerpt."""
+def _page(*, answered: bool = True, unscored: int | None = None) -> SearchOutcome:
+    """Two shown hits of three ranked; the first has a cut and a whole excerpt."""
     ranked = [
         _hit(
             1,
             premise_conflict=PREMISE_CONFLICT_THRESHOLD,
-            excerpt=Excerpt("Decision > Storage", 12, 91, _LONG),
-            supporting=Excerpt("Consequences", 95, 96, "Widgets persist."),
+            excerpt=Excerpt("Decision > Storage", 12, 31, _KEPT, truncated=True),
+            supporting=Excerpt("Consequences", 95, 95, "Widgets persist."),
         ),
         _hit(2, premise_conflict=PREMISE_CONFLICT_THRESHOLD - 0.01),
         _hit(3),
     ]
     hits, window = apply_window(ranked, limit=2, pageable=False)
+    usage = (
+        None
+        if unscored is None
+        else SearchUsage("jev-1.13.0", 16, 41_250, 1_234.5, unscored)
+    )
     return SearchOutcome(
         status=SearchStatus.OK,
         query="where are widgets stored?",
-        answered=True,
+        answered=answered,
         hits=tuple(hits),
         window=window,
+        usage=usage,
     )
 
 
@@ -291,20 +320,23 @@ def _page_json() -> dict[str, Any]:
 
 
 class TestJsonPage:
-    def test_excerpts_are_clipped_to_their_caps_and_marked(self) -> None:
+    def test_excerpts_travel_as_the_search_bounded_them(self) -> None:
         first = _page_json()["hits"][0]
 
-        excerpt = first["excerpt"]
-        assert len(excerpt["text"]) <= EXCERPT_CHARS < len(_LONG)
-        assert _LONG.startswith(excerpt["text"])
-        assert _LONG[len(excerpt["text"])] == "\n"
-        assert excerpt["truncated"] is True
-        assert (excerpt["line_start"], excerpt["line_end"]) == (12, 91)
-
-        supporting = first["supporting"]
-        assert len(supporting["text"]) <= SUPPORTING_CHARS
-        assert supporting["text"] == "Widgets persist."
-        assert supporting["truncated"] is False
+        assert first["excerpt"] == {
+            "section": "Decision > Storage",
+            "line_start": 12,
+            "line_end": 31,
+            "text": _KEPT,
+            "truncated": True,
+        }
+        assert first["supporting"] == {
+            "section": "Consequences",
+            "line_start": 95,
+            "line_end": 95,
+            "text": "Widgets persist.",
+            "truncated": False,
+        }
 
     def test_derivable_and_echoed_values_are_left_out(self) -> None:
         data = _page_json()
@@ -330,7 +362,7 @@ class TestHumanPage:
         assert texts[0] == "answered"
         assert texts[1] == (
             "1 2026-02-21-widget-adr adr "
-            ".vault/adr/2026-02-21-widget-adr.md:12-91 Decision > Storage"
+            ".vault/adr/2026-02-21-widget-adr.md:12-31 Decision > Storage"
         )
 
     def test_premise_note_marks_only_hits_at_the_threshold(self) -> None:
@@ -344,12 +376,14 @@ class TestHumanPage:
         )
         assert lines[first_hit + 1] is notes[0]
 
-    def test_clipped_passage_ends_with_the_truncation_marker(self) -> None:
+    def test_a_cut_passage_ends_with_the_truncation_marker(self) -> None:
         texts = [line.text for line in _outcome_lines(_page())]
 
         also = next(i for i, text in enumerate(texts) if text.startswith("also "))
-        assert texts[also - 1] == TRUNCATE_MARKER
+        assert texts[also - 2 : also] == [_KEPT.splitlines()[-1], TRUNCATE_MARKER]
         assert texts[also + 1] == "Widgets persist."
+        # The whole supporting passage carries no marker.
+        assert TRUNCATE_MARKER not in texts[also + 1 :]
 
     def test_page_ends_with_count_and_what_was_withheld(self) -> None:
         texts = [line.text for line in _outcome_lines(_page())]
@@ -357,3 +391,62 @@ class TestHumanPage:
         assert texts[-2] == "2 hits"
         assert "1 more hits" in texts[-1]
         assert "--offset" not in texts[-1]
+
+    def test_nothing_answers_only_when_every_record_was_read(self) -> None:
+        texts = [line.text for line in _outcome_lines(_page(answered=False))]
+
+        assert texts[0] == "nothing in the vault answers this"
+
+    def test_unscored_records_withhold_the_verdict_and_are_counted(self) -> None:
+        texts = [
+            line.text for line in _outcome_lines(_page(answered=False, unscored=2))
+        ]
+
+        assert "nothing in the vault answers this" not in texts
+        assert texts[0] == "no record that was read answers this"
+        assert texts[1] == "2 records the provider would not read in full"
+
+    def test_an_answer_still_reports_what_went_unscored(self) -> None:
+        texts = [line.text for line in _outcome_lines(_page(unscored=1))]
+
+        assert texts[:2] == [
+            "answered",
+            "1 record the provider would not read in full",
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Size of the --json reply
+# ---------------------------------------------------------------------------
+
+
+def _json_tokens(shape: str, limit: int) -> float:
+    ranking = worst_case_ranking(shape)
+    hits, window = apply_window(ranking, limit=limit, pageable=False)
+    outcome = SearchOutcome(
+        status=SearchStatus.OK,
+        query="where are widgets stored?",
+        answered=False,
+        hits=tuple(hits),
+        window=window,
+        usage=SearchUsage("jev-1.13.0", 16, 41_250, 1_234.5, 99),
+    )
+    text = _json_text(outcome)
+    assert len(json.loads(text)["data"]["hits"]) == limit
+    return len(text.encode("utf-8")) / BYTES_PER_TOKEN
+
+
+class TestJsonReplySize:
+    @pytest.mark.parametrize("shape", list(WORST_SHAPES))
+    def test_a_default_worst_case_reply_fits_the_discovery_budget(
+        self, shape: str
+    ) -> None:
+        tokens = _json_tokens(shape, DEFAULT_RESULTS)
+
+        assert tokens <= DISCOVERY_BUDGET, f"{shape}: {tokens:,.0f} tokens"
+
+    @pytest.mark.parametrize("shape", list(WORST_SHAPES))
+    def test_a_full_worst_case_reply_fits_the_reply_ceiling(self, shape: str) -> None:
+        tokens = _json_tokens(shape, MAX_RESULTS)
+
+        assert tokens <= REPLY_CEILING, f"{shape}: {tokens:,.0f} tokens"

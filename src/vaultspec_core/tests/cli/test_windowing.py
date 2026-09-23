@@ -20,6 +20,7 @@ from vaultspec_core.core.windowing import (
     MAX_LIMIT,
     Window,
     apply_window,
+    clip_lines,
     clip_text,
     elision_line,
 )
@@ -143,6 +144,53 @@ def test_clip_text_cuts_at_the_limit_without_a_late_boundary() -> None:
 def test_clip_text_refuses_a_non_positive_limit(limit: int) -> None:
     with pytest.raises(ValueError, match="positive"):
         clip_text("text", limit)
+
+
+#: One CJK ideograph (three UTF-8 bytes) and one emoji (four UTF-8 bytes).
+_CJK = "\N{CJK UNIFIED IDEOGRAPH-4E2D}"
+_EMOJI = "\N{GRINNING FACE}"
+
+
+def test_clip_text_bounds_encoded_bytes_not_characters() -> None:
+    text = _CJK * 100
+
+    clipped = clip_text(text, 100)
+
+    assert len(clipped.encode("utf-8")) <= 100
+    assert clipped == _CJK * 33
+
+
+def test_clip_text_never_splits_a_code_point() -> None:
+    assert clip_text(_EMOJI * 10, 10) == _EMOJI * 2
+
+
+def test_clip_text_measures_the_late_line_boundary_in_bytes() -> None:
+    # The newline sits at byte 30 of a 40-byte budget - in its second half -
+    # but at character 10 of 40, which a character count would call early.
+    text = _CJK * 10 + "\n" + "x" * 40
+
+    assert clip_text(text, 40) == _CJK * 10
+
+
+def test_clip_lines_keeps_whole_lines_within_the_budget() -> None:
+    text = "alpha\n" + _CJK * 4 + "\n" + "gamma line"
+
+    assert clip_lines(text, 5) == "alpha"
+    assert clip_lines(text, 18) == "alpha\n" + _CJK * 4
+    assert clip_lines(text, 28) == "alpha\n" + _CJK * 4
+    assert clip_lines(text, 29) == text
+
+
+def test_clip_lines_cuts_a_first_line_longer_than_the_budget() -> None:
+    text = _EMOJI * 5 + "\nsecond"
+
+    assert clip_lines(text, 13) == _EMOJI * 3
+
+
+@pytest.mark.parametrize("limit", [0, -3])
+def test_clip_lines_refuses_a_non_positive_limit(limit: int) -> None:
+    with pytest.raises(ValueError, match="positive"):
+        clip_lines("text", limit)
 
 
 def test_a_window_that_cannot_be_resumed_reports_no_resume_point() -> None:

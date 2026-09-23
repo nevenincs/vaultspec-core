@@ -32,16 +32,21 @@ worth ranking by.
 
 **Content rejection.** The provider's edge firewall refuses some request
 bodies outright. That fails only the request that carried the text: a refused
-stage-two window is left unscored, and a record with no scored window is
-dropped and counted. A refused stage-one request is bisected, first by
-question and then by option, within a bounded depth and request budget, so
-the offending cards are isolated and counted while the rest are still ranked.
-Every other provider failure propagates and fails the whole search, because a
-ranking missing records for an unknown reason would present a guess as a
-result.
+stage-two window is left unscored, as is a window whose text exceeds the
+request bound, and the record is counted as unscored - ranked on the windows
+that were read, or dropped when none was. A refused stage-one request is
+bisected, first by question and then by option, within a bounded depth and
+request budget, so the offending cards are isolated and counted while the
+rest are still ranked. When no stage-one request is answered at all, the
+query itself is what the firewall refuses, and the search stops there with
+every record counted. Every other provider failure propagates and fails the
+whole search, because a ranking missing records for an unknown reason would
+present a guess as a result.
 
 Returned excerpts are the record's own blocks, addressed by local block ids;
-the model chooses a block, it never supplies text.
+the model chooses a block, it never supplies text. Each is cut to its byte cap
+here, at a line boundary, so its line range still addresses exactly the text
+it carries.
 """
 
 from __future__ import annotations
@@ -54,17 +59,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, cast
 
+from ..core.windowing import clip_lines, clip_text
 from ._corpus import (
-    SECTION_CHARS,
-    TITLE_CHARS,
+    SECTION_BYTES,
+    TITLE_BYTES,
     Record,
-    blob_hash,
     card_title,
-    record_blocks,
+    read_version,
     summary_card,
 )
 from ._lexical import top_matches
-from ._models import Excerpt, SearchHit, SearchUsage
+from ._models import EXCERPT_BYTES, SUPPORTING_BYTES, Excerpt, SearchHit, SearchUsage
 from ._questions import (
     ABOUT,
     ANSWERED_THRESHOLD,
@@ -95,6 +100,7 @@ from ._transport import (
     ContentRejectedError,
     NoulAnswer,
     QuestionType,
+    RequestTooLargeError,
     estimate_tokens,
     sanitise,
 )
@@ -120,6 +126,7 @@ __all__ = [
     "Option",
     "Question",
     "Ranking",
+    "bounded_excerpt",
     "build_wide_questions",
     "build_windows",
     "excerpt_blocks",
@@ -128,6 +135,7 @@ __all__ = [
     "pack_requests",
     "rank",
     "run_search",
+    "search_hit",
     "shortlist",
 ]
 
@@ -167,8 +175,8 @@ class Meter:
     """What one search sent, what it cost, and which records went unread.
 
     Thread-safe: every concurrent request reports to the same meter. A record
-    counts as unscored when the provider refused to read it and no later
-    request read it.
+    counts as unscored when the provider refused to read any of it and no
+    later request read it whole.
     """
 
     def __init__(self) -> None:
@@ -192,13 +200,13 @@ class Meter:
                 self._model = evaluation.model
 
     def refused(self, records: Iterable[Record]) -> None:
-        """Mark *records* unscored: the provider refused to read them."""
+        """Mark *records* unscored: the provider refused to read them, or part."""
         paths = [record.rel_path for record in records]
         with self._lock:
             self._unscored.update(paths)
 
     def read(self, record: Record) -> None:
-        """Mark *record* scored, clearing an earlier refusal."""
+        """Mark *record* read whole, clearing an earlier refusal."""
         with self._lock:
             self._unscored.discard(record.rel_path)
 
@@ -552,6 +560,7 @@ class Judgment:
         refutes: Probability that it contradicts a premise, over windows.
         excerpt: The block judged to answer, in file lines.
         supporting: A second block, when it clears the floor.
+        blob_hash: Git blob id of the file version the blocks were cut from.
     """
 
     record: Record
@@ -560,12 +569,13 @@ class Judgment:
     refutes: float
     excerpt: Block | None
     supporting: Block | None
+    blob_hash: str
 
 
 def _section(block: Block) -> str:
     # Each heading is bounded like a card section, so a malformed heading
     # cannot make an excerpt's location - or a reply carrying it - unbounded.
-    return " > ".join(heading[:SECTION_CHARS] for heading in block.heading_path)
+    return " > ".join(clip_text(h, SECTION_BYTES) for h in block.heading_path)
 
 
 def _block_entry(block: Block) -> dict[str, str]:
@@ -679,7 +689,12 @@ class _Window:
 def _ask_window(
     search: _Search, title: str, window: Sequence[tuple[str, Block]]
 ) -> _Window | None:
-    """Ask the stage-two questions of one window; ``None`` when refused."""
+    """Ask the stage-two questions of one window; ``None`` when it went unread.
+
+    A window goes unread when the firewall refuses its text, or when its text
+    alone exceeds the request bound - a single line of about 100 KB does.
+    Either way only this window is lost, not the search.
+    """
     state = {
         "query": search.query,
         "document": {
@@ -689,7 +704,7 @@ def _ask_window(
     }
     try:
         evaluation = search.evaluate(state, _read_questions(window))
-    except ContentRejectedError:
+    except (ContentRejectedError, RequestTooLargeError):
         return None
     where = evaluation.answers["where"]
     excerpt, supporting = (
@@ -707,23 +722,29 @@ def _ask_window(
 
 
 def _judge(search: _Search, record: Record) -> Judgment | None:
-    """Read *record* in full; ``None`` when it has no text or was refused."""
-    blocks = record_blocks(record)
-    if not blocks:
+    """Read *record* in full; ``None`` when it has no text or none was read.
+
+    A record read only in part is judged on the windows that were read and
+    still counted as unscored, so a caller can tell a ranking over partial
+    text from one over every word.
+    """
+    version = read_version(record)
+    if version is None or not version.blocks:
         return None
     title = card_title(record)
     no_blocks: dict[str, object] = {}
     empty = {"query": search.query, "document": {"title": title, "blocks": no_blocks}}
-    windows = build_windows(blocks, base_tokens=estimate_tokens(sanitise(empty)))
-    answered = [
-        result
-        for window in windows
-        if (result := _ask_window(search, title, window)) is not None
-    ]
-    if not answered:
+    windows = build_windows(
+        version.blocks, base_tokens=estimate_tokens(sanitise(empty))
+    )
+    results = [_ask_window(search, title, window) for window in windows]
+    answered = [result for result in results if result is not None]
+    if len(answered) < len(results):
         search.meter.refused([record])
+    else:
+        search.meter.read(record)
+    if not answered:
         return None
-    search.meter.read(record)
     best = max(answered, key=lambda result: result.answers)
     return Judgment(
         record=record,
@@ -732,6 +753,7 @@ def _judge(search: _Search, record: Record) -> Judgment | None:
         refutes=max(result.refutes for result in answered),
         excerpt=best.excerpt,
         supporting=best.supporting,
+        blob_hash=version.blob_hash,
     )
 
 
@@ -771,18 +793,45 @@ def rank(
     return scored
 
 
-def _excerpt(block: Block | None) -> Excerpt | None:
+def bounded_excerpt(block: Block | None, cap: int) -> Excerpt | None:
+    """Bound *block* to *cap* UTF-8 bytes as the excerpt a caller receives.
+
+    The text keeps the block's leading whole lines, and ``line_end`` moves to
+    the last of them, so the range still addresses exactly the text carried.
+
+    Args:
+        block: The chosen block, or ``None`` when none was chosen.
+        cap: The most UTF-8 bytes of text to carry.
+
+    Returns:
+        The excerpt, marked ``truncated`` when the block goes on past it, or
+        ``None`` for no block.
+    """
     if block is None:
         return None
+    text = clip_lines(block.text, cap)
     return Excerpt(
         section=_section(block),
         line_start=block.line_start,
-        line_end=block.line_end,
-        text=block.text,
+        line_end=block.line_start + text.count("\n"),
+        text=text,
+        truncated=len(text) < len(block.text),
     )
 
 
-def _hit(judgment: Judgment, score: float, blob: str) -> SearchHit:
+def search_hit(judgment: Judgment, score: float) -> SearchHit:
+    """Project a judged record onto the hit every surface carries.
+
+    Everything that can grow with the vault - the title, the section paths
+    and the excerpt text - is bounded here, in bytes, so no surface clips.
+
+    Args:
+        judgment: The record read in full.
+        score: Its ranking score.
+
+    Returns:
+        The hit.
+    """
     record = judgment.record
     return SearchHit(
         name=record.name,
@@ -790,13 +839,13 @@ def _hit(judgment: Judgment, score: float, blob: str) -> SearchHit:
         doc_type=record.doc_type,
         feature=record.feature,
         date=record.date,
-        title=record.title[:TITLE_CHARS],
+        title=clip_text(record.title, TITLE_BYTES),
         score=score,
         answers=judgment.answers,
         premise_conflict=judgment.refutes,
-        excerpt=_excerpt(judgment.excerpt),
-        supporting=_excerpt(judgment.supporting),
-        blob_hash=blob,
+        excerpt=bounded_excerpt(judgment.excerpt, EXCERPT_BYTES),
+        supporting=bounded_excerpt(judgment.supporting, SUPPORTING_BYTES),
+        blob_hash=judgment.blob_hash,
     )
 
 
@@ -805,7 +854,8 @@ class Ranking:
     """The engine's verdict.
 
     Attributes:
-        hits: Every judged record, best first.
+        hits: Every judged record, best first; empty when the provider
+            answered no stage-one request.
         answered: Whether the best answer probability reached the threshold.
     """
 
@@ -836,7 +886,8 @@ def run_search(
 
     Raises:
         HostedSearchError: Any provider failure other than a content
-            rejection, which is absorbed as unscored records.
+            rejection or a stage-two window over the request bound, which
+            are absorbed as unscored records.
     """
     search = _Search(client, query, deadline, meter)
     kind = kind_question()
@@ -847,18 +898,23 @@ def run_search(
         futures = [pool.submit(_ask_wide, search, request) for request in requests]
         # The lexical pass is local work; it runs while the requests are out.
         lexical = _lexical(query, records)
-        recall = _recall(pair for pairs in _gather(futures) for pair in pairs)
+        answered_wide = _gather(futures)
+    if not any(answered_wide):
+        # Every record has been counted as unscored; reading the lexical
+        # matches would only send the refused query again.
+        logger.debug("hosted search: the provider refused every stage-one request")
+        return Ranking(hits=(), answered=False)
+    recall = _recall(pair for pairs in answered_wide for pair in pairs)
     candidates = shortlist(records, recall.wide, lexical)
     judgments = [
         judgment
         for judgment in _concurrently(lambda record: _judge(search, record), candidates)
         if judgment is not None
     ]
-    hits: list[SearchHit] = []
-    for judgment, score in rank(judgments, kind=recall.kind, wide=recall.wide):
-        blob = blob_hash(judgment.record)
-        if blob is not None:
-            hits.append(_hit(judgment, score, blob))
+    hits = [
+        search_hit(judgment, score)
+        for judgment, score in rank(judgments, kind=recall.kind, wide=recall.wide)
+    ]
     answered = any(judgment.answers >= ANSWERED_THRESHOLD for judgment in judgments)
     logger.debug(
         "hosted search judged %d of %d records after %d requests",

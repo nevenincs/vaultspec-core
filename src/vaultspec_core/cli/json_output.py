@@ -39,11 +39,14 @@ __all__ = ["json_format_kwargs", "pretty_enabled"]
 
 #: Compact separators: no space after ``,`` or ``:``. ``json.dumps`` defaults
 #: to ``", "`` and ``": "``, which adds two bytes per field on top of the
-#: indentation itself.
-_COMPACT: dict[str, Any] = {"separators": (",", ":")}
+#: indentation itself. Non-ASCII text is written as UTF-8 rather than
+#: ``\uXXXX`` escapes, which cost six bytes per character (twelve for an
+#: emoji) against the reply budgets; the entry point already makes stdout
+#: UTF-8 (``console.py``), so the raw form is always writable.
+_COMPACT: dict[str, Any] = {"separators": (",", ":"), "ensure_ascii": False}
 
 #: Indented form, for a human reading a payload directly.
-_PRETTY: dict[str, Any] = {"indent": 2}
+_PRETTY: dict[str, Any] = {"indent": 2, "ensure_ascii": False}
 
 #: Environment variable that restores indentation.
 _PRETTY_ENV = "VAULTSPEC_JSON_PRETTY"

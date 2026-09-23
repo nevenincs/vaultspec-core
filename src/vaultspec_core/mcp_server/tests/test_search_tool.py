@@ -6,7 +6,8 @@ validation runs on the real in-memory server, since every refusal happens
 before a credential is resolved and so does not depend on the environment. The
 no-key path runs the real server as a stdio subprocess with an environment the
 test controls, because an in-process server would read the ambient one. The
-reply budget is measured on the worst-case wire payload.
+reply budget is measured on the worst-case wire payload, built by the search
+package's own bounding from text in the scripts that cost the most bytes.
 
 A configured search needs the network and a key; the search package's own
 tests and its deselected live test cover that path.
@@ -35,11 +36,10 @@ from vaultspec_core.mcp_server.tools.search import (
 from vaultspec_core.search import (
     CREDENTIAL_VARIABLE,
     DEFAULT_RESULTS,
-    EXCERPT_CHARS,
+    EXCERPT_BYTES,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
     SEARCHABLE_TYPES,
-    SUPPORTING_CHARS,
     CredentialSource,
     Excerpt,
     SearchHit,
@@ -48,7 +48,13 @@ from vaultspec_core.search import (
     SearchUsage,
     UnavailableReason,
 )
-from vaultspec_core.search._corpus import SECTION_CHARS, TITLE_CHARS
+from vaultspec_core.search.tests.reply_budget import (
+    BYTES_PER_TOKEN,
+    DISCOVERY_BUDGET,
+    REPLY_CEILING,
+    WORST_SHAPES,
+    worst_case_ranking,
+)
 from vaultspec_core.vaultcore.models import DocType
 
 from .conftest import data_of, run_in_fresh_workspace, stdio_session
@@ -59,26 +65,20 @@ if TYPE_CHECKING:
 #: A workspace root the projected ``resource_uri`` values are built on.
 _ROOT = Path(tempfile.gettempdir()).resolve() / "workspaces" / "search-project"
 
-#: Bytes of reply JSON per token, as the envelope budgets are measured.
-_BYTES_PER_TOKEN = 3.46
-
-#: The discovery reply budget, in tokens, that a default search must fit.
-_DISCOVERY_BUDGET = 4_000
-
-#: The ceiling no single reply may exceed, in tokens, whatever the limit.
-_REPLY_CEILING = 10_000
-
 #: A stand-in credential. It never reaches the network: the only call made
 #: with it set is ``status``, which reads configuration and sends nothing.
 _SENTINEL_KEY = "vsc-sentinel-credential-0123456789"
 
 
-def _excerpt(text: str, section: str = "Constraints") -> Excerpt:
+def _excerpt(
+    text: str, section: str = "Constraints", *, truncated: bool = False
+) -> Excerpt:
     return Excerpt(
         section=section,
         line_start=40,
         line_end=40 + text.count("\n"),
         text=text,
+        truncated=truncated,
     )
 
 
@@ -87,9 +87,9 @@ def _hit(
     *,
     excerpt: Excerpt | None = None,
     supporting: Excerpt | None = None,
-    stem: str = "2026-09-23-search-adr",
-    title: str = "Hosted vault search",
-    feature: str = "search",
+    stem: str = "2026-01-02-widget-adr",
+    title: str = "Widget storage",
+    feature: str = "widget",
 ) -> SearchHit:
     return SearchHit(
         name=f"{stem}{index or ''}",
@@ -108,7 +108,11 @@ def _hit(
 
 
 def _ranked(
-    hits: list[SearchHit], *, limit: int = DEFAULT_RESULTS, answered: bool = True
+    hits: list[SearchHit],
+    *,
+    limit: int = DEFAULT_RESULTS,
+    answered: bool = True,
+    unscored: int = 0,
 ) -> SearchOutcome:
     """Build an ``ok`` outcome paged exactly as the service pages a ranking."""
     page, window = apply_window(hits, limit=limit, pageable=False)
@@ -123,7 +127,7 @@ def _ranked(
             requests=6,
             input_tokens=41_250,
             elapsed_ms=1_234.567,
-            unscored=0,
+            unscored=unscored,
         ),
     )
 
@@ -151,49 +155,37 @@ def _summary(reply: CallToolResult) -> str:
 
 
 @pytest.mark.unit
-def test_an_excerpt_over_its_cap_is_cut_at_a_line_boundary_and_marked() -> None:
-    lines = [
-        f"Line {i:02d} of the answering block, long enough to matter."
-        for i in range(40)
-    ]
-    text = "\n".join(lines)
-    assert len(text) > EXCERPT_CHARS
-
-    row = search_result(_ranked([_hit(excerpt=_excerpt(text))]), _ROOT).hits[0]
-
-    assert row.excerpt is not None
-    carried = row.excerpt.text
-    assert row.excerpt.truncated is True
-    assert len(carried) <= EXCERPT_CHARS
-    assert text.startswith(carried)
-    assert text[len(carried)] == "\n", "the cut must fall on a line boundary"
-    # The line range still locates the whole block, so the rest is one read away.
-    assert (row.excerpt.line_start, row.excerpt.line_end) == (40, 79)
-
-
-@pytest.mark.unit
-def test_supporting_text_is_bounded_by_its_own_cap() -> None:
-    answer = "The ceiling is 10,000 tokens per reply."
-    support = "\n".join(f"Supporting line {i:02d} with more detail." for i in range(30))
-    assert len(support) > SUPPORTING_CHARS
+def test_excerpts_travel_as_the_search_bounded_them() -> None:
+    # The search package cuts and marks excerpts; the wire carries its text,
+    # range and marker unchanged rather than clipping a second time.
+    answer = "\n".join(f"Line {i:02d} of the answering block." for i in range(60))
+    support = "The ceiling is 10,000 tokens per reply."
+    assert len(answer.encode("utf-8")) > EXCERPT_BYTES
 
     row = search_result(
-        _ranked([_hit(excerpt=_excerpt(answer), supporting=_excerpt(support))]), _ROOT
+        _ranked(
+            [
+                _hit(
+                    excerpt=_excerpt(answer),
+                    supporting=_excerpt(support, truncated=True),
+                )
+            ]
+        ),
+        _ROOT,
     ).hits[0]
 
     assert row.excerpt is not None
     assert row.supporting is not None
     assert (row.excerpt.text, row.excerpt.truncated) == (answer, False)
-    assert row.supporting.truncated is True
-    assert len(row.supporting.text) <= SUPPORTING_CHARS
-    assert support.startswith(row.supporting.text)
+    assert (row.excerpt.line_start, row.excerpt.line_end) == (40, 99)
+    assert (row.supporting.text, row.supporting.truncated) == (support, True)
 
 
 @pytest.mark.unit
 def test_a_hit_carries_its_locators_and_rounded_scores() -> None:
     row = search_result(_ranked([_hit()]), _ROOT).hits[0]
 
-    assert row.path == ".vault/adr/2026-09-23-search-adr.md"
+    assert row.path == ".vault/adr/2026-01-02-widget-adr.md"
     assert row.type == DocType.ADR.value
     assert row.resource_uri == (_ROOT / row.path).as_uri()
     assert (row.score, row.answers, row.premise_conflict) == (0.912, 0.877, 0.012)
@@ -242,6 +234,16 @@ async def test_an_unanswered_whole_page_says_so() -> None:
     assert payload["answered"] is False
     assert payload["truncated"] is False
     assert _summary(reply) == "1 hit, not answered"
+
+
+@pytest.mark.unit
+async def test_the_summary_counts_records_left_unscored() -> None:
+    reply = await _reply(_ranked([_hit()], answered=False, unscored=2))
+
+    payload = reply.structured_content
+    assert payload is not None
+    assert payload["usage"]["unscored"] == 2
+    assert _summary(reply) == "1 hit, not answered, 2 unscored"
 
 
 @pytest.mark.unit
@@ -441,59 +443,35 @@ def test_status_reports_a_configured_key_by_source_never_by_value() -> None:
 # Reply budget
 # ---------------------------------------------------------------------------
 
-#: Stems, feature tags and heading depth sized to the longest this vault holds;
-#: title and headings are at the caps the search package clips them to.
-_LONG_STEM = "2026-09-23-typesafe-search-envelope-budget-ceiling-topic-research"[:73]
-_LONG_FEATURE = "typesafe-search-envelope-budget-ceiling"
-_DEEP_SECTION = " > ".join(["H" * SECTION_CHARS] * 3)
 
-#: Prose that JSON must escape now and then, as vault text does.
-_PROSE = 'The "discovery" budget caps `find` at C:\\vault\\adr; see the ADR. '
-
-
-def _worst_case_hit(index: int) -> SearchHit:
-    def block(cap: int) -> Excerpt:
-        # One unbroken line, so the clip keeps the full cap.
-        text = (_PROSE * (cap // len(_PROSE) + 2))[: cap + 200]
-        return Excerpt(_DEEP_SECTION, 120, 160, text)
-
-    return _hit(
-        index,
-        excerpt=block(EXCERPT_CHARS),
-        supporting=block(SUPPORTING_CHARS),
-        stem=_LONG_STEM[:-2],
-        title="T" * TITLE_CHARS,
-        feature=_LONG_FEATURE,
-    )
-
-
-async def _reply_tokens(limit: int) -> float:
-    ranking = [_worst_case_hit(i + 10) for i in range(MAX_RESULTS)]
-    reply = await _reply(_ranked(ranking, limit=limit))
+async def _reply_tokens(shape: str, limit: int) -> float:
+    ranking = worst_case_ranking(shape)
+    reply = await _reply(_ranked(ranking, limit=limit, answered=False, unscored=99))
 
     payload = reply.structured_content
     assert payload is not None
     assert len(payload["hits"]) == limit
-    for hit in payload["hits"]:
-        assert len(hit["excerpt"]["text"]) == EXCERPT_CHARS
-        assert len(hit["supporting"]["text"]) == SUPPORTING_CHARS
     wire = reply.model_dump_json(by_alias=True, exclude_none=True).encode("utf-8")
-    return len(wire) / _BYTES_PER_TOKEN
+    return len(wire) / BYTES_PER_TOKEN
 
 
 @pytest.mark.unit
-async def test_a_default_worst_case_reply_fits_the_discovery_budget() -> None:
-    tokens = await _reply_tokens(DEFAULT_RESULTS)
+@pytest.mark.parametrize("shape", list(WORST_SHAPES))
+async def test_a_default_worst_case_reply_fits_the_discovery_budget(
+    shape: str,
+) -> None:
+    tokens = await _reply_tokens(shape, DEFAULT_RESULTS)
 
-    assert tokens <= _DISCOVERY_BUDGET, (
-        f"{DEFAULT_RESULTS} worst-case hits cost {tokens:,.0f} tokens"
+    assert tokens <= DISCOVERY_BUDGET, (
+        f"{DEFAULT_RESULTS} worst-case {shape} hits cost {tokens:,.0f} tokens"
     )
 
 
 @pytest.mark.unit
-async def test_a_full_worst_case_reply_fits_the_reply_ceiling() -> None:
-    tokens = await _reply_tokens(MAX_RESULTS)
+@pytest.mark.parametrize("shape", list(WORST_SHAPES))
+async def test_a_full_worst_case_reply_fits_the_reply_ceiling(shape: str) -> None:
+    tokens = await _reply_tokens(shape, MAX_RESULTS)
 
-    assert tokens <= _REPLY_CEILING, (
-        f"{MAX_RESULTS} worst-case hits cost {tokens:,.0f} tokens"
+    assert tokens <= REPLY_CEILING, (
+        f"{MAX_RESULTS} worst-case {shape} hits cost {tokens:,.0f} tokens"
     )

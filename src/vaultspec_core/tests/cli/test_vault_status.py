@@ -1010,7 +1010,16 @@ class TestHostedSearchRow:
 
     @staticmethod
     def _run_with_key(root: Path, key: str, *args: str):
-        runner = CliRunner(env={"NO_COLOR": "1", CREDENTIAL_VARIABLE: key})
+        # NO_COLOR alone keeps bold and dim codes when FORCE_COLOR makes the
+        # console act as a terminal, as CI does; a dumb terminal emits none.
+        runner = CliRunner(
+            env={
+                "NO_COLOR": "1",
+                "TERM": "dumb",
+                "COLUMNS": "200",
+                CREDENTIAL_VARIABLE: key,
+            }
+        )
         return runner.invoke(app, ["-t", str(root), "status", *args])
 
     def test_unconfigured_row_names_the_variable(self, tmp_path: Path) -> None:

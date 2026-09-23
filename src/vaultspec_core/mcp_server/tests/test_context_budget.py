@@ -61,13 +61,25 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: ``hosted_search`` field. ``find`` grew 78: its feature, date and type
 #: filters now share one declaration with ``search``, which lists the record
 #: types and describes each filter. The ceiling keeps a margin of 47.
-MAX_TOOL_DEFINITION_CHARS = 23_900
+#:
+#: Raised a third time, from 23,900, by exactly the parameter documentation
+#: the model had never received. The ``ctx`` trimming in ``tool_description``
+#: matched arguments at a fixed indent that ``inspect.getdoc`` dedents away,
+#: so it removed every argument documented after ``ctx``; the ``Args:``
+#: guidance is what a caller acts on, which is the prose this ratchet exists
+#: to keep. Measured 23,895 before the fix and 26,375 after (+2,480): invoke
+#: +711, find +572, log +392, search +167, discover +139, plan_edit +130,
+#: status +123, plan_progress +118, create +66, edit +62. Margin of 5.
+MAX_TOOL_DEFINITION_CHARS = 26_380
 
 #: Aggregate ceiling for the read-only surface (five tools), same rules.
 #: Measured at 9,194 chars. Raised from 9,500 by the same three changes, which
 #: all reach this surface, since ``search`` is read-only: measured 9,446
-#: before and 13,100 after (+3,654), with a margin of 50.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 13_150
+#: before and 13,100 after (+3,654), with a margin of 50. Raised again from
+#: 13,150 by the restored parameter documentation above: measured 13,142
+#: before and 14,143 after (+1,001: find, search, discover and status), with
+#: a margin of 8.
+MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 14_151
 
 # Maximum number of tools: the tiered surface is nine hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.

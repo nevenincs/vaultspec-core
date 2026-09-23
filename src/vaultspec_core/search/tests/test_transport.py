@@ -315,10 +315,32 @@ class TestFailures:
         assert "blocked" not in str(caught.value)
         assert len(provider.received) == 1
 
-    def test_json_403_without_authentication_error_is_a_content_rejection(
-        self,
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"detail": {"error_type": "permission_error"}},
+            {"detail": "forbidden"},
+            None,
+        ],
+        ids=["permission-error", "no-error-type", "json-null"],
+    )
+    def test_any_json_403_rejects_the_credential_not_the_content(
+        self, body: object
     ) -> None:
-        reply = Reply.json({"detail": {"error_type": "forbidden_content"}}, 403)
+        # The firewall answers before the API and never in JSON; a JSON 403
+        # comes from the API itself, about the key.
+        with (
+            ScriptedProvider(Reply.json(body, 403)) as provider,
+            _client(provider) as client,
+            pytest.raises(CredentialRejectedError) as caught,
+        ):
+            client.evaluate(STATE, QUESTIONS)
+
+        assert caught.value.reason is UnavailableReason.CREDENTIAL_REJECTED
+        assert caught.value.status == 403
+
+    def test_plain_text_403_is_a_content_rejection(self) -> None:
+        reply = Reply(status=403, body=b"Forbidden", content_type="text/plain")
         with (
             ScriptedProvider(reply) as provider,
             _client(provider) as client,

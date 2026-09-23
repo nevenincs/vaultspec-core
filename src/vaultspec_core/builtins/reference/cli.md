@@ -974,6 +974,7 @@ name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name.
 in seconds, both layers combined. | | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log
 level for the CLI. | | `VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource
 editing. | | `VAULTSPEC_CORE_TYPESAFE_API_KEY` | secret | unset | Enables hosted vault
-search; read from the environment, else the workspace `.env` in `dependency` or `dev`
-install mode. Never printed. | | `VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server
-lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit). |
+search; read from the environment, else the workspace `.env` when core runs from the
+workspace's own environment in `dependency` or `dev` install mode. Never printed. | |
+`VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
+`0`/`false`/`off`/`no` disables it (EOF-only exit). |

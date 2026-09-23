@@ -24,8 +24,12 @@ _FALLBACK: Final = f"or search with {SEARCH_ADR}."
 
 _UNAVAILABLE: Final[dict[UnavailableReason, str]] = {
     UnavailableReason.CREDENTIAL_REJECTED: (
-        f"The TypeSafe API rejected the key in {CREDENTIAL_VARIABLE}; check or "
-        f"rotate it, {_FALLBACK}"
+        f"The TypeSafe API rejected the key in {CREDENTIAL_VARIABLE} or denied "
+        f"it this request; check or rotate it, {_FALLBACK}"
+    ),
+    UnavailableReason.CONTENT_REJECTED: (
+        "The TypeSafe API refused to read the query or every record it matched; "
+        f"rephrase the query or narrow it with type or feature filters, {_FALLBACK}"
     ),
     UnavailableReason.RATE_LIMITED: (
         f"The TypeSafe API is rate limiting this key; retry shortly, {_FALLBACK}"

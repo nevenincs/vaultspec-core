@@ -25,11 +25,14 @@ for the state plus the longest question. Every request is estimated at
 call when it exceeds :data:`REQUEST_TOKEN_LIMIT` or :data:`STATE_TOKEN_LIMIT`,
 which leave headroom under those bounds. A refusal costs no round trip.
 
-**Failure taxonomy.** The status code alone does not identify a failure: a
-missing key is answered with a JSON 403 whose ``error_type`` is
-``authentication_error``, while the firewall's content block is an HTML 403.
-The first fails every request, and the second fails only the request that
-carried the blocked text. Each failure is its own :class:`HostedSearchError`
+**Failure taxonomy.** The status code alone does not identify a failure. The
+API answers a missing key with a JSON 403 whose ``error_type`` is
+``authentication_error``, and a key it will not serve with a JSON 403 such as
+``permission_error``; the firewall's content block is an HTML 403 sent before
+the request reaches the API. Any 403 with a JSON body therefore rejects the
+credential and fails every request, and only a 403 whose body is not JSON is a
+content rejection, which fails just the request that carried the blocked
+text. Each failure is its own :class:`HostedSearchError`
 subclass, so a caller can drop one record for a content rejection and fail the
 whole search for anything else. Exception messages carry the status code and
 the provider's ``error_type`` only, never the key, the request or the response
@@ -137,9 +140,6 @@ _CLOCK_SLACK: Final = 0.05
 #: Statuses worth another attempt: request timeout, rate limit, server error.
 _RETRY_STATUSES: Final = frozenset({408, 429})
 
-#: The provider ``error_type`` that marks a rejected or missing credential.
-_AUTHENTICATION_ERROR: Final = "authentication_error"
-
 #: Shape of a provider ``error_type`` that may be quoted in a message: a short
 #: identifier, never free text.
 _ERROR_TYPE: Final = re.compile(r"[a-z][a-z0-9_]{0,63}")
@@ -198,13 +198,13 @@ class HostedSearchError(VaultSpecError):
 
 
 class CredentialRejectedError(HostedSearchError):
-    """The provider refused the key: 401, 402, or a 403 authentication error."""
+    """The provider refused the key: 401, 402, or a 403 with a JSON body."""
 
     reason = UnavailableReason.CREDENTIAL_REJECTED
 
 
 class ContentRejectedError(HostedSearchError):
-    """The edge firewall refused this request's content.
+    """The edge firewall refused this request's content: a 403 that is not JSON.
 
     Only the request that carried the content fails; the key is not at fault,
     so the reason is ``None``.
@@ -568,12 +568,21 @@ def _retry_after(header: str | None) -> float | None:
     return seconds if math.isfinite(seconds) and seconds >= 0 else None
 
 
-def _provider_error_type(body: bytes) -> str | None:
-    """Return the provider's ``error_type`` from a JSON error body, if safe."""
+#: Stands for an error body that is not JSON, which ``None`` cannot: ``null``
+#: is a JSON body.
+_NOT_JSON: Final = object()
+
+
+def _error_payload(body: bytes) -> object:
+    """Return an error body parsed as JSON, or :data:`_NOT_JSON`."""
     try:
-        payload: object = json.loads(body)
+        return json.loads(body)
     except (ValueError, UnicodeDecodeError):
-        return None
+        return _NOT_JSON
+
+
+def _provider_error_type(payload: object) -> str | None:
+    """Return the provider's ``error_type`` from a parsed error body, if safe."""
     if not isinstance(payload, dict):
         return None
     fields = cast("dict[str, object]", payload)
@@ -588,8 +597,9 @@ def _provider_error_type(body: bytes) -> str | None:
 def _failure(reply: _Reply) -> HostedSearchError:
     """Classify a non-200 reply."""
     status = reply.status
-    error_type = _provider_error_type(reply.body)
-    if status in (401, 402) or (status == 403 and error_type == _AUTHENTICATION_ERROR):
+    payload = _error_payload(reply.body)
+    error_type = _provider_error_type(payload)
+    if status in (401, 402) or (status == 403 and payload is not _NOT_JSON):
         return CredentialRejectedError(
             _describe("credential rejected", status, error_type),
             status=status,

@@ -984,14 +984,16 @@ hosted search is not configured. It also names the `vaultspec-rag` search to run
 instead. `vaultspec-core status` shows whether a key is configured and where it came
 from. The key itself never appears in any output.
 
-Output starts with a verdict: `answered`, or `nothing in the vault answers this`. The
-ranked records follow, best first. Each record line gives its rank, record name, type,
-`path:first-last` line range, and the section the passage sits under. The passage
-follows, clipped at a line boundary to 900 characters, with `...` marking a cut. A
-second passage (`also ...`, 400 characters) appears when the answer spans two. A `!`
-note flags a record that may contradict an assumption in the question. The page ends
-with the hit count and, when the ranking holds more records than were shown, the number
-withheld.
+Output starts with a verdict: `answered`, or `nothing in the vault answers this`. When
+the provider would not read some records in full, the verdict reads
+`no record that was read answers this` instead, and the next line gives the number of
+those records. The ranked records follow, best first. Each record line gives its rank,
+record name, type, `path:first-last` line range, and the section the passage sits under.
+The passage follows: at most 700 bytes of whole lines, with `...` marking a passage that
+goes on past the line range shown. A second passage (`also ...`, 300 bytes) appears when
+the answer spans two. A `!` note flags a record that may contradict an assumption in the
+question. The page ends with the hit count and, when the ranking holds more records than
+were shown, the number withheld.
 
 #### Arguments
 
@@ -1018,11 +1020,15 @@ carries `answered`, the `hits`, and the window fields `returned`, `total`, and
 `truncated`. Each hit carries `path`, `doc_type`, `feature`, `date`, `title`, `score`,
 `answers` (the probability that the record states the answer), `premise_conflict`,
 `blob_hash`, and an `excerpt` with `section`, `line_start`, `line_end`, `text`, and
-`truncated`. A `supporting` excerpt is present only when the answer spans two passages.
-The `not_configured` and `unavailable` replies carry a `remediation` sentence, and
-`unavailable` also carries its `reason`: `credential_rejected`, `rate_limited`,
-`transport`, `deadline`, `invalid_response`, or `request_too_large`. `usage` reports the
-requests, tokens, and time a search spent.
+`truncated`. `line_end` is the last line `text` holds, and `truncated` marks a passage
+that goes on past it. A `supporting` excerpt is present only when the answer spans two
+passages. The `not_configured` and `unavailable` replies carry a `remediation` sentence,
+and `unavailable` also carries its `reason`: `credential_rejected`, `content_rejected`,
+`rate_limited`, `transport`, `deadline`, `invalid_response`, or `request_too_large`.
+`usage` reports the requests, tokens, and time a search spent, and `unscored`, the
+number of records the provider would not read in full. `answered` is `false` for the
+whole vault only when `unscored` is `0`. The JSON carries non-ASCII text as UTF-8 rather
+than `\u` escapes.
 
 Exit codes:
 
@@ -1046,7 +1052,7 @@ Exit codes:
 - **Search only one feature's decisions and read the whole ranking**:
 
   ```bash
-  vaultspec-core vault search "which variable enrols hosted search" --type adr --feature typesafe-search --limit 11
+  vaultspec-core vault search "which variable enrols hosted search" --type adr --feature hosted-search --limit 11
   ```
 
 - **Script against the verdict and the excerpts**:
@@ -3271,9 +3277,12 @@ overridden by the `--target` flag.
 - `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key that
   enables hosted vault search (`vaultspec-core vault search` and the MCP `search` tool).
   It is read from the process environment. It is read from the workspace-root `.env`
-  only when it is absent from the environment and the workspace runs core in
-  `dependency` or `dev` install mode, and only this one variable is read from that file.
-  The generic `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
+  only when it is absent from the environment, core runs from the workspace's own
+  environment (its Python interpreter lives inside the workspace, as a project virtual
+  environment does), and the workspace declares the `dependency` or `dev` install mode.
+  Only this one variable is read from that file. A globally installed core (a uv tool, a
+  pipx install, or a release binary) never reads the workspace `.env`. The generic
+  `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
   `vaultspec-core status` reports only whether one is configured and from which source.
 - `VAULTSPEC_STDIO_WATCHDOG` (str, default on) - Lifetime watchdog for the MCP server.
   Set it to `0`, `false`, `off`, or `no` to disable it, which leaves the server to exit

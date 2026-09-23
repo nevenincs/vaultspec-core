@@ -6,10 +6,10 @@ records and quote the same passages. No ranking, credential or remediation
 logic is authored here: this layer only projects a
 :class:`~vaultspec_core.search.SearchOutcome` onto the wire.
 
-The projection bounds what the service leaves unbounded. Each excerpt is
-clipped at a line boundary to the caps the search package declares, and says
-so, and the page carries the shared window fields, so the worst-case reply
-stays inside the envelope budget whatever the vault holds.
+The search package bounds every excerpt, title and section in encoded bytes
+before this layer sees them, and marks each excerpt it cut; the projection
+carries them as they are. The page carries the shared window fields, so the
+worst-case reply stays inside the envelope budget whatever the vault holds.
 
 The tool is registered on both surfaces and whether or not a key is present:
 the tool list is a function of core's version alone. It mutates nothing
@@ -31,14 +31,12 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ...core.types import get_context as _get_ctx
-from ...core.windowing import clip_text
 from ...search import (
     DEFAULT_RESULTS,
-    EXCERPT_CHARS,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
     SEARCHABLE_TYPES,
-    SUPPORTING_CHARS,
+    InvalidQueryError,
     SearchStatus,
     remediation,
     search_vault,
@@ -87,11 +85,11 @@ class SearchExcerpt(LeanModel):
 
     Attributes:
         section: The heading path the span sits under, outermost first.
-        line_start: First line of the whole span in the file, 1-based.
-        line_end: Last line of the whole span, inclusive.
-        text: The span's text, or its leading lines when ``truncated``.
-        truncated: Whether ``text`` stops before the span does; the line
-            range still locates the whole span, so the rest is one read away.
+        line_start: First line of the span in the file, 1-based.
+        line_end: Last line of the span, inclusive.
+        text: The file's lines ``line_start`` through ``line_end``.
+        truncated: Whether the answering block goes on past ``line_end``, so
+            the rest is one read away.
     """
 
     section: str
@@ -144,7 +142,7 @@ class SearchUsageRow(LeanModel):
         requests: Provider requests made.
         input_tokens: Input tokens billed.
         elapsed_ms: Wall time of the hosted stages, whole milliseconds.
-        unscored: Records the provider's content filter refused to read.
+        unscored: Records the provider would not read in full.
     """
 
     model: str
@@ -162,7 +160,8 @@ class SearchResult(LeanModel):
 
     Attributes:
         status: ``ok``, ``not_configured`` or ``unavailable``.
-        answered: Whether any record was judged to answer the query.
+        answered: Whether any record was judged to answer the query; a
+            verdict on the whole vault only when ``usage.unscored`` is zero.
         hits: The ranked page, best first.
         returned: Hits on this page (``ok`` only).
         total: Hits the ranking held before the page cap (``ok`` only).
@@ -184,25 +183,23 @@ class SearchResult(LeanModel):
     usage: SearchUsageRow | None = None
 
 
-def _excerpt_row(excerpt: Excerpt | None, limit: int) -> SearchExcerpt | None:
-    """Project *excerpt* onto the wire, clipped to *limit* characters.
+def _excerpt_row(excerpt: Excerpt | None) -> SearchExcerpt | None:
+    """Project an already-bounded *excerpt* onto the wire.
 
     Args:
         excerpt: The verbatim span, or ``None``.
-        limit: The most characters of its text to carry.
 
     Returns:
         The wire excerpt, or ``None`` when there is no span.
     """
     if excerpt is None:
         return None
-    text = clip_text(excerpt.text, limit)
     return SearchExcerpt(
         section=excerpt.section,
         line_start=excerpt.line_start,
         line_end=excerpt.line_end,
-        text=text,
-        truncated=len(text) < len(excerpt.text),
+        text=excerpt.text,
+        truncated=excerpt.truncated,
     )
 
 
@@ -214,7 +211,7 @@ def _hit_row(hit: SearchHit, root: Path) -> SearchHitRow:
         root: The workspace root its path is relative to.
 
     Returns:
-        The wire row, excerpts clipped to their caps.
+        The wire row.
     """
     return SearchHitRow(
         path=hit.path,
@@ -227,8 +224,8 @@ def _hit_row(hit: SearchHit, root: Path) -> SearchHitRow:
         premise_conflict=round(hit.premise_conflict, _SCORE_PLACES),
         blob_hash=hit.blob_hash,
         resource_uri=(root / hit.path).as_uri(),
-        excerpt=_excerpt_row(hit.excerpt, EXCERPT_CHARS),
-        supporting=_excerpt_row(hit.supporting, SUPPORTING_CHARS),
+        excerpt=_excerpt_row(hit.excerpt),
+        supporting=_excerpt_row(hit.supporting),
     )
 
 
@@ -254,8 +251,9 @@ def search_result(outcome: SearchOutcome, root: Path) -> SearchResult:
         root: The workspace root the hits' paths are relative to.
 
     Returns:
-        The tool result: the hits with clipped excerpts, the window fields
-        for a ranked page, and the next step for an outcome without one.
+        The tool result: the hits with their bounded excerpts, the window
+        fields for a ranked page, and the next step for an outcome without
+        one.
     """
     window = outcome.window.as_fields() if outcome.window is not None else {}
     return SearchResult.model_validate(
@@ -278,8 +276,8 @@ def _search_summary(payload: object) -> str:
         payload: The :class:`SearchResult` the tool returned.
 
     Returns:
-        ``"3 hits, answered"``, ``"not configured"`` or
-        ``"unavailable: rate_limited"``, for example.
+        ``"3 hits, answered"``, ``"1 hit, not answered, 2 unscored"``,
+        ``"not configured"`` or ``"unavailable: rate_limited"``, for example.
     """
     if not isinstance(payload, SearchResult):
         return type(payload).__name__
@@ -290,7 +288,10 @@ def _search_summary(payload: object) -> str:
     count = len(payload.hits)
     shown = f"{count} of {payload.total}" if payload.truncated else str(count)
     verdict = "answered" if payload.answered else "not answered"
-    return f"{shown} hit{'' if count == 1 else 's'}, {verdict}"
+    summary = f"{shown} hit{'' if count == 1 else 's'}, {verdict}"
+    if payload.usage is not None and payload.usage.unscored:
+        summary += f", {payload.usage.unscored} unscored"
+    return summary
 
 
 def _refuse_unsearchable(types: list[DocType] | None) -> None:
@@ -347,8 +348,9 @@ def register_search_tools(mcp: MCPServer[None]) -> None:
 
         Ranks records against a natural-language ``query``, best first. Each
         hit quotes its answering block verbatim with its file lines and
-        ``blob_hash``; ``truncated`` marks text clipped at a line boundary.
-        ``answered`` says whether any record states the answer;
+        ``blob_hash``; ``truncated`` marks a block cut at ``line_end``.
+        ``answered``: whether a record read states the answer;
+        ``usage.unscored``: records not read in full.
         ``premise_conflict`` is the probability a record contradicts the
         question's premise. ``not_configured`` (no TypeSafe key, nothing
         sent) and ``unavailable`` carry a ``remediation`` naming the fallback.
@@ -385,7 +387,7 @@ def register_search_tools(mcp: MCPServer[None]) -> None:
             # The service blocks on network I/O for about a second; a worker
             # thread keeps the event loop serving other requests meanwhile.
             outcome = await anyio.to_thread.run_sync(run)
-        except ValueError as exc:
+        except InvalidQueryError as exc:
             raise ToolError(str(exc)) from exc
         logger.debug("search: %s, %d hit(s)", outcome.status, len(outcome.hits))
         return search_result(outcome, root_dir)

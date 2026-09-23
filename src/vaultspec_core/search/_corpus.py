@@ -24,7 +24,10 @@ fence-aware paragraph blocks of :mod:`vaultspec_core.vaultcore.markdown`. A
 block is a verbatim slice of the body, and the body is a run of whole lines
 of the file, so a block's lines map to file lines by one offset: the line the
 body starts on. Returned excerpts are these blocks, never model text, and
-their line ranges address the file a caller opens.
+their line ranges address the file a caller opens. The blocks are cut from
+one read of the file's bytes, and the blob id is hashed from the same bytes,
+so an edit made while a search runs cannot leave the id naming one version
+and the line ranges another.
 """
 
 from __future__ import annotations
@@ -35,9 +38,16 @@ from dataclasses import dataclass, replace
 from functools import cache
 from typing import TYPE_CHECKING, Final
 
+from ..core.windowing import clip_text
 from ..vaultcore.blob_hash import git_blob_oid
 from ..vaultcore.body_schema import BODY_SCHEMA_REGISTRY
-from ..vaultcore.markdown import LineRole, iter_headings, line_roles, paragraph_blocks
+from ..vaultcore.markdown import (
+    HTML_COMMENT_OPEN,
+    LineRole,
+    iter_headings,
+    line_roles,
+    paragraph_blocks,
+)
 from ..vaultcore.parser import split_frontmatter
 from ..vaultcore.query_listing import docs_from_graph
 from ._questions import RECORD_GROUPS
@@ -53,14 +63,14 @@ __all__ = [
     "CARD_SECTIONS",
     "LEAD_CHARS",
     "SEARCHABLE_TYPES",
-    "SECTION_CHARS",
-    "TITLE_CHARS",
+    "SECTION_BYTES",
+    "TITLE_BYTES",
     "Record",
-    "blob_hash",
+    "RecordVersion",
     "card_title",
     "load_records",
+    "read_version",
     "readable",
-    "record_blocks",
     "summary_card",
     "template_headings",
 ]
@@ -73,16 +83,18 @@ SEARCHABLE_TYPES: Final = frozenset(
     doc_type for group in RECORD_GROUPS for doc_type in group
 )
 
-#: Characters of a card's title. Titles are short by convention; the bound
-#: only keeps one malformed heading from inflating a stage-one request.
-TITLE_CHARS: Final = 240
+#: UTF-8 bytes of a title, on a card and on a hit. Titles are short by
+#: convention; the bound only keeps one malformed heading from inflating a
+#: stage-one request or a reply.
+TITLE_BYTES: Final = 240
 
 #: Characters of the opening paragraph a card carries.
 LEAD_CHARS: Final = 240
 
-#: Distinctive headings a card carries, and the characters kept of each.
+#: Distinctive headings a card carries, and the UTF-8 bytes kept of each
+#: heading, on a card and in an excerpt's section path.
 CARD_SECTIONS: Final = 10
-SECTION_CHARS: Final = 90
+SECTION_BYTES: Final = 90
 
 #: Heading levels a card lists. Level one is the title, and below level three
 #: headings name details too fine to summarise a record.
@@ -93,7 +105,7 @@ _MARKUP: Final = re.compile(r"\*\*|`")
 
 #: Opening characters of a paragraph that is not prose: a table row or a
 #: comment left by a template.
-_NOT_PROSE: Final = ("|", "<!--")
+_NOT_PROSE: Final = ("|", HTML_COMMENT_OPEN)
 
 
 @dataclass(frozen=True)
@@ -242,9 +254,9 @@ def card_title(record: Record) -> str:
         record: The record.
 
     Returns:
-        The readable title, bounded to :data:`TITLE_CHARS`.
+        The readable title, bounded to :data:`TITLE_BYTES`.
     """
-    return readable(record.title)[:TITLE_CHARS]
+    return clip_text(readable(record.title), TITLE_BYTES)
 
 
 def _is_prose(block: Block) -> bool:
@@ -275,7 +287,7 @@ def _sections(record: Record) -> list[str]:
             continue
         text = readable(heading.text)
         if text and text not in template:
-            sections.append(text[:SECTION_CHARS])
+            sections.append(clip_text(text, SECTION_BYTES))
             if len(sections) == CARD_SECTIONS:
                 break
     return sections
@@ -306,39 +318,51 @@ def summary_card(record: Record) -> dict[str, object]:
 # ---------------------------------------------------------------- blocks
 
 
-def record_blocks(record: Record) -> list[Block]:
-    """Split *record*'s body into excerpt blocks numbered by file line.
+@dataclass(frozen=True)
+class RecordVersion:
+    """One version of a record's file: its blob id and the blocks cut from it.
+
+    Attributes:
+        blob_hash: The git blob id of the bytes the blocks were cut from.
+        blocks: The body's paragraph blocks, each with ``line_start`` and
+            ``line_end`` counted in the file. Each block's text is exactly
+            the file's lines in that range, joined by ``\\n``.
+    """
+
+    blob_hash: str
+    blocks: tuple[Block, ...]
+
+
+def read_version(record: Record) -> RecordVersion | None:
+    """Read *record*'s file once and cut its excerpt blocks from those bytes.
+
+    The bytes are hashed and decoded exactly as the graph decodes a document,
+    so the blob id and every block's line range describe one version of the
+    file, whatever changed on disk since the records were listed.
 
     Args:
         record: The record.
 
     Returns:
-        The body's paragraph blocks, each with ``line_start`` and
-        ``line_end`` counted in the file. Each block's text is exactly the
-        file's lines in that range, joined by ``\\n``.
+        The version, or ``None`` when the file can no longer be read or is no
+        longer UTF-8.
     """
-    offset = record.body_line - 1
-    return [
+    from ..graph.api import decode_document
+
+    try:
+        raw = record.path.read_bytes()
+        text = decode_document(raw)
+    except (OSError, UnicodeDecodeError):
+        logger.debug("record file unreadable for its full read: %s", record.rel_path)
+        return None
+    split = split_frontmatter(text)
+    offset = split.body_line - 1
+    blocks = tuple(
         replace(
             block,
             line_start=block.line_start + offset,
             line_end=block.line_end + offset,
         )
-        for block in paragraph_blocks(record.body)
-    ]
-
-
-def blob_hash(record: Record) -> str | None:
-    """Return the git blob id of *record*'s file as it is on disk now.
-
-    Args:
-        record: The record.
-
-    Returns:
-        The blob id, or ``None`` when the file can no longer be read.
-    """
-    try:
-        return git_blob_oid(record.path.read_bytes())
-    except OSError:
-        logger.debug("record file unreadable for its blob hash: %s", record.rel_path)
-        return None
+        for block in paragraph_blocks(split.body)
+    )
+    return RecordVersion(blob_hash=git_blob_oid(raw), blocks=blocks)

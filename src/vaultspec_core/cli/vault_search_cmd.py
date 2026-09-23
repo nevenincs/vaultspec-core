@@ -8,9 +8,11 @@ owns only the shape of that answer: on a terminal and in the ``--json``
 envelope.
 
 Both shapes carry the window the search applied (``returned``, ``total``,
-``truncated``) and the excerpts clipped to the same caps, each marked when it
-was cut. The key never reaches this module; the search package reports only
-whether one is configured.
+``truncated``) and the excerpts exactly as the search package bounded them,
+each marked when it was cut; nothing is clipped here. The terminal verdict
+says nothing in the vault answers only when the search read every record. The
+key never reaches this module; the search package reports only whether one is
+configured.
 
 Exit codes:
 
@@ -43,14 +45,13 @@ from vaultspec_core.cli.vault_cmd_app import (
     FeatureFilterOption,
     vault_app,
 )
-from vaultspec_core.core.windowing import clip_text, elision_line
+from vaultspec_core.core.windowing import elision_line
 from vaultspec_core.search import (
     DEFAULT_RESULTS,
-    EXCERPT_CHARS,
     MAX_RESULTS,
     PREMISE_CONFLICT_THRESHOLD,
     SEARCHABLE_TYPES,
-    SUPPORTING_CHARS,
+    InvalidQueryError,
     SearchStatus,
     remediation,
 )
@@ -106,20 +107,6 @@ def _record_types(values: list[str] | None) -> frozenset[DocType] | None:
     return frozenset(searchable[value] for value in values)
 
 
-def _clipped(excerpt: Excerpt, limit: int) -> tuple[Excerpt, bool]:
-    """Clip an excerpt's text to *limit* and report whether text was cut."""
-    text = clip_text(excerpt.text, limit)
-    return dataclasses.replace(excerpt, text=text), len(text) < len(excerpt.text)
-
-
-def _excerpt_payload(excerpt: Excerpt, limit: int) -> dict[str, object]:
-    """Render one excerpt, clipped to *limit*, with its truncation marker."""
-    shown, truncated = _clipped(excerpt, limit)
-    payload = dataclasses.asdict(shown)
-    payload["truncated"] = truncated
-    return payload
-
-
 def _hit_payload(hit: SearchHit) -> dict[str, object]:
     """Render one hit for the JSON envelope.
 
@@ -127,11 +114,10 @@ def _hit_payload(hit: SearchHit) -> dict[str, object]:
     search did not choose is absent rather than ``null``.
     """
     row = dataclasses.asdict(hit)
-    del row["name"], row["excerpt"], row["supporting"]
-    if hit.excerpt is not None:
-        row["excerpt"] = _excerpt_payload(hit.excerpt, EXCERPT_CHARS)
-    if hit.supporting is not None:
-        row["supporting"] = _excerpt_payload(hit.supporting, SUPPORTING_CHARS)
+    del row["name"]
+    for key in ("excerpt", "supporting"):
+        if row[key] is None:
+            del row[key]
     return row
 
 
@@ -157,13 +143,26 @@ def _outcome_payload(outcome: SearchOutcome) -> dict[str, object]:
     return payload
 
 
-def _passage_lines(excerpt: Excerpt, limit: int, *, depth: int) -> list[TreeLine]:
-    """Render an excerpt's clipped text as indented lines, marked when cut."""
+def _json_text(outcome: SearchOutcome) -> str:
+    """Render *outcome* as the ``--json`` envelope text the command prints."""
+    import json
+
+    from vaultspec_core.cli.rendering import json_envelope
+
+    status = _envelope_status(outcome.status)
+    envelope = json_envelope("vault.search", status, _outcome_payload(outcome))
+    # The excerpt caps bound UTF-8 bytes. ASCII escaping would carry each CJK
+    # character in six bytes and each emoji in twelve, so the reply budget the
+    # caps guarantee holds only when the text travels as the UTF-8 it is.
+    return json.dumps(envelope, **json_format_kwargs(), default=str)
+
+
+def _passage_lines(excerpt: Excerpt, *, depth: int) -> list[TreeLine]:
+    """Render an excerpt's text as indented lines, marked when it was cut."""
     from vaultspec_core.cli.rendering import TRUNCATE_MARKER, TreeLine
 
-    shown, truncated = _clipped(excerpt, limit)
-    lines = [TreeLine(line, depth=depth) for line in shown.text.splitlines()]
-    if truncated:
+    lines = [TreeLine(line, depth=depth) for line in excerpt.text.splitlines()]
+    if excerpt.truncated:
         lines.append(TreeLine(TRUNCATE_MARKER, depth=depth, style="dim"))
     return lines
 
@@ -195,13 +194,28 @@ def _hit_lines(rank: int, hit: SearchHit) -> list[TreeLine]:
     if hit.excerpt is None:
         lines.append(TreeLine("no answering passage located", depth=1, style="dim"))
     else:
-        lines += _passage_lines(hit.excerpt, EXCERPT_CHARS, depth=1)
+        lines += _passage_lines(hit.excerpt, depth=1)
     if hit.supporting is not None:
         extra = hit.supporting
         also = f"also {hit.path}:{extra.line_start}-{extra.line_end} {extra.section}"
         lines.append(TreeLine(also.rstrip(), depth=1, style="dim"))
-        lines += _passage_lines(extra, SUPPORTING_CHARS, depth=2)
+        lines += _passage_lines(extra, depth=2)
     return lines
+
+
+def _verdict_line(outcome: SearchOutcome) -> TreeLine:
+    """Render the verdict of a ranked outcome.
+
+    "Nothing answers" is claimed only when every record was read; with records
+    unscored, the verdict covers the records that were.
+    """
+    from vaultspec_core.cli.rendering import TreeLine
+
+    if outcome.answered:
+        return TreeLine("answered", style="green")
+    if outcome.abstained:
+        return TreeLine("nothing in the vault answers this", style="yellow")
+    return TreeLine("no record that was read answers this", style="yellow")
 
 
 def _outcome_lines(outcome: SearchOutcome) -> list[TreeLine]:
@@ -219,12 +233,15 @@ def _outcome_lines(outcome: SearchOutcome) -> list[TreeLine]:
             lines.append(TreeLine(note, depth=1))
         return lines
 
-    verdict = (
-        TreeLine("answered", style="green")
-        if outcome.answered
-        else TreeLine("nothing in the vault answers this", style="yellow")
-    )
-    lines = [verdict]
+    lines = [_verdict_line(outcome)]
+    if outcome.unscored:
+        noun = "record" if outcome.unscored == 1 else "records"
+        lines.append(
+            TreeLine(
+                f"{outcome.unscored} {noun} the provider would not read in full",
+                style="yellow",
+            )
+        )
     for rank, hit in enumerate(outcome.hits, start=1):
         lines += _hit_lines(rank, hit)
     if outcome.window is not None:
@@ -280,20 +297,17 @@ def cmd_search(
             date=date,
             limit=limit,
         )
-    except ValueError as exc:
+    except InvalidQueryError as exc:
         raise typer.BadParameter(str(exc), param_hint="'QUERY'") from exc
     except OSError as exc:
         handle_error(exc, json_output=json_output)
         return
 
-    from vaultspec_core.cli.rendering import Outcome, json_envelope, render_tree
+    from vaultspec_core.cli.rendering import Outcome, render_tree
 
-    status = _envelope_status(outcome.status)
     if json_output:
-        import json
-
-        envelope = json_envelope("vault.search", status, _outcome_payload(outcome))
-        typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
+        typer.echo(_json_text(outcome))
     else:
         render_tree(_outcome_lines(outcome), title="Vault search")
-    raise typer.Exit(1 if status is Outcome.FAILED else 0)
+    failed = _envelope_status(outcome.status) is Outcome.FAILED
+    raise typer.Exit(1 if failed else 0)

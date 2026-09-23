@@ -364,26 +364,33 @@ reaches the model. An empty or blank query, a query over 2,000 characters, a `li
 outside 1 to 11, an unknown type, or `index` fails the whole call with a protocol error.
 
 **Enabling hosted search.** Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` in the server's
-environment. If the variable is absent there and the workspace runs vaultspec-core as a
-dependency or dev install, the server reads that one variable from the workspace-root
-`.env` instead. No other variable enables search: `TYPESAFE_API_KEY` and vaultspec-rag's
-own variables do not. With a key set, every search sends the question and vault text to
-the TypeSafe API at `api.typesafe.ai`. Setting the key is the consent to that data flow,
-and it applies in read-only mode too. Without a key, nothing leaves the machine. The key
+environment. If the variable is absent there, the server reads that one variable from
+the workspace-root `.env` instead, but only when both hold: the server runs from the
+workspace's own environment (its Python interpreter lives inside the workspace, as a
+project virtual environment does), and the workspace declares the `dependency` or `dev`
+install mode. A globally installed vaultspec-core, such as a uv tool, a pipx install, or
+a release binary, never reads the workspace `.env`, so a cloned repository cannot supply
+the key. No other variable enables search: `TYPESAFE_API_KEY` and vaultspec-rag's own
+variables do not. With a key set, every search sends the question and vault text to the
+TypeSafe API at `api.typesafe.ai`. Setting the key is the consent to that data flow, and
+it applies in read-only mode too. Without a key, nothing leaves the machine. The key
 never appears in a response, a log, or an error. `status` reports only whether a key is
 configured and where it was found.
 
 **Outcomes.** The `status` field is one of three values:
 
-- `ok`: the vault was judged. `hits` may be empty, and `answered` says whether any
-  record was judged to answer the question.
+- `ok`: the vault was judged. `answered` says whether any record was judged to answer
+  the question. It is a verdict on the whole vault only when `usage.unscored` is `0`: a
+  record the provider would not read in full was not judged. `hits` is empty only when
+  every record was read.
 - `not_configured`: no key is set and nothing was sent. `remediation` names the variable
   and the vaultspec-rag command to run instead. The server never calls vaultspec-rag
   itself; you or your agent run the fallback.
 - `unavailable`: a key is set but the search failed. `reason` names the failure:
-  `credential_rejected`, `rate_limited`, `transport`, `deadline`, `invalid_response`, or
-  `request_too_large`. `remediation` gives the next step. No partial ranking is
-  returned.
+  `credential_rejected`, `content_rejected`, `rate_limited`, `transport`, `deadline`,
+  `invalid_response`, or `request_too_large`. `content_rejected` means the provider
+  refused to read the question itself, or every record the ranking needed. `remediation`
+  gives the next step. No partial ranking is returned.
 
 **Hits.** Each hit reports `path`, `type`, `feature`, `date`, `title`, `score` (the
 ranking score), `answers` (the probability that the record states the answer),
@@ -396,20 +403,25 @@ ranked, but no single block was chosen.
 **Excerpts.** Each excerpt has these fields:
 
 - `section`: the heading path, outermost first, each heading separated by `" > "`.
-- `line_start` and `line_end`: the whole block's lines in the file version that
-  `blob_hash` names.
+- `line_start` and `line_end`: the lines of `text` in the file version that `blob_hash`
+  names.
 - `text`: the file's own text, never text a model wrote.
-- `truncated`: whether `text` was cut.
+- `truncated`: whether the block goes on past `line_end`.
 
-An excerpt's text is cut at a line boundary to at most 900 characters, or 400 for
-`supporting`. When `truncated` is `true`, `text` holds the block's opening lines, and
-the line range still covers the whole block.
+An excerpt's text is at most 700 bytes of UTF-8, or 300 for `supporting`, and the
+section's headings are bounded the same way. A longer block keeps its opening whole
+lines, `line_end` is the last line kept, and `truncated` is `true`; the rest of the
+block starts at `line_end + 1`. The one exception is a block whose first line alone is
+over the limit: `text` is then the start of that line, and `line_end` equals
+`line_start`.
 
 **Paging.** A ranked reply carries `returned`, `total`, and `truncated`. The ranking is
 computed fresh for each request, so there is no offset to resume from. When `truncated`
 is `true`, raise `limit` (up to 11) or narrow the filters. `usage` reports the model
 version, the request count, input tokens, elapsed milliseconds, and `unscored`, the
-number of records the provider's content filter refused to read. It is absent when
+number of records the provider would not read in full: its content filter refused them,
+or one of their passages exceeded the request size. A record refused only in part is
+still ranked, on the text that was read, and is counted too. `usage` is absent when
 nothing was sent. The reply never echoes the question back.
 
 Example response:
