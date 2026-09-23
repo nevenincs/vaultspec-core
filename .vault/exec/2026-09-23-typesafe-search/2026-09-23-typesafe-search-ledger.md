@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:d9be5983f1734f59872d19d96ce1920171f1d7ba37f3cbc219602f7d4214bd6b'
+body_hash: 'sha256:bd224f8ef36ab681e5a7b37327c1edc810bd2bd3931406fa6b6e6f128d04481c'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -218,3 +218,5 @@ related:
 - `S07` `M` `src/vaultspec_core/cli/vault_feature_cmd.py`
 - `S07` `M` `src/vaultspec_core/tests/cli/test_feature_list_recency.py`
 - `S07` `verify:` `pytest test_feature_list_recency` -> `pass`
+- `S10` `M` `src/vaultspec_core/tests/cli/test_exec_ledger_cli.py`
+- `S10` `verify:` `pytest test_exec_ledger` -> `pass`

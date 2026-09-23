@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import pytest
 
+from vaultspec_core.vaultcore.checks.markdown import apply_markdown_hygiene
 from vaultspec_core.vaultcore.exec_ledger import (
+    append_notes,
     append_rows,
+    format_note,
     format_row,
     is_ledger_stem,
     ledger_step_ids,
     parse_ledger_rows,
+)
+
+#: A freshly scaffolded ledger: its ``## Changes`` section holds only the
+#: template's hint comment.
+_SCAFFOLDED = (
+    "# `demo` ledger\n\n## Changes\n\n<!-- Rows are appended here,\n"
+    "     one per path touched. -->\n"
 )
 
 LEDGER = """# `demo` ledger
@@ -126,8 +136,30 @@ class TestAppendRows:
         body = "# `demo` ledger\n\n## Changes\n\n## Notes\n\n- `S01` note.\n"
         updated = append_rows(body, [format_row("S01", "M", "src/a.py")])
 
-        assert "## Changes\n- `S01` `M` `src/a.py`\n\n## Notes" in updated
+        assert "## Changes\n\n- `S01` `M` `src/a.py`\n\n## Notes" in updated
         assert ledger_step_ids(updated) == ("S01",)
+
+    def test_rows_after_a_hint_comment_start_their_own_list(self) -> None:
+        updated = append_rows(_SCAFFOLDED, [format_row("S01", "M", "src/a.py")])
+
+        assert updated == _SCAFFOLDED + "\n- `S01` `M` `src/a.py`\n"
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            LEDGER,
+            _SCAFFOLDED,
+            "# `demo` ledger\n\n## Changes\n",
+            "# `demo` ledger\n\n## Changes\n\n\n- `S01` `M` `a.py`\n\n\n",
+        ],
+    )
+    def test_appending_leaves_nothing_for_the_hygiene_check(self, body: str) -> None:
+        rows = append_rows(body, [format_row("S09", "A", "src/z.py")])
+        noted = append_notes(rows, [format_note("S09", "left a scaffold")])
+
+        for text in (rows, noted):
+            assert apply_markdown_hygiene(text)[1].total == 0, repr(text)
+            assert "\n## Changes\n\n" in text
 
     def test_repeated_appends_do_not_accumulate_blank_lines(self) -> None:
         body = LEDGER
@@ -241,8 +273,6 @@ class TestNotes:
     """Notes are exception-only, Step-keyed, and never evidence."""
 
     def test_append_notes_creates_the_section_at_the_end(self) -> None:
-        from vaultspec_core.vaultcore.exec_ledger import append_notes, format_note
-
         body = "# `demo` ledger\n\n## Changes\n\n- `S01` `M` `a.py`\n"
         updated = append_notes(body, [format_note("S01", "left  a\nscaffold")])
 
@@ -250,8 +280,6 @@ class TestNotes:
         assert ledger_step_ids(updated) == ("S01",)
 
     def test_append_notes_reuses_an_existing_section_idempotently(self) -> None:
-        from vaultspec_core.vaultcore.exec_ledger import append_notes, format_note
-
         line = format_note("S03", "skipped")
         once = append_notes(LEDGER, [line])
         twice = append_notes(once, [line])

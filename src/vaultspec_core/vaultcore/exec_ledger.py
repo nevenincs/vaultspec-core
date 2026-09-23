@@ -367,13 +367,19 @@ def _append_to_section(body: str, section: Section, rows: Sequence[str]) -> str:
     if not fresh:
         return body
 
-    # Rebuild the section with exactly one blank line before the appended
-    # rows and one after, so repeated appends cannot accumulate whitespace.
+    # Rebuild the section in the layout the markdown hygiene check accepts,
+    # so an append never leaves the ledger needing a fix: one blank line
+    # under the heading, one before the rows when they start a list rather
+    # than extend one, and one before the next section, or a single newline
+    # when the section ends the document. Repeated appends therefore cannot
+    # accumulate whitespace either.
     head = body[: section.start]
     if not head.endswith("\n"):
         head += "\n"
-    kept = section.body.rstrip("\n")
+    kept = section.body.strip("\n")
     if kept:
-        kept += "\n"
-    updated = f"{kept}{chr(10).join(fresh)}\n\n"
-    return head + updated + body[section.end :]
+        extends_list = _ROW_RE.match(kept.rsplit("\n", 1)[-1]) is not None
+        kept += "\n" if extends_list else "\n\n"
+    tail = body[section.end :]
+    ending = "\n\n" if tail else "\n"
+    return f"{head}\n{kept}{chr(10).join(fresh)}{ending}{tail}"
