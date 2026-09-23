@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:b618795e4864464569449aa6716b7514789584bcad9a5bbeeef6f1aee75ffeac'
+body_hash: 'sha256:796169b9423c3adda459d42df2d683a7a9547893caa9309f40534381ed9bd2d2'
 ---
 
 # `commit-gate` plan
@@ -19,7 +19,7 @@ Replace the three whole-vault commit hooks with one staged-document gate, and st
 
 Approved 2026-09-23
 
-Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too.
+Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too. After the plan closed, the user asked on 2026-09-23 that the hook changes be enrolled in the per-release schema migrations; S10 does that under the amended convergence clause of the ADR.
 
 Decision coverage:
 
@@ -46,6 +46,7 @@ Issues addressed:
 - [x] `S07` - add the read-only commit-gate verb running the staged runner and the provider guard in one process, with file-scoped output and no mutating hints; `src/vaultspec_core/cli/root.py and a new cli verb module`.
 - [x] `S08` - make vaultspec-commit-gate the one canonical hook, retire vault-fix, spec-check and check-provider-artifacts, and extend the read-only guard to the new entry and its output; `src/vaultspec_core/core/enums.py, src/vaultspec_core/core/precommit.py, .pre-commit-config.yaml, dev/guards/test_automation_contracts.py`.
 - [x] `S09` - document the gate and the CI home of corpus checks, regenerate the CLI reference, and record before and after commit timings on the core vault and the 30k corpus; `docs/, src/vaultspec_core/builtins/reference/`.
+- [x] `S10` - enroll the hook retirement as the 0.2.5 schema migration, converging YAML configs that carry vaultspec hooks and existing managed prek.toml blocks, never touching declined or hook-free configs; `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py (new), src/vaultspec_core/migrations/__init__.py, src/vaultspec_core/core/prek_boundary.py`.
 
 ## Parallelization
 

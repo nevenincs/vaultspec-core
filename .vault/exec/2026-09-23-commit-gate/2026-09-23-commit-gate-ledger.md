@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:7fa7e9a03f9c7667e0174d45fa6292976ee1ad6594c6cad734a36eabefa1fe75'
+body_hash: 'sha256:ba558b7cc5f4ef2275523cf79c8c5ea1c3543a9af706a6e449dd4cda8c40910d'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -85,6 +85,12 @@ related:
 - `S09` `verify:` `ty check` -> `pass`
 - `S07` `verify:` `pytest test_commit_gate_cli` -> `pass`
 - `S03` `verify:` `pytest dev/tests` -> `pass`
+- `S10` `A` `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py`
+- `S10` `A` `src/vaultspec_core/migrations/tests/test_commit_gate.py`
+- `S10` `M` `src/vaultspec_core/migrations/__init__.py`
+- `S10` `M` `src/vaultspec_core/core/prek_boundary.py`
+- `S10` `M` `.vault/adr/2026-09-23-commit-gate-adr.md`
+- `S10` `verify:` `vaultspec-core migrations run --dry-run` -> `pass`
 
 ## Notes
 
@@ -92,3 +98,4 @@ related:
 - `S05` full-suite run also hit test_rename_concurrency under -n auto; it passes 3/3 alone and is untouched by this Step
 - `S08` test_rename_concurrency failed intermittently under -n auto in full runs; it passes alone and exercises rename/edit locks this Step does not touch
 - `S09` the deployed .vaultspec/reference mirror is left for the next release carry-forward, matching how it has been refreshed from the packaged builtins after each release
+- `S10` full run also hit the load-sensitive MCP stdin-EOF entrypoint test; it passes alone twice and is untouched here

@@ -320,6 +320,49 @@ def _replace_or_append_block(raw: str, block: str) -> str:
     return raw + separator + block
 
 
+def refresh_managed_prek_block(
+    target: Path, *, mode: InstallMode | None = None, dry_run: bool = False
+) -> bool:
+    """Re-render an existing managed hook block in ``prek.toml``, adding none.
+
+    Only the lines between the vaultspec markers are compared and replaced, so
+    operator-authored TOML is never touched and a ``prek.toml`` without a
+    managed block is left exactly as it is: transplanting hooks into one is
+    the operator's call through ``spec precommit migrate``.
+
+    Args:
+        target: Workspace root directory.
+        mode: Provisioning mode to render entries for; resolved from the
+            workspace declaration when ``None``.
+        dry_run: Report whether a refresh is due without writing.
+
+    Returns:
+        ``True`` when the managed block differed from the canonical render
+        (and, unless *dry_run*, was rewritten).
+    """
+    from .helpers import atomic_write
+    from .workspace_mode import resolve_render_mode
+
+    config_path = target / PREK_CONFIG_NAME
+    try:
+        raw = config_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    lines = raw.splitlines()
+    begins = [i for i, line in enumerate(lines) if line.strip() == MARKER_BEGIN]
+    ends = [i for i, line in enumerate(lines) if line.strip() == MARKER_END]
+    if not (begins and ends and begins[0] < ends[0]):
+        return False
+    if mode is None:
+        mode = resolve_render_mode(target)
+    block = render_prek_hook_block(mode)
+    if lines[begins[0] : ends[0] + 1] == block.splitlines():
+        return False
+    if not dry_run:
+        atomic_write(config_path, _replace_or_append_block(raw, block))
+    return True
+
+
 def _strip_declined_leftovers(
     target: Path, detail: str, *, dry_run: bool
 ) -> PrekMigrationResult:

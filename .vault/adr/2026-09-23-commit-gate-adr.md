@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:b29996b6726321bba638a058f30424a6d30a526d3e597d1ae6ceac9bbdafdd23'
+body_hash: 'sha256:62fb6b6f9a017ce7a84b966d83b50fec47c6d26b584bc24834193bf5fe14e193'
 related:
   - "[[2026-09-23-commit-gate-research]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"
@@ -121,6 +121,15 @@ new id. `spec precommit migrate` re-renders a managed `prek.toml` block that sti
 them. Uninstall strips both old and new ids. Hook-config resolution follows prek's order
 (`prek.toml`, then `.pre-commit-config.yaml`, then `.pre-commit-config.yml`), so a
 workspace on the `.yml` spelling is managed in place rather than given a second config.
+
+The retirement also ships as a versioned schema migration targeting the 0.2.5 release. The
+registry's explicit triggers (`install --upgrade`, `migrations run`, `vault repair`)
+therefore converge every existing install once, and `migrations status` reports it as
+pending until they do. The migration converges a YAML config only while it still carries
+vaultspec hooks, including one whose install stopped managing it. It refreshes only an
+existing managed `prek.toml` block, never adds one, and leaves a declined workspace
+untouched (amended 2026-09-23 on the user's instruction to enroll the hook changes in the
+per-release schema migrations).
 
 **Revision of prior decisions.** This record realizes the pre-commit section of
 `2026-02-24-vault-doctor-suite-adr`: staged files passed by the runner, error-only
