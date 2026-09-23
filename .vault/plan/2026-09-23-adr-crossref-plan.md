@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-adr-crossref-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:eee23353ed0b56cad5bd35b805809d46bcc8fd8979e9148c5117406e94e28892'
+body_hash: 'sha256:96c1136ffced131bd96cf18e581043828cdec17d765963a42ced60a09bb2a047'
 ---
 
 # `adr-crossref` plan
@@ -37,7 +37,7 @@ the crossref credential import moves to the config-layer resolver.
 
 - [x] `S01` - Record the prefilter evidence and the bounded cross-referencing decision; `.vault/research/2026-09-23-adr-crossref-research.md, .vault/adr/2026-09-23-adr-crossref-adr.md`.
 - [x] `S02` - Extract the related-link writer from vault link add into core, under the document write lock with graph-cache invalidation; `src/vaultspec_core/vaultcore/related_links.py, src/vaultspec_core/cli/link_cmd.py`.
-- [ ] `S03` - Build the crossref backend - corpus, fingerprint, code stage, questions, engine, service and wire projection - with offline tests against the scripted provider; `src/vaultspec_core/crossref/`.
+- [x] `S03` - Build the crossref backend - corpus, fingerprint, code stage, questions, engine, service and wire projection - with offline tests against the scripted provider; `src/vaultspec_core/crossref/`.
 - [ ] `S04` - Add the vault adr crossref CLI verb and regenerate the CLI reference and handbook; `src/vaultspec_core/cli/vault_crossref_cmd.py, docs/CLI.md, src/vaultspec_core/builtins/reference/cli.md`.
 - [ ] `S05` - Add the crossref MCP tool on both surfaces with the read-only argument guard, and ratchet the surface budget by its measured size; `src/vaultspec_core/mcp_server/tools/crossref.py, src/vaultspec_core/mcp_server/app.py, docs/MCP.md`.
 - [ ] `S06` - Adopt the cross-reference step in the ADR and curation workflows and name the tool in the CLI rule and personas, then sync; `src/vaultspec_core/builtins/skills/, src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md, src/vaultspec_core/builtins/agents/`.

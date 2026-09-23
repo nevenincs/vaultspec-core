@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:e4f72288b1f13fbabfed1c1a1d4387d960ca264a9daa4090be6a23479c4c7c0c'
+body_hash: 'sha256:6ac9333cb58f1111ef6eb18fff785a07947bca2790c3b380f6b42a54ffeae38a'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -24,3 +24,17 @@ related:
 - `S02` `M` `src/vaultspec_core/vaultcore/resolve.py`
 - `S02` `M` `src/vaultspec_core/cli/link_cmd.py`
 - `S02` `verify:` `pytest vaultcore/tests/test_related_links.py tests/cli/test_link_cli.py tests/cli/test_modified_stamp_mutators.py vaultcore/tests/test_resolve.py` -> `pass`
+- `S03` `A` `src/vaultspec_core/crossref/__init__.py`
+- `S03` `A` `src/vaultspec_core/crossref/_corpus.py`
+- `S03` `A` `src/vaultspec_core/crossref/_engine.py`
+- `S03` `A` `src/vaultspec_core/crossref/_models.py`
+- `S03` `A` `src/vaultspec_core/crossref/_prefilter.py`
+- `S03` `A` `src/vaultspec_core/crossref/_questions.py`
+- `S03` `A` `src/vaultspec_core/crossref/_service.py`
+- `S03` `A` `src/vaultspec_core/crossref/_wire.py`
+- `S03` `A` `src/vaultspec_core/crossref/tests/__init__.py`
+- `S03` `A` `src/vaultspec_core/crossref/tests/test_corpus.py`
+- `S03` `A` `src/vaultspec_core/crossref/tests/test_service.py`
+- `S03` `A` `src/vaultspec_core/crossref/tests/vault.py`
+- `S03` `M` `pyproject.toml`
+- `S03` `verify:` `ruff check and basedpyright on src/vaultspec_core/crossref` -> `pass`
