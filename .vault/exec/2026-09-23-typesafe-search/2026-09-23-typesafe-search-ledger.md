@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:d6d312e398da1a13a054ba21bfc1cb5e4bba1d9622c82b77bd634240e38b9d3a'
+body_hash: 'sha256:a25a2789b20c40a32f376cb55cb29e233106fa937f82cc2151e265712aef405c'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -308,3 +308,7 @@ related:
 - `S14` `A` `dev/environment.py`
 - `S14` `A` `dev/guards/test_environment_registry.py`
 - `S14` `verify:` `pytest dev -m not repo` -> `pass`
+- `S13` `M` `src/vaultspec_core/cli/spec_cmd_rules.py`
+- `S13` `M` `src/vaultspec_core/cli/spec_cmd_skills.py`
+- `S13` `M` `src/vaultspec_core/cli/spec_cmd_agents.py`
+- `S13` `verify:` `just framework-reference` -> `pass`
