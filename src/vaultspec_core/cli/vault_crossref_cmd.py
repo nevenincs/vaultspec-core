@@ -17,13 +17,15 @@ Exit codes:
 ``0``
     Every source taken was judged (envelope ``unchanged``, or ``updated`` when
     ``--apply`` wrote links), or hosted search is not configured (envelope
-    ``skipped``); the reply names the manual path instead.
+    ``skipped``); the reply names the search to run instead.
 ``1``
     Hosted search is configured but a source could not be judged (envelope
-    ``failed``); a sweep stops there and reports where to resume.
+    ``failed``). A sweep moves past an ADR the provider refuses to read,
+    stops at any other failure, and reports where to resume.
 ``2``
-    The input is invalid: no source, a source that is not an ADR of this
-    vault, a vault larger than one run reads, or an option out of range.
+    The input is invalid: no source, a source or cursor that is not an ADR
+    of this vault, named sources mixed with a filter, a vault larger than one
+    run reads, or an option out of range.
 """
 
 from __future__ import annotations
@@ -180,7 +182,7 @@ def cmd_adr_crossref(
     code-only rank, one bounded Choice stage and a bounded pair judgment. Lists
     the candidates judged to be links and the declared links judged weak. With
     --apply, writes the new links into the source's related: field. Without a
-    hosted-search key it sends nothing and names the manual path instead.
+    hosted-search key it sends nothing and names the search to run instead.
     """
     apply_target(target, json_output=json_output)
     from vaultspec_core.core.types import get_context as _get_ctx

@@ -749,13 +749,16 @@ verdicts (should be linked) and `weak` ones (declared, judged below the threshol
 removed), each with an advisory relation. One `REFS` entry is judged alone; several,
 `--feature TAG` (`-f`), `--isolated` (ADRs linking no other ADR) or `--all` (every ADR
 that still governs) sweep in stem order, resumable with `--after STEM` from the reply's
-`next_after`. `--max-sources N` (default `10`, `1`..`50`) caps a sweep. `--apply` writes
-new `link` verdicts into each source's `related:` as it finishes. `--json` emits
-`vaultspec.vault.adr.crossref.v1`: `data.sources` (each with `status`, `verdicts`,
-`links`, `written`, `verdicts_total`, `truncated`), the totals, `remaining`,
-`next_after`, `stopped` and `usage`; at most 80 verdict rows per reply. Requires
-`VAULTSPEC_CORE_TYPESAFE_API_KEY`; without it nothing is sent and the reply is
-`not_configured` with the listing to use instead. MCP: `crossref`.
+`next_after`; named ADRs cannot be combined with `--feature` or `--isolated`. An ADR the
+provider refuses to read fails alone and the sweep moves past it; any other failure
+stops the sweep. `--max-sources N` (default `10`, `1`..`50`) caps a sweep. `--apply`
+writes new `link` verdicts, unread, into each source's `related:` as it finishes.
+`--json` emits `vaultspec.vault.adr.crossref.v1`: `data.sources` (each with `status`,
+`verdicts`, `links`, `written`, `verdicts_total`, `truncated`, and when they apply
+`unjudged_declared`, `write_failed`, `reason`, `next_step`, `remediation`), the totals,
+`remaining`, `next_after`, `stopped` and `usage`; at most 80 verdict rows per reply.
+Requires `VAULTSPEC_CORE_TYPESAFE_API_KEY`; without it nothing is sent and the reply is
+`not_configured` with the search to run instead. MCP: `crossref`.
 
 ### vaultspec-core vault rule promote
 
