@@ -749,12 +749,14 @@ verdicts (should be linked) and `weak` ones (declared, judged below the threshol
 removed), each with an advisory relation. One `REFS` entry is judged alone; several,
 `--feature TAG` (`-f`), `--isolated` (ADRs linking no other ADR) or `--all` (every ADR
 that still governs) sweep in stem order, resumable with `--after STEM` from the reply's
-`next_after`; named ADRs cannot be combined with `--feature` or `--isolated`. An ADR the
-provider refuses to read fails alone and the sweep moves past it; any other failure
-stops the sweep. `--max-sources N` (default `10`, `1`..`50`) caps a sweep. `--apply`
-writes new `link` verdicts, unread, into each source's `related:` as it finishes.
-`--json` emits `vaultspec.vault.adr.crossref.v1`: `data.sources` (each with `status`,
-`verdicts`, `links`, `written`, `verdicts_total`, `truncated`, and when they apply
+`next_after` and the same selector; named ADRs cannot be combined with `--feature`,
+`--isolated` or `--all`. An ADR the provider refuses to read fails alone and the sweep
+moves past it once the provider has read something in that sweep; a refusal before then,
+three in a row, or any other failure stops the sweep. A link `--apply` could not write
+exits 1. `--max-sources N` (default `10`, `1`..`50`) caps a sweep. `--apply` writes new
+`link` verdicts, unread, into each source's `related:` as it finishes. `--json` emits
+`vaultspec.vault.adr.crossref.v1`: `data.sources` (each with `status`, `verdicts`,
+`links`, `written`, `verdicts_total`, `truncated`, and when they apply
 `unjudged_declared`, `write_failed`, `reason`, `next_step`, `remediation`), the totals,
 `remaining`, `next_after`, `stopped` and `usage`; at most 80 verdict rows per reply.
 Requires `VAULTSPEC_CORE_TYPESAFE_API_KEY`; without it nothing is sent and the reply is
@@ -983,7 +985,8 @@ pending. | | `vaultspec-core migrations run` | `0` success (including no-op), `1
 migration failed. | | `vaultspec-core vault search` | `0` searched, or not configured
 (`skipped`); `1` configured but unavailable; `2` invalid input. | |
 `vaultspec-core vault adr crossref` | `0` judged, or not configured (`skipped`); `1`
-configured but a source could not be judged; `2` invalid input. |
+configured but a source could not be judged, or a link could not be written; `2` invalid
+input. |
 
 ## Environment variables
 

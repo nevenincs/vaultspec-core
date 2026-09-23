@@ -14,6 +14,7 @@ worst-case sweep reply.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from typing import TYPE_CHECKING, cast
 
@@ -21,7 +22,12 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
-from vaultspec_core.cli.vault_crossref_cmd import _source_lines, _sweep_lines
+from vaultspec_core.cli.rendering import Outcome
+from vaultspec_core.cli.vault_crossref_cmd import (
+    _envelope_status,
+    _source_lines,
+    _sweep_lines,
+)
 from vaultspec_core.core.discovery_guidance import LIST_VAULT
 from vaultspec_core.core.enums import AdrStatus
 from vaultspec_core.crossref import (
@@ -178,6 +184,17 @@ def test_a_source_renders_its_verdicts_and_what_was_written() -> None:
     assert f"{_SOURCE}: 2 links" in text
     assert "(written)" in text
     assert "1 declared link(s) not judged" in text
+
+
+def test_a_link_that_could_not_be_written_is_shown_and_fails_the_run() -> None:
+    outcome = dataclasses.replace(
+        _judged(_SOURCE, 1), write_failed=("2026-09-02-unwritable-adr",)
+    )
+
+    text = "\n".join(line.text for line in _source_lines(outcome))
+
+    assert "could not write the link to 2026-09-02-unwritable-adr" in text
+    assert _envelope_status((outcome,)) is Outcome.FAILED
 
 
 def test_a_stopped_sweep_says_where_to_resume() -> None:

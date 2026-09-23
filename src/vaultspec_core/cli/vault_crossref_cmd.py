@@ -19,7 +19,8 @@ Exit codes:
     ``--apply`` wrote links), or hosted search is not configured (envelope
     ``skipped``); the reply names the search to run instead.
 ``1``
-    Hosted search is configured but a source could not be judged (envelope
+    A link ``--apply`` judged could not be written, or hosted search is
+    configured but a source could not be judged (envelope
     ``failed``). A sweep moves past an ADR the provider refuses to read,
     stops at any other failure, and reports where to resume.
 ``2``
@@ -60,7 +61,7 @@ __all__ = ["cmd_adr_crossref"]
 def _envelope_status(outcomes: tuple[CrossrefOutcome, ...]) -> Outcome:
     from vaultspec_core.cli.rendering import Outcome
 
-    if any(o.status is CrossrefStatus.UNAVAILABLE for o in outcomes):
+    if any(o.status is CrossrefStatus.UNAVAILABLE or o.write_failed for o in outcomes):
         return Outcome.FAILED
     if any(o.status is CrossrefStatus.NOT_CONFIGURED for o in outcomes):
         return Outcome.SKIPPED
@@ -96,6 +97,10 @@ def _source_lines(outcome: CrossrefOutcome) -> list[TreeLine]:
             f"{verdict.stem} ({mark})"
         )
         lines.append(TreeLine(text, depth=1, style=style))
+    for stem in outcome.write_failed:
+        lines.append(
+            TreeLine(f"could not write the link to {stem}", depth=1, style="red")
+        )
     if outcome.bounds is not None and outcome.bounds.unjudged_declared:
         extra = len(outcome.bounds.unjudged_declared)
         lines.append(
@@ -189,11 +194,6 @@ def cmd_adr_crossref(
     from vaultspec_core.crossref import crossref_adr, crossref_sweep
 
     names = list(refs or [])
-    if not names and feature is None and not all_adrs and not isolated:
-        raise typer.BadParameter(
-            "name an ADR, or sweep with --feature, --isolated or --all",
-            param_hint="'REFS'",
-        )
     root = _get_ctx().target_dir
     single = len(names) == 1 and feature is None and not all_adrs and not isolated
     try:
@@ -211,6 +211,7 @@ def cmd_adr_crossref(
             names,
             feature=feature,
             isolated=isolated,
+            all_adrs=all_adrs,
             after=after,
             max_sources=max_sources,
             apply=apply,

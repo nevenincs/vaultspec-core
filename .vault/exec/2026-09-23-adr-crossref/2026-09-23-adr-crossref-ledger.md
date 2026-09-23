@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:da8abd073ecad7365276b190c46bc62df2b3e92701deacaab86bcb6ec9803eb1'
+body_hash: 'sha256:e2991fb65ad0eb2054df4ff4b9b7f9d83cf55a577b9d6a973146012d35213e8c'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -89,6 +89,8 @@ related:
 - `S03` `M` `src/vaultspec_core/crossref/tests/test_bounds.py`
 - `S03` `A` `src/vaultspec_core/crossref/tests/test_sweep_safety.py`
 - `S03` `M` `src/vaultspec_core/vaultcore/related_links.py`
+- `S04` `M` `src/vaultspec_core/tests/cli/test_vault_crossref_cmd.py`
+- `S04` `verify:` `pytest test_vault_crossref_cmd test_cli_handbook_drift test_cli_reference_drift test_cli_reference_generated` -> `pass`
 
 ## Notes
 
