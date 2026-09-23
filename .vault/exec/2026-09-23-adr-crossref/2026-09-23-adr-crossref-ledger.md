@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:1fe4f4d62b965bfc808311f94aaa2fa9bb6611e782ae1fdb7c0d365112daedff'
+body_hash: 'sha256:f993ddeb69a5fa61855f6f99089f792065745d9efb5530b6c1e815571313d174'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -97,6 +97,7 @@ related:
 - `S05` `verify:` `pytest test_crossref_tool` -> `pass`
 - `S04` `verify:` `pytest test_cli_handbook_drift test_cli_reference_drift test_cli_reference_generated` -> `pass`
 - `S05` `verify:` `pytest test_crossref_tool test_context_budget` -> `pass`
+- `S06` `verify:` `pytest test_corpus_contracts test_cli_language_contract test_template_annotations` -> `pass`
 
 ## Notes
 

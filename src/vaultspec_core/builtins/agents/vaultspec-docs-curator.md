@@ -40,16 +40,17 @@ body heading. Record `supersedes` and `superseded_by` edges from
   `--after <next_after>`. One sweep is all a run takes: each ADR costs up to 46 paid
   requests. On `not_configured`, run the next step the reply names. On `stopped`, report
   the reason; a sweep stopped on time or a transient failure is resumed later, and one
-  stopped on refusals means the provider refused several ADRs in a row: cross-reference
-  one other ADR on its own, and if that is judged, the refused ADRs are their own;
-  resume with `--after` set to the last of them and record them. A source that is
-  `unavailable` inside a sweep that did not stop was refused on its own text: record it.
-  Read the ADRs behind each `link` verdict and each `weak` declared link. Then search
-  decisions and vault facts with `vaultspec-core vault search "<question>"`; when it
-  declines or fails, run the next step its reply names. Read the candidates whole, judge
-  agreement, duplication, contradiction, or fragmentation. Walk each supersession chain
-  end to end. Refinements chained as supersessions, or sibling `accepted` records on one
-  scope, are one fragmented decision.
+  stopped on a refusal (`content_rejected` or `request_too_large`) means no read settled
+  it: cross-reference one other ADR on its own, and if that is judged, cross-reference
+  the first refused ADR on its own. If it is refused again, its refusal is its own:
+  record it and resume with `--after` set to it. Otherwise resume as usual. A source
+  that is `unavailable` inside a sweep that did not stop was refused on its own text:
+  record it. Read the ADRs behind each `link` verdict and each `weak` declared link.
+  Then search decisions and vault facts with `vaultspec-core vault search "<question>"`;
+  when it declines or fails, run the next step its reply names. Read the candidates
+  whole, judge agreement, duplication, contradiction, or fragmentation. Walk each
+  supersession chain end to end. Refinements chained as supersessions, or sibling
+  `accepted` records on one scope, are one fragmented decision.
 - Decision against code:
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
   whole, confirm with grep that the decision is implemented. For a retired decision,
