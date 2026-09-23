@@ -2,10 +2,11 @@
 
 The ADR supersession, rule promotion, and frontmatter repair paths once each
 carried a renderer of their own. Their output is pinned here against those
-renderers, kept below as the reference, over every markdown file in the
-repository and a set of synthetic frontmatters: a rebuild must not move one
-byte for any document the old code handled. The round-trip tests show a
-frontmatter already in canonical form renders back to itself.
+renderers, kept below as the reference, over a set of synthetic
+frontmatters here and over every markdown file in the repository in
+``test_repository_corpus``: a rebuild must not move one byte for any document
+the old code handled. The round-trip tests show a frontmatter already in
+canonical form renders back to itself.
 
 No mocks, patches, or skips.
 """
@@ -32,10 +33,6 @@ from vaultspec_core.vaultcore.parser import (
 )
 
 pytestmark = [pytest.mark.unit]
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-
-_SKIPPED_DIRS = frozenset({".venv", ".git", "node_modules"})
 
 _BOM = chr(0xFEFF)
 
@@ -214,17 +211,6 @@ _SYNTHETIC = [
 
 
 class TestRendererMatchesReference:
-    def test_every_repository_markdown_file(self) -> None:
-        paths = [
-            path
-            for path in _REPO_ROOT.rglob("*.md")
-            if not _SKIPPED_DIRS.intersection(path.relative_to(_REPO_ROOT).parts)
-        ]
-        assert len(paths) > 100
-        for path in paths:
-            text = path.read_bytes().decode("utf-8", "surrogateescape")
-            _assert_matches_reference(text.replace("\r\n", "\n"))
-
     @pytest.mark.parametrize("content", _SYNTHETIC)
     def test_synthetic_frontmatter(self, content: str) -> None:
         _assert_matches_reference(content)

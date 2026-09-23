@@ -30,6 +30,8 @@ __all__ = [
     "parse_frontmatter",
     "parse_vault_metadata",
     "related_block",
+    "render_block_list",
+    "render_scalar",
     "rerender_frontmatter",
     "split_frontmatter",
 ]
@@ -449,15 +451,33 @@ _MODELLED_KEYS = frozenset(
 _STAMP_KEYS = frozenset({"modified", "body_schema", "body_hash"})
 
 
-def _block_list(key: str, values: Sequence[str], quote: str) -> list[str]:
-    """Render a YAML block list, or nothing for an empty one."""
+def render_block_list(key: str, values: Sequence[str], quote: str) -> list[str]:
+    """Render *key* as a YAML block list with each item wrapped in *quote*.
+
+    Args:
+        key: The frontmatter key.
+        values: The list items, in order.
+        quote: The quote character wrapped around each item.
+
+    Returns:
+        The key line and one ``  - `` line per item, or no lines for an
+        empty list, so an empty field is left out of the frontmatter.
+    """
     if not values:
         return []
     return [f"{key}:", *(f"  - {quote}{value}{quote}" for value in values)]
 
 
-def _scalar(key: str, value: str | None) -> list[str]:
-    """Render a single-quoted scalar line, or nothing for an empty value."""
+def render_scalar(key: str, value: str | None) -> list[str]:
+    """Render *key* as a single-quoted scalar line.
+
+    Args:
+        key: The frontmatter key.
+        value: The scalar value.
+
+    Returns:
+        The one line, or no lines for an empty value.
+    """
     return [f"{key}: '{value}'"] if value else []
 
 
@@ -525,21 +545,21 @@ def rerender_frontmatter(
         *(
             tag_lines
             if tag_lines is not None
-            else _block_list("tags", metadata.tags, '"')
+            else render_block_list("tags", metadata.tags, '"')
         ),
         *([f"date: '{date}'" if quote_date else f"date: {date}"] if date else []),
     ]
     if render_stamps:
-        lines += _scalar("modified", metadata.modified)
-        lines += _scalar("body_schema", metadata.body_schema)
-        lines += _scalar("body_hash", metadata.body_hash)
+        lines += render_scalar("modified", metadata.modified)
+        lines += render_scalar("body_schema", metadata.body_schema)
+        lines += render_scalar("body_hash", metadata.body_hash)
     lines += [
-        *_block_list("related", metadata.related, '"'),
-        *_block_list("supersedes", metadata.supersedes, "'"),
-        *_scalar("superseded_by", metadata.superseded_by),
-        *_block_list("derived_from", metadata.derived_from, "'"),
-        *_block_list("promoted_to", metadata.promoted_to, "'"),
-        *_scalar("archived", metadata.archived),
+        *render_block_list("related", metadata.related, '"'),
+        *render_block_list("supersedes", metadata.supersedes, "'"),
+        *render_scalar("superseded_by", metadata.superseded_by),
+        *render_block_list("derived_from", metadata.derived_from, "'"),
+        *render_block_list("promoted_to", metadata.promoted_to, "'"),
+        *render_scalar("archived", metadata.archived),
     ]
     known = _MODELLED_KEYS | _STAMP_KEYS if render_stamps else _MODELLED_KEYS
     lines += _unmodelled_lines(split.yaml_block, known)

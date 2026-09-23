@@ -17,7 +17,6 @@ from __future__ import annotations
 import hashlib
 import itertools
 import re
-from pathlib import Path
 
 import pytest
 
@@ -210,10 +209,6 @@ _REFERENCE_FENCE_RE = re.compile(
     re.DOTALL,
 )
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-
-_SKIPPED_DIRS = frozenset({".venv", ".git", "node_modules"})
-
 _ANY_DIGEST = BODY_HASH_PREFIX + "0" * 64
 
 
@@ -240,19 +235,11 @@ def _assert_matches_reference(text: str) -> None:
 
 
 class TestFenceMatchesReference:
-    """The fingerprint reads frontmatter exactly as its original fence rule."""
+    """The fingerprint reads frontmatter exactly as its original fence rule.
 
-    def test_every_repository_markdown_file(self) -> None:
-        paths = [
-            path
-            for path in _REPO_ROOT.rglob("*.md")
-            if not _SKIPPED_DIRS.intersection(path.relative_to(_REPO_ROOT).parts)
-        ]
-        assert len(paths) > 100
-        for path in paths:
-            _assert_matches_reference(
-                path.read_bytes().decode("utf-8", "surrogateescape")
-            )
+    ``test_repository_corpus`` holds it to the same reference over every
+    markdown file in the repository.
+    """
 
     @pytest.mark.parametrize(
         "text",

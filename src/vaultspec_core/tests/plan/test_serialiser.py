@@ -10,8 +10,9 @@ import random
 
 import pytest
 
-from vaultspec_core.plan.parser import parse_plan
-from vaultspec_core.plan.serialiser import serialise_plan
+from vaultspec_core.core.helpers import dump_yaml
+from vaultspec_core.plan.parser import Plan, parse_plan
+from vaultspec_core.plan.serialiser import _render_frontmatter, serialise_plan
 from vaultspec_core.tests.plan._factories import make_clean_plan
 
 # ---- Core round-trip --------------------------------------------------------
@@ -117,6 +118,46 @@ def test_serialised_related_uses_single_quoted_wikilinks(tier: str) -> None:
 
     assert "related:" in rendered
     assert "  - '[[2026-05-05-test-feature-adr]]'" in rendered
+
+
+def _reference_frontmatter(plan: Plan) -> str:
+    """The plan frontmatter as the serialiser first rendered it.
+
+    Kept only here, as the reference the shared frontmatter line renderers
+    must reproduce: a plan edit that re-rendered one byte differently would
+    churn the frontmatter of every plan it touches.
+    """
+    fm = plan.frontmatter
+    lines = ["---", "tags:"]
+    lines.extend(f"  - '{tag}'" for tag in fm.tags)
+    lines.append(f"date: '{fm.date}'")
+    lines.append(f"tier: {fm.tier.value}")
+    if fm.related:
+        lines.append("related:")
+        lines.extend(f"  - '{entry}'" for entry in fm.related)
+    if fm.extra:
+        lines.extend(dump_yaml(fm.extra).splitlines())
+    lines.append("---")
+    return "\n".join(lines)
+
+
+def _assert_frontmatter_matches_reference(plan: Plan) -> None:
+    assert _render_frontmatter(plan) == _reference_frontmatter(plan)
+
+
+@pytest.mark.parametrize("tier", ["L1", "L2", "L3", "L4"])
+def test_frontmatter_matches_the_reference_rendering(tier: str) -> None:
+    """Plan frontmatter renders exactly as the serialiser first wrote it."""
+    source = make_clean_plan(tier, rng=random.Random(8), phases=1, steps=1).render()
+    stamped = source.replace(
+        f"tier: {tier}\n",
+        f"tier: {tier}\nmodified: '2026-05-06'\nbody_schema: body-v2\n",
+    )
+    unrelated = source.replace("related:\n  - '[[2026-05-05-test-feature-adr]]'\n", "")
+    assert unrelated != source
+
+    for text in (source, stamped, unrelated):
+        _assert_frontmatter_matches_reference(parse_plan(text))
 
 
 def test_round_trip_preserves_unowned_frontmatter_fields() -> None:

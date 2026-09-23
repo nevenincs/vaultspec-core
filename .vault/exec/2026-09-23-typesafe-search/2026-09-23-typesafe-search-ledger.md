@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:aecb6e7c2a89862b331d14e32514bdb1a69be966e67352ea80f7060dfd6ed243'
+body_hash: 'sha256:c62a29070ff515c32692750735d5dd6e52dee4cd76de24bda4f091aa35603fe8'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -206,3 +206,12 @@ related:
 - `S01` `M` `src/vaultspec_core/vaultcore/markdown.py`
 - `S01` `M` `src/vaultspec_core/vaultcore/tests/test_markdown.py`
 - `S01` `verify:` `pytest vaultcore` -> `pass`
+- `S12` `M` `src/vaultspec_core/vaultcore/checks/modified_stamp.py`
+- `S12` `M` `src/vaultspec_core/plan/serialiser.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/checks/tests/test_modified_stamp.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_modified_stamp.py`
+- `S12` `M` `src/vaultspec_core/tests/plan/test_serialiser.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_body_hash.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_frontmatter_render.py`
+- `S12` `A` `src/vaultspec_core/vaultcore/tests/test_repository_corpus.py`
+- `S12` `verify:` `pytest -m repo test_repository_corpus` -> `pass`

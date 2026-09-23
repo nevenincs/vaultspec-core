@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import re
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -27,6 +28,7 @@ from vaultspec_core.vaultcore import (
     parse_lenient_date,
     parse_vault_metadata,
 )
+from vaultspec_core.vaultcore.body_hash import set_body_hash
 from vaultspec_core.vaultcore.hydration import (
     DocumentIdentity,
     ExecBinding,
@@ -168,6 +170,88 @@ class TestRefreshModifiedStamp:
         _, digest_one = _split_body_hash(first, "\n")
         _, digest_two = _split_body_hash(second, "\n")
         assert digest_one != digest_two
+
+
+#: The ``modified-stamp`` checker's own stamper as it was first written, kept
+#: only here as the reference the shared stamper must reproduce: the checker
+#: now stamps through ``refresh_modified_stamp``, and a fix that moved one
+#: byte the old stamper did not would churn every document it repairs.
+_REFERENCE_FENCE_RE = re.compile(r"^(﻿?)---[ \t]*\n(.*?)\n---", re.DOTALL)
+_REFERENCE_MODIFIED_RE = re.compile(
+    r"^(?P<indent>[ \t]*)modified:[^\n]*$", re.MULTILINE
+)
+_REFERENCE_DATE_RE = re.compile(
+    r"^(?P<indent>[ \t]*)date:[^\n]*(?P<eol>\r\n|\n|$)", re.MULTILINE
+)
+
+_STAMP_DAY = datetime.date(2026, 9, 23)
+
+
+def _reference_stamp(text: str) -> str | None:
+    """Stamp *text* as the checker did, or ``None`` where it declined."""
+    fence = _REFERENCE_FENCE_RE.match(text)
+    if not fence:
+        return None
+    block_start, block_end = fence.start(2), fence.end(2)
+    frontmatter = text[block_start:block_end]
+    line = f"modified: '{_STAMP_DAY.isoformat()}'"
+    existing = _REFERENCE_MODIFIED_RE.search(frontmatter)
+    if existing is not None:
+        frontmatter = (
+            frontmatter[: existing.start()]
+            + existing.group("indent")
+            + line
+            + frontmatter[existing.end() :]
+        )
+        return set_body_hash(text[:block_start] + frontmatter + text[block_end:])
+    date_line = _REFERENCE_DATE_RE.search(frontmatter)
+    if date_line is None:
+        return None
+    indent = date_line.group("indent")
+    insert_at = block_start + date_line.end()
+    stamp = f"{indent}{line}\n" if date_line.group("eol") else f"\n{indent}{line}"
+    return set_body_hash(text[:insert_at] + stamp + text[insert_at:])
+
+
+def _assert_stamp_matches_reference(text: str) -> None:
+    """The shared stamper writes exactly what the checker's stamper wrote.
+
+    Args:
+        text: ``\\n``-normalised document text, the form the checker stamps.
+            Where the reference declined, the shared stamper must leave the
+            text unchanged, which is how the checker now tells it declined.
+    """
+    expected = _reference_stamp(text)
+    stamped = refresh_modified_stamp(text, _STAMP_DAY)
+    assert stamped == (text if expected is None else expected), repr(text)
+
+
+class TestCheckerStampMatchesReference:
+    """The checker's stamp is the shared stamper's, byte for byte."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "---\ntags:\n  - '#x'\ndate: '2026-01-01'\nmodified: '2026-01-01'\n"
+            "---\n\nBody.\n",
+            "---\ndate: '2026-01-01'\n  modified: 2026/01/01\n---\nBody.\n",
+            "---\ndate: '2026-01-01'\nmodified:\nrelated: []\n---\nBody.\n",
+            "---\ntags:\n  - '#x'\ndate: '2026-01-01'\nrelated: []\n---\nBody.\n",
+            "---\ntags:\n  - '#x'\n  date: '2026-01-01'\n---\n\nBody.\n",
+            "---\ndate: '2026-01-01'\ndate: '2026-01-02'\n---\nBody.\n",
+            "---\ndate: '2026-01-01'\n---\n# H\n\nmodified: body text\n",
+            "﻿---\ndate: '2026-01-01'\nmodified: '2026-01-01'\n---\nBody.\n",
+            "---\ndate: '2026-01-01'\nbody_schema: body-v2\n---\nBody.\n",
+            "---\ntags:\n  - '#x'\n---\n\nBody.\n",
+            "\n---\ndate: '2026-01-01'\n---\nBody.\n",
+            "  ---\ndate: '2026-01-01'\n---\nBody.\n",
+            "# No frontmatter\n\ndate: '2026-01-01'\n",
+            "---\ndate: '2026-01-01'\n# never closed\n",
+            "---\ndate: '2026-01-01'\n---",
+        ],
+    )
+    def test_named_input_classes(self, text: str) -> None:
+        _assert_stamp_matches_reference(text)
 
 
 _BUILTIN_TEMPLATES = Path(vaultspec_core.__file__).parent / "builtins" / "templates"

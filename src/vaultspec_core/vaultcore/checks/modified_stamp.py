@@ -66,13 +66,19 @@ treated exactly like an absent one and re-seeded from the live body.
 
 from __future__ import annotations
 
+import datetime
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
 from ..body_hash import body_digest, is_canonical_digest, set_body_hash
-from ..models import normalize_date, parse_lenient_date, vault_today
+from ..models import (
+    normalize_date,
+    parse_lenient_date,
+    refresh_modified_stamp,
+    vault_today,
+)
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -82,7 +88,6 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
-    import datetime
     from collections.abc import Callable
     from pathlib import Path
 
@@ -98,19 +103,6 @@ __all__ = [
 #: Leading ``yyyy-mm-dd`` prefix on a vault filename, the scaffold-time
 #: date anchor used when ``date:`` is absent or unparseable.
 _FILENAME_DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
-
-#: Frontmatter ``modified:`` line, capturing leading whitespace so an
-#: indented key is rewritten in place rather than duplicated.
-_MODIFIED_LINE_RE = re.compile(r"^(?P<indent>[ \t]*)modified:[^\n]*$", re.MULTILINE)
-
-#: Frontmatter ``date:`` line, the insertion anchor when ``modified:`` is
-#: absent (the new stamp lands directly after it, matching its layout).
-#: The trailing newline is optional so a ``date:`` line that is the last
-#: line of the frontmatter block (no ``\n`` before the closing fence,
-#: which the fence match strips) still anchors the insertion.
-_DATE_LINE_RE = re.compile(
-    r"^(?P<indent>[ \t]*)date:[^\n]*(?P<eol>\r\n|\n|$)", re.MULTILINE
-)
 
 
 def filename_date(path: Path) -> str | None:
@@ -214,68 +206,17 @@ def _rewrite_locked(doc_path: Path, transform: Callable[[str], str | None]) -> b
     return True
 
 
-def _stamp_frontmatter(text: str, value: str) -> str | None:
-    """Return *text* with its ``modified:`` field set to *value*.
-
-    Operates on LF-normalised full document text and preserves every other
-    character. When the field already exists its value is rewritten
-    (keeping indentation); when absent it is inserted directly after the
-    ``date:`` line.
-
-    Args:
-        text: LF-normalised full document text.
-        value: Canonical ``yyyy-mm-dd`` date string to stamp.
-
-    Returns:
-        The rewritten text, or ``None`` when the document has no
-        frontmatter fence, or carries neither ``modified:`` nor a
-        ``date:`` anchor to insert after.
-    """
-    fence = re.match(r"^(﻿?)---[ \t]*\n(.*?)\n---", text, re.DOTALL)
-    if not fence:
-        return None
-
-    block_start = fence.start(2)
-    block_end = fence.end(2)
-    frontmatter = text[block_start:block_end]
-    canonical = f"'{value}'"
-
-    existing = _MODIFIED_LINE_RE.search(frontmatter)
-    if existing is not None:
-        indent = existing.group("indent")
-        replacement = f"{indent}modified: {canonical}"
-        new_frontmatter = (
-            frontmatter[: existing.start()]
-            + replacement
-            + frontmatter[existing.end() :]
-        )
-        return text[:block_start] + new_frontmatter + text[block_end:]
-
-    date_line = _DATE_LINE_RE.search(frontmatter)
-    if date_line is None:
-        return None
-    indent = date_line.group("indent")
-    insert_at = block_start + date_line.end()
-    if date_line.group("eol"):
-        # Date line carries its own newline: drop the new stamp on the
-        # following line, terminated so the next line is undisturbed.
-        stamp_line = f"{indent}modified: {canonical}\n"
-    else:
-        # Date line is the last line of the block (its newline was
-        # consumed by the closing-fence match): open a new line first.
-        stamp_line = f"\n{indent}modified: {canonical}"
-    return text[:insert_at] + stamp_line + text[insert_at:]
-
-
 def write_stamp(doc_path: Path, value: str, *, root_dir: Path | None) -> bool:
     """Set the ``modified:`` stamp to *value* and re-attest ``body_hash:``.
 
     Both fields move in one write, which is what makes the staleness fix
     converge: the value the next run compares against is written by the
-    same operation that resolves the finding. A document with no
-    frontmatter fence, or one missing both ``modified:`` and ``date:``, is
-    left untouched (no canonical anchor exists). The source CRLF/LF
-    convention and every other byte are preserved.
+    same operation that resolves the finding. The rewrite is
+    :func:`~vaultspec_core.vaultcore.models.refresh_modified_stamp`, the
+    stamper every mutating verb uses. A document it leaves unchanged - no
+    frontmatter fence, neither ``modified:`` nor ``date:`` to anchor the
+    stamp, or already carrying this stamp and fingerprint - is not
+    rewritten. The source line endings and every other byte are preserved.
 
     Args:
         doc_path: Document to rewrite.
@@ -289,11 +230,11 @@ def write_stamp(doc_path: Path, value: str, *, root_dir: Path | None) -> bool:
         ``True`` when the file was rewritten, ``False`` otherwise.
     """
 
+    day = datetime.date.fromisoformat(value)
+
     def transform(text: str) -> str | None:
-        stamped = _stamp_frontmatter(text, value)
-        if stamped is None:
-            return None
-        return set_body_hash(stamped)
+        stamped = refresh_modified_stamp(text, day)
+        return None if stamped == text else stamped
 
     return _rewrite(doc_path, transform, root_dir=root_dir)
 
