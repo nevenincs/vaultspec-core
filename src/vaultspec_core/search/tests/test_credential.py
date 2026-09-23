@@ -39,6 +39,11 @@ def _workspace(
     return root
 
 
+def _own_env(root: Path) -> Path:
+    """The interpreter prefix of a project environment inside *root*."""
+    return root / ".venv"
+
+
 def _dotenv_line(value: str) -> str:
     return f"# local credentials\n{CREDENTIAL_VARIABLE}={value}\n"
 
@@ -56,7 +61,11 @@ class TestPrecedence:
             tmp_path, mode=InstallMode.DEV, dotenv=_dotenv_line(DOTENV_KEY)
         )
 
-        credential = resolve_credential(root, {CREDENTIAL_VARIABLE: f" {ENV_KEY} "})
+        credential = resolve_credential(
+            root,
+            {CREDENTIAL_VARIABLE: f" {ENV_KEY} "},
+            interpreter_prefix=_own_env(root),
+        )
 
         assert credential == Credential(ENV_KEY, CredentialSource.ENVIRONMENT)
 
@@ -66,7 +75,7 @@ class TestPrecedence:
     ) -> None:
         root = _workspace(tmp_path, mode=mode, dotenv=_dotenv_line(DOTENV_KEY))
 
-        credential = resolve_credential(root, {})
+        credential = resolve_credential(root, {}, interpreter_prefix=_own_env(root))
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
@@ -77,7 +86,9 @@ class TestPrecedence:
             tmp_path, mode=InstallMode.DEPENDENCY, dotenv=_dotenv_line(DOTENV_KEY)
         )
 
-        credential = resolve_credential(root, {CREDENTIAL_VARIABLE: "   "})
+        credential = resolve_credential(
+            root, {CREDENTIAL_VARIABLE: "   "}, interpreter_prefix=_own_env(root)
+        )
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
@@ -86,7 +97,12 @@ class TestPrecedence:
     ) -> None:
         root = _workspace(tmp_path, mode=InstallMode.DEPENDENCY)
 
-        assert resolve_credential(root, {CREDENTIAL_VARIABLE: ""}) is None
+        assert (
+            resolve_credential(
+                root, {CREDENTIAL_VARIABLE: ""}, interpreter_prefix=_own_env(root)
+            )
+            is None
+        )
 
     def test_dev_mode_detected_from_pyproject_opens_dotenv(
         self, tmp_path: Path
@@ -98,7 +114,7 @@ class TestPrecedence:
             encoding="utf-8",
         )
 
-        credential = resolve_credential(root, {})
+        credential = resolve_credential(root, {}, interpreter_prefix=_own_env(root))
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
@@ -109,12 +125,12 @@ class TestClosedDotenv:
             tmp_path, mode=InstallMode.TOOL, dotenv=_dotenv_line(DOTENV_KEY)
         )
 
-        assert resolve_credential(root, {}) is None
+        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
 
     def test_undeclared_workspace_ignores_the_dotenv(self, tmp_path: Path) -> None:
         root = _workspace(tmp_path, dotenv=_dotenv_line(DOTENV_KEY))
 
-        assert resolve_credential(root, {}) is None
+        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
 
     def test_corrupt_declaration_ignores_the_dotenv(self, tmp_path: Path) -> None:
         root = _workspace(
@@ -123,6 +139,28 @@ class TestClosedDotenv:
         declaration = root / DirName.VAULTSPEC.value / WORKSPACE_FILENAME
         declaration.write_text("{not valid json", encoding="utf-8")
 
+        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
+
+    def test_a_declared_mode_does_not_open_the_dotenv_to_a_foreign_interpreter(
+        self, tmp_path: Path
+    ) -> None:
+        # A cloned repository declares dev mode and ships a key, but core runs
+        # from an interpreter outside it - a uv tool, pipx or a release binary.
+        root = _workspace(
+            tmp_path / "clone", mode=InstallMode.DEV, dotenv=_dotenv_line(DOTENV_KEY)
+        )
+        global_tool = tmp_path / "tools" / "vaultspec-core"
+
+        assert resolve_credential(root, {}, interpreter_prefix=global_tool) is None
+
+    def test_the_running_interpreter_is_used_when_no_prefix_is_given(
+        self, tmp_path: Path
+    ) -> None:
+        root = _workspace(
+            tmp_path, mode=InstallMode.DEV, dotenv=_dotenv_line(DOTENV_KEY)
+        )
+
+        # This test process runs outside tmp_path, so the dotenv stays closed.
         assert resolve_credential(root, {}) is None
 
     def test_generic_typesafe_variables_never_enrol(self, tmp_path: Path) -> None:
@@ -136,7 +174,9 @@ class TestClosedDotenv:
             "VAULTSPEC_RAG_TYPESAFE_API_KEY": "rag",
         }
 
-        assert resolve_credential(root, environ) is None
+        assert (
+            resolve_credential(root, environ, interpreter_prefix=_own_env(root)) is None
+        )
 
 
 class TestDotenvShapes:
@@ -154,7 +194,7 @@ class TestDotenvShapes:
     ) -> None:
         root = _workspace(tmp_path, mode=InstallMode.DEPENDENCY, dotenv=text)
 
-        credential = resolve_credential(root, {})
+        credential = resolve_credential(root, {}, interpreter_prefix=_own_env(root))
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
@@ -163,7 +203,7 @@ class TestDotenvShapes:
             tmp_path, mode=InstallMode.DEPENDENCY, dotenv=f'{CREDENTIAL_VARIABLE}=""\n'
         )
 
-        assert resolve_credential(root, {}) is None
+        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
 
 
 class TestReporting:
@@ -178,8 +218,10 @@ class TestReporting:
             tmp_path, mode=InstallMode.DEV, dotenv=_dotenv_line(DOTENV_KEY)
         )
 
-        from_dotenv = hosted_search_config(root, {})
-        from_environment = hosted_search_config(root, {CREDENTIAL_VARIABLE: ENV_KEY})
+        from_dotenv = hosted_search_config(root, {}, interpreter_prefix=_own_env(root))
+        from_environment = hosted_search_config(
+            root, {CREDENTIAL_VARIABLE: ENV_KEY}, interpreter_prefix=_own_env(root)
+        )
         unconfigured = hosted_search_config(_workspace(tmp_path / "bare"), {})
 
         assert from_dotenv == HostedSearchConfig(True, CredentialSource.DOTENV)
