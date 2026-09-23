@@ -22,6 +22,7 @@ from vaultspec_core.plan.frontmatter import (
     parse_plan_frontmatter,
 )
 from vaultspec_core.vaultcore.markdown import (
+    HTML_COMMENT_CLOSE,
     HTML_COMMENT_OPEN,
     HTML_COMMENT_RE,
     document_title,
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 __all__ = [
+    "LINK_RULES_OPEN",
     "EpicIntent",
     "Phase",
     "Plan",
@@ -199,6 +201,9 @@ class PlanParseError(ValueError):
 # ---- Regexes (compiled once) -----------------------------------------------
 
 
+#: The first line of the generated link-rules comment: the serialiser emits
+#: it and the parser recognises the comment by it.
+LINK_RULES_OPEN = f"{HTML_COMMENT_OPEN} LINK RULES:"
 #: The text of a level-two Wave heading.
 _RE_WAVE_HEADING = re.compile(r"Wave +`(?P<id>W\d{2,}[a-z]?)` *- *(?P<title>.+)")
 #: The text of the level-two heading that opens the Epic intent.
@@ -304,7 +309,7 @@ def parse_plan(source: str | Path) -> Plan:
 
 
 _RE_RETIRED_LEDGER = re.compile(
-    r"<!--\s*RETIRED:\s*(?P<body>[^>]*?)\s*-->",
+    rf"{HTML_COMMENT_OPEN}\s*RETIRED:\s*(?P<body>[^>]*?)\s*{HTML_COMMENT_CLOSE}",
 )
 
 
@@ -532,11 +537,11 @@ def _walk_body(
             continue
 
         # 2. Link rules comment block
-        if "<!-- LINK RULES:" in line:
+        if LINK_RULES_OPEN in line:
             has_link_rules = True
             in_link_rules_comment = True
         if in_link_rules_comment:
-            if "-->" in line:
+            if HTML_COMMENT_CLOSE in line:
                 in_link_rules_comment = False
             continue
 

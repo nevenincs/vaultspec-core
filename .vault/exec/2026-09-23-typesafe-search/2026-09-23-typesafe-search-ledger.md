@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:a4553b4bcaba907bc51cf4ad4db5d61a988cb7709ed8558c4574889138851e01'
+body_hash: 'sha256:2b611f0e745c959de2d5ef1912a6d5e850b09ff65ae2536bb0eac03c9b943762'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -244,3 +244,5 @@ related:
 - `S01` `M` `src/vaultspec_core/search/_models.py`
 - `S01` `M` `src/vaultspec_core/search/tests/test_corpus.py`
 - `S01` `verify:` `pytest -m repo test_repository_corpus` -> `pass`
+- `S10` `M` `src/vaultspec_core/plan/serialiser.py`
+- `S10` `verify:` `pytest checks, plan` -> `pass`

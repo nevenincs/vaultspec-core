@@ -27,6 +27,7 @@ from vaultspec_core.plan.display_path import (
     wave_display_path,
 )
 from vaultspec_core.plan.frontmatter import Tier
+from vaultspec_core.plan.parser import LINK_RULES_OPEN
 from vaultspec_core.vaultcore.parser import render_block_list, render_scalar
 
 if TYPE_CHECKING:
@@ -195,7 +196,7 @@ def _render_frontmatter(plan: Plan) -> str:
 
 def _render_link_rules_comment() -> str:
     lines = [
-        "<!-- LINK RULES:",
+        LINK_RULES_OPEN,
         "     - [[wiki-links]] are ONLY for .vault/ documents in the",
         "       related: field above.",
         "     - The related: field carries governing ADRs, if any.",
