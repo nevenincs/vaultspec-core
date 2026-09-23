@@ -687,8 +687,8 @@ and, when it does, where the key was found (`source`: `environment` or `dotenv`)
 describes configuration, not whether the key works. Next to it, `companion` reports
 whether the `vaultspec-rag` companion is provisioned, which decides the next step a
 declined `search` names (`package`, `signal`, `mode`, `version`, `floor`,
-`health_authority`, or `null` when the probe failed). It reports configuration, not
-liveness: a provisioned companion can still be down. Both fields come from the same
+`health_authority`; the key is absent when the probe failed). It reports configuration,
+not liveness: a provisioned companion can still be down. Both fields come from the same
 backend call as `vaultspec-core status --json`. Every response carries a
 `tool_schema_version` field so a client can detect a server upgrade.
 

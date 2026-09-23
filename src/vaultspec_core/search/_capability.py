@@ -106,11 +106,14 @@ def discovery_fields(capability: DiscoveryCapability) -> dict[str, object]:
         capability: The capability :func:`discovery_capability` read.
 
     Returns:
-        ``hosted_search`` and ``companion``, each as its dataclass's fields;
-        ``companion`` is ``None`` when the probe failed.
+        ``hosted_search`` and ``companion``, each as its dataclass's fields.
+        ``companion`` is absent when the probe failed, never null, so the CLI
+        and the MCP result, whose schema publishes no null, send the same
+        keys.
     """
-    companion = capability.companion
-    return {
-        "hosted_search": dataclasses.asdict(capability.hosted_search),
-        "companion": None if companion is None else dataclasses.asdict(companion),
+    fields: dict[str, object] = {
+        "hosted_search": dataclasses.asdict(capability.hosted_search)
     }
+    if capability.companion is not None:
+        fields["companion"] = dataclasses.asdict(capability.companion)
+    return fields

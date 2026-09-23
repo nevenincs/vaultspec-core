@@ -861,8 +861,8 @@ the key came from the `environment` or the workspace `dotenv`. It then shows whe
 search names. Both lines report configuration, not liveness: a configured key can still
 be rejected when a search runs, and a provisioned companion can still be down. Under
 `--json` they are `data.hosted_search` (`configured`, `source`) and `data.companion`
-(`package`, `signal`, `mode`, `version`, `floor`, `health_authority`, or `null` when the
-probe failed).
+(`package`, `signal`, `mode`, `version`, `floor`, `health_authority`; the key is absent
+when the probe failed).
 
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace - a plan-line header, then each step (display path, checkbox state, a

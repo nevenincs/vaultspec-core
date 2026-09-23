@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-24'
 body_schema: 'body-v2'
-body_hash: 'sha256:2e3a6171454abed5020e3ff9ae58b1c86b0d65eb3afbc1c18547785aa2415fa1'
+body_hash: 'sha256:2aa0899180684b7915d423138e220d1bc0bd66a89e659ad78202a6250da58bc2'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -150,6 +150,19 @@ related:
 - `S07` `verify:` `pytest mcp_server search tests/cli exec_ledger dev/guards` -> `pass`
 - `S07` `verify:` `spec reference generate --check` -> `pass`
 - `S07` `by:` `opus-medium`
+- `S01` `A` `src/vaultspec_core/mcp_server/tests/test_result_schema_nulls.py`
+- `S01` `M` `docs/MCP.md`
+- `S01` `M` `docs/CLI.md`
+- `S01` `verify:` `just check-python` -> `pass`
+- `S01` `verify:` `just check-type` -> `pass`
+- `S01` `verify:` `just check-type-strict` -> `pass`
+- `S01` `verify:` `just check-size` -> `pass`
+- `S01` `verify:` `just check-complexity` -> `pass`
+- `S01` `verify:` `just check-nesting` -> `pass`
+- `S01` `verify:` `just check-markdown` -> `pass`
+- `S01` `verify:` `pytest mcp_server search tests/cli exec_ledger dev/guards` -> `pass`
+- `S01` `verify:` `spec reference generate --check` -> `pass`
+- `S01` `by:` `opus-medium`
 
 ## Notes
 

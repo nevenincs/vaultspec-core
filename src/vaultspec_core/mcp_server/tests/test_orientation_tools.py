@@ -16,9 +16,14 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from mcp import Client
 
+from vaultspec_core.config import HostedSearchConfig
 from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
 from vaultspec_core.mcp_server.app import create_server
-from vaultspec_core.search import discovery_capability, discovery_fields
+from vaultspec_core.search import (
+    DiscoveryCapability,
+    discovery_capability,
+    discovery_fields,
+)
 from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 
 from .conftest import data_of
@@ -106,9 +111,24 @@ async def test_status_rollup_carries_the_backend_discovery_record(
         payload = data_of(await client.call_tool("status", {}))
 
     expected = discovery_fields(discovery_capability(vault_root))
-    discovery = {key: payload.get(key) for key in expected}
+    # Key presence, not ``get``: an omitted key and a null one must not match.
+    names = {"hosted_search", "companion"}
+    discovery = {key: payload[key] for key in names & payload.keys()}
     assert discovery == json.loads(json.dumps(expected))
     assert payload["companion"]["package"] == RAG_DISTRIBUTION_NAME
+
+
+def test_a_failed_companion_probe_omits_the_key_on_both_surfaces() -> None:
+    """Both surfaces spread one projection, and it drops the key, never nulls it."""
+    failed = DiscoveryCapability(
+        hosted_search=HostedSearchConfig(configured=False, source=None),
+        companion=None,
+    )
+
+    fields = discovery_fields(failed)
+
+    assert "companion" not in fields
+    assert fields["hosted_search"] == {"configured": False, "source": None}
 
 
 async def test_status_schema_omits_null_only_where_the_wire_does(
