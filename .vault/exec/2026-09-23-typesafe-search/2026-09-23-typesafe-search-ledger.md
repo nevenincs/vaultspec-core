@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:a586d8fb27816df65f9c9f47a48842517736527c6dc16c9fca003af73f37e34f'
+body_hash: 'sha256:bb108e77bb95a9bb61f4eac609adcf4c1d20d5ab8e4e24b0590a677f89e2a6b9'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -86,3 +86,6 @@ related:
 - `S05` `A` `src/vaultspec_core/search/tests/test_engine.py`
 - `S05` `A` `src/vaultspec_core/search/tests/test_lexical.py`
 - `S05` `A` `src/vaultspec_core/search/tests/test_service.py`
+- `S06` `M` `src/vaultspec_core/core/windowing.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S06` `M` `src/vaultspec_core/tests/cli/test_windowing.py`
