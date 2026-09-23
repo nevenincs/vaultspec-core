@@ -21,6 +21,7 @@ from vaultspec_core.search import (
     SearchStatus,
     UnavailableReason,
 )
+from vaultspec_core.search._corpus import SECTION_CHARS, TITLE_CHARS
 from vaultspec_core.search._credential import CREDENTIAL_VARIABLE
 from vaultspec_core.search._engine import KIND_QID
 from vaultspec_core.search._questions import (
@@ -287,6 +288,22 @@ class TestRanking:
         assert top.supporting is not None
         assert top.supporting.section == "Consequences"
         assert_verbatim(paths["adr"], top.supporting)
+
+    def test_title_and_excerpt_location_are_bounded(
+        self, tmp_path: Path, provider: ScriptedProvider, client: JevClient
+    ) -> None:
+        long_title = "t" * (TITLE_CHARS * 3)
+        long_heading = "h" * (SECTION_CHARS * 3)
+        body = CACHE_ADR.replace(
+            "# `cache` adr: `graph cache`", f"# `cache` adr: `{long_title}`"
+        ).replace("## Validation detail", f"## {long_heading}")
+        write_record(tmp_path, "adr", "2026-01-02-cache-adr", body, feature="cache")
+
+        top = search(tmp_path, client).hits[0]
+
+        assert len(top.title) == TITLE_CHARS
+        assert top.excerpt is not None
+        assert top.excerpt.section == long_heading[:SECTION_CHARS]
 
     def test_usage_reports_what_the_provider_billed(
         self, tmp_path: Path, provider: ScriptedProvider, client: JevClient

@@ -51,9 +51,10 @@ __all__ = [
     "UnavailableReason",
 ]
 
-#: Hits returned when a caller names no limit: five hits with their excerpts
-#: sit well inside the discovery reply budget.
-DEFAULT_RESULTS: Final = 5
+#: Hits returned when a caller names no limit. Four hits with their excerpts
+#: at the caps below stay inside the discovery reply budget with room for
+#: long titles and headings; raising the limit reaches the rest.
+DEFAULT_RESULTS: Final = 4
 
 #: The most hits one search returns: every record a search reads in full, so
 #: raising the limit reaches the whole ranking and no page needs an offset.

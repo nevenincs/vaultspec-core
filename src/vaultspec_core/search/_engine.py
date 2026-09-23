@@ -54,7 +54,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, cast
 
-from ._corpus import Record, blob_hash, card_title, record_blocks, summary_card
+from ._corpus import (
+    SECTION_CHARS,
+    TITLE_CHARS,
+    Record,
+    blob_hash,
+    card_title,
+    record_blocks,
+    summary_card,
+)
 from ._lexical import top_matches
 from ._models import Excerpt, SearchHit, SearchUsage
 from ._questions import (
@@ -555,7 +563,9 @@ class Judgment:
 
 
 def _section(block: Block) -> str:
-    return " > ".join(block.heading_path)
+    # Each heading is bounded like a card section, so a malformed heading
+    # cannot make an excerpt's location - or a reply carrying it - unbounded.
+    return " > ".join(heading[:SECTION_CHARS] for heading in block.heading_path)
 
 
 def _block_entry(block: Block) -> dict[str, str]:
@@ -780,7 +790,7 @@ def _hit(judgment: Judgment, score: float, blob: str) -> SearchHit:
         doc_type=record.doc_type,
         feature=record.feature,
         date=record.date,
-        title=record.title,
+        title=record.title[:TITLE_CHARS],
         score=score,
         answers=judgment.answers,
         premise_conflict=judgment.refutes,
