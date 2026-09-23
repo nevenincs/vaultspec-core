@@ -145,7 +145,7 @@ packages = ["src/vaultspec_core"]
 # memory only.
 addopts = [
   "-m",
-  "not benchmark and not claude",
+  "not benchmark and not claude and not typesafe",
   "-ra",
   "--tb=short",
   "--strict-markers",
@@ -185,6 +185,7 @@ markers = [
   "repo: asserts a fact about this checkout, not about the shipped library",
   "integration: requires CLI tools and network",
   "claude: requires Claude CLI installed",
+  "typesafe: calls the live TypeSafe API; needs VAULTSPEC_CORE_TYPESAFE_API_KEY, deselected by default",
   "timeout: timeout in seconds for individual tests",
   "e2e: end-to-end tests requiring real LLM API keys",
   "benchmark: slow scale benchmarks, deselected by default",

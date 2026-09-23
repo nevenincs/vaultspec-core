@@ -50,7 +50,7 @@ PYTHON_PATHS = ("src", "dev", "docs")
 INSTRUMENT_PATHS = ("dev", "docs")
 
 #: Markers requiring an external CLI or credentials, excluded from every gate.
-EXCLUDED_MARKERS = "not claude"
+EXCLUDED_MARKERS = "not claude and not typesafe"
 
 #: What a lane testing the LIBRARY selects. The two populations in this suite
 #: are told apart by marker, not by directory: `repo` tests assert facts about
