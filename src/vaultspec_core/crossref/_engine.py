@@ -169,12 +169,23 @@ def _deal(pool: Sequence[str]) -> list[list[str]]:
 def _run[T](
     jobs: Sequence[Callable[[], T]],
 ) -> list[T]:
-    """Run *jobs* on a bounded pool; the first exception propagates."""
+    """Run *jobs* on a bounded pool; the first exception propagates.
+
+    A failure that decides the outcome cancels every job not yet started, so
+    no request is paid for after the source has already failed; only the ones
+    already in flight finish.
+    """
     if not jobs:
         return []
-    with ThreadPoolExecutor(max_workers=min(WORKERS, len(jobs))) as pool:
-        futures = [pool.submit(job) for job in jobs]
-        return [future.result() for future in futures]
+    pool = ThreadPoolExecutor(max_workers=min(WORKERS, len(jobs)))
+    futures = [pool.submit(job) for job in jobs]
+    try:
+        results = [future.result() for future in futures]
+    except BaseException:
+        pool.shutdown(wait=True, cancel_futures=True)
+        raise
+    pool.shutdown(wait=True)
+    return results
 
 
 def _ask(
@@ -229,11 +240,13 @@ def _choice_rank(
         if evaluation is None:
             continue
         answer = cast("ChoiceAnswer", evaluation.answers[_PICK_QID])
-        for key, value in answer.probabilities.items():
-            if key != NONE_KEY:
-                probability[chunk[int(key[1:])]] = value
+        for number, stem in enumerate(chunk):
+            probability[stem] = answer.probabilities.get(f"c{number}", 0.0)
+    # A refused chunk's candidates are left out of the Choice ranking rather
+    # than ranked last in it, so they keep the rank their code signals give.
+    answered = [stem for stem in pool if stem in probability]
     order = {stem: rank for rank, stem in enumerate(pool)}
-    return sorted(pool, key=lambda s: (-probability.get(s, 0.0), order[s]))
+    return sorted(answered, key=lambda s: (-probability[s], order[s]))
 
 
 def _selection(

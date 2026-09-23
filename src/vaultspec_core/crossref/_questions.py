@@ -41,6 +41,7 @@ __all__ = [
     "LINK_THRESHOLD",
     "MAX_CORPUS",
     "MAX_SOURCES",
+    "MIN_SOURCE_SECONDS",
     "MODEL",
     "NEED_QID",
     "NONE_KEY",
@@ -133,6 +134,10 @@ SOURCE_DEADLINE: Final = 60.0
 
 #: Seconds one sweep may spend, across every source.
 RUN_DEADLINE: Final = 300.0
+
+#: Seconds of the sweep's budget a source needs before it is started; a
+#: source started with less would only spend requests and then fail on time.
+MIN_SOURCE_SECONDS: Final = 15.0
 
 #: Sources one sweep judges at most, and when the caller names no count.
 MAX_SOURCES: Final = 50

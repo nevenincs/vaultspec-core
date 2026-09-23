@@ -48,6 +48,7 @@ from ._prefilter import Index
 from ._questions import (
     DEFAULT_SOURCES,
     MAX_SOURCES,
+    MIN_SOURCE_SECONDS,
     RUN_DEADLINE,
     SOURCE_DEADLINE,
     WORKERS,
@@ -67,6 +68,12 @@ logger = logging.getLogger(__name__)
 #: Statuses a sweep skips unless the source is named: a decision that no
 #: longer governs gains nothing from new links.
 _RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED})
+
+#: Failures that belong to one ADR's text rather than to the provider or the
+#: key: a sweep records them and moves on, since retrying cannot change them.
+_PER_SOURCE = frozenset(
+    {UnavailableReason.CONTENT_REJECTED, UnavailableReason.REQUEST_TOO_LARGE}
+)
 
 
 def sweep_size(max_sources: int) -> int:
@@ -106,14 +113,26 @@ def _declined(
 
 
 def _apply(root: Path, source: AdrRecord, outcome: CrossrefOutcome) -> CrossrefOutcome:
-    """Write *outcome*'s undeclared ``link`` verdicts into the source's ``related:``."""
+    """Write *outcome*'s undeclared ``link`` verdicts into the source's ``related:``.
+
+    A write that fails - an unreadable file, a ``related:`` value that cannot
+    be extended safely - is recorded against its verdict and the rest go on,
+    so the judgment already paid for is never lost to one bad file.
+    """
     path = root / source.rel_path
     verdicts: list[Verdict] = []
+    failed: list[str] = []
     for verdict in outcome.verdicts:
         if verdict.kind is VerdictKind.LINK and not verdict.declared:
-            verdict = replace(verdict, applied=link_document(root, path, verdict.stem))
+            try:
+                written = link_document(root, path, verdict.stem)
+            except (OSError, UnicodeDecodeError, ValueError) as exc:
+                logger.warning("crossref could not link %s: %s", verdict.stem, exc)
+                failed.append(verdict.stem)
+                written = False
+            verdict = replace(verdict, applied=written)
         verdicts.append(verdict)
-    return replace(outcome, verdicts=tuple(verdicts))
+    return replace(outcome, verdicts=tuple(verdicts), write_failed=tuple(failed))
 
 
 def _judge_one(
@@ -220,8 +239,17 @@ def _selection(
     feature: str | None,
     isolated: bool,
 ) -> list[AdrRecord]:
-    """Return the sources a sweep may take, in stem order."""
+    """Return the sources a sweep may take, in stem order.
+
+    Raises:
+        InvalidSourceError: If a named source is no ADR of this vault, or
+            sources are named together with a filter.
+    """
     if refs:
+        if feature is not None or isolated:
+            raise InvalidSourceError(
+                "name ADRs or sweep by feature or isolation, not both"
+            )
         named = {_resolve(ref, records).stem for ref in refs}
         chosen = [records[stem] for stem in named]
     else:
@@ -254,13 +282,19 @@ def crossref_sweep(
     still governs (not superseded or rejected), narrowed to *feature* and, with
     *isolated*, to ADRs that declare no ADR link.
 
+    A source the provider refuses to read, or cannot fit in a request, fails
+    on its own and the sweep moves past it; any other failure stops the sweep
+    at the source that met it, so a resumed run retries that source. The
+    cursor always names the last source processed, so resuming never repeats
+    one that was judged or refused on its own text.
+
     Args:
         root: The workspace root.
         refs: Name the sources outright; each is resolved as
             :func:`crossref_adr` resolves its source.
         feature: Take only this feature's ADRs.
         isolated: Take only ADRs that declare no ADR link.
-        after: Take only sources whose stem sorts after this one: the
+        after: Take only sources whose stem sorts after this ADR: the
             ``next_after`` of the previous run.
         max_sources: Sources to judge; clamped to ``1..MAX_SOURCES``.
         apply: Write each judged source's new ``link`` verdicts as it
@@ -272,19 +306,22 @@ def crossref_sweep(
         The sweep outcome.
 
     Raises:
-        InvalidSourceError: If a named source is no ADR of this vault.
+        InvalidSourceError: If a named source or the cursor is no ADR of this
+            vault, or sources are named together with a filter.
         CorpusTooLargeError: If the vault holds more ADRs than one run reads.
     """
     records = {record.stem: record for record in load_adrs(root)}
     selection = _selection(records, list(refs), feature, isolated)
-    if after:
-        selection = [record for record in selection if record.stem > after]
-    size = sweep_size(max_sources)
-    taken = selection[:size]
+    cursor = _resolve(after, records).stem if after else None
+    if cursor is not None:
+        selection = [record for record in selection if record.stem > cursor]
+    taken = selection[: sweep_size(max_sources)]
     credential = _credential(root, environ)
     if credential is None:
         declined = tuple(_declined(root, record.stem) for record in taken[:1])
-        return SweepOutcome(outcomes=declined, remaining=len(selection))
+        return SweepOutcome(
+            outcomes=declined, remaining=len(selection), next_after=cursor
+        )
     owned = client is None
     active = _client(credential, client)
     if active is None:
@@ -293,32 +330,40 @@ def crossref_sweep(
             taken[0].stem if taken else "",
             UnavailableReason.CREDENTIAL_REJECTED,
         )
-        return SweepOutcome(outcomes=(outcome,), remaining=len(selection))
+        return SweepOutcome(
+            outcomes=(outcome,),
+            remaining=len(selection),
+            next_after=cursor,
+            stopped=UnavailableReason.CREDENTIAL_REJECTED.value,
+        )
     index = Index(list(records.values()))
     run_deadline = time.monotonic() + RUN_DEADLINE
     outcomes: list[CrossrefOutcome] = []
+    processed = 0
     stopped: str | None = None
     try:
         for record in taken:
-            if time.monotonic() >= run_deadline:
-                stopped = "deadline"
+            if run_deadline - time.monotonic() < MIN_SOURCE_SECONDS:
+                stopped = UnavailableReason.DEADLINE.value
                 break
             deadline = min(time.monotonic() + SOURCE_DEADLINE, run_deadline)
             outcome = _judge_one(
                 root, active, record, index, deadline=deadline, apply=apply
             )
             outcomes.append(outcome)
-            if outcome.status is not CrossrefStatus.OK:
-                stopped = outcome.reason.value if outcome.reason else "unavailable"
-                break
+            if outcome.status is CrossrefStatus.OK or outcome.reason in _PER_SOURCE:
+                processed += 1
+                cursor = record.stem
+                continue
+            stopped = outcome.reason.value if outcome.reason else "unavailable"
+            break
     finally:
         if owned:
             active.close()
-    judged = [o.source for o in outcomes if o.status is CrossrefStatus.OK]
-    remaining = len(selection) - len(judged)
+    remaining = len(selection) - processed
     return SweepOutcome(
         outcomes=tuple(outcomes),
         remaining=remaining,
-        next_after=judged[-1] if judged and remaining else None,
+        next_after=cursor if remaining else None,
         stopped=stopped,
     )

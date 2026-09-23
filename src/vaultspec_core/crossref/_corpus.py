@@ -82,12 +82,13 @@ _TITLE_PREFIX_RE: Final = re.compile(r"^`?[a-z0-9-]+`?\s+adr:\s*")
 _STEM_RE: Final = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 
 #: Code spans that name no artifact: status tokens, record types, bare
-#: numbers, booleans and all-caps words used as emphasis.
+#: numbers, booleans and all-caps words used as emphasis. An all-caps name with
+#: an underscore is a configuration variable, which is an artifact.
 _NOT_ARTIFACT_RE: Final = re.compile(
     r"^(?:true|false|none|null|yes|no|"
     r"proposed|accepted|rejected|superseded|deprecated|"
     r"adr|plan|research|audit|reference|exec|index|"
-    r"[\d.,%x]+|[A-Z0-9_]+)$"
+    r"[\d.,%x]+|[A-Z0-9]+)$"
 )
 
 #: A trailing call, line locator or line range on a code span.

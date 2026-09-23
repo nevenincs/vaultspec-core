@@ -90,11 +90,13 @@ class Judge:
         questions: dict[str, dict[str, Any]] = payload["questions"]
         if "candidate" in state:
             self.pairs += 1
-            if BLOCKED in state["candidate"]["text"]:
-                return Reply.html(403, "<html><body>Attention Required!</body></html>")
-            answers = self._pair(state["candidate"]["text"])
         else:
             self.choices += 1
+        if BLOCKED.encode() in received.body:
+            return Reply.html(403, "<html><body>Attention Required!</body></html>")
+        if "candidate" in state:
+            answers = self._pair(state["candidate"]["text"])
+        else:
             (qid, question), *_ = questions.items()
             answers = {qid: self._choice(question["criteria"])}
         usage = {"input_tokens": len(received.body) // 4, "output_tokens": 0}

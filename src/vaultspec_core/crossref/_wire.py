@@ -87,9 +87,10 @@ def _verdict_fields(verdict: Verdict) -> dict[str, object]:
         "kind": verdict.kind.value,
         "score": round(verdict.score, SCORE_PLACES),
         "relation": verdict.relation,
-        "status": verdict.status.value if verdict.status else None,
         "declared": verdict.declared,
     }
+    if verdict.status is not None:
+        fields["status"] = verdict.status.value
     if verdict.applied:
         fields["applied"] = True
     return fields
@@ -120,6 +121,8 @@ def _sweep_source(outcome: CrossrefOutcome, budget: int) -> dict[str, object]:
         "links": len(outcome.links),
         "written": len(outcome.written),
     }
+    if outcome.write_failed:
+        fields["write_failed"] = list(outcome.write_failed)
     if outcome.bounds is not None and outcome.bounds.unjudged_declared:
         fields["unjudged_declared"] = len(outcome.bounds.unjudged_declared)
     _decline_fields(outcome, fields)

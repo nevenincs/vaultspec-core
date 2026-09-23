@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:0d360b7060a10abf5a28d2e0a37d61e0b09d0003a86ea74f58d53241a8cbd5b3'
+body_hash: 'sha256:a3f2dbd24343f89750e9c0e65ec60539a2ad92cd4cb31e76a17a2d19b253eb98'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -70,6 +70,15 @@ related:
 - `S08` `M` `.vault/adr/2026-07-09-mcp-tool-schema-adr.md`
 - `S08` `M` `.vault/adr/2026-08-01-mcp-read-only-adr.md`
 - `S08` `verify:` `vaultspec-core vault check all` -> `pass`
+- `S03` `M` `src/vaultspec_core/crossref/_engine.py`
+- `S03` `M` `src/vaultspec_core/crossref/_service.py`
+- `S03` `M` `src/vaultspec_core/crossref/_corpus.py`
+- `S03` `M` `src/vaultspec_core/crossref/_models.py`
+- `S03` `M` `src/vaultspec_core/crossref/_questions.py`
+- `S03` `M` `src/vaultspec_core/crossref/_wire.py`
+- `S03` `A` `src/vaultspec_core/crossref/tests/test_bounds.py`
+- `S03` `M` `src/vaultspec_core/crossref/tests/test_service.py`
+- `S03` `verify:` `pytest src/vaultspec_core/crossref` -> `pass`
 
 ## Notes
 

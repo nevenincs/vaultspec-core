@@ -173,6 +173,8 @@ class CrossrefOutcome:
         reason: Why a configured run failed (``unavailable`` only).
         next_step: The search to run instead (not ``ok``).
         usage: What was sent; ``None`` when nothing was.
+        write_failed: Stems of ``link`` verdicts that applying could not
+            write into the source's ``related:``.
     """
 
     source: str
@@ -183,6 +185,7 @@ class CrossrefOutcome:
     reason: UnavailableReason | None = None
     next_step: NextStep | None = None
     usage: CrossrefUsage | None = None
+    write_failed: tuple[str, ...] = ()
 
     @property
     def links(self) -> tuple[Verdict, ...]:
@@ -201,9 +204,9 @@ class SweepOutcome:
 
     Attributes:
         outcomes: One outcome per source judged, in sweep order.
-        remaining: Sources the selection held that this run did not reach.
-        next_after: The last source judged, to resume after; ``None`` when
-            the selection is exhausted.
+        remaining: Sources the selection held that this run did not process.
+        next_after: The last source processed - judged, or refused on its own
+            text - to resume after; ``None`` when the selection is exhausted.
         stopped: Why the sweep stopped early: the failure reason of the
             source that failed, ``deadline`` for the run deadline, or ``None``
             when it judged every source it took.
