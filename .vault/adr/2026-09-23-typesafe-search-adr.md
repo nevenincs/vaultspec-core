@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:f8cf7c0b26d8849404e4174229ae52c23a21ea0b0fda4b69632d8e37338a82e4'
+body_hash: 'sha256:7bcec3aec17f3bf772fe3488de950d6bef907f2d37b6ad52b816e30df9d62fe1'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -245,5 +245,6 @@ key, never redirect one.
 
 - The same question module can serve other judgments over vault records, such as
   finding which accepted decisions govern a plan.
-- vaultspec-rag should treat HTML 403 as a content rejection rather than a credential
-  failure. That fix is rag's to make.
+- Two vaultspec-rag defects found here are filed with rag, where the fixes belong:
+  vault hits that cannot locate the answer (nevenincs/vaultspec-rag#531), and a
+  content-block 403 that disables hosted mode (nevenincs/vaultspec-rag#532).

@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:a46ef1b847ae7c131183ed144bc9c2889ef0f5328a6ff0e703497c7026424b9e'
+body_hash: 'sha256:6acce11d93fa278eaaf4cddfaa653d3774474eca0497dd8d843fdd8558d6cf8e'
 related:
   - '[[2026-08-26-rag-search-exposure-adr]]'
   - '[[2026-08-23-envelope-optimization-adr]]'
@@ -125,8 +125,10 @@ Harness, queries and raw outputs are in `tmp/typesafe-search-eval/`.
 | BM25 over full text, in-process          | 0.57        | 0.86        | 0.725         | 11/21                           | 0/3                        | 13 ms          |
 
 rag's vault results carry no section, anchor or line range. Its only excerpt is a
-200-character `snippet` from the start of the matched chunk. That snippet contained the
-gold evidence in 0 of 21 cases and showed the gold section heading in 8. Jev's excerpt
+200-character `snippet` from the start of the matched chunk, which is up to 3,000
+characters (`vaultspec_rag/search/_searcher.py`, `_map_vault_results`). That snippet
+contained the gold evidence in 0 of 21 cases and showed the gold section heading in 8.
+This is filed as https://github.com/nevenincs/vaultspec-rag/issues/531. Jev's excerpt
 is a located block (median 638 characters) whose heading matched the gold section in 19
 of 21 cases. rag's latency includes a CLI process per query. Between the two runs, the
 "does anything answer" value moved by at most 0.03 per query.
@@ -241,9 +243,12 @@ Consequences:
 - An HTML 403 is a content rejection and must be handled per request, not as a
   credential failure.
 - rag's transport treats every 403 as a permanent credential failure
-  (`vaultspec_rag/search/_typesafe_transport.py:260`). One blocked candidate could
-  therefore disable its hosted mode until restart. This is inferred from code, not
-  reproduced.
+  (`vaultspec_rag/search/_typesafe_transport.py:260`). Reproduced on
+  `vaultspec-rag@0.4.35`: one candidate quoting `python -m pytest` returned
+  `credential_rejected`, and every later request was refused with `credential_disabled`
+  until restart. The same body sent without a key also returns the HTML 403, so the
+  block happens at the edge before authentication. Filed as
+  https://github.com/nevenincs/vaultspec-rag/issues/532.
 - A missing key returned 403 with `authentication_error`, not the 401 the API reference
   lists (https://docs.typesafe.ai/api). Status alone does not identify the cause.
 
@@ -365,6 +370,8 @@ transport would not.
 - https://docs.typesafe.ai/cookbooks/classifying_rag_passages
 - https://docs.typesafe.ai/sdk/python/changelog
 - https://pypi.org/pypi/typesafe-sdk/json
+- https://github.com/nevenincs/vaultspec-rag/issues/531
+- https://github.com/nevenincs/vaultspec-rag/issues/532
 - `src/vaultspec_core/mcp_server/tools/documents.py:942`
 - `src/vaultspec_core/mcp_server/tools/documents.py:1029`
 - `src/vaultspec_core/core/discovery_guidance.py:48`
