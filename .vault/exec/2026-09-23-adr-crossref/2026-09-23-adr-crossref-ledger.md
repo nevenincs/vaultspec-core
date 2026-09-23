@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:59b5f900a4be4c2b476bbf55885c6924bc26f19e4e2067c8138f868d7f26067c'
+body_hash: 'sha256:d65b8e70a42d4b185fe87fb764c45b9f39af764f490015255fd7ae05a9318e1f'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -65,6 +65,8 @@ related:
 - `S06` `M` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
 - `S06` `M` `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`
 - `S06` `verify:` `pytest test_cli_reference_drift test_corpus_contracts test_discovery_guidance test_cli_language_contract test_template_annotations` -> `pass`
+- `S07` `A` `src/vaultspec_core/crossref/tests/test_live.py`
+- `S07` `verify:` `pytest src/vaultspec_core/crossref/tests/test_live.py -m typesafe (three runs)` -> `pass`
 
 ## Notes
 
