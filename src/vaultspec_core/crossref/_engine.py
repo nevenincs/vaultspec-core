@@ -30,7 +30,7 @@ from __future__ import annotations
 import math
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_EXCEPTION, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -71,7 +71,7 @@ if TYPE_CHECKING:
     from ._corpus import AdrRecord
     from ._prefilter import Index
 
-__all__ = ["Judgement", "Meter", "judge", "max_evaluations"]
+__all__ = ["Judgement", "Meter", "judge", "max_evaluations", "order_choice"]
 
 #: The question id of a Choice chunk's one question.
 _PICK_QID = "pick"
@@ -179,13 +179,13 @@ def _run[T](
         return []
     pool = ThreadPoolExecutor(max_workers=min(WORKERS, len(jobs)))
     futures = [pool.submit(job) for job in jobs]
-    try:
-        results = [future.result() for future in futures]
-    except BaseException:
+    done, _ = wait(futures, return_when=FIRST_EXCEPTION)
+    failed = next((f for f in futures if f in done and f.exception()), None)
+    if failed is not None:
         pool.shutdown(wait=True, cancel_futures=True)
-        raise
+        raise cast("BaseException", failed.exception())
     pool.shutdown(wait=True)
-    return results
+    return [future.result() for future in futures]
 
 
 def _ask(
@@ -205,6 +205,31 @@ def _ask(
         return None
     meter.answered(evaluation)
     return evaluation
+
+
+def order_choice(pool: Sequence[str], probability: Mapping[str, float]) -> list[str]:
+    """Order *pool* by Choice probability, placing unanswered candidates by code rank.
+
+    A candidate whose chunk the provider refused has no probability. It takes
+    the position its code rank gives it rather than the last one, so a
+    refusal neither promotes nor buries it.
+
+    Args:
+        pool: The candidates, in code-rank order.
+        probability: The Choice probability of each answered candidate.
+
+    Returns:
+        Every candidate of *pool*, best first.
+    """
+    order = {stem: rank for rank, stem in enumerate(pool)}
+    ranked = sorted(
+        (stem for stem in pool if stem in probability),
+        key=lambda s: (-probability[s], order[s]),
+    )
+    for stem in pool:
+        if stem not in probability:
+            ranked.insert(min(order[stem], len(ranked)), stem)
+    return ranked
 
 
 def _choice_rank(
@@ -242,11 +267,7 @@ def _choice_rank(
         answer = cast("ChoiceAnswer", evaluation.answers[_PICK_QID])
         for number, stem in enumerate(chunk):
             probability[stem] = answer.probabilities.get(f"c{number}", 0.0)
-    # A refused chunk's candidates are left out of the Choice ranking rather
-    # than ranked last in it, so they keep the rank their code signals give.
-    answered = [stem for stem in pool if stem in probability]
-    order = {stem: rank for rank, stem in enumerate(pool)}
-    return sorted(answered, key=lambda s: (-probability[s], order[s]))
+    return order_choice(pool, probability)
 
 
 def _selection(

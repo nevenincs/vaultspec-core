@@ -220,7 +220,7 @@ def test_a_sweep_moves_past_an_adr_refused_on_its_own_text(
     write_adr(tmp_path, "2026-01-04-refused-adr", implementation=BLOCKED)
 
     sweep = crossref_sweep(
-        tmp_path, max_sources=50, environ=ENV, client=_client(provider)
+        tmp_path, all_adrs=True, max_sources=50, environ=ENV, client=_client(provider)
     )
 
     reasons = {o.source: o.reason for o in sweep.outcomes}
@@ -238,7 +238,7 @@ def test_a_resumed_sweep_that_fails_first_keeps_its_cursor(tmp_path: Path) -> No
     with ScriptedProvider(limited) as provider:
         client = JevClient(KEY, endpoint=provider.endpoint, max_attempts=1)
         sweep = crossref_sweep(
-            tmp_path, after=f"[[{SOURCE}]]", environ=ENV, client=client
+            tmp_path, all_adrs=True, after=f"[[{SOURCE}]]", environ=ENV, client=client
         )
 
     assert sweep.stopped == UnavailableReason.RATE_LIMITED.value
@@ -252,7 +252,9 @@ def test_an_unknown_cursor_and_mixed_selectors_are_refused(
     _small_vault(tmp_path)
 
     with pytest.raises(InvalidSourceError):
-        crossref_sweep(tmp_path, after="2026-09-09-nothing-adr", environ=ENV)
+        crossref_sweep(
+            tmp_path, all_adrs=True, after="2026-09-09-nothing-adr", environ=ENV
+        )
     with pytest.raises(InvalidSourceError):
         crossref_sweep(tmp_path, [SOURCE], isolated=True, environ=ENV)
     assert provider.received == []

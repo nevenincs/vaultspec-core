@@ -40,6 +40,7 @@ __all__ = [
     "LEAD_CHARS",
     "LINK_THRESHOLD",
     "MAX_CORPUS",
+    "MAX_REFUSALS",
     "MAX_SOURCES",
     "MIN_SOURCE_SECONDS",
     "MODEL",
@@ -138,6 +139,11 @@ RUN_DEADLINE: Final = 300.0
 #: Seconds of the sweep's budget a source needs before it is started; a
 #: source started with less would only spend requests and then fail on time.
 MIN_SOURCE_SECONDS: Final = 15.0
+
+#: Sources in a row the provider may refuse before a sweep stops: one refused
+#: ADR is its own text, a run of them is more likely the provider refusing
+#: everything.
+MAX_REFUSALS: Final = 3
 
 #: Sources one sweep judges at most, and when the caller names no count.
 MAX_SOURCES: Final = 50

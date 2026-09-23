@@ -93,6 +93,8 @@ def link_document(root: Path, path: Path, dst: str) -> bool:
         OSError: When the document cannot be read or written.
         ValueError: When the existing ``related:`` value cannot be extended
             safely.
+        AdvisoryLockTimeoutError: When another writer holds the document's
+            lock past the lock timeout.
     """
     from .edit_engine import document_write_lock, invalidate_graph_cache
     from .related_surgery import append_related_entry

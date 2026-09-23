@@ -31,6 +31,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from ..core.enums import AdrStatus
+from ..core.exceptions import AdvisoryLockTimeoutError
 from ..search._models import UnavailableReason
 from ..vaultcore.models import DocType
 from ..vaultcore.related_links import link_document
@@ -47,6 +48,7 @@ from ._models import (
 from ._prefilter import Index
 from ._questions import (
     DEFAULT_SOURCES,
+    MAX_REFUSALS,
     MAX_SOURCES,
     MIN_SOURCE_SECONDS,
     RUN_DEADLINE,
@@ -69,8 +71,11 @@ logger = logging.getLogger(__name__)
 #: longer governs gains nothing from new links.
 _RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED})
 
-#: Failures that belong to one ADR's text rather than to the provider or the
-#: key: a sweep records them and moves on, since retrying cannot change them.
+#: Failures that can belong to one ADR's text rather than to the provider or
+#: the key: a sweep records them and moves on, since retrying cannot change
+#: them. A content refusal counts as the ADR's own only once the provider has
+#: read something in this run; before that it may be an edge blocking every
+#: request, and the sweep stops instead.
 _PER_SOURCE = frozenset(
     {UnavailableReason.CONTENT_REJECTED, UnavailableReason.REQUEST_TOO_LARGE}
 )
@@ -126,7 +131,12 @@ def _apply(root: Path, source: AdrRecord, outcome: CrossrefOutcome) -> CrossrefO
         if verdict.kind is VerdictKind.LINK and not verdict.declared:
             try:
                 written = link_document(root, path, verdict.stem)
-            except (OSError, UnicodeDecodeError, ValueError) as exc:
+            except (
+                OSError,
+                UnicodeDecodeError,
+                ValueError,
+                AdvisoryLockTimeoutError,
+            ) as exc:
                 logger.warning("crossref could not link %s: %s", verdict.stem, exc)
                 failed.append(verdict.stem)
                 written = False
@@ -238,6 +248,7 @@ def _selection(
     refs: Sequence[str],
     feature: str | None,
     isolated: bool,
+    every: bool,
 ) -> list[AdrRecord]:
     """Return the sources a sweep may take, in stem order.
 
@@ -246,9 +257,9 @@ def _selection(
             sources are named together with a filter.
     """
     if refs:
-        if feature is not None or isolated:
+        if feature is not None or isolated or every:
             raise InvalidSourceError(
-                "name ADRs or sweep by feature or isolation, not both"
+                "name ADRs or sweep by feature, isolation or all, not both"
             )
         named = {_resolve(ref, records).stem for ref in refs}
         chosen = [records[stem] for stem in named]
@@ -270,6 +281,7 @@ def crossref_sweep(
     *,
     feature: str | None = None,
     isolated: bool = False,
+    all_adrs: bool = False,
     after: str | None = None,
     max_sources: int = DEFAULT_SOURCES,
     apply: bool = False,
@@ -280,7 +292,8 @@ def crossref_sweep(
 
     With *refs* the sweep takes exactly those ADRs; otherwise every ADR that
     still governs (not superseded or rejected), narrowed to *feature* and, with
-    *isolated*, to ADRs that declare no ADR link.
+    *isolated*, to ADRs that declare no ADR link. *all_adrs* takes every such
+    ADR unnarrowed; one of the selectors is required.
 
     A source the provider refuses to read, or cannot fit in a request, fails
     on its own and the sweep moves past it; any other failure stops the sweep
@@ -294,6 +307,7 @@ def crossref_sweep(
             :func:`crossref_adr` resolves its source.
         feature: Take only this feature's ADRs.
         isolated: Take only ADRs that declare no ADR link.
+        all_adrs: Take every ADR that still governs.
         after: Take only sources whose stem sorts after this ADR: the
             ``next_after`` of the previous run.
         max_sources: Sources to judge; clamped to ``1..MAX_SOURCES``.
@@ -306,12 +320,15 @@ def crossref_sweep(
         The sweep outcome.
 
     Raises:
-        InvalidSourceError: If a named source or the cursor is no ADR of this
-            vault, or sources are named together with a filter.
+        InvalidSourceError: If no selector is given, a named source or the
+            cursor is no ADR of this vault, or sources are named together
+            with a selector.
         CorpusTooLargeError: If the vault holds more ADRs than one run reads.
     """
+    if not refs and feature is None and not isolated and not all_adrs:
+        raise InvalidSourceError("name an ADR, or sweep by feature, isolation or all")
     records = {record.stem: record for record in load_adrs(root)}
-    selection = _selection(records, list(refs), feature, isolated)
+    selection = _selection(records, list(refs), feature, isolated, all_adrs)
     cursor = _resolve(after, records).stem if after else None
     if cursor is not None:
         selection = [record for record in selection if record.stem > cursor]
@@ -320,7 +337,9 @@ def crossref_sweep(
     if credential is None:
         declined = tuple(_declined(root, record.stem) for record in taken[:1])
         return SweepOutcome(
-            outcomes=declined, remaining=len(selection), next_after=cursor
+            outcomes=declined,
+            remaining=len(selection),
+            next_after=cursor if selection else None,
         )
     owned = client is None
     active = _client(credential, client)
@@ -333,13 +352,15 @@ def crossref_sweep(
         return SweepOutcome(
             outcomes=(outcome,),
             remaining=len(selection),
-            next_after=cursor,
+            next_after=cursor if selection else None,
             stopped=UnavailableReason.CREDENTIAL_REJECTED.value,
         )
     index = Index(list(records.values()))
     run_deadline = time.monotonic() + RUN_DEADLINE
     outcomes: list[CrossrefOutcome] = []
     processed = 0
+    refusals = 0
+    provider_read = False
     stopped: str | None = None
     try:
         for record in taken:
@@ -351,7 +372,17 @@ def crossref_sweep(
                 root, active, record, index, deadline=deadline, apply=apply
             )
             outcomes.append(outcome)
-            if outcome.status is CrossrefStatus.OK or outcome.reason in _PER_SOURCE:
+            usage = outcome.usage
+            provider_read = provider_read or (
+                usage is not None and usage.requests > usage.unscored
+            )
+            refusals = 0 if outcome.status is CrossrefStatus.OK else refusals + 1
+            own = (
+                outcome.reason in _PER_SOURCE
+                and provider_read
+                and refusals < MAX_REFUSALS
+            )
+            if outcome.status is CrossrefStatus.OK or own:
                 processed += 1
                 cursor = record.stem
                 continue

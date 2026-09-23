@@ -342,10 +342,11 @@ def test_a_sweep_runs_in_stem_order_and_resumes_after_its_cursor(
     write_adr(tmp_path, "2026-01-04-retired-adr", status="superseded")
 
     first = crossref_sweep(
-        tmp_path, max_sources=3, environ=ENV, client=_client(provider)
+        tmp_path, all_adrs=True, max_sources=3, environ=ENV, client=_client(provider)
     )
     second = crossref_sweep(
         tmp_path,
+        all_adrs=True,
         after=first.next_after,
         max_sources=50,
         environ=ENV,
@@ -396,7 +397,9 @@ def test_a_sweep_stops_at_the_first_failed_source(tmp_path: Path) -> None:
 
     with ScriptedProvider(limited) as provider:
         client = JevClient(KEY, endpoint=provider.endpoint, max_attempts=1)
-        sweep = crossref_sweep(tmp_path, max_sources=5, environ=ENV, client=client)
+        sweep = crossref_sweep(
+            tmp_path, all_adrs=True, max_sources=5, environ=ENV, client=client
+        )
 
     assert len(sweep.outcomes) == 1
     assert sweep.outcomes[0].reason is UnavailableReason.RATE_LIMITED
@@ -415,7 +418,7 @@ def test_a_sweep_reply_is_bounded(tmp_path: Path, provider: ScriptedProvider) ->
         )
 
     sweep = crossref_sweep(
-        tmp_path, max_sources=12, environ=ENV, client=_client(provider)
+        tmp_path, all_adrs=True, max_sources=12, environ=ENV, client=_client(provider)
     )
     fields = sweep_fields(sweep)
 

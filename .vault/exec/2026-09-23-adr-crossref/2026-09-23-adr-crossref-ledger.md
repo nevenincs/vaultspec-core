@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:6c4727ed07b46caf38ad86929d58ec2d65cce7bb23ac062928c150d2523f8e5d'
+body_hash: 'sha256:da8abd073ecad7365276b190c46bc62df2b3e92701deacaab86bcb6ec9803eb1'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -83,6 +83,12 @@ related:
 - `S04` `verify:` `pytest test_cli_handbook_drift test_cli_reference_drift test_cli_reference_generated test_vault_crossref_cmd` -> `pass`
 - `S05` `M` `src/vaultspec_core/mcp_server/tools/crossref.py`
 - `S05` `M` `src/vaultspec_core/mcp_server/tests/test_crossref_tool.py`
+- `S09` `verify:` `pytest full default suite (5731)` -> `pass`
+- `S09` `verify:` `live crossref on this vault: 37 requests, 4.3 s, within 46 and 60 s` -> `pass`
+- `S09` `verify:` `live crossref sweep of 3 cadrumo ADRs (534): 38 requests and 7.7-10.4 s per source, within 46 and 60 s` -> `pass`
+- `S03` `M` `src/vaultspec_core/crossref/tests/test_bounds.py`
+- `S03` `A` `src/vaultspec_core/crossref/tests/test_sweep_safety.py`
+- `S03` `M` `src/vaultspec_core/vaultcore/related_links.py`
 
 ## Notes
 

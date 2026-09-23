@@ -206,7 +206,8 @@ class SweepOutcome:
         outcomes: One outcome per source judged, in sweep order.
         remaining: Sources the selection held that this run did not process.
         next_after: The last source processed - judged, or refused on its own
-            text - to resume after; ``None`` when the selection is exhausted.
+            text once the provider had read others - to resume after; ``None``
+            when the selection is exhausted.
         stopped: Why the sweep stopped early: the failure reason of the
             source that failed, ``deadline`` for the run deadline, or ``None``
             when it judged every source it took.
