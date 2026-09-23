@@ -121,7 +121,7 @@ default:
 # environment `init-python` creates. The report still lists every phase, with
 # the ones that were not attempted naming the failure that stopped them.
 
-# Initialize a fresh clone or worktree: dependencies, framework, hooks, .env.
+# Initialize a fresh clone or worktree: dependencies, framework, .env.
 [group('setup')]
 init:
     uv run --no-project --python 3.13 -- python -m dev.init all
@@ -136,7 +136,7 @@ init-python:
 init-node:
     uv run --no-project --python 3.13 -- python -m dev.init node
 
-# Enroll the Vaultspec framework and install the committed git hooks.
+# Enroll the Vaultspec framework. Installs no git hook.
 [group('setup')]
 init-tools:
     uv run --no-project --python 3.13 -- python -m dev.init tools

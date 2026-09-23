@@ -250,9 +250,8 @@ your installation route.
 and selection rules.
 
 **Pre-commit hooks.** Generated configuration doesn't activate a Git hook. If you use
-pre-commit, run `pre-commit install` to activate it. Vault checks and annotation cleanup
-aren't limited to staged files; cleanup modifies documents. Review changes before
-committing.
+pre-commit, run `pre-commit install` to activate it. The generated hooks check the whole
+vault rather than only staged files, and never modify documents.
 
 Use the [pre-commit controls](CLI.md#vaultspec-core-spec-precommit) to enable or disable
 configuration generation. These settings don't remove an existing configuration or
