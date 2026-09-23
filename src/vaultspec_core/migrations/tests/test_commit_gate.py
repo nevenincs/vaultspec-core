@@ -230,3 +230,45 @@ def test_the_driver_runs_it_for_a_0_2_4_workspace(factory: WorkspaceFactory) -> 
     assert [r.name for r in results] == ["commit_gate"]
     assert _ids(factory.root / _YAML) == ["ruff", _GATE]
     assert read_manifest_data(factory.root).vaultspec_version == "0.2.5"
+
+
+class TestLeavesWhatItCannotRead:
+    def test_a_crlf_prek_toml_keeps_its_line_endings(self, tmp_path: Path) -> None:
+        """Only vaultspec's lines between the markers may change.
+
+        The migration runs unattended, so re-emitting a CRLF file as LF - or
+        adding a trailing newline the operator's tail never had - would be a
+        whole-file diff nobody asked for.
+        """
+        crlf_block = _RETIRED_BLOCK.replace("\n", "\r\n")
+        tail = "# operator tail, no final newline"
+        original = _OPERATOR_TOML.replace("\n", "\r\n") + "\r\n" + crlf_block + tail
+        (tmp_path / "prek.toml").write_bytes(original.encode())
+
+        assert migrate(tmp_path).counts == {"yaml": 0, "prek": 1}
+
+        rewritten = (tmp_path / "prek.toml").read_bytes().decode()
+        assert "\n" not in rewritten.replace("\r\n", "")
+        assert rewritten.startswith(_OPERATOR_TOML.replace("\n", "\r\n"))
+        assert rewritten.endswith("\r\n" + tail)
+        assert _GATE in rewritten
+
+    def test_an_unparseable_yaml_config_is_reported_not_called_clean(
+        self, tmp_path: Path
+    ) -> None:
+        broken = "repos: [unclosed\n  - id: vault-fix\n"
+        (tmp_path / _YAML).write_text(broken, encoding="utf-8")
+
+        result = migrate(tmp_path)
+
+        assert "could not be read" in result.summary
+        assert (tmp_path / _YAML).read_text(encoding="utf-8") == broken
+
+    def test_an_invalid_prek_toml_is_left_untouched(self, tmp_path: Path) -> None:
+        broken = "[[repos\n" + _RETIRED_BLOCK
+        (tmp_path / "prek.toml").write_text(broken, encoding="utf-8")
+
+        result = migrate(tmp_path)
+
+        assert "could not be read" in result.summary
+        assert (tmp_path / "prek.toml").read_text(encoding="utf-8") == broken

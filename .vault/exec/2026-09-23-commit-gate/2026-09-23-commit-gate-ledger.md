@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:ba558b7cc5f4ef2275523cf79c8c5ea1c3543a9af706a6e449dd4cda8c40910d'
+body_hash: 'sha256:efbb3aa3e99a98b8e1b190860f45c8f20367c5f4637183dc8eaf548738ab8c85'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -91,6 +91,10 @@ related:
 - `S10` `M` `src/vaultspec_core/core/prek_boundary.py`
 - `S10` `M` `.vault/adr/2026-09-23-commit-gate-adr.md`
 - `S10` `verify:` `vaultspec-core migrations run --dry-run` -> `pass`
+- `S10` `M` `src/vaultspec_core/core/precommit.py`
+- `S10` `M` `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py`
+- `S10` `M` `src/vaultspec_core/migrations/tests/test_commit_gate.py`
+- `S10` `verify:` `ty check` -> `pass`
 
 ## Notes
 

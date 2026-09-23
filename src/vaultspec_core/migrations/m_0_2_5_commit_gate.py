@@ -74,6 +74,42 @@ def preview(workspace: Path) -> list[Path]:
     return []
 
 
+def _converge_prek(workspace: Path) -> MigrationResult:
+    """Re-render a stale managed block in ``prek.toml``; never add one."""
+    from ..core.prek_boundary import collect_prek_boundary, refresh_managed_prek_block
+
+    if collect_prek_boundary(workspace).parse_error:
+        return _result("prek.toml could not be read; left for spec doctor")
+    if refresh_managed_prek_block(workspace):
+        return _result(
+            "re-rendered the managed prek.toml block with the commit gate", prek=1
+        )
+    return _result("no stale vaultspec block in prek.toml; nothing converged")
+
+
+def _converge_yaml(workspace: Path) -> MigrationResult:
+    """Converge the YAML config prek reads, while it carries vaultspec hooks."""
+    from ..core.precommit import managed_strip_outcome, scaffold_precommit
+    from ..core.prek_boundary import precommit_config_path
+
+    config = precommit_config_path(workspace)
+    if not config.exists():
+        return _result("no hook config; nothing converged")
+    # ``managed_strip_outcome`` answers "does this config carry any vaultspec
+    # hook, current or retired" without writing: a config it would leave
+    # unchanged has none, which is an operator's decision to honour.
+    outcome = managed_strip_outcome(config)
+    if outcome == "unreadable":
+        return _result(f"{config.name} could not be read; left for spec doctor")
+    if outcome == "unchanged":
+        return _result(f"{config.name} carries no vaultspec hooks; left as it is")
+    if scaffold_precommit(workspace):
+        summary = f"converged {config.name} on the vaultspec-commit-gate hook"
+        logger.info("Migration %s: %s", _NAME, summary)
+        return _result(summary, yaml=1)
+    return _result(f"{config.name} already carries only the commit gate")
+
+
 def migrate(workspace: Path) -> MigrationResult:
     """Replace retired vaultspec hooks with the commit gate where they remain.
 
@@ -91,12 +127,7 @@ def migrate(workspace: Path) -> MigrationResult:
         wedges the registry for every later entry.
     """
     from ..core.exceptions import VaultSpecError
-    from ..core.precommit import managed_strip_outcome, scaffold_precommit
-    from ..core.prek_boundary import (
-        PREK_CONFIG_NAME,
-        precommit_config_path,
-        refresh_managed_prek_block,
-    )
+    from ..core.prek_boundary import PREK_CONFIG_NAME
     from ..core.workspace_mode import read_hooks_declaration
 
     try:
@@ -106,28 +137,9 @@ def migrate(workspace: Path) -> MigrationResult:
         return _result("workspace declaration unreadable; left for spec doctor")
     if declined:
         return _result("the workspace declines commit hooks; nothing converged")
-
     if (workspace / PREK_CONFIG_NAME).exists():
-        if refresh_managed_prek_block(workspace):
-            return _result(
-                "re-rendered the managed prek.toml block with the commit gate",
-                prek=1,
-            )
-        return _result("no stale vaultspec block in prek.toml; nothing converged")
-
-    config = precommit_config_path(workspace)
-    if not config.exists():
-        return _result("no hook config; nothing converged")
-    # ``managed_strip_outcome`` answers "does this config carry any vaultspec
-    # hook, current or retired" without writing: a config it would leave
-    # unchanged has none, which is an operator's decision to honour.
-    if managed_strip_outcome(config) == "unchanged":
-        return _result(f"{config.name} carries no vaultspec hooks; left as it is")
-    if scaffold_precommit(workspace):
-        summary = f"converged {config.name} on the vaultspec-commit-gate hook"
-        logger.info("Migration %s: %s", _NAME, summary)
-        return _result(summary, yaml=1)
-    return _result(f"{config.name} already carries only the commit gate")
+        return _converge_prek(workspace)
+    return _converge_yaml(workspace)
 
 
 MIGRATION = Migration(

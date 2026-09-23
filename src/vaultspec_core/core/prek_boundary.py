@@ -301,23 +301,28 @@ def _block_carries_retired_hook(raw: str) -> bool:
 
 
 def _replace_or_append_block(raw: str, block: str) -> str:
-    """Substitute the managed block in *raw*, or append it."""
+    """Substitute the managed block in *raw*, or append it.
+
+    The file keeps its own line terminator, and a substitution keeps its
+    trailing-newline state too, so the only lines that change are vaultspec's
+    between the markers. Re-emitting a CRLF file as LF would be a whole-file
+    diff the operator never made - and the substitution also runs unattended,
+    from the release migration.
+    """
+    newline = "\r\n" if "\r\n" in raw else "\n"
+    ends_with_newline = raw.endswith(("\n", "\r"))
     lines = raw.splitlines()
     begins = [i for i, line in enumerate(lines) if line.strip() == MARKER_BEGIN]
     ends = [i for i, line in enumerate(lines) if line.strip() == MARKER_END]
     if begins and ends and begins[0] < ends[0]:
         head = lines[: begins[0]]
         tail = lines[ends[0] + 1 :]
-        body = block.splitlines()
-        new_lines = [*head, *body, *tail]
-        rendered = "\n".join(new_lines)
-        if not rendered.endswith("\n"):
-            rendered += "\n"
-        return rendered
-    if raw and not raw.endswith("\n"):
-        raw += "\n"
-    separator = "\n" if raw.strip() else ""
-    return raw + separator + block
+        rendered = newline.join([*head, *block.splitlines(), *tail])
+        return rendered + newline if ends_with_newline else rendered
+    if raw and not ends_with_newline:
+        raw += newline
+    separator = newline if raw.strip() else ""
+    return raw + separator + block.replace("\n", newline)
 
 
 def refresh_managed_prek_block(
@@ -345,8 +350,13 @@ def refresh_managed_prek_block(
 
     config_path = target / PREK_CONFIG_NAME
     try:
-        raw = config_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        # Bytes, not ``read_text``: universal newlines would erase the CRLF
+        # convention the rewrite must preserve.
+        raw = config_path.read_bytes().decode("utf-8")
+        # Refuse a file that is not valid TOML, as ``migrate_hooks_to_prek``
+        # does: markers inside a multi-line string are not a managed block.
+        tomllib.loads(raw)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
         return False
     lines = raw.splitlines()
     begins = [i for i, line in enumerate(lines) if line.strip() == MARKER_BEGIN]
@@ -378,8 +388,12 @@ def _strip_declined_leftovers(
 
     removed: list[str] = []
     stripped: list[str] = []
+    unreadable: list[str] = []
     for config in existing_precommit_configs(target):
         outcome = managed_strip_outcome(config)
+        if outcome == "unreadable":
+            unreadable.append(config.name)
+            continue
         if outcome == "unchanged":
             continue
         if not dry_run:
@@ -394,6 +408,8 @@ def _strip_declined_leftovers(
             f"removed vaultspec hooks from {', '.join(stripped)} and kept the "
             "operator's own hooks"
         )
+    if unreadable:
+        notes.append(f"left {', '.join(unreadable)} alone: it could not be read")
     return PrekMigrationResult(
         status="declined", detail="; ".join(notes), yaml_removed=bool(removed)
     )
@@ -473,7 +489,7 @@ def migrate_hooks_to_prek(
             detail="prek.toml is not valid TOML; fix it before migrating",
         )
 
-    raw = config_path.read_text(encoding="utf-8")
+    raw = config_path.read_bytes().decode("utf-8")
     if boundary.hooks_present and _block_carries_retired_hook(raw):
         rendered = _replace_or_append_block(raw, render_prek_hook_block(mode))
         if not dry_run:
