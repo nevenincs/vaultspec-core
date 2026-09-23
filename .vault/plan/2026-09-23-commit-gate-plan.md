@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:d1812e2dcc3f930420ff88d044636c28ff6438402815f09752b95e064b7e258b'
+body_hash: 'sha256:58e8365f59e47dc072afa1edb39733cf008cbacf206c577225d2ef03daa5cb9b'
 ---
 
 # `commit-gate` plan
@@ -48,6 +48,7 @@ Issues addressed:
 - [x] `S09` - document the gate and the CI home of corpus checks, regenerate the CLI reference, and record before and after commit timings on the core vault and the 30k corpus; `docs/, src/vaultspec_core/builtins/reference/`.
 - [x] `S10` - enroll the hook retirement as the 0.2.5 schema migration, converging YAML configs that carry vaultspec hooks and existing managed prek.toml blocks, never touching declined or hook-free configs; `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py (new), src/vaultspec_core/migrations/__init__.py, src/vaultspec_core/core/prek_boundary.py`.
 - [x] `S11` - surface duplicate vaultspec hook listings: warn on copies in configs prek does not read, and report as an error and repair the gate listed more than once in the config prek reads; `src/vaultspec_core/core/diagnosis/collectors_precommit.py, core/prek_boundary.py, core/precommit.py, core/provider_sync.py, cli/spec_cmd_doctor.py`.
+- [x] `S12` - reword the builtin system clauses that told agents to learn conventions from, and gate commits on, a commit hook the gate no longer runs linters in, and re-seed core's deployed copies; `src/vaultspec_core/builtins/system/01-core.md, src/vaultspec_core/builtins/system/02-operations.md, .vaultspec/system/`.
 
 ## Parallelization
 

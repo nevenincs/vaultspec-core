@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:e2d93e8cb29317aba35db1bd403ba9869c3bc32c2ab39714d3a8116e4ac846c8'
+body_hash: 'sha256:f8e06a01a73fc763e7ba94975d9b0315a12e98285108157ffedf4837b9335e42'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -109,6 +109,11 @@ related:
 - `S11` `M` `src/vaultspec_core/tests/cli/test_signals.py`
 - `S11` `M` `.vault/adr/2026-09-23-commit-gate-adr.md`
 - `S11` `verify:` `ty check` -> `pass`
+- `S12` `M` `src/vaultspec_core/builtins/system/01-core.md`
+- `S12` `M` `src/vaultspec_core/builtins/system/02-operations.md`
+- `S12` `M` `.vaultspec/system/01-core.md`
+- `S12` `M` `.vaultspec/system/02-operations.md`
+- `S12` `verify:` `vaultspec-core spec doctor builtins` -> `pass`
 
 ## Notes
 
@@ -117,3 +122,4 @@ related:
 - `S08` test_rename_concurrency failed intermittently under -n auto in full runs; it passes alone and exercises rename/edit locks this Step does not touch
 - `S09` the deployed .vaultspec/reference mirror is left for the next release carry-forward, matching how it has been refreshed from the packaged builtins after each release
 - `S10` full run also hit the load-sensitive MCP stdin-EOF entrypoint test; it passes alone twice and is untouched here
+- `S12` deployed copies re-seeded with install --upgrade; its refresh of the release-tracked .vaultspec/reference/cli.md was put back to the committed content, per the carry-forward deferral
