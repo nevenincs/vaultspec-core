@@ -548,6 +548,33 @@ operation). The `data` payload carries `plans_in_flight`, `recent_documents`,
 `active_features`, and `hints` under stable keys. Schema bumps follow the standard
 version integer convention.
 
+The rollup's Discovery section and `data.hosted_search` (`configured`, `source`:
+`environment` or `dotenv`) report whether hosted vault search is configured;
+`data.companion` reports the semantic-search companion. Both are configuration, not
+liveness.
+
+### vaultspec-core vault search
+
+Signature: `vaultspec-core vault search [OPTIONS] QUERY`. Rank vault records against a
+plain-language question with hosted search and quote each record's answering passage
+with its `path:first-last` line range, after a verdict (`answered` or
+`nothing in the vault answers this`). Requires `VAULTSPEC_CORE_TYPESAFE_API_KEY`;
+without it nothing is sent, and the reply is `not_configured` with the rag search to run
+instead.
+
+| Option | Short | Default | Description | | --------------- | ----- | ------- |
+------------------------------------------------------ | | `--type TYPE` | - | all |
+Record type (`adr`, `audit`, `exec`, `plan`, `reference`, `research`). Repeatable. | |
+`--feature TAG` | `-f` | None | Filter by feature tag. | | `--date DATE` | - | None |
+Filter by exact date. | | `--limit N` | - | `4` | Ranked records to return, `1`..`11`;
+no offset. | | `--json` | - | off | Emit `vaultspec.vault.search.v1`. |
+
+`--json` `data` carries `status` (`ok`, `not_configured`, `unavailable`), `answered`,
+`hits` (each with `path`, `doc_type`, `score`, `answers`, `premise_conflict`,
+`blob_hash`, and an `excerpt` of `section`, `line_start`, `line_end`, `text`,
+`truncated`), the window fields `returned`, `total`, `truncated`, and `remediation` and
+`reason` when a search did not run or finish.
+
 ### vaultspec-core vault list
 
 List vault documents. `DOC_TYPE` filters by type.
@@ -916,7 +943,8 @@ warnings, `2` errors (`--gate-errors` folds `1` to `0`). | |
 `vaultspec-core spec mcps status` | `0` config status ok, `1` otherwise. | |
 `vaultspec-core migrations status` | `0` up to date or no manifest, `1` migrations
 pending. | | `vaultspec-core migrations run` | `0` success (including no-op), `1` a
-migration failed. |
+migration failed. | | `vaultspec-core vault search` | `0` searched, or not configured
+(`skipped`); `1` configured but unavailable; `2` invalid input. |
 
 ## Environment variables
 
@@ -934,5 +962,7 @@ name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name.
 | `VAULTSPEC_LOCK_TIMEOUT_SECONDS` | float | `120.0` | Advisory-lock acquisition budget
 in seconds, both layers combined. | | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log
 level for the CLI. | | `VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource
-editing. | | `VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
-`0`/`false`/`off`/`no` disables it (EOF-only exit). |
+editing. | | `VAULTSPEC_CORE_TYPESAFE_API_KEY` | secret | unset | Enables hosted vault
+search; read from the environment, else the workspace `.env` in `dependency` or `dev`
+install mode. Never printed. | | `VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server
+lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit). |

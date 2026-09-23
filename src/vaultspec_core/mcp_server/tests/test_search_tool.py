@@ -33,6 +33,7 @@ from vaultspec_core.mcp_server.tools.search import (
     search_result,
 )
 from vaultspec_core.search import (
+    CREDENTIAL_VARIABLE,
     DEFAULT_RESULTS,
     EXCERPT_CHARS,
     MAX_QUERY_CHARS,
@@ -48,7 +49,6 @@ from vaultspec_core.search import (
     UnavailableReason,
 )
 from vaultspec_core.search._corpus import SECTION_CHARS, TITLE_CHARS
-from vaultspec_core.search._credential import CREDENTIAL_VARIABLE
 from vaultspec_core.vaultcore.models import DocType
 
 from .conftest import data_of, run_in_fresh_workspace, stdio_session

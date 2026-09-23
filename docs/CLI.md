@@ -843,6 +843,13 @@ active features; and vault totals. Outcome semantics: always `unchanged` (read-o
 verb). Advisory hints point at the targeted form and at `vaultspec-core spec doctor` for
 framework health.
 
+The rollup's Discovery section says which vault search to reach for. First it says
+whether hosted vault search (`vaultspec-core vault search`) is configured and whether
+the key came from the `environment` or the workspace `dotenv`. It then shows whether the
+`vaultspec-rag` companion is provisioned. Both lines report configuration, not liveness:
+a configured key can still be rejected when a search runs. Under `--json` they are
+`data.hosted_search` (`configured`, `source`) and `data.companion`.
+
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace - a plan-line header, then each step (display path, checkbox state, a
 cursor on the next open step) mapped to its evidence: `ledger N rows` plus the last
@@ -943,6 +950,98 @@ Show vault statistics and document counts.
 
   ```bash
   vaultspec-core vault stats --invalid --orphaned
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault search
+
+```bash
+vaultspec-core vault search [OPTIONS] QUERY
+```
+
+Ask the vault a question in plain language and read the passages that answer it. Hosted
+search ranks the vault's records against the question and quotes, for each ranked
+record, the passage that answers it with its line range. It reads the vault from disk on
+every search, so there is no index to build or refresh. The same search backs the MCP
+`search` tool.
+
+Hosted search is enabled by a TypeSafe key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
+[environment variables](#environment-variables)). Every search sends the question and
+vault text to the TypeSafe API. Without a key the command sends nothing and reports that
+hosted search is not configured. It also names the `vaultspec-rag` search to run
+instead. `vaultspec-core status` shows whether a key is configured and where it came
+from. The key itself never appears in any output.
+
+Output starts with a verdict: `answered`, or `nothing in the vault answers this`. The
+ranked records follow, best first. Each record line gives its rank, record name, type,
+`path:first-last` line range, and the section the passage sits under. The passage
+follows, clipped at a line boundary to 900 characters, with `...` marking a cut. A
+second passage (`also ...`, 400 characters) appears when the answer spans two. A `!`
+note flags a record that may contradict an assumption in the question. The page ends
+with the hit count and, when the ranking holds more records than were shown, the number
+withheld.
+
+#### Arguments
+
+- `QUERY` - The question to ask, in plain language. Must not be blank; at most 2,000
+  characters.
+
+#### Options
+
+- `--type TYPE` - Search only records of this type: `adr`, `audit`, `exec`, `plan`,
+  `reference`, or `research`. Repeat the flag to search several types. Generated feature
+  indexes are never searched. By default every type is searched.
+- `--feature TAG` (`-f`) - Search only this feature's records.
+- `--date DATE` - Search only records with this exact date (`YYYY-MM-DD`).
+- `--limit N` (default `4`) - Maximum ranked records to return, from `1` to `11`. The
+  most a search ranks is 11, so `--limit 11` returns the whole ranking. There is no
+  `--offset`.
+- `--json` (default off) - Emit machine-readable output (`vaultspec.vault.search.v1`).
+
+The type, feature, and date filters are applied before anything is sent: a record they
+exclude never leaves the machine.
+
+Under `--json`, `data.status` is `ok`, `not_configured`, or `unavailable`. An `ok` reply
+carries `answered`, the `hits`, and the window fields `returned`, `total`, and
+`truncated`. Each hit carries `path`, `doc_type`, `feature`, `date`, `title`, `score`,
+`answers` (the probability that the record states the answer), `premise_conflict`,
+`blob_hash`, and an `excerpt` with `section`, `line_start`, `line_end`, `text`, and
+`truncated`. A `supporting` excerpt is present only when the answer spans two passages.
+The `not_configured` and `unavailable` replies carry a `remediation` sentence, and
+`unavailable` also carries its `reason`: `credential_rejected`, `rate_limited`,
+`transport`, `deadline`, `invalid_response`, or `request_too_large`. `usage` reports the
+requests, tokens, and time a search spent.
+
+Exit codes:
+
+- `0` - The search ran (envelope `status` `unchanged`), whether or not anything answers.
+  Also `0` when hosted search is not configured (envelope `status` `skipped`). That is
+  the default state without a key, and the reply is the search to run instead, not a
+  failure.
+- `1` - Hosted search is configured but did not finish (envelope `status` `failed`), or
+  the workspace cannot be read.
+- `2` - Invalid input: a blank or overlong `QUERY`, an unsearchable `--type`, or a
+  `--limit` outside `1..11`. Nothing is read or sent.
+
+#### Examples
+
+- **Ask why a decision was taken**:
+
+  ```bash
+  vaultspec-core vault search "why does core never call vaultspec-rag"
+  ```
+
+- **Search only one feature's decisions and read the whole ranking**:
+
+  ```bash
+  vaultspec-core vault search "which variable enrols hosted search" --type adr --feature typesafe-search --limit 11
+  ```
+
+- **Script against the verdict and the excerpts**:
+
+  ```bash
+  vaultspec-core vault search "what is the default page size" --json
   ```
 
 ______________________________________________________________________
@@ -3158,6 +3257,13 @@ overridden by the `--target` flag.
 - `VAULTSPEC_NO_HINTS` (str, unset by default) - Set to `1` to drop the `Next actions`
   block the commands print after their report. Equivalent to `--no-hints`. Only the
   exact value `1` counts; anything else leaves the hints in place.
+- `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key that
+  enables hosted vault search (`vaultspec-core vault search` and the MCP `search` tool).
+  It is read from the process environment. It is read from the workspace-root `.env`
+  only when it is absent from the environment and the workspace runs core in
+  `dependency` or `dev` install mode, and only this one variable is read from that file.
+  The generic `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
+  `vaultspec-core status` reports only whether one is configured and from which source.
 - `VAULTSPEC_STDIO_WATCHDOG` (str, default on) - Lifetime watchdog for the MCP server.
   Set it to `0`, `false`, `off`, or `no` to disable it, which leaves the server to exit
   on stdin EOF alone. Read by `vaultspec-core-mcp` rather than by the CLI; see the

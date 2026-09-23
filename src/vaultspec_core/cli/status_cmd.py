@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from vaultspec_core.core.diagnosis.collectors_companion import (
         CompanionCapability,
     )
+    from vaultspec_core.search import HostedSearchConfig
     from vaultspec_core.vaultcore.orientation import (
         GroundingTrace,
         PlanInFlight,
@@ -122,6 +123,7 @@ def cmd_status(
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.search import hosted_search_config
     from vaultspec_core.vaultcore.orientation import (
         TargetResolutionError,
         compute_rollup,
@@ -159,6 +161,7 @@ def cmd_status(
         json_output=json_output,
         no_hints=no_hints,
         companion=_safe_companion(root_dir),
+        hosted_search=hosted_search_config(root_dir),
     )
 
 
@@ -281,13 +284,32 @@ def _companion_line(cap: CompanionCapability) -> str:
     )
 
 
+def _hosted_search_line(config: HostedSearchConfig) -> str:
+    """Render the one-line orientation summary for hosted vault search.
+
+    States configuration only: a configured key can still be rejected, and
+    that surfaces on the search itself, not here.
+    """
+    from vaultspec_core.search import CREDENTIAL_VARIABLE
+
+    if config.configured and config.source is not None:
+        return (
+            f"  [green]hosted search configured[/green]  "
+            f"[dim]source: {config.source.value}[/dim]"
+        )
+    return f"  [dim]hosted search not configured - {CREDENTIAL_VARIABLE} unset[/dim]"
+
+
 def _rollup_payload(
-    rollup: Rollup, companion: CompanionCapability | None = None
+    rollup: Rollup,
+    companion: CompanionCapability | None,
+    hosted_search: HostedSearchConfig,
 ) -> dict[str, Any]:
     """Shape a :class:`Rollup` into the JSON envelope's data mapping."""
     import dataclasses
 
     return {
+        "hosted_search": dataclasses.asdict(hosted_search),
         "companion": dataclasses.asdict(companion) if companion else None,
         "active_features": [dataclasses.asdict(f) for f in rollup.active_features],
         "active_features_total": rollup.active_features_total,
@@ -315,7 +337,8 @@ def _emit_status_rollup(
     *,
     json_output: bool,
     no_hints: bool,
-    companion: CompanionCapability | None = None,
+    companion: CompanionCapability | None,
+    hosted_search: HostedSearchConfig,
 ) -> None:
     """Render the vault-wide rollup as text or JSON."""
     if json_output:
@@ -329,7 +352,7 @@ def _emit_status_rollup(
         envelope = json_envelope(
             "vault.status",
             "unchanged",
-            _rollup_payload(rollup, companion),
+            _rollup_payload(rollup, companion, hosted_search),
             hints={"next_steps": hints} if hints is not None else None,
         )
         typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
@@ -411,9 +434,10 @@ def _emit_status_rollup(
     else:
         console.print("  [dim]none[/dim]")
 
+    console.print()
+    console.print("[bold]Discovery[/bold]")
+    console.print(_hosted_search_line(hosted_search))
     if companion is not None:
-        console.print()
-        console.print("[bold]Discovery[/bold]")
         console.print(_companion_line(companion))
 
     totals = rollup.totals

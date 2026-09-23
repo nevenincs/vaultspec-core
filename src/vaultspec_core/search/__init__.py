@@ -7,7 +7,10 @@ to the agent-level fallback. It never calls vaultspec-rag.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ._corpus import SEARCHABLE_TYPES as SEARCHABLE_TYPES
+from ._credential import CREDENTIAL_VARIABLE as CREDENTIAL_VARIABLE
 from ._credential import hosted_search_config as hosted_search_config
 from ._lexical import tokenize as tokenize
 from ._models import DEFAULT_RESULTS as DEFAULT_RESULTS
@@ -25,9 +28,9 @@ from ._models import SearchUsage as SearchUsage
 from ._models import UnavailableReason as UnavailableReason
 from ._questions import PREMISE_CONFLICT_THRESHOLD as PREMISE_CONFLICT_THRESHOLD
 from ._remediation import remediation as remediation
-from ._service import search_vault as search_vault
 
 __all__ = [
+    "CREDENTIAL_VARIABLE",
     "DEFAULT_RESULTS",
     "EXCERPT_CHARS",
     "MAX_QUERY_CHARS",
@@ -48,3 +51,17 @@ __all__ = [
     "search_vault",
     "tokenize",
 ]
+
+if TYPE_CHECKING:
+    from ._service import search_vault as search_vault
+
+
+def __getattr__(name: str) -> object:
+    # The service pulls in the HTTPS transport (ssl, http.client). Every CLI
+    # start imports this package for its constants, so the transport loads
+    # only when a search actually runs.
+    if name == "search_vault":
+        from ._service import search_vault
+
+        return search_vault
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

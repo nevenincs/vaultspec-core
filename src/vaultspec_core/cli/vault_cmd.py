@@ -9,7 +9,8 @@ all backend logic. Mounted onto :data:`.root.app` as the ``vault`` command group
 This module is the public surface: every command re-exports through it so no
 import site outside the package changes. The ``vault check`` and
 ``vault sanitize`` verbs live in :mod:`vaultspec_core.cli.vault_check_cmd`, the
-``vault feature`` verbs in :mod:`vaultspec_core.cli.vault_feature_cmd`, and the
+``vault feature`` verbs in :mod:`vaultspec_core.cli.vault_feature_cmd`, the
+``vault search`` verb in :mod:`vaultspec_core.cli.vault_search_cmd`, and the
 document-editing verbs in :mod:`vaultspec_core.cli.edit_cmd`. Each decorates
 the apps owned by :mod:`vaultspec_core.cli.vault_cmd_app` at module level, and
 is imported here for that registration side effect - the same arrangement
@@ -102,6 +103,8 @@ from vaultspec_core.cli.vault_check_cmd import (
     cmd_sanitize_annotations,
 )
 from vaultspec_core.cli.vault_cmd_app import (
+    DateFilterOption,
+    FeatureFilterOption,
     adr_app,
     check_app,
     feature_app,
@@ -116,6 +119,7 @@ from vaultspec_core.cli.vault_feature_cmd import (
     cmd_feature_rename,
     cmd_feature_unarchive,
 )
+from vaultspec_core.cli.vault_search_cmd import cmd_search
 from vaultspec_core.core.windowing import apply_window
 
 # Every name this module exports, which is also - deliberately - every
@@ -159,6 +163,7 @@ __all__ = [
     "cmd_rename",
     "cmd_repair",
     "cmd_sanitize_annotations",
+    "cmd_search",
     "cmd_set_body",
     "cmd_set_frontmatter",
     "cmd_stats",
@@ -389,12 +394,8 @@ def _validate_created_doc(console: Console, doc_path: Path) -> None:
 
 @vault_app.command("stats")
 def cmd_stats(
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
-    date: Annotated[
-        str | None, typer.Option("--date", help="Filter by date (YYYY-MM-DD)")
-    ] = None,
+    feature: FeatureFilterOption = None,
+    date: DateFilterOption = None,
     type_filter: Annotated[
         str | None, typer.Option("--type", help="Filter by document type")
     ] = None,
@@ -506,12 +507,8 @@ def cmd_list(
     doc_type: Annotated[
         str | None, typer.Argument(help="Document type to list")
     ] = None,
-    date: Annotated[
-        str | None, typer.Option("--date", help="Filter by date (YYYY-MM-DD)")
-    ] = None,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    date: DateFilterOption = None,
+    feature: FeatureFilterOption = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     limit: Annotated[
         int | None,

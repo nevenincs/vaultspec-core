@@ -26,6 +26,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.search import CREDENTIAL_VARIABLE
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -1000,3 +1001,49 @@ class TestFeaturePlanAggregation:
             if "cracked" in line
         )
         assert "1 unreadable plan" in row
+
+
+class TestHostedSearchRow:
+    """The rollup reports hosted-search configuration, never the key itself."""
+
+    _KEY = "status-row-key-value"
+
+    @staticmethod
+    def _run_with_key(root: Path, key: str, *args: str):
+        runner = CliRunner(env={"NO_COLOR": "1", CREDENTIAL_VARIABLE: key})
+        return runner.invoke(app, ["-t", str(root), "status", *args])
+
+    def test_unconfigured_row_names_the_variable(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = self._run_with_key(tmp_path, "")
+
+        assert result.exit_code == 0, result.output
+        discovery = result.stdout.split("Discovery")[1]
+        assert f"hosted search not configured - {CREDENTIAL_VARIABLE} unset" in (
+            discovery
+        )
+
+    def test_configured_row_names_the_source_not_the_key(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = self._run_with_key(tmp_path, self._KEY)
+
+        assert result.exit_code == 0, result.output
+        discovery = result.stdout.split("Discovery")[1]
+        assert "hosted search configured  source: environment" in discovery
+        assert self._KEY not in result.output
+
+    def test_json_key_reports_configuration_and_source(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        unset = json.loads(self._run_with_key(tmp_path, "", "--json").stdout)
+        result = self._run_with_key(tmp_path, self._KEY, "--json")
+        configured = json.loads(result.stdout)
+
+        assert unset["data"]["hosted_search"] == {"configured": False, "source": None}
+        assert configured["data"]["hosted_search"] == {
+            "configured": True,
+            "source": "environment",
+        }
+        assert self._KEY not in result.output
