@@ -214,7 +214,7 @@ class SearchUsage:
         model: The model version that answered.
         requests: Provider requests made.
         input_tokens: Input tokens billed across those requests.
-        elapsed_ms: Wall time of the hosted stages.
+        elapsed_ms: Wall time of the hosted stages, in whole milliseconds.
         unscored: Records the provider would not read in full: its content
             filter refused them, or one of their windows exceeded the request
             bound. A record refused only in part is still ranked, on the text
@@ -224,7 +224,7 @@ class SearchUsage:
     model: str
     requests: int
     input_tokens: int
-    elapsed_ms: float
+    elapsed_ms: int
     unscored: int
 
 

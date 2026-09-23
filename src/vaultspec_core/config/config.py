@@ -505,9 +505,11 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         default=None,
         description=(
             "TypeSafe API key that enables hosted vault search. Read from the "
-            "process environment, then from the workspace .env only when the "
-            "workspace installs vaultspec-core in dependency or dev mode. "
-            "Unset or blank means hosted search is not configured."
+            "process environment first. A workspace-root .env supplies it only "
+            "when vaultspec-core runs from the workspace's own environment (its "
+            "project virtual environment) in dependency or dev mode, never for "
+            "a globally installed tool. Unset or blank means hosted search is "
+            "not configured."
         ),
         secret=True,
     ),

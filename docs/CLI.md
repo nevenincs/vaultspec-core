@@ -1017,8 +1017,9 @@ exclude never leaves the machine.
 
 Under `--json`, `data.status` is `ok`, `not_configured`, or `unavailable`. An `ok` reply
 carries `answered`, the `hits`, and the window fields `returned`, `total`, and
-`truncated`. Each hit carries `path`, `doc_type`, `feature`, `date`, `title`, `score`,
-`answers` (the probability that the record states the answer), `premise_conflict`,
+`truncated`. Each hit carries the same fields as a hit from the MCP `search` tool:
+`path`, `type`, `feature`, `date`, `title`, `score`, `answers` (the probability that the
+record states the answer), `premise_conflict`, each score to three decimal places,
 `blob_hash`, and an `excerpt` with `section`, `line_start`, `line_end`, `text`, and
 `truncated`. `line_end` is the last line `text` holds, and `truncated` marks a passage
 that goes on past it. A `supporting` excerpt is present only when the answer spans two

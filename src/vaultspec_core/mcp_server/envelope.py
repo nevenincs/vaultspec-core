@@ -54,7 +54,14 @@ from pydantic import BaseModel, GetJsonSchemaHandler, TypeAdapter
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-__all__ = ["LeanEnum", "LeanModel", "compact_result", "describe", "tool_description"]
+__all__ = [
+    "LeanEnum",
+    "LeanModel",
+    "LeanShape",
+    "compact_result",
+    "describe",
+    "tool_description",
+]
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -155,14 +162,7 @@ class LeanModel(BaseModel):
             The pruned schema fragment.
         """
         produced = dict(handler(core_schema))
-        produced.pop("description", None)
-        produced.pop("title", None)
-        properties = produced.get("properties")
-        if isinstance(properties, dict):
-            produced["properties"] = {
-                name: _strip_titles(prop)
-                for name, prop in cast("dict[str, Any]", properties).items()
-            }
+        _lean_object(produced)
         return produced
 
 
@@ -195,6 +195,57 @@ class LeanEnum:
             key: value
             for key, value in produced.items()
             if key not in ("description", "title")
+        }
+
+
+class LeanShape:
+    """``Annotated`` marker that ships a domain dataclass as a result shape.
+
+    A field typed from the dataclass a service already returns needs no
+    result-model copy of it, but Pydantic renders a dataclass the way it
+    renders a model: with its docstring and derived titles. This marker prunes
+    them as :class:`LeanModel` does, keeping the shared ``$defs`` entry so a
+    shape used twice is described once.
+
+    Every property is also marked required and loses its default: a dataclass
+    serialises every field, so a default describes input the wire never takes.
+    """
+
+    def __get_pydantic_json_schema__(
+        self, core_schema: Any, handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        """Prune the dataclass's shared definition in place.
+
+        Args:
+            core_schema: The pydantic-core schema for the dataclass.
+            handler: The next handler in the generation chain.
+
+        Returns:
+            The reference to the pruned definition.
+        """
+        reference = handler(core_schema)
+        definition = handler.resolve_ref_schema(reference)
+        _lean_object(definition)
+        properties = cast("dict[str, Any]", definition.get("properties", {}))
+        for prop in properties.values():
+            prop.pop("default", None)
+        definition["required"] = list(properties)
+        return reference
+
+
+def _lean_object(schema: dict[str, Any]) -> None:
+    """Drop an object schema's description and every derived title, in place.
+
+    Args:
+        schema: An object schema fragment.
+    """
+    schema.pop("description", None)
+    schema.pop("title", None)
+    properties = schema.get("properties")
+    if isinstance(properties, dict):
+        schema["properties"] = {
+            name: _strip_titles(prop)
+            for name, prop in cast("dict[str, Any]", properties).items()
         }
 
 

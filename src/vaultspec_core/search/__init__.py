@@ -29,6 +29,8 @@ from ._models import SearchUsage as SearchUsage
 from ._models import UnavailableReason as UnavailableReason
 from ._questions import PREMISE_CONFLICT_THRESHOLD as PREMISE_CONFLICT_THRESHOLD
 from ._remediation import remediation as remediation
+from ._wire import SCORE_PLACES as SCORE_PLACES
+from ._wire import hit_fields as hit_fields
 
 __all__ = [
     "CREDENTIAL_VARIABLE",
@@ -37,6 +39,7 @@ __all__ = [
     "MAX_QUERY_CHARS",
     "MAX_RESULTS",
     "PREMISE_CONFLICT_THRESHOLD",
+    "SCORE_PLACES",
     "SEARCHABLE_TYPES",
     "SUPPORTING_BYTES",
     "CredentialSource",
@@ -48,6 +51,7 @@ __all__ = [
     "SearchStatus",
     "SearchUsage",
     "UnavailableReason",
+    "hit_fields",
     "hosted_search_config",
     "remediation",
     "search_vault",

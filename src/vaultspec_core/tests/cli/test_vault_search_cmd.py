@@ -16,6 +16,7 @@ or already supplied, and the size of the worst-case ``--json`` reply.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from typing import TYPE_CHECKING, Any
 
@@ -44,8 +45,8 @@ from vaultspec_core.search import (
     SearchUsage,
 )
 from vaultspec_core.search.tests.reply_budget import (
-    BYTES_PER_TOKEN,
     DISCOVERY_BUDGET,
+    ENVELOPE_BYTES_PER_TOKEN,
     REPLY_CEILING,
     WORST_SHAPES,
     worst_case_ranking,
@@ -302,7 +303,7 @@ def _page(*, answered: bool = True, unscored: int | None = None) -> SearchOutcom
     usage = (
         None
         if unscored is None
-        else SearchUsage("jev-1.13.0", 16, 41_250, 1_234.5, unscored)
+        else SearchUsage("jev-1.13.0", 16, 41_250, 1_235, unscored)
     )
     return SearchOutcome(
         status=SearchStatus.OK,
@@ -337,6 +338,21 @@ class TestJsonPage:
             "text": "Widgets persist.",
             "truncated": False,
         }
+
+    def test_hits_carry_the_mcp_tool_keys_and_rounding(self) -> None:
+        precise = dataclasses.replace(
+            _hit(1), score=0.912345, answers=0.876543, premise_conflict=0.012345
+        )
+        outcome = dataclasses.replace(_page(), hits=(precise,))
+        hit = json.loads(json.dumps(_outcome_payload(outcome)))["hits"][0]
+
+        assert hit["type"] == DocType.ADR.value
+        assert "doc_type" not in hit
+        assert (hit["score"], hit["answers"], hit["premise_conflict"]) == (
+            0.912,
+            0.877,
+            0.012,
+        )
 
     def test_derivable_and_echoed_values_are_left_out(self) -> None:
         data = _page_json()
@@ -429,11 +445,11 @@ def _json_tokens(shape: str, limit: int) -> float:
         answered=False,
         hits=tuple(hits),
         window=window,
-        usage=SearchUsage("jev-1.13.0", 16, 41_250, 1_234.5, 99),
+        usage=SearchUsage("jev-1.13.0", 16, 41_250, 1_235, 99),
     )
     text = _json_text(outcome)
     assert len(json.loads(text)["data"]["hits"]) == limit
-    return len(text.encode("utf-8")) / BYTES_PER_TOKEN
+    return len(text.encode("utf-8")) / ENVELOPE_BYTES_PER_TOKEN
 
 
 class TestJsonReplySize:

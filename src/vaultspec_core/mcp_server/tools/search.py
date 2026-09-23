@@ -7,9 +7,10 @@ logic is authored here: this layer only projects a
 :class:`~vaultspec_core.search.SearchOutcome` onto the wire.
 
 The search package bounds every excerpt, title and section in encoded bytes
-before this layer sees them, and marks each excerpt it cut; the projection
-carries them as they are. The page carries the shared window fields, so the
-worst-case reply stays inside the envelope budget whatever the vault holds.
+before this layer sees them, marks each excerpt it cut, and projects each hit
+once for every surface; this layer carries that projection as it is. The page
+carries the shared window fields, so the worst-case reply stays inside the
+envelope budget whatever the vault holds and wherever the workspace lives.
 
 The tool is registered on both surfaces and whether or not a key is present:
 the tool list is a function of core's version alone. It mutates nothing
@@ -36,21 +37,22 @@ from ...search import (
     MAX_QUERY_CHARS,
     MAX_RESULTS,
     SEARCHABLE_TYPES,
+    Excerpt,
     InvalidQueryError,
     SearchStatus,
+    SearchUsage,
+    hit_fields,
     remediation,
     search_vault,
 )
-from ..envelope import LeanModel, compact_result
+from ..envelope import LeanModel, LeanShape, compact_result
 from ..filters import DateFilter, FeatureFilter, TypeFilter
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from mcp.server.mcpserver import MCPServer
 
-    from ...search import Excerpt, SearchHit, SearchOutcome, SearchUsage
+    from ...search import SearchOutcome
     from ...vaultcore.models import DocType
 
 logger = logging.getLogger(__name__)
@@ -75,34 +77,14 @@ _SearchTypes = Annotated[
     Field(description=f"Default: {', '.join(sorted(SEARCHABLE_TYPES))}."),
 ]
 
-#: Decimal places kept of each probability. Three separate any two hits a
-#: caller could act on; the rest is digits the model reads and cannot use.
-_SCORE_PLACES = 3
-
-
-class SearchExcerpt(LeanModel):
-    """A verbatim span of a hit's record, as the wire carries it.
-
-    Attributes:
-        section: The heading path the span sits under, outermost first.
-        line_start: First line of the span in the file, 1-based.
-        line_end: Last line of the span, inclusive.
-        text: The file's lines ``line_start`` through ``line_end``.
-        truncated: Whether the answering block goes on past ``line_end``, so
-            the rest is one read away.
-    """
-
-    section: str
-    line_start: int
-    line_end: int
-    text: str
-    truncated: bool
-
 
 class SearchHitRow(LeanModel):
-    """One ranked record.
+    """One ranked record, as :func:`~vaultspec_core.search.hit_fields` projects it.
 
-    The record's name is its path's stem, so it is not carried twice.
+    The record's name is its path's stem, so it is not carried twice. No
+    ``file://`` locator is carried either: ``path`` is relative to the
+    workspace the caller already has open, and a locator built on the
+    workspace root would grow the reply with that root's length.
 
     Attributes:
         path: The record's path relative to the workspace root.
@@ -115,7 +97,6 @@ class SearchHitRow(LeanModel):
         premise_conflict: Probability that the record contradicts an
             assumption in the query; reported, never folded into ``score``.
         blob_hash: Git blob id of the file the line ranges refer to.
-        resource_uri: A ``file://`` locator the host reads directly.
         excerpt: The block judged to answer; absent when none was chosen.
         supporting: A second block, when the answer spans two.
     """
@@ -129,27 +110,8 @@ class SearchHitRow(LeanModel):
     answers: float
     premise_conflict: float
     blob_hash: str
-    resource_uri: str
-    excerpt: SearchExcerpt | None = None
-    supporting: SearchExcerpt | None = None
-
-
-class SearchUsageRow(LeanModel):
-    """What the hosted stages cost.
-
-    Attributes:
-        model: The model version that answered.
-        requests: Provider requests made.
-        input_tokens: Input tokens billed.
-        elapsed_ms: Wall time of the hosted stages, whole milliseconds.
-        unscored: Records the provider would not read in full.
-    """
-
-    model: str
-    requests: int
-    input_tokens: int
-    elapsed_ms: int
-    unscored: int
+    excerpt: Annotated[Excerpt, LeanShape()] | None = None
+    supporting: Annotated[Excerpt, LeanShape()] | None = None
 
 
 class SearchResult(LeanModel):
@@ -180,75 +142,15 @@ class SearchResult(LeanModel):
     truncated: bool | None = None
     reason: str | None = None
     remediation: str | None = None
-    usage: SearchUsageRow | None = None
+    usage: Annotated[SearchUsage, LeanShape()] | None = None
 
 
-def _excerpt_row(excerpt: Excerpt | None) -> SearchExcerpt | None:
-    """Project an already-bounded *excerpt* onto the wire.
-
-    Args:
-        excerpt: The verbatim span, or ``None``.
-
-    Returns:
-        The wire excerpt, or ``None`` when there is no span.
-    """
-    if excerpt is None:
-        return None
-    return SearchExcerpt(
-        section=excerpt.section,
-        line_start=excerpt.line_start,
-        line_end=excerpt.line_end,
-        text=excerpt.text,
-        truncated=excerpt.truncated,
-    )
-
-
-def _hit_row(hit: SearchHit, root: Path) -> SearchHitRow:
-    """Project one ranked record onto the wire.
-
-    Args:
-        hit: The ranked record.
-        root: The workspace root its path is relative to.
-
-    Returns:
-        The wire row.
-    """
-    return SearchHitRow(
-        path=hit.path,
-        type=hit.doc_type.value,
-        feature=hit.feature,
-        date=hit.date,
-        title=hit.title,
-        score=round(hit.score, _SCORE_PLACES),
-        answers=round(hit.answers, _SCORE_PLACES),
-        premise_conflict=round(hit.premise_conflict, _SCORE_PLACES),
-        blob_hash=hit.blob_hash,
-        resource_uri=(root / hit.path).as_uri(),
-        excerpt=_excerpt_row(hit.excerpt),
-        supporting=_excerpt_row(hit.supporting),
-    )
-
-
-def _usage_row(usage: SearchUsage | None) -> SearchUsageRow | None:
-    """Project search cost onto the wire, or ``None`` when nothing was sent."""
-    if usage is None:
-        return None
-    return SearchUsageRow(
-        model=usage.model,
-        requests=usage.requests,
-        input_tokens=usage.input_tokens,
-        elapsed_ms=round(usage.elapsed_ms),
-        unscored=usage.unscored,
-    )
-
-
-def search_result(outcome: SearchOutcome, root: Path) -> SearchResult:
+def search_result(outcome: SearchOutcome) -> SearchResult:
     """Project a search outcome onto the ``search`` tool's result.
 
     Args:
         outcome: The outcome :func:`~vaultspec_core.search.search_vault`
             returned.
-        root: The workspace root the hits' paths are relative to.
 
     Returns:
         The tool result: the hits with their bounded excerpts, the window
@@ -260,11 +162,11 @@ def search_result(outcome: SearchOutcome, root: Path) -> SearchResult:
         {
             "status": outcome.status.value,
             "answered": outcome.answered,
-            "hits": [_hit_row(hit, root) for hit in outcome.hits],
+            "hits": [hit_fields(hit) for hit in outcome.hits],
             **window,
             "reason": outcome.reason.value if outcome.reason is not None else None,
             "remediation": remediation(outcome),
-            "usage": _usage_row(outcome.usage),
+            "usage": outcome.usage,
         }
     )
 
@@ -390,6 +292,6 @@ def register_search_tools(mcp: MCPServer[None]) -> None:
         except InvalidQueryError as exc:
             raise ToolError(str(exc)) from exc
         logger.debug("search: %s, %d hit(s)", outcome.status, len(outcome.hits))
-        return search_result(outcome, root_dir)
+        return search_result(outcome)
 
     _ = search  # bound by the decorator; silence unused warnings

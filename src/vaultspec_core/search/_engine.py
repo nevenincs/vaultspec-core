@@ -52,6 +52,7 @@ it carries.
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from collections import Counter
@@ -222,7 +223,8 @@ class Meter:
                 model=self._model or MODEL,
                 requests=self._requests,
                 input_tokens=self._input_tokens,
-                elapsed_ms=(time.monotonic() - self._started) * 1000,
+                # Rounded up: a search that sent anything took some time.
+                elapsed_ms=math.ceil((time.monotonic() - self._started) * 1000),
                 unscored=len(self._unscored),
             )
 

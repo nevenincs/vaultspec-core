@@ -395,10 +395,11 @@ configured and where it was found.
 **Hits.** Each hit reports `path`, `type`, `feature`, `date`, `title`, `score` (the
 ranking score), `answers` (the probability that the record states the answer),
 `premise_conflict` (the probability that the record contradicts an assumption in the
-question, reported on its own and never folded into `score`), `blob_hash`,
-`resource_uri`, and up to two excerpts. `excerpt` is the block judged to answer, and
-`supporting` is a second block when the answer spans two. A hit with no `excerpt` was
-ranked, but no single block was chosen.
+question, reported on its own and never folded into `score`), `blob_hash`, and up to two
+excerpts. `excerpt` is the block judged to answer, and `supporting` is a second block
+when the answer spans two. A hit with no `excerpt` was ranked, but no single block was
+chosen. Unlike `find`, a hit carries no `resource_uri`: `path` is relative to the
+workspace, and `blob_hash` names the file version.
 
 **Excerpts.** Each excerpt has these fields:
 
@@ -441,7 +442,6 @@ Example response:
       "answers": 0.877,
       "premise_conflict": 0.012,
       "blob_hash": "<git blob OID>",
-      "resource_uri": "file:///.../2026-07-12-search-api-adr.md",
       "excerpt": {
         "section": "Decision",
         "line_start": 41,

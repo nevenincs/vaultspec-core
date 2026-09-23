@@ -16,8 +16,6 @@ tests and its deselected live test cover that path.
 from __future__ import annotations
 
 import os
-import tempfile
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -47,10 +45,11 @@ from vaultspec_core.search import (
     SearchStatus,
     SearchUsage,
     UnavailableReason,
+    hit_fields,
 )
 from vaultspec_core.search.tests.reply_budget import (
-    BYTES_PER_TOKEN,
     DISCOVERY_BUDGET,
+    ENVELOPE_BYTES_PER_TOKEN,
     REPLY_CEILING,
     WORST_SHAPES,
     worst_case_ranking,
@@ -60,10 +59,9 @@ from vaultspec_core.vaultcore.models import DocType
 from .conftest import data_of, run_in_fresh_workspace, stdio_session
 
 if TYPE_CHECKING:
-    from mcp.types import Tool
+    from pathlib import Path
 
-#: A workspace root the projected ``resource_uri`` values are built on.
-_ROOT = Path(tempfile.gettempdir()).resolve() / "workspaces" / "search-project"
+    from mcp.types import Tool
 
 #: A stand-in credential. It never reaches the network: the only call made
 #: with it set is ``status``, which reads configuration and sends nothing.
@@ -126,7 +124,7 @@ def _ranked(
             model="jev-1.13.0",
             requests=6,
             input_tokens=41_250,
-            elapsed_ms=1_234.567,
+            elapsed_ms=1_235,
             unscored=unscored,
         ),
     )
@@ -136,7 +134,7 @@ async def _reply(outcome: SearchOutcome) -> CallToolResult:
     """Render *outcome* as the ``search`` tool puts it on the wire."""
 
     async def tool() -> SearchResult:
-        return search_result(outcome, _ROOT)
+        return search_result(outcome)
 
     # The envelope keeps the declared return type for the output schema and
     # returns the wire object itself at runtime.
@@ -170,8 +168,7 @@ def test_excerpts_travel_as_the_search_bounded_them() -> None:
                     supporting=_excerpt(support, truncated=True),
                 )
             ]
-        ),
-        _ROOT,
+        )
     ).hits[0]
 
     assert row.excerpt is not None
@@ -183,12 +180,26 @@ def test_excerpts_travel_as_the_search_bounded_them() -> None:
 
 @pytest.mark.unit
 def test_a_hit_carries_its_locators_and_rounded_scores() -> None:
-    row = search_result(_ranked([_hit()]), _ROOT).hits[0]
+    row = search_result(_ranked([_hit()])).hits[0]
 
     assert row.path == ".vault/adr/2026-01-02-widget-adr.md"
     assert row.type == DocType.ADR.value
-    assert row.resource_uri == (_ROOT / row.path).as_uri()
     assert (row.score, row.answers, row.premise_conflict) == (0.912, 0.877, 0.012)
+
+
+@pytest.mark.unit
+async def test_a_hit_travels_as_the_search_package_projects_it() -> None:
+    # One projection serves every surface, so the CLI's --json hits and these
+    # carry the same keys and the same rounding.
+    hit = _hit(excerpt=_excerpt("The answer.", truncated=True))
+
+    reply = await _reply(_ranked([hit]))
+
+    payload = reply.structured_content
+    assert payload is not None
+    assert payload["hits"] == [hit_fields(hit)]
+    # A workspace locator would grow each hit with the root's length.
+    assert "resource_uri" not in payload["hits"][0]
 
 
 @pytest.mark.unit
@@ -368,6 +379,29 @@ async def test_search_is_registered_with_its_bounds_on_both_surfaces(
 
 
 @pytest.mark.unit
+async def test_the_output_schema_describes_the_domain_shapes_leanly(
+    vault_root: Path,
+) -> None:
+    search = _tool(await create_server().list_tools(), "search")
+    schema = search.output_schema
+    assert schema is not None
+
+    definitions = schema["$defs"]
+    for shape in (Excerpt, SearchUsage):
+        definition = definitions[shape.__name__]
+        fields = list(shape.__dataclass_fields__)
+        # Every field is always serialised, so every field is required, and
+        # the maintainer docstring and derived titles stay off the wire.
+        assert definition["required"] == fields
+        assert "description" not in definition
+        assert "title" not in definition
+        for prop in definition["properties"].values():
+            assert "title" not in prop
+            assert "default" not in prop
+    assert definitions["SearchUsage"]["properties"]["elapsed_ms"]["type"] == "integer"
+
+
+@pytest.mark.unit
 async def test_find_and_search_share_one_declaration_of_each_filter(
     vault_root: Path,
 ) -> None:
@@ -452,7 +486,7 @@ async def _reply_tokens(shape: str, limit: int) -> float:
     assert payload is not None
     assert len(payload["hits"]) == limit
     wire = reply.model_dump_json(by_alias=True, exclude_none=True).encode("utf-8")
-    return len(wire) / BYTES_PER_TOKEN
+    return len(wire) / ENVELOPE_BYTES_PER_TOKEN
 
 
 @pytest.mark.unit

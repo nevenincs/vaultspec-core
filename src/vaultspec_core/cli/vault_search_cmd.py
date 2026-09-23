@@ -3,9 +3,10 @@
 The verb presents hosted vault search and adds no search logic of its own. The
 filters, the page ceiling, the three outcomes and the next step after an outcome
 that did not rank all come from :mod:`vaultspec_core.search`, so this verb and
-the MCP ``search`` tool give the same answer to the same question. This module
-owns only the shape of that answer: on a terminal and in the ``--json``
-envelope.
+the MCP ``search`` tool give the same answer to the same question, and each hit
+in the ``--json`` envelope is the search package's one projection of it. This
+module owns only the shape of the answer around the hits: on a terminal and in
+the envelope.
 
 Both shapes carry the window the search applied (``returned``, ``total``,
 ``truncated``) and the excerpts exactly as the search package bounded them,
@@ -53,6 +54,7 @@ from vaultspec_core.search import (
     SEARCHABLE_TYPES,
     InvalidQueryError,
     SearchStatus,
+    hit_fields,
     remediation,
 )
 
@@ -107,20 +109,6 @@ def _record_types(values: list[str] | None) -> frozenset[DocType] | None:
     return frozenset(searchable[value] for value in values)
 
 
-def _hit_payload(hit: SearchHit) -> dict[str, object]:
-    """Render one hit for the JSON envelope.
-
-    ``name`` is dropped because it is the stem of ``path``, and an excerpt the
-    search did not choose is absent rather than ``null``.
-    """
-    row = dataclasses.asdict(hit)
-    del row["name"]
-    for key in ("excerpt", "supporting"):
-        if row[key] is None:
-            del row[key]
-    return row
-
-
 def _outcome_payload(outcome: SearchOutcome) -> dict[str, object]:
     """Render an outcome as the envelope's ``data``.
 
@@ -130,7 +118,7 @@ def _outcome_payload(outcome: SearchOutcome) -> dict[str, object]:
     payload: dict[str, object] = {"status": outcome.status.value}
     if outcome.status is SearchStatus.OK:
         payload["answered"] = outcome.answered
-        payload["hits"] = [_hit_payload(hit) for hit in outcome.hits]
+        payload["hits"] = [hit_fields(hit) for hit in outcome.hits]
     if outcome.window is not None:
         payload.update(outcome.window.as_fields())
     if outcome.reason is not None:

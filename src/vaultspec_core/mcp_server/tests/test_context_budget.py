@@ -18,6 +18,7 @@ import pytest
 from vaultspec_core.config import reset_config
 from vaultspec_core.core.types import init_paths
 from vaultspec_core.mcp_server.app import create_server
+from vaultspec_core.search.tests.reply_budget import ENVELOPE_BYTES_PER_TOKEN
 from vaultspec_core.vaultcore.models import DocType
 
 from .conftest import EXPECTED_TOOLS
@@ -34,7 +35,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: Aggregate ceiling for the full eleven-tool wire surface, in characters.
 #:
 #: This is a **ratchet, not a target**. The measured surface is 43,919 chars
-#: (~5.4K tokens at the 3.46 chars/token measured for this codebase's JSON),
+#: (~5.4K tokens at ``ENVELOPE_BYTES_PER_TOKEN``, measured for this JSON),
 #: and every one of those tokens is re-sent on every turn of every
 #: conversation before any work happens. The ceiling sits just above the
 #: current measurement so the surface cannot grow, and it is meant to be
@@ -202,9 +203,10 @@ def _budget_failure_report(tools: list[MCPTool], total: int, ceiling: int) -> st
     )
     desc_total = sum(row[2] for row in rows)
     out_total = sum(row[4] for row in rows)
+    tokens = total / ENVELOPE_BYTES_PER_TOKEN
     return (
         f"Aggregate tool definition size ({total:,} chars, "
-        f"~{total / 3.46:,.0f} tokens) exceeds budget of {ceiling:,} chars.\n"
+        f"~{tokens:,.0f} tokens) exceeds budget of {ceiling:,} chars.\n"
         f"This surface is re-sent on EVERY turn of every conversation.\n"
         f"Per-tool breakdown (largest first):\n{breakdown}\n"
         f"Descriptions total {desc_total:,} chars; output schemas total "

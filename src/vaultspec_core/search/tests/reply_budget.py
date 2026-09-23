@@ -30,15 +30,18 @@ from vaultspec_core.vaultcore.markdown import Block
 from vaultspec_core.vaultcore.models import DocType
 
 __all__ = [
-    "BYTES_PER_TOKEN",
     "DISCOVERY_BUDGET",
+    "ENVELOPE_BYTES_PER_TOKEN",
     "REPLY_CEILING",
     "WORST_SHAPES",
     "worst_case_ranking",
 ]
 
-#: Bytes of reply JSON per token, as the envelope budgets are measured.
-BYTES_PER_TOKEN: Final = 3.46
+#: Bytes of compact reply JSON per token, measured for this codebase's MCP
+#: payloads; every envelope budget, for tool definitions and replies alike, is
+#: converted at this ratio. Not the search transport's ``BYTES_PER_TOKEN``,
+#: which estimates the provider's request tokens and errs toward more.
+ENVELOPE_BYTES_PER_TOKEN: Final = 3.46
 
 #: The discovery reply budget, in tokens, that a default page must fit.
 DISCOVERY_BUDGET: Final = 4_000

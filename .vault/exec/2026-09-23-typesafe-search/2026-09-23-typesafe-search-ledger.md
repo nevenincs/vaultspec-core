@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:e352daae968c57c7eb842ec371b75839a07946b95124bf8f9501b2cdeb2e96a9'
+body_hash: 'sha256:d439edae81d3d824aa55b87b5d2cf6a19bca716b42a5b0fbeff7fe1c1d078130'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -231,3 +231,12 @@ related:
 - `S09` `M` `.github/workflows/main-health.yml`
 - `S09` `M` `dev/guards/test_ci_check_shape.py`
 - `S09` `verify:` `just check-workflow` -> `pass`
+- `S06` `M` `docs/CLI.md`
+- `S06` `M` `src/vaultspec_core/cli/vault_search_cmd.py`
+- `S06` `M` `src/vaultspec_core/config/config.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S06` `M` `src/vaultspec_core/search/tests/reply_budget.py`
+- `S06` `M` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S06` `A` `src/vaultspec_core/search/_wire.py`
+- `S06` `verify:` `pytest search, mcp search/context/surface, cli search, config` -> `pass`
