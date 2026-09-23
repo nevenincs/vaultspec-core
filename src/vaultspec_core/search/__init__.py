@@ -22,6 +22,7 @@ from ._models import SearchOutcome as SearchOutcome
 from ._models import SearchStatus as SearchStatus
 from ._models import SearchUsage as SearchUsage
 from ._models import UnavailableReason as UnavailableReason
+from ._remediation import remediation as remediation
 from ._service import search_vault as search_vault
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "SearchUsage",
     "UnavailableReason",
     "hosted_search_config",
+    "remediation",
     "search_vault",
     "tokenize",
 ]
