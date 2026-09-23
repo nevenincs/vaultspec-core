@@ -35,8 +35,10 @@ if TYPE_CHECKING:
 
 __all__ = [
     "DEFAULT_RESULTS",
+    "EXCERPT_CHARS",
     "MAX_QUERY_CHARS",
     "MAX_RESULTS",
+    "SUPPORTING_CHARS",
     "CredentialSource",
     "Excerpt",
     "HostedSearchConfig",
@@ -51,9 +53,18 @@ __all__ = [
 #: sit well inside the discovery reply budget.
 DEFAULT_RESULTS: Final = 5
 
-#: The most hits one search returns. Every shortlisted record is judged
-#: regardless, so a larger page would only repeat weaker candidates.
-MAX_RESULTS: Final = 20
+#: The most hits one search returns. A search reads about eleven records in
+#: full, so a larger page would only list weaker candidates, and ten hits with
+#: their excerpts stay under the envelope's hard reply ceiling.
+MAX_RESULTS: Final = 10
+
+#: Characters of a hit's answering excerpt a surface carries, clipped at a
+#: line boundary with ``core.windowing.clip_text``. Blocks run to about 1,400
+#: characters; five hits at this size sit inside the discovery reply budget.
+EXCERPT_CHARS: Final = 900
+
+#: Characters of a hit's supporting excerpt a surface carries.
+SUPPORTING_CHARS: Final = 400
 
 
 #: The longest query accepted. A query is a question, not a document: every
