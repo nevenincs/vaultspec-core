@@ -104,3 +104,36 @@ def test_workspace_discovery_hint_points_at_sibling(tmp_path: Path) -> None:
     assert "Hint:" in result.output
     assert "--target" in result.output
     assert "main" in result.output
+
+
+def _date_option(*path: str) -> tuple[object, ...]:
+    """Describe the ``--date`` option of the command at *path*."""
+    import typer
+    from typer._click.core import Context as ClickContext
+    from typer.core import TyperGroup, TyperOption
+
+    command = typer.main.get_command(app)
+    for name in path:
+        assert isinstance(command, TyperGroup)
+        sub = command.get_command(ClickContext(command), name)
+        assert sub is not None, name
+        command = sub
+    option = next(param for param in command.params if "--date" in param.opts)
+    assert isinstance(option, TyperOption)
+    return (
+        option.opts,
+        option.secondary_opts,
+        option.type,
+        option.default,
+        option.required,
+        option.help,
+    )
+
+
+def test_date_filter_is_the_shared_record_filter() -> None:
+    """``vault feature list --date`` is the date filter every vault listing takes.
+
+    One declaration keeps the flag, its type and its help from drifting
+    between the verbs that narrow records by date.
+    """
+    assert _date_option("vault", "feature", "list") == _date_option("vault", "list")

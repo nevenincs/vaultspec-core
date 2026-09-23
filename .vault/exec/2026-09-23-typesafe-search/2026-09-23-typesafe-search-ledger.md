@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:c62a29070ff515c32692750735d5dd6e52dee4cd76de24bda4f091aa35603fe8'
+body_hash: 'sha256:d9be5983f1734f59872d19d96ce1920171f1d7ba37f3cbc219602f7d4214bd6b'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -215,3 +215,6 @@ related:
 - `S12` `M` `src/vaultspec_core/vaultcore/tests/test_frontmatter_render.py`
 - `S12` `A` `src/vaultspec_core/vaultcore/tests/test_repository_corpus.py`
 - `S12` `verify:` `pytest -m repo test_repository_corpus` -> `pass`
+- `S07` `M` `src/vaultspec_core/cli/vault_feature_cmd.py`
+- `S07` `M` `src/vaultspec_core/tests/cli/test_feature_list_recency.py`
+- `S07` `verify:` `pytest test_feature_list_recency` -> `pass`

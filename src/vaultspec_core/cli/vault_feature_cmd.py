@@ -32,7 +32,7 @@ import typer
 from vaultspec_core.cli._errors import handle_error as _handle_error
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
-from vaultspec_core.cli.vault_cmd_app import feature_app
+from vaultspec_core.cli.vault_cmd_app import DateFilterOption, feature_app
 from vaultspec_core.core.windowing import apply_window
 
 if TYPE_CHECKING:
@@ -249,7 +249,7 @@ def _run_feature_index(
 
 @feature_app.command("list")
 def cmd_feature_list(
-    date: Annotated[str | None, typer.Option("--date", help="Filter by date")] = None,
+    date: DateFilterOption = None,
     orphaned: Annotated[
         bool, typer.Option("--orphaned", help="Show only orphaned features")
     ] = False,
