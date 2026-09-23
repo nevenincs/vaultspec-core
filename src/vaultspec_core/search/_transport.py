@@ -79,6 +79,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "BYTES_PER_TOKEN",
+    "CHOICE_OPTION_LIMIT",
     "ENDPOINT",
     "REQUEST_TOKEN_LIMIT",
     "STATE_TOKEN_LIMIT",
@@ -108,6 +109,9 @@ ENDPOINT: Final = "https://api.typesafe.ai/v1/systemone"
 
 #: Bytes of UTF-8 JSON per token, for estimating a request before sending it.
 BYTES_PER_TOKEN: Final = 3.3
+
+#: Most options one Choice question accepts, as published.
+CHOICE_OPTION_LIMIT: Final = 255
 
 #: Largest estimated request, in tokens, under the published 64k bound.
 REQUEST_TOKEN_LIMIT: Final = 60_000

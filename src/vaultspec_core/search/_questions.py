@@ -33,6 +33,7 @@ __all__ = [
     "KIND_TO_TYPE",
     "KIND_WEIGHT",
     "MODEL",
+    "NONE_KEY",
     "NO_BLOCK",
     "NO_RECORD",
     "RECORD_GROUPS",
@@ -70,6 +71,10 @@ WIDE: Final = (
     "blueprint, audit = review findings, plan = sequenced work, exec = change "
     "ledger)."
 )
+
+#: The option key of the no-match option on every Choice the engine asks;
+#: :data:`NO_RECORD` and :data:`NO_BLOCK` are its descriptions.
+NONE_KEY: Final = "none"
 
 #: The no-match option appended to every stage-1 Choice, so a group with
 #: nothing relevant can say so instead of promoting its least bad record.

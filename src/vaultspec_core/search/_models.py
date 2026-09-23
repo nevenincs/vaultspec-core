@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "DEFAULT_RESULTS",
+    "MAX_QUERY_CHARS",
     "MAX_RESULTS",
     "CredentialSource",
     "Excerpt",
@@ -53,6 +54,12 @@ DEFAULT_RESULTS: Final = 5
 #: The most hits one search returns. Every shortlisted record is judged
 #: regardless, so a larger page would only repeat weaker candidates.
 MAX_RESULTS: Final = 20
+
+
+#: The longest query accepted. A query is a question, not a document: every
+#: request carries it, so an unbounded query would crowd out the records it is
+#: judged against.
+MAX_QUERY_CHARS: Final = 2_000
 
 
 class SearchStatus(StrEnum):

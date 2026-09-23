@@ -3,7 +3,9 @@
 The transport tests exercise the client against real sockets, real HTTP/1.1
 keep-alive and real timeouts. Only the provider's decisions are scripted: each
 request receives the next scripted reply, and the last reply repeats once the
-script runs out. The server records every request it receives and the peak
+script runs out. A search sends many requests concurrently, in no fixed order,
+so a server may instead be given a responder that derives each reply from the
+request it answers. The server records every request it receives and the peak
 number it handled at once.
 """
 
@@ -17,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import TYPE_CHECKING, Any, Self, override
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from socketserver import BaseServer
     from types import TracebackType
 
@@ -132,12 +135,21 @@ def _provider_of(server: BaseServer) -> ScriptedProvider:
 
 
 class ScriptedProvider:
-    """Serve scripted replies on ``127.0.0.1`` for the life of a ``with`` block."""
+    """Serve scripted replies on ``127.0.0.1`` for the life of a ``with`` block.
 
-    def __init__(self, *replies: Reply) -> None:
-        if not replies:
-            raise ValueError("a script needs at least one reply")
+    Args:
+        replies: Replies served in order, the last one repeating.
+        responder: Derives each reply from the request instead; used when
+            no script is given.
+    """
+
+    def __init__(
+        self, *replies: Reply, responder: Callable[[Received], Reply] | None = None
+    ) -> None:
+        if not replies and responder is None:
+            raise ValueError("a script needs at least one reply or a responder")
         self._script = list(replies)
+        self._responder = responder
         self._lock = threading.Lock()
         self._in_flight = 0
         self.received: list[Received] = []
@@ -158,11 +170,14 @@ class ScriptedProvider:
 
     def take(self, received: Received) -> Reply:
         """Record *received* and return the reply scripted for it."""
+        responder = self._responder
         with self._lock:
             self.received.append(received)
-            if len(self._script) > 1:
-                return self._script.pop(0)
-            return self._script[0]
+            if responder is None or self._script:
+                if len(self._script) > 1:
+                    return self._script.pop(0)
+                return self._script[0]
+        return responder(received)
 
     def enter(self) -> None:
         with self._lock:
