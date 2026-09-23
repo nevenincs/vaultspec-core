@@ -23,7 +23,7 @@ import logging
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ._base import CheckDiagnostic, CheckResult, Severity
 
@@ -256,7 +256,8 @@ def _check_dangling(
         related = frontmatter.get("related", [])
         targets = set(extract_wiki_links(body))
         if isinstance(related, list):
-            targets.update(extract_related_links(related))
+            # Frontmatter is untyped data; the extractor skips malformed entries.
+            targets.update(extract_related_links(cast("list[str]", related)))
         rel_path = path.relative_to(root_dir)
         for target in sorted(t for t in targets if not links.resolves(t)):
             result.diagnostics.append(

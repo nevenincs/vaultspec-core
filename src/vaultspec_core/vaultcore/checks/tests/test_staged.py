@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from .._base import CheckResult
+    from .._base import CheckResult, Severity
 
 pytestmark = [pytest.mark.unit]
 
@@ -80,7 +80,9 @@ def vault(tmp_path: Path) -> Path:
     return root
 
 
-def _findings(results: list[CheckResult], name: str, scope: set[Path]) -> set[tuple]:
+def _findings(
+    results: list[CheckResult], name: str, scope: set[Path]
+) -> set[tuple[Path | None, str, Severity]]:
     (result,) = [r for r in results if r.check_name == name]
     return {
         (d.path, d.message, d.severity) for d in result.diagnostics if d.path in scope
