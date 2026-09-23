@@ -10,11 +10,10 @@ whole, confirm with grep.
 
 1. **Locate by meaning.** Code:
    `vaultspec-rag search "<concept and domain nouns>" --type code` (narrow with
-   `--language` or `--path`). When `status` reports hosted search configured, search
-   decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
-   `search`); otherwise use
-   `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Orientation: the
-   discovery verbs `vaultspec-core status [target]`, `vaultspec-core vault list`, and
+   `--language` or `--path`). Search decisions and vault facts with
+   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or
+   fails, run the next step its reply names. Orientation: the discovery verbs
+   `vaultspec-core status [target]`, `vaultspec-core vault list`, and
    `vaultspec-core vault graph` (MCP: `status`, `find`). A small, well-named module is
    listed directly.
 1. **Read** the epicenter file, or the nearest existing analogue when extending a

@@ -6,15 +6,16 @@ when it is absent) are defined once, in ``rules/vaultspec-discovery.builtin.md``
 Every other entry point cites the rule by name; the four roles whose job is
 search itself are registered restaters and carry the invocation verbatim.
 
-Decision and vault-fact questions are routed by one sentence: core's hosted
-search when ``status`` reports it configured, rag's decision search otherwise.
-rag's decision search appears nowhere except as that sentence's fallback.
+Decision and vault-fact questions are routed by one state-free sentence:
+core's ``search``, and when it declines or fails, the next step its reply
+names. No builtin offers rag's vault search itself; the reply does, when the
+workspace provisions rag.
 
 No test here counts anything. Each asserts a relation between the registry in
 ``core.discovery_guidance`` and the tree:
 the home defines every canonical sentence, restaters restate, citers cite,
 any rag or hosted-search invocation anywhere is spelled the canonical way, and
-rag's decision search is always the routed fallback.
+rag is invoked only for code.
 """
 
 from __future__ import annotations
@@ -34,10 +35,8 @@ from vaultspec_core.core.discovery_guidance import (
     DISCOVERY_SEQUENCE_MARKER,
     MCP_ONLY_CAPABILITIES,
     RAG_SEARCH_FLAGS,
-    SEARCH_ADR,
     SEARCH_CODE,
     SEARCH_VAULT,
-    VAULT_SEARCH_ROUTING,
 )
 
 if TYPE_CHECKING:
@@ -158,40 +157,46 @@ class TestSequenceHasOneHome:
         )
 
 
-class TestDecisionSearchIsRouted:
-    def test_rag_decision_search_appears_only_as_the_routed_fallback(self):
-        """Every SEARCH_ADR spelling sits inside VAULT_SEARCH_ROUTING.
+#: A sentence that names ``status`` and hosted search together: the shape of a
+#: route chosen from orientation state.
+_STATUS_GATE = re.compile(r"`status`[^.;]*hosted search|hosted search[^.;]*`status`")
 
-        Offered on its own, rag's decision search would bypass a configured
-        hosted search. Covers references too: a playbook read beside its
-        SKILL.md still instructs the search it names.
+
+class TestRoutingIsStateFree:
+    def test_no_entry_point_routes_discovery_on_status(
+        self, entry_points: dict[str, str]
+    ):
+        """Discovery routing never waits on what ``status`` reports.
+
+        A dispatched worker or a read-only session skips orientation, and a
+        configured key can still be rejected, so a route chosen from ``status``
+        is chosen from state the reader may not have. The search reply names
+        the next step instead.
         """
-        adr = _normalized(SEARCH_ADR)
-        routing = _normalized(VAULT_SEARCH_ROUTING)
         offenders = [
-            _rel(p) for p in _builtin_docs() if adr in _read(p).replace(routing, "")
+            rel for rel, body in entry_points.items() if _STATUS_GATE.search(body)
         ]
-        assert not offenders, (
-            f"rag decision search offered outside the routing sentence: {offenders}"
-        )
+        assert not offenders, f"discovery routed on status: {offenders}"
 
 
 class TestInvocationsAreCanonical:
-    def test_every_rag_search_invocation_is_a_canonical_spelling(self):
-        """Any ``vaultspec-rag search`` span, anywhere, is SEARCH_CODE or SEARCH_ADR.
+    def test_every_rag_search_invocation_is_the_code_search(self):
+        """Any ``vaultspec-rag search`` span, anywhere, is SEARCH_CODE.
 
-        Covers references too: the ADR spelling carries the ``--doc-type adr``
-        filter for a recall reason, and a variant query string teaches a
-        different query.
+        Vault questions go to core's ``search``, whose reply names a rag vault
+        search when the workspace provisions rag, over the record types asked
+        for. A builtin that offered one itself would choose a route from state
+        it cannot see. Covers references too: a playbook read beside its
+        SKILL.md still instructs the search it names, and a variant query
+        string teaches a different query.
         """
-        allowed = {SEARCH_CODE, SEARCH_ADR}
         offenders = [
             (_rel(p), span)
             for p in _builtin_docs()
             for span in _RAG_SEARCH.findall(_read(p))
-            if span not in allowed
+            if span != SEARCH_CODE
         ]
-        assert not offenders, f"non-canonical rag invocations: {offenders}"
+        assert not offenders, f"non-code rag invocations: {offenders}"
 
     def test_every_hosted_search_invocation_is_the_canonical_spelling(self):
         """Any hosted-search invocation with a question, anywhere, is SEARCH_VAULT."""

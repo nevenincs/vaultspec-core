@@ -19,9 +19,10 @@ Three properties matter and are enforced by that test:
 * The fallback sentence is identical everywhere, so a reader who has seen it
   once does not have to re-read a variant to check whether it says something
   new.
-* rag's decision search is only ever offered inside the routing sentence, so
-  no builtin sends a decision question to rag where core's hosted search is
-  configured.
+* No builtin offers rag's vault search. Decision and vault-fact questions go
+  to core's ``search``, whose reply names the search to run when it declines
+  or fails, resolved from what the workspace provisions; guidance that chose a
+  route itself would need runtime state it cannot see.
 * No builtin invents a rag CLI flag. Several of rag's strongest capabilities -
   intent ranking, relevance feedback, and the noise-domain filters - exist only
   on its MCP tools and as inline query tokens, with no CLI flag at all. Prose
@@ -51,14 +52,10 @@ DISCOVERY_FALLBACK = (
 SEARCH_CODE = '`vaultspec-rag search "<concept and domain nouns>" --type code`'
 
 #: rag's vault search before its record-type filter. ``--doc-type`` narrows it
-#: to one type or, comma-separated, a union of types.
+#: to one type or, comma-separated, a union of types. Only a declined core
+#: search names it, over the record types that search was asked for; no
+#: builtin offers it.
 RAG_VAULT_SEARCH = 'vaultspec-rag search "<intent>" --type vault'
-
-#: Canonical spelling for locating governing decisions.
-#:
-#: The directed ``--doc-type adr`` filter, not catch-all ``--type vault``,
-#: which is materially noisier for decision recall.
-SEARCH_ADR = f"`{RAG_VAULT_SEARCH} --doc-type adr`"
 
 #: Core's listing verb, the orientation half of the no-semantic route; an
 #: optional record type narrows it. Its MCP counterpart is ``find``.
@@ -71,13 +68,15 @@ SEARCH_VAULT = '`vaultspec-core vault search "<question>"`'
 
 #: The single sentence routing decision and vault-fact questions.
 #:
-#: The branch is observed state, not a guess: ``status`` reports whether hosted
-#: search is configured, and without a key core's search only returns
-#: ``not_configured``, so rag's decision search is the route. Code search is
-#: rag's alone and is not routed.
+#: State-free: it carries no runtime condition, because the reader who needs
+#: it - a dispatched worker, a read-only session - often cannot see the state
+#: a condition would name, and a configured key can still be rejected. The
+#: search itself decides: when it declines or fails, its reply names the next
+#: step, a rag vault search when rag is provisioned and core's listing verbs
+#: and grep otherwise. Code search is rag's alone and is not routed.
 VAULT_SEARCH_ROUTING = (
-    "When `status` reports hosted search configured, search decisions and vault "
-    f"facts with {SEARCH_VAULT} (MCP: `search`); otherwise use {SEARCH_ADR}."
+    f"Search decisions and vault facts with {SEARCH_VAULT} (MCP: `search`); "
+    "when it declines or fails, run the next step its reply names."
 )
 
 #: rag CLI flags that exist, as of the floor in
@@ -142,7 +141,6 @@ DISCOVERY_HOME = "rules/vaultspec-discovery.builtin.md"
 DISCOVERY_CANONICAL_SENTENCES = (
     DISCOVERY_FALLBACK,
     SEARCH_CODE,
-    SEARCH_ADR,
     SEARCH_VAULT,
     VAULT_SEARCH_ROUTING,
 )
