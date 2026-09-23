@@ -85,6 +85,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: null branch, and a key that is sent null spells it as a type list.
 #: Measured 26,289 before, 25,643 with the schema change alone and 26,107
 #: with the record (-182). Margin of 8.
+#:
+#: Held at 26,115 when ``log`` took ``verify`` as a list, as the CLI
+#: repeats ``--verify``. The array schema cost 27; trimmed ``log``
+#: parameter prose paid 23 of it. Measured 26,107 before and 26,111
+#: after (+4). Margin of 4.
 MAX_TOOL_DEFINITION_CHARS = 26_115
 
 #: Aggregate ceiling for the read-only surface (five tools), same rules.

@@ -90,22 +90,22 @@ def register_exec_tools(mcp: MCPServer[None]) -> None:
         plan: str,
         step: str,
         rows: list[str] | None = None,
-        verify: str | None = None,
+        verify: list[str] | None = None,
         by: str | None = None,
         notes: list[str] | None = None,
     ) -> LogResult:
         """Append one Step's rows to its plan's execution ledger.
 
-        Creates the ledger on first use; re-logging a row is idempotent.
+        Creates the ledger on first use; re-logging is idempotent.
 
         Args:
             ctx: The MCP request context (unused).
             feature: Feature tag.
             plan: The parent plan's stem.
-            step: Step id (``S01``) or display path (``P01.S01``).
+            step: ``S01`` or display path ``P01.S01``.
             rows: One ``OP:path`` per path touched: ``A:`` added, ``M:``
                 modified, ``D:`` deleted, ``R:old->new`` renamed.
-            verify: A check that ran, as ``<command>=pass|fail``.
+            verify: One ``<command>=pass|fail`` per check run.
             by: The persona that closed the Step.
             notes: Exception notes only.
         """
@@ -125,7 +125,7 @@ def register_exec_tools(mcp: MCPServer[None]) -> None:
                 plan_stem=plan,
                 step=step,
                 rows=tuple(parse_row_spec(spec) for spec in rows or []),
-                verify=(parse_verify_spec(verify),) if verify else (),
+                verify=tuple(parse_verify_spec(spec) for spec in verify or []),
                 by=by,
                 notes=tuple(notes or []),
             )

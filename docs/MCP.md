@@ -935,7 +935,7 @@ this tool and `vaultspec-core vault exec log` share one writer.
 | `plan`    | string                  | - (required) | The parent plan's stem.                                                                        |
 | `step`    | string                  | - (required) | Canonical step id (`S01`) or display path (`P01.S01`).                                         |
 | `rows`    | list of strings or null | `null`       | One `OP:path` per path touched: `A:` added, `M:` modified, `D:` deleted, `R:old->new` renamed. |
-| `verify`  | string or null          | `null`       | A check that ran, as `<command>=pass` or `<command>=fail`.                                     |
+| `verify`  | list of strings or null | `null`       | One `<command>=pass` or `<command>=fail` per check that ran.                                   |
 | `by`      | string or null          | `null`       | The persona that closed the step.                                                              |
 | `notes`   | list of strings or null | `null`       | Exception notes only (data loss, skipped work, a scaffold left in code, a persistent failure). |
 

@@ -61,7 +61,7 @@ async def test_log_creates_then_appends_the_ledger(vault_root: Path) -> None:
             client,
             step="S01",
             rows=["M:src/foo.py", "A:tests/test_foo.py"],
-            verify="pytest -q=pass",
+            verify=["pytest -q=pass", "ruff check=fail"],
             by="vaultspec-low-executor",
         )
         second = await _log(
@@ -69,12 +69,13 @@ async def test_log_creates_then_appends_the_ledger(vault_root: Path) -> None:
         )
 
     assert first["created"] is True and first["changed"] is True
-    assert first["step"] == "S01" and first["rows"] == 4
+    assert first["step"] == "S01" and first["rows"] == 5
     assert second["created"] is False and second["changed"] is True
     assert second["notes"] == 1
     text = _ledger(vault_root).read_text(encoding="utf-8")
     assert "- `S01` `M` `src/foo.py`" in text
     assert "- `S01` `verify:` `pytest -q` -> `pass`" in text
+    assert "- `S01` `verify:` `ruff check` -> `fail`" in text
     assert "- `S01` `by:` `vaultspec-low-executor`" in text
     assert "- `S02` `D` `src/bar.py`" in text
     assert "- `S02` skipped docs" in text
@@ -98,7 +99,7 @@ async def test_relog_is_idempotent(vault_root: Path) -> None:
     [
         {"step": "S01", "rows": ["src/foo.py"]},
         {"step": "S01", "rows": ["X:src/foo.py"]},
-        {"step": "S01", "verify": "pytest=maybe"},
+        {"step": "S01", "verify": ["pytest=pass", "pytest=maybe"]},
         {"step": "S99", "rows": ["M:src/foo.py"]},
         {"step": "S01", "rows": ["M:src/foo.py"], "plan": "no-such-plan"},
     ],
