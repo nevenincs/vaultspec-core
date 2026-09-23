@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:fb2acc2ce27a000512e4608ad5f8164b352b75a0b2b26f1296a5ebf06dffbd6a'
+body_hash: 'sha256:e00e44d4cc77d62880ed4887e7e963e8dc416ba968fd6bfaeb316c13866b0cc7'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -34,3 +34,15 @@ related:
 - `S01` `M` `src/vaultspec_core/vaultcore/checks/tests/test_adr_status.py`
 - `S01` `M` `src/vaultspec_core/vaultcore/checks/tests/test_body_sections.py`
 - `S01` `M` `src/vaultspec_core/vaultcore/checks/tests/test_markdown.py`
+- `S03` `M` `src/vaultspec_core/config/config.py`
+- `S03` `A` `src/vaultspec_core/config/dotenv.py`
+- `S03` `M` `src/vaultspec_core/config/__init__.py`
+- `S03` `M` `src/vaultspec_core/config/tests/test_config.py`
+- `S03` `A` `src/vaultspec_core/config/tests/test_dotenv.py`
+- `S03` `A` `src/vaultspec_core/search/_credential.py`
+- `S03` `A` `src/vaultspec_core/search/tests/__init__.py`
+- `S03` `A` `src/vaultspec_core/search/tests/test_credential.py`
+- `S03` `M` `.env.example`
+- `S04` `A` `src/vaultspec_core/search/_transport.py`
+- `S04` `A` `src/vaultspec_core/search/tests/scripted_provider.py`
+- `S04` `A` `src/vaultspec_core/search/tests/test_transport.py`
