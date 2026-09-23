@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:2fbd61d5cb060d2329eb6b4c54c39f65ec91503870ca3231c02f90f3b4b6aa4f'
+body_hash: 'sha256:a46ef1b847ae7c131183ed144bc9c2889ef0f5328a6ff0e703497c7026424b9e'
 related:
   - '[[2026-08-26-rag-search-exposure-adr]]'
   - '[[2026-08-23-envelope-optimization-adr]]'
@@ -20,14 +20,16 @@ Should vault search in vaultspec-core run on TypeSafe Jev, enrolled by
 `VAULTSPEC_CORE_TYPESAFE_API_KEY`, with vaultspec-rag kept as the fallback? Core has
 no vault search today: `find` matches stems and features, and semantic search reaches
 agents only as prose telling them to run rag. A live, labelled evaluation on this
-vault (24 queries, `jev-1.13.0`, 2026-09-23) found that a two-stage Jev engine finds
-the right record about as well as rag, locates the answering excerpt where rag does
-not, abstains on unanswerable questions, runs in about one second without an index,
-and costs about half a cent per query. The same evidence exposes four things the ADR
-must settle: rag as an in-core fallback contradicts an accepted decision; a Cloudflare
-rule in front of the API blocks 2.8% of vault records unless text is sanitised; where
-the credential may be read from; and how a new surface fits the fixed MCP tool set and
-the envelope budget.
+vault used `jev-1.13.0` on 2026-09-23: 24 development queries, then 20 held-out
+queries over features the first set never touched. A two-stage Jev engine ranked the
+right record first more often than rag (0.83 against 0.72 held out). It located the
+answering excerpt where rag almost never does, and abstained on most unanswerable
+questions. It runs in about one second without an index, and costs about half a cent
+per query. Its misses are recall of answers buried in body detail, a weakness rag does
+not share. The same evidence exposes four things the ADR must settle: rag as an
+in-core fallback contradicts an accepted decision; a Cloudflare rule in front of the
+API blocks 2.8% of vault records unless text is sanitised; where the credential may be
+read from; and how a new surface fits the fixed MCP tool set and the envelope budget.
 
 ## Findings
 
@@ -132,8 +134,9 @@ of 21 cases. rag's latency includes a CLI process per query. Between the two run
 Limits of this evidence:
 
 - 21 answerable queries give 0.05 steps per query.
-- The 0.2 kind weight was picked on these same queries, so a held-out set must confirm
-  it. Weights 0.1 and 0.2 score identically; 0.3 scores higher.
+- The 0.2 kind weight was picked on these same queries. Weights 0.1 and 0.2 score
+  identically; 0.3 scores higher. The held-out finding below confirms 0.2 on unseen
+  queries.
 - Queries written from the documents favour lexical overlap, which flatters BM25.
 - One unanswerable case (FreeBSD builds) is arguably answered by a release target list,
   and Jev's 0.70 there is defensible.
@@ -167,6 +170,54 @@ signal here.
 One paraphrased query, asking why the markdown hook stopped repairing vault findings,
 was missed by every engine except BM25, which ranked it 5. A summary cannot carry every
 body detail, so how deep the BM25 top-N added to the shortlist should go is still open.
+
+### Held-out queries confirm the kind prior; per-record judgments cannot rank siblings
+
+Revisions guided by the TypeSafe skill were measured on the dev set; the one that
+showed a gain was then checked on 20 held-out queries.
+
+**Held-out set.** A second agent wrote the 20 queries over 12 features that the dev set
+does not touch, verified the same way: 10 direct, 4 sibling, 2 multi-record, 2 with no
+answer, 2 false premise (`tmp/typesafe-search-eval/heldout.json`).
+
+**Per-record Score.** The skill's "comparable per-item Scores for graded ranking"
+guidance does not separate siblings. A four-level Score on how directly a record answers
+("primary account" down to "does not address") returned at least 0.98 of the scale for
+research, ADR and plan alike. On the dev set, answer plus Score ranked hit@1 0.71, the
+same as the answer Noul alone. Judged alone, each sibling does state the answer with its
+reasons. Which record owns it is relational, and no per-record question can see it.
+
+**Finalist Choice.** A Choice over the top four finalists, read side by side, asked
+which record is the authoritative source, following the skill-suggestion cookbook's
+second request. It reached hit@1 0.95 on three saved dev shortlists, at about 1.3k
+tokens and a 276 ms serial request. On the held-out set it matched the kind prior.
+
+| engine (18 answerable held-out queries) | hit@1 | hit@3 | MRR   | excerpt holds the gold evidence  | abstained (2 unanswerable) | median latency |
+| --------------------------------------- | ----- | ----- | ----- | -------------------------------- | -------------------------- | -------------- |
+| Jev, answer plus 0.2 kind (v2)          | 0.83  | 0.83  | 0.844 | 13/18                            | 1/2                        | 957 ms         |
+| Jev, finalist Choice (v4)               | 0.83  | 0.83  | 0.847 | 13/18, 14/18 with a second block | 1/2                        | 1,260 ms       |
+| `vaultspec-rag@0.4.35`, keyless         | 0.72  | 0.83  | 0.797 | 1/18                             | 0/2                        | 2,355 ms       |
+| BM25                                    | 0.33  | 0.61  | 0.496 | 11/18                            | 0/2                        | 17 ms          |
+
+The two Jev rankings differ on one case, rank 4 against 5. The kind prior is therefore
+not overfit to the dev set, and the finalist request adds latency without a measured
+gain.
+
+**Recall.** The remaining Jev misses are recall, not ranking. For two held-out queries
+the gold record never reached stage 2, because the answer sits in a body detail that
+its summary does not carry: an fsync setting, and a Windows config-merge defect. Their
+stage-1 rank was past 20 and their BM25 rank 9 and 8, so the BM25 top-3 union missed
+them. rag ranked both first. rag in turn missed or buried three records that Jev ranked
+first. Summary-based recall and embedding recall fail on different queries.
+
+**Excerpt Choice.** Adding an explicit "no block answers" option did no harm. That
+option's probability on the top record was 1.0 and 0.98 for the two dev queries with no
+answer. Returning a second block when its probability is at least 0.25 added one
+correct excerpt on each set.
+
+**Kind question.** The record-kind Choice asks about the same state as stage 1. Carrying
+it inside a stage-1 request, the skill's fan-out advice, saved one request per search
+(15.3 against 16.3) at unchanged latency.
 
 ### Cloudflare in front of the API rejects 2.8% of vault records unless text is sanitised
 
@@ -288,7 +339,9 @@ transport would not.
 
 ### Not investigated
 
-- Held-out accuracy beyond these 24 queries.
+- Accuracy beyond the 44 queries of the two sets, and whether a deeper or paragraph-level
+  lexical union closes the recall gap. Tuning that gap on the held-out set would
+  consume it, so a third set is needed.
 - Vaults an order of magnitude larger.
 - rag's own hosted mode on this vault.
 - Non-English records.

@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:d09de1ea93cdd00128c6eca30ba21bf6acf27dc1044962a18dbf6be8d08bfb97'
+body_hash: 'sha256:f8cf7c0b26d8849404e4174229ae52c23a21ea0b0fda4b69632d8e37338a82e4'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -35,10 +35,11 @@ before any code lands.
 
 ## Considerations
 
-- **Retrieval quality.** A two-stage Jev engine matched rag's record ranking on this
-  vault. It located the answering excerpt in 18 of 21 cases, against rag's 0, and
-  abstained on unanswerable questions (`2026-09-23-typesafe-search-research`, the
-  evaluation and abstention findings).
+- **Retrieval quality.** On held-out queries a two-stage Jev engine ranked the right
+  record first in 0.83 of cases, against rag's 0.72, and located the answering excerpt
+  in 13 of 18 cases, against rag's 1. It abstains where rag cannot, and misses answers
+  that live only in body detail (`2026-09-23-typesafe-search-research`, the
+  evaluation, abstention and held-out findings).
 - **Request bounds.** Stage 1 must see summaries, not full records: 64k tokens per
   request, 255 options per Choice, and accuracy that falls with irrelevant state (same
   research, request bounds).
@@ -153,13 +154,18 @@ A search package in core owns five layers, top to bottom.
 - **Engine.** Hard filters are applied first.
   - Stage 1 sends the query as state. There is one Choice per record type over
     summaries, each with a `none` option, packed into bounded requests run
-    concurrently. A parallel Choice classifies the kind of record the query needs.
+    concurrently. A Choice classifying the kind of record the query needs rides in one
+    of those requests, because it asks about the same state.
   - The shortlist is the leaders per type, plus an in-process lexical top-N.
   - Stage 2 reads each shortlisted record in full, in windows under the state bound.
     For each window it asks whether the record answers the query, whether it is about
     the query's subject, and whether it contradicts a premise of the query (Nouls).
-    A Choice picks the answering block.
+    A Choice with an explicit "no block answers" option picks the answering block. A
+    second block is returned when its probability is at least a set floor.
   - Records rank by the answer probability plus a weighted record-kind probability.
+    That weight held on held-out queries. A per-record Score and a finalist Choice
+    were tested and are not used: the Score cannot separate sibling records, and the
+    finalist Choice added latency without a held-out gain.
   - The highest answer probability becomes an `answered` verdict against a threshold.
   - Premise conflicts are reported as their own flag, not folded into the ranking.
 - **Transport.** A stdlib HTTPS client with the properties listed under Constraints,
@@ -222,8 +228,13 @@ key, never redirect one.
 - **Throughput.** Account rate limits bound it to roughly 75 searches a minute per key.
 - **Vault size.** Stage-1 cost grows linearly with vault size, so a much larger vault
   will need a pre-filter decision later.
-- **Unconfirmed settings.** The kind weight and the `answered` threshold were set on 21
-  queries, and need a held-out set before they are relied on.
+- **Settings.** The kind weight held on 18 held-out queries. The `answered` threshold
+  abstained on 3 of 5 unanswerable questions across both sets, so it needs a larger
+  labelled set before an empty result is treated as proof of absence.
+- **Recall.** Summary-based recall misses answers that live only in body detail: 2 of
+  18 held-out queries, both of which rag ranked first. The "not configured" routing
+  keeps rag available to agents, but a configured key does not. Deepening the lexical
+  union is the first remedy to measure, on a fresh query set.
 - **Blocking rule.** Correctness depends on a third party's blocking rule staying
   within what the sanitiser covers. A new trigger would surface as unscored records,
   not a wrong answer.
