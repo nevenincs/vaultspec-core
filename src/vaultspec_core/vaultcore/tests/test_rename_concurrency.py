@@ -53,7 +53,12 @@ def reset_cfg() -> Generator[None]:
     reset_config()
 
 
-def _prove_serialized_by(lock_target: Path, second_caller: Callable[[], None]) -> None:
+def _prove_serialized_by(
+    lock_target: Path,
+    second_caller: Callable[[], None],
+    *,
+    while_blocked: Callable[[], None] | None = None,
+) -> None:
     """Assert *second_caller* blocks on *lock_target* until a holder releases.
 
     Spawns a holder thread that acquires ``advisory_lock(lock_target)`` and
@@ -64,6 +69,9 @@ def _prove_serialized_by(lock_target: Path, second_caller: Callable[[], None]) -
     Args:
         lock_target: The sentinel both the holder and *second_caller* contend on.
         second_caller: A zero-arg callable performing the lock-protected work.
+        while_blocked: Work done on the holder's behalf once the worker is
+            confirmed blocked and before the lock is released - the write an
+            in-flight edit lands while it holds the document.
     """
     holder_acquired = threading.Event()
     release_holder = threading.Event()
@@ -95,6 +103,8 @@ def _prove_serialized_by(lock_target: Path, second_caller: Callable[[], None]) -
         "second caller completed while the docs lock was held - it is not "
         "serializing on the docs_lock_target sentinel"
     )
+    if while_blocked is not None:
+        while_blocked()
 
     # Release the holder; the worker must now run to completion.
     release_holder.set()
@@ -346,6 +356,67 @@ def test_rename_blocks_while_the_renamed_document_is_locked_by_an_edit(
     # stale-and-orphaned pair.
     assert gamma.exists()
     assert not alpha.exists()
+
+
+def test_rename_reads_the_document_only_under_its_lock(tmp_path: Path) -> None:
+    """The rename reads the renamed document only while holding its lock.
+
+    An edit replaces a document while holding the document's lock, and on
+    Windows an unlocked read that races that replace is refused with
+    ``PermissionError``. The observable proof that no such read happens is the
+    reported ``old_blob_hash``: an edit that lands while the rename waits for
+    the lock must be the content the rename hashes, because the rename moves
+    exactly those bytes. A read taken before the lock names the pre-edit bytes
+    instead.
+    """
+    import json
+
+    from typer.testing import CliRunner
+
+    from ...cli import app
+    from ...core.commands import install_run
+    from ..blob_hash import git_blob_oid
+    from ..edit_engine import document_lock_target
+
+    root = tmp_path / "project"
+    adr_dir = root / ".vault" / "adr"
+    adr_dir.mkdir(parents=True)
+    (adr_dir / "2026-01-01-alpha-adr.md").write_text(_ALPHA, encoding="utf-8")
+    (adr_dir / "2026-01-01-beta-adr.md").write_text(_BETA, encoding="utf-8")
+    install_run(path=root, provider="all", upgrade=False, dry_run=False, force=True)
+    (root / ".vault" / "data").mkdir(parents=True, exist_ok=True)
+
+    alpha = adr_dir / "2026-01-01-alpha-adr.md"
+    lock_target = document_lock_target(alpha, root)
+    lock_target.parent.mkdir(parents=True, exist_ok=True)
+    reported_blob: list[str] = []
+    edited_blob: list[str] = []
+
+    def _run_rename() -> None:
+        result = CliRunner().invoke(
+            app,
+            [
+                "--target",
+                str(root),
+                "vault",
+                "rename",
+                "2026-01-01-alpha-adr",
+                "--to",
+                "2026-01-01-gamma-adr",
+                "--no-check",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        reported_blob.append(json.loads(result.output)["data"]["old_blob_hash"])
+
+    def _land_edit() -> None:
+        alpha.write_bytes(_ALPHA.replace("# Alpha", "# Alpha, edited").encode())
+        edited_blob.append(git_blob_oid(alpha.read_bytes()))
+
+    _prove_serialized_by(lock_target, _run_rename, while_blocked=_land_edit)
+
+    assert reported_blob == edited_blob
 
 
 def test_rename_blocks_while_a_referrer_document_is_locked_by_an_edit(

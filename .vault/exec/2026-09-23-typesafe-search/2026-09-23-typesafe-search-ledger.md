@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:bd224f8ef36ab681e5a7b37327c1edc810bd2bd3931406fa6b6e6f128d04481c'
+body_hash: 'sha256:e7c04b9e13af1bfb87edf0677394349a3ce15c247250603f41bbf5ac7706faab'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -220,3 +220,6 @@ related:
 - `S07` `verify:` `pytest test_feature_list_recency` -> `pass`
 - `S10` `M` `src/vaultspec_core/tests/cli/test_exec_ledger_cli.py`
 - `S10` `verify:` `pytest test_exec_ledger` -> `pass`
+- `S11` `M` `src/vaultspec_core/cli/edit_cmd.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/tests/test_rename_concurrency.py`
+- `S11` `verify:` `rename-and-edit load test 40 serial runs` -> `pass`
