@@ -1,0 +1,32 @@
+"""Hosted vault search: ranked records with verbatim excerpts.
+
+Search runs on the TypeSafe Jev model when a hosted-search credential is
+configured, and reports ``not_configured`` otherwise, so the caller can route
+to the agent-level fallback. It never calls vaultspec-rag.
+"""
+
+from __future__ import annotations
+
+from ._models import DEFAULT_RESULTS as DEFAULT_RESULTS
+from ._models import MAX_RESULTS as MAX_RESULTS
+from ._models import CredentialSource as CredentialSource
+from ._models import Excerpt as Excerpt
+from ._models import HostedSearchConfig as HostedSearchConfig
+from ._models import SearchHit as SearchHit
+from ._models import SearchOutcome as SearchOutcome
+from ._models import SearchStatus as SearchStatus
+from ._models import SearchUsage as SearchUsage
+from ._models import UnavailableReason as UnavailableReason
+
+__all__ = [
+    "DEFAULT_RESULTS",
+    "MAX_RESULTS",
+    "CredentialSource",
+    "Excerpt",
+    "HostedSearchConfig",
+    "SearchHit",
+    "SearchOutcome",
+    "SearchStatus",
+    "SearchUsage",
+    "UnavailableReason",
+]
