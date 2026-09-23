@@ -510,13 +510,13 @@ judge.
 **Bounds.** Every other ADR is ranked by code alone, the best 192 are put to the model
 as Choice questions of at most 32 options, and the best 32, plus up to 8 declared links
 outside them, are judged in pairs. A source costs at most 46 requests and 60 seconds, a
-sweep takes at most 50 sources and 300 seconds, and a vault may hold at most 5,000 ADRs.
-Sweeps run in stem order and store no state. An ADR the provider refuses to read is held
-open while the sweep judges on: once a later ADR is read, the refusal counts as that
-ADR's own and the sweep moves past it, and at the end of the selection a sweep in which
-the provider read something moves past it too. Three refusals in a row, or any other
-failure, stop the sweep before the first refusal still open, and resuming retries from
-there.
+sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300 seconds,
+and a vault may hold at most 5,000 ADRs. Sweeps run in stem order and store no state. An
+ADR the provider refuses to read is held open while the sweep judges on, past its source
+limit by up to two more ADRs if it must: a later ADR the provider reads shows the
+refusal was that ADR's own, and the sweep moves past both. A refusal no read settles,
+three refusals in a row, or any other failure stops the sweep with `stopped` set and the
+cursor before the first refusal still open, so resuming retries from there.
 
 **Verdicts.** Each row has `stem`, `kind`, `score`, `relation`, `status`, `declared`,
 and `applied` when this call wrote it. `link` means the source should link the ADR;

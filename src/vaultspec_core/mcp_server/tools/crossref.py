@@ -234,7 +234,13 @@ def register_crossref_tools(
                 all_adrs,
                 apply,
             )
-            sweeping = len(refs) != 1 or feature or isolated or all_adrs or after
+            sweeping = (
+                len(refs) != 1
+                or feature is not None
+                or isolated
+                or all_adrs
+                or after is not None
+            )
             if not sweeping:
                 outcome = await _run(
                     functools.partial(crossref_adr, root, refs[0], apply=apply)
