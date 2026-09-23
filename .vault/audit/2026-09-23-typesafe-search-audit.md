@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:8e251b2fdd12b9806b7e7d98ecefec008320b0184ac082d1d50e3da58314ff94'
+body_hash: 'sha256:3c1a0cc92c10aa7061cc63c4f5735393e7ea4ac63dbe390218636d56b6c5f79b'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -301,6 +301,130 @@ renders as one paragraph. CLI `--json` `not_configured` omits `answered`
 and the degradation chain appear only in `docs/CLI.md:968-1062,3278-3287` and
 `docs/MCP.md:344-474`.
 
+### discovery-fallback-close | high | The plan-close review of the discovery fallback finds two red gates; result REVISION REQUIRED
+
+The review covered plan `2026-09-23-discovery-fallback-plan`, S01 to S05, commits
+`ba5dd259`, `2ee3d5ed`, `84c4098a`, `ccf05dcb`, `bd4abc26` and `9bd7e145`, against the
+discovery-fallback amendment of `2026-09-23-typesafe-search-adr` and the plan's related
+decisions. It traced a declined search from the service through `outcome_fields` to CLI
+text, CLI `--json` and MCP `search`, both status surfaces, the guidance constants
+through the builtins to their `.vaultspec/` copies, and the user docs against the code.
+
+Result: `REVISION REQUIRED`. There are 2 high, 3 medium and 2 low findings below.
+
+Gates, run on a clean checkout of `bd4abc26`:
+
+- pytest over `search`, `mcp_server/tests`, the CLI vault search, status and reference
+  tests, `test_discovery_guidance` and `dev/guards`: 698 passed and 1 failed, the
+  docs-bare-commands finding.
+- `just check-markdown` fails on the plan's own ledger, the ledger-note-escaping
+  finding.
+- On `1d2adb31`, after the environment-variable centralisation lane committed its move
+  of the credential into `config/`, the search, capability, MCP search, CLI search,
+  status and guidance tests pass (165). The next-step wiring survives that move:
+  `_remediation.py` and `_capability.py` now read the variable name from the config
+  registry, and `next_step` is unchanged.
+
+Verified to hold:
+
+- **Backend-resolved fallback.** `next_step`
+  (`src/vaultspec_core/search/_remediation.py:67-90`) resolves a typed `NextStep` from
+  the companion probe and the requested types. `SearchOutcome.__post_init__`
+  (`src/vaultspec_core/search/_models.py:335`) makes a decline without a step, or a
+  ranked page with one, unrepresentable.
+- **Search parity.** CLI `--json` `data` and the MCP result are both `outcome_fields`
+  (`src/vaultspec_core/search/_wire.py:74`), and
+  `test_the_wire_is_the_search_packages_one_projection` holds them equal. `answered` is
+  always present. Type validation lives in `src/vaultspec_core/search/_filters.py`,
+  and the surfaces only map `UnsearchableTypeError` and `InvalidQueryError` to their own
+  error types.
+- **rag exposure.** The probe reads `.mcp.json` and distribution metadata only. No rag
+  import or call was added.
+- **State-free guidance.** No builtin rule, skill or persona names TypeSafe, a key or a
+  `status` gate. The routing sentence lives in the discovery rule alone, the ADR
+  listing is its own mandatory step, and the `.vaultspec/` copies equal the builtins.
+- **Reference.** The generated reference lists the wire hit fields and renders the vault
+  search options as a table, and the drift tests pass.
+- **Boundaries.** The reviewed code and tests cite no vault record and add no
+  suppressions, skips or mocks.
+
+### docs-bare-commands | high | The S05 user docs teach bare CLI commands and fail the CLI language guard
+
+`dev/guards/test_cli_language_contract.py:262` fails on `docs/framework.md:97`, `:108`
+and `:110` (`vault search`, `vault list`), `docs/MCP.md:686` (`status --json`) and
+`README.md:97` (`vault search`). The guard requires the `vaultspec-core` entry point on
+every runnable snippet. The S05 verify row
+(`.vault/exec/2026-09-23-discovery-fallback/2026-09-23-discovery-fallback-ledger.md:86`)
+ran only `just framework-reference-check`, so the guard never ran on S05. The S04 note
+(`:115`) recorded the failure without routing it.
+
+### ledger-note-escaping | high | The ledger writer emits note text raw, so check-markdown fails on a machine-owned ledger
+
+`just check-markdown` fails on the S03 note
+(`.vault/exec/2026-09-23-discovery-fallback/2026-09-23-discovery-fallback-ledger.md:114`):
+mdformat escapes the underscores in `search/_models.py` and `search/_credential.py`,
+which the note carries as plain text. `format_note`
+(`src/vaultspec_core/vaultcore/exec_ledger.py:284-286`) joins free text unescaped.
+`format_row` (`:278-279`) backticks every cell, and `8d46b5e2` fixed only the
+blank-line layout. Any note that names a private module or holds `*`, `_` or `<` leaves
+a file the markdown gate refuses, and the file may not be hand-edited. The working tree
+holds an uncommitted hand-escape of that line from another session. It clears the gate,
+but the writer defect remains. No Step of this plan owns `exec_ledger.py`.
+
+### status-companion-parity | medium | MCP status omits the companion record the CLI carries, an exception the amended ADR does not record
+
+CLI `status --json` spreads `discovery_fields` (`hosted_search` and `companion`,
+`src/vaultspec_core/cli/status_cmd.py:285-297`). MCP `StatusResult` carries
+`hosted_search` alone, read through `hosted_search_config` directly
+(`src/vaultspec_core/mcp_server/tools/orientation.py:28,542`) rather than
+`discovery_capability`. The amendment's thin-surfaces bullet
+(`.vault/adr/2026-09-23-typesafe-search-adr.md:229`) promises identical fields, and S01
+names both status surfaces.
+
+The reason is sound: the companion record costs 439 tool-definition characters against
+a ceiling `2026-08-23-envelope-optimization-adr` says is never raised. The companion
+only decides the fallback, which reaches an MCP agent as `next_step`, so nothing an
+agent acts on is lost. `docs/MCP.md` documents the difference. The reason is recorded
+only in a ledger note (`:112`), which is not a home for decisions. The ADR contradicts
+the code as shipped.
+
+### status-companion-prose | medium | CLI status words its own discovery fallback, contradicting the canonical routing
+
+`_companion_line` (`src/vaultspec_core/cli/status_cmd.py:252-255`) prints "not
+provisioned - use find and grep for discovery". This is guidance authored in a surface.
+It sends vault questions to find and grep past `search`. It differs from
+`DISCOVERY_FALLBACK` (`src/vaultspec_core/core/discovery_guidance.py:47-50`, a targeted
+grep for code). It also names the MCP verb `find` on a CLI surface. The plan's
+verification forbids status logic beyond rendering in `cli/`.
+
+### verdict-vocabulary | medium | The discovery rule keys reply handling to terminal sentences that MCP replies never carry
+
+`src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md:34-37` and
+`src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md:15-16` quote "nothing in the
+vault answers this" and "no record that was read answers this". Those are
+`SearchVerdict.sentence` (`src/vaultspec_core/search/_models.py:145`), printed only by
+CLI text. MCP and `--json` carry `verdict` as `nothing_answers` or `none_read_answers`
+(`src/vaultspec_core/search/_wire.py:94-95`). An MCP agent must map value to sentence
+unaided. No guard in `src/vaultspec_core/tests/test_discovery_guidance.py` ties the
+quotes to the enum, so rewording a sentence silently orphans the rule.
+
+### surface-wording | low | Surfaces still author outcome wording the backend owns elsewhere
+
+The MCP summary derives "answered" or "not answered" from `answered`
+(`src/vaultspec_core/mcp_server/tools/search.py:184`), not from `verdict`. A
+`none_read_answers` page therefore logs "not answered", while the CLI prints "no record
+that was read answers this". CLI text authors the premise note, the missing-passage line
+and the unscored line (`src/vaultspec_core/cli/vault_search_cmd.py:122,130,165`). They
+are terminal-only, so wire parity holds.
+
+### next-step-scope | low | The next step keeps the type filter but drops the feature and date filters
+
+`next_step` (`src/vaultspec_core/search/_remediation.py:67`) and `_declined`
+(`src/vaultspec_core/search/_service.py:74`) carry only the types. A declined
+`--feature x` search therefore names a vault-wide rag search or listing, though rag
+takes `--feature` and `--date` and `vault list` takes `--feature`. The amendment asks
+only for types, so this conforms.
+
 ## Recommendations
 
 - credential-gate: also require that the running interpreter is the workspace's own
@@ -343,3 +467,27 @@ and the degradation chain appear only in `docs/CLI.md:968-1062,3278-3287` and
   fix the reference generator inputs. No new decision beyond the ADR amendment.
 - user-docs: add hosted search and the degradation chain to `README.md` and
   `docs/framework.md`.
+- docs-bare-commands: spell `vaultspec-core vault search`, `vaultspec-core vault list`
+  and `vaultspec-core status --json` in `README.md`, `docs/framework.md` and
+  `docs/MCP.md`. Re-verify S05 with `dev/guards` and `check-markdown`. This reopens S05.
+- ledger-note-escaping: make `format_note` in
+  `src/vaultspec_core/vaultcore/exec_ledger.py` emit text the markdown gate accepts, and
+  test it with a note naming `search/_models.py`. Repair the existing line through the
+  writer or `vault check --fix`, not by hand. This needs an in-scope correction Step
+  added with the plan verbs, because no Step owns the file.
+- status-companion-parity: amend the thin-surfaces bullet of
+  `2026-09-23-typesafe-search-adr`. Identical fields hold for `search`; MCP `status`
+  carries `hosted_search` alone under the tool-definition budget, and the companion
+  reaches agents as `next_step`. The amendment needs user authorization. Separately,
+  read MCP status through `discovery_capability(...).hosted_search`, so both status
+  surfaces share one backend entry point (S01 scope).
+- status-companion-prose: drop the advice clause from `_companion_line` and state
+  provisioning only, as `_hosted_search_line` does, or render a sentence the search
+  package owns. This reopens S01.
+- verdict-vocabulary: name the wire value beside each quoted sentence in the discovery
+  rule and the ADR skill. Add a guard to `test_discovery_guidance.py` that the rule
+  carries each negative `SearchVerdict` value and sentence, then sync. This reopens S04.
+- surface-wording: have the MCP summary word `verdict`. Consider moving the premise and
+  unscored sentences beside `SearchVerdict.sentence`. No new decision is needed.
+- next-step-scope: carry the feature filter, and the date filter for rag, into
+  `NextStep.command`. No new decision is needed.
