@@ -193,13 +193,21 @@ def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, 
         ``(signal, annotated_document_count, unreadable_markdown_count)``.
     """
     from ...config import get_config
+    from ...graph import VaultGraph
     from ...vaultcore.checks import check_annotations, check_encoding
 
     if not (target / get_config().docs_dir).is_dir():
         return VaultContentSignal.NO_VAULT, 0, 0
 
-    annotated = len(check_annotations(target, fix=False).diagnostics)
-    unreadable = len(check_encoding(target).diagnostics)
+    # One read of the corpus feeds both checkers, as in the combined check
+    # run; standalone, each walks and reads every document again. The graph
+    # cache stays untouched because a diagnosis writes nothing.
+    graph = VaultGraph(target, use_cache=False)
+    graph.ensure_raw_texts()
+    annotated = len(
+        check_annotations(target, fix=False, raw_texts=graph.raw_texts).diagnostics
+    )
+    unreadable = len(check_encoding(target, graph=graph).diagnostics)
 
     if annotated:
         return VaultContentSignal.ANNOTATIONS, annotated, unreadable

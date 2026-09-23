@@ -545,7 +545,10 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "install') if this repository wants commit-time checks"
         ),
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
-        PrecommitSignal.UNREADABLE: ("could not be read; this check did not run"),
+        PrecommitSignal.UNREADABLE: (
+            "could not be read, or has a shape vaultspec does not recognise "
+            "and will not rewrite; this check did not run"
+        ),
         PrecommitSignal.DECLINED: (
             "declined by the workspace declaration (hooks.pre_commit = false); "
             "run 'vaultspec-core spec precommit enable' to restore the hooks"

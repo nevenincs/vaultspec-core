@@ -53,6 +53,8 @@ _SHAPES = {
     ),
     "gate in a second local repo": _local(_hook("ruff", "ruff"))
     + _local(_hook("vaultspec-commit-gate", _GATE_DEP)),
+    "unrecognised hooks list": "- repo: local\n  hooks: oops\n"
+    + _local(_hook("vault-fix", "x")),
 }
 
 #: The signals that plan a scaffold repair, and those that assert none is due.
@@ -61,7 +63,13 @@ _REPAIRABLE = {
     PrecommitSignal.NON_CANONICAL,
     PrecommitSignal.DUPLICATED,
 }
-_SETTLED = {PrecommitSignal.COMPLETE, PrecommitSignal.NOT_INSTALLED}
+_SETTLED = {
+    PrecommitSignal.COMPLETE,
+    PrecommitSignal.NOT_INSTALLED,
+    # A shape the scaffold refuses to rewrite: no repair is planned, and the
+    # row must not read as a working gate either.
+    PrecommitSignal.UNREADABLE,
+}
 
 
 @pytest.mark.parametrize("shape", sorted(_SHAPES))
@@ -76,10 +84,14 @@ def test_doctor_calls_for_a_repair_exactly_when_the_scaffold_would_make_one(
     )
 
     if shape == "gate missing":
-        # No vaultspec hook at all reads as the owner's stand-down, which
-        # sync honours instead of re-adding the hooks.
+        # The scaffold alone would append the gate, but sync consults this
+        # signal first and stands down on it, taking a config with no vaultspec
+        # hook as the owner's removal; doctor names the gap and plans no repair.
         assert signal is PrecommitSignal.NO_HOOKS
+        assert would_write
         return
+    if shape == "unrecognised hooks list":
+        assert signal is PrecommitSignal.UNREADABLE
     assert signal in _REPAIRABLE | _SETTLED, signal
     assert (signal in _REPAIRABLE) is would_write, (shape, signal, would_write)
 

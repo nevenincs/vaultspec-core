@@ -130,6 +130,10 @@ def _yaml_signal(assessment: YamlHookAssessment) -> PrecommitSignal:
         return PrecommitSignal.UNREADABLE
     if not assessment.vaultspec_hooks:
         return PrecommitSignal.NO_HOOKS
+    # Vaultspec hooks in a shape the reconcile refuses: no writer will touch
+    # the file, so it can vouch for no gate, whatever hooks it appears to list.
+    if not assessment.recognised:
+        return PrecommitSignal.UNREADABLE
     kinds = assessment.change_kinds
     if HookChange.DEDUPLICATED in kinds:
         return PrecommitSignal.DUPLICATED

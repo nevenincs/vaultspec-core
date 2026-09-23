@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:6d6c916dc6022e727cbc7dc466ce6d577140673a9f2119ed2416707c3611170f'
+body_hash: 'sha256:fdb39bfb2c8b8e75a0e50c1a5c457419fdf941320b6e89813ec38f1b6e5db7aa'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -127,6 +127,10 @@ related:
 - `S14` `A` `src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py`
 - `S14` `verify:` `pytest test_doctor_aggregates_canonical_checks against the prior modules` -> `fail`
 - `S13` `verify:` `pytest test_an_uninstalled_hook_weighs_nothing_in_the_exit_code against the warn weighting` -> `fail`
+- `S14` `M` `src/vaultspec_core/cli/spec_cmd_doctor.py`
+- `S14` `M` `src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py`
+- `S14` `M` `src/vaultspec_core/tests/cli/test_precommit_hook_set.py`
+- `S14` `verify:` `pytest unrecognised hooks list without the recognised check` -> `fail`
 
 ## Notes
 

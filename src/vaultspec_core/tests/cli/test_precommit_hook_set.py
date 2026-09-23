@@ -243,4 +243,4 @@ def test_an_uninstalled_hook_weighs_nothing_in_the_exit_code() -> None:
             WorkspaceDiagnosis(framework=FrameworkSignal.PRESENT, precommit=signal)
         )
 
-    assert code(PrecommitSignal.NOT_INSTALLED) == code(PrecommitSignal.COMPLETE)
+    assert code(PrecommitSignal.NOT_INSTALLED) == code(PrecommitSignal.COMPLETE) == 0

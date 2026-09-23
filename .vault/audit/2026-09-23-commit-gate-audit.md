@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:bc5d9620dd72653c8c222d04e33a1b4f36668df89b1701f7619c0aab0b53046d'
+body_hash: 'sha256:96f62aced58a712ee3859c3362874326da21db26fa84cfcc38b5503976d41417'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
   - "[[2026-09-23-commit-gate-adr]]"
@@ -192,6 +192,56 @@ Uninstall previews with `managed_strip_outcome`. One behaviour changes: the gate
 leftover retired hook now reads `INCOMPLETE`, because sync would remove the retired hook.
 `src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py` gave 3 failures on
 the old modules and passes now.
+
+### s14-unrecognised-yaml-reads-as-complete | high | a YAML shape the reconcile refuses was reported as a healthy gate
+
+The review of 06cd3b34 found that `assess_precommit_yaml` recorded `recognised`, but
+`_yaml_signal` never read it. A config whose first local repo had `hooks:` as a scalar, and
+whose second listed only a retired hook, therefore read `COMPLETE`. Doctor exited 0 in a
+repository with no gate, one that sync refuses to touch; before S14 it read `INCOMPLETE`.
+Fixed under reopened S14: an unrecognised shape that lists vaultspec hooks maps to
+`UNREADABLE`, whose detail now names
+the unrecognised shape. A shape with no vaultspec hook still reads `NO_HOOKS`, as the
+existing collector tests pin. The new "unrecognised hooks list" case in
+`src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py` failed without the
+fix and passes with it.
+
+### s14-agreement-test-exemption | medium | the parametrized agreement test skipped `gate missing` on a rationale the reviewer read as wrong
+
+The scaffold alone would append the gate, but sync reads the signal first and stands down on
+`NO_HOOKS` (`src/vaultspec_core/core/provider_sync.py:201`). So doctor planning no repair
+matches what sync does. The comment now states that mechanism, and the case asserts both
+that the signal is `NO_HOOKS` and that the scaffold's dry run would write.
+
+### s14-vault-content-row-cost | medium | the content row read the corpus twice, once per checker
+
+Fixed: the row builds one `VaultGraph` with raw texts, with the cache neither read nor
+written because a diagnosis writes nothing, and feeds both `check_annotations` and
+`check_encoding` from it, which is the single-ingress path the combined check run uses. On
+this worktree's vault, under load, the shared read took 3.2–4.8s and the two checkers
+standalone took 4.0–5.4s. A first attempt that used the graph cache wrote
+`.vault/data/.graph-cache/graph.json`, and `test_adoption_touches_no_other_file` caught it. The earlier inline probe
+was faster still at 0.19s, but it was the parallel implementation S14 removes. Whether
+doctor may spend one full corpus read per invocation is left to a follow-on ADR if the
+cost matters.
+
+### s13-exit-code-guard-relation | low | the NOT_INSTALLED guard pinned a relation, not a value
+
+Fixed: it now also asserts the exit code is 0.
+
+### s14-dry-run-duplicate-warning | low | `sync --dry-run` no longer warns of a duplicated hook
+
+Recorded, not changed. A preview no longer claims changes in the past tense, and doctor's
+`DUPLICATED` row reports the duplicate. Whether preview runs should list pending changes is
+for a later decision.
+
+### s14-parse-free-guard-scope | low | the AST guard covers only the hook collector
+
+Recorded, no change needed. The test is named for the hook collector, which is the scope
+S14 set. The other collectors' reads of the files they own are outside that scope.
+
+Result of the S13/S14 review: REVISION REQUIRED, then fixed. The high and both mediums are
+resolved in reopened S14, and the S13 low is fixed. The two remaining lows are recorded.
 
 ## Recommendations
 
