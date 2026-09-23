@@ -36,6 +36,7 @@ __all__ = [
     "NONE_KEY",
     "NO_BLOCK",
     "NO_RECORD",
+    "PREMISE_CONFLICT_THRESHOLD",
     "RECORD_GROUPS",
     "REFUTES",
     "SECOND_BLOCK_FLOOR",
@@ -166,6 +167,13 @@ KIND_WEIGHT: Final = 0.2
 #: The highest answer probability at or above which the search reports that
 #: the vault answers the query.
 ANSWERED_THRESHOLD: Final = 0.5
+
+#: The premise-conflict probability at or above which a surface points out
+#: that a record contradicts an assumption in the query. Measured on 44
+#: labelled queries: every false-premise query had a record at or above it
+#: and no other query did, but the nearest other query reached 0.84, so the
+#: note is advisory rather than a verdict.
+PREMISE_CONFLICT_THRESHOLD: Final = 0.85
 
 #: The least probability a second excerpt block needs to be returned beside
 #: the first, for answers that span two paragraphs.

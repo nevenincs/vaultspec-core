@@ -23,6 +23,7 @@ from ._models import SearchOutcome as SearchOutcome
 from ._models import SearchStatus as SearchStatus
 from ._models import SearchUsage as SearchUsage
 from ._models import UnavailableReason as UnavailableReason
+from ._questions import PREMISE_CONFLICT_THRESHOLD as PREMISE_CONFLICT_THRESHOLD
 from ._remediation import remediation as remediation
 from ._service import search_vault as search_vault
 
@@ -31,6 +32,7 @@ __all__ = [
     "EXCERPT_CHARS",
     "MAX_QUERY_CHARS",
     "MAX_RESULTS",
+    "PREMISE_CONFLICT_THRESHOLD",
     "SEARCHABLE_TYPES",
     "SUPPORTING_CHARS",
     "CredentialSource",
