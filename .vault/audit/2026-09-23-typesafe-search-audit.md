@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:3a998328c6bb5a032b4eb460a99faa2b7066f37c792277ded813afb67e4dbe39'
+body_hash: 'sha256:0595d7190ee2aca0b34f1da29413c5c77eb07391df689caa346455b36bc9086c'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -175,6 +175,82 @@ edits whitespace inside them. No such fence exists in this repository.
 `src/vaultspec_core/mcp_server/tests/test_search_tool.py:444-447` builds stems from
 this feature. Code and docs should not echo vault identifiers.
 
+### re-review | low | The fix round resolves every high and medium finding; result PASS
+
+The re-review covered commits `d6cfcb4c..a424b95a` against the findings above.
+
+- **Resolved, 15 findings:** credential-gate, content-rejection, adr-drift,
+  reply-ceiling, ci-windows-ansi, rename-race, duplicates, tool-args, test-population,
+  cli-valueerror, blob-race, oversize-line, indented-fences, boundary-names and
+  exec-log-blank.
+
+- **Deferred as recommended, unchanged:** rerender-flags and precommit-signal.
+
+- **Live evidence on the final code:**
+
+  - The live tests pass 3 of 3.
+  - Dev set: hit@1 0.90, excerpt 19/21.
+  - Held-out set: hit@1 0.94, excerpt 12/18.
+  - The rename race ran 40 serial runs with no failure.
+
+  The research record carries the measurement.
+
+- **CI wiring.** The merge gate now runs the live lane from a repository secret. No
+  critical or high finding is open, so the result is `PASS`.
+
+### reply-ceiling-root | medium | Each search hit's absolute resource URI grows the reply with the workspace path
+
+`src/vaultspec_core/mcp_server/tools/search.py:226` puts `(root / path).as_uri()` on
+every hit, and no byte cap covers it. With 11 worst-case CJK hits, a 26-character CJK
+root reached 9,984 tokens, because URL encoding costs 9 bytes per CJK character. The
+budget test's margin therefore depends on the machine's temp path.
+
+### tool-surface-ratchet | medium | The tool-definition size ceilings were raised against the envelope ADR
+
+`src/vaultspec_core/mcp_server/tests/test_context_budget.py:73` moves from 23,900 to
+26,380 characters, and `:82` from 13,150 to 14,151.
+`2026-08-23-envelope-optimization-adr` says the ceiling is never raised. The growth is
+parameter documentation the tool-args bug had been dropping, so the surface was over
+budget before this branch. About 7,600 tokens against a budget of 5,000.
+
+### wire-mirrors | medium | The MCP search rows mirror the search dataclasses, and the two surfaces project hits differently
+
+`SearchExcerpt` and `SearchUsageRow` in `src/vaultspec_core/mcp_server/tools/search.py`
+repeat `Excerpt` and `SearchUsage` from `src/vaultspec_core/search/_models.py`. The CLI
+`_hit_payload` and the MCP `_hit_row` give the same hit different keys and rounding.
+
+### comment-markers | medium | HTML comment markers are still spelled out beside their canonical constants
+
+`src/vaultspec_core/vaultcore/checks/annotations.py` and
+`src/vaultspec_core/plan/parser.py:539` use `"<!--"` and `"-->"` literals.
+`HTML_COMMENT_OPEN` and `HTML_COMMENT_CLOSE` are exported by
+`src/vaultspec_core/vaultcore/markdown.py`.
+
+### budget-constants | low | The envelope bytes-per-token ratio is declared twice
+
+`src/vaultspec_core/search/tests/reply_budget.py:41` and
+`src/vaultspec_core/mcp_server/tests/test_context_budget.py` each state 3.46.
+`src/vaultspec_core/search/_transport.py` exports a `BYTES_PER_TOKEN` of 3.3 with
+another meaning.
+
+### credential-description | low | The config registry description omits the interpreter check
+
+`src/vaultspec_core/config/config.py:506-510` describes the workspace `.env` as opened
+by the install mode alone.
+
+### block-units | low | Search blocks are bounded in characters by a byte constant
+
+`src/vaultspec_core/search/_corpus.py:367` passes `EXCERPT_BYTES` as `max_chars`. A
+multi-byte block can reach about 2,100 bytes, and the excerpt keeps only its first
+700 bytes.
+
+### fence-consumers | low | line_roles and non_prose_spans disagree on a list item opened before a comment
+
+Take `- item <!--`, `note`, `-->`, then a fence indented four spaces. `line_roles`
+closes the item at `-->` and reads the fence as text, so
+`src/vaultspec_core/vaultcore/checks/markdown.py:96` edits inside it.
+`non_prose_spans` protects the same fence.
+
 ## Recommendations
 
 - credential-gate: also require that the running interpreter is the workspace's own
@@ -196,3 +272,10 @@ this feature. Code and docs should not echo vault identifiers.
 - rerender-flags: a follow-on ADR must decide one canonical date quoting and stamp
   placement, and whether existing documents are rewritten to it.
 - precommit-signal: outside this plan; record it for the owning feature.
+- reply-ceiling-root: drop the per-hit resource URI from search rows. The relative path
+  and the blob hash already locate the version, and `find` still returns the URI.
+- tool-surface-ratchet: a follow-on ADR must decide between restating the
+  tool-definition budget and trimming parameter documentation back under the old
+  ceiling.
+- wire-mirrors, comment-markers, budget-constants, credential-description, block-units
+  and fence-consumers: fix within the plan's scope. None needs a new decision.

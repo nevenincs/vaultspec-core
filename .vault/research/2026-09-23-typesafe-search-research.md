@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:26c0b250940b25e8e83b18eb021552c086ff45b2775b93262c6dd2cda3826240'
+body_hash: 'sha256:a75cd19f67b90272a3977bfc6ae644b1ae890391e73d916823c945c98f8a9e7e'
 related:
   - '[[2026-08-26-rag-search-exposure-adr]]'
   - '[[2026-08-23-envelope-optimization-adr]]'
