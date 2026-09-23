@@ -64,7 +64,8 @@ LIST_VAULT = "vaultspec-core vault list"
 
 #: The decision listing that runs beside search. Summary-based recall can miss
 #: a record whose answer lives only in body detail, so listing the ADRs stays
-#: mandatory until that recall is measured.
+#: mandatory at discovery until that recall is measured. Under an approved
+#: plan, the decisions the plan links stand in for it within their scope.
 LIST_ADR = f"`{LIST_VAULT} adr`"
 
 #: Canonical spelling for asking the vault a question through core's hosted

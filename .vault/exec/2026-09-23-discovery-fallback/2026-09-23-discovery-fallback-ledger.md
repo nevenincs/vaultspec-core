@@ -3,9 +3,9 @@ tags:
   - '#exec'
   - '#discovery-fallback'
 date: '2026-09-23'
-modified: '2026-09-23'
+modified: '2026-09-24'
 body_schema: 'body-v2'
-body_hash: 'sha256:6fc4b4d67543a96b165bc98841f0b118ce1883a73f767585ea4d672ca74a601c'
+body_hash: 'sha256:cf583792e5f103ff82b4ea641c2e7231124df38f43e0db971883d95cadc0b2c4'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -134,6 +134,10 @@ related:
 - `S05` `M` `.vaultspec/reference/cli.md`
 - `S05` `verify:` `just check-markdown` -> `pass`
 - `S05` `by:` `opus-low`
+- `S04` `M` `.vault/adr/2026-09-23-typesafe-search-adr.md`
+- `S04` `verify:` `pytest discovery-guidance, corpus, seed, agents-render, antigravity, reference-drift, sync, install, cli-language guards` -> `pass`
+- `S04` `verify:` `just check-python, check-type, check-markdown` -> `pass`
+- `S04` `verify:` `vaultspec-core vault check all` -> `pass`
 
 ## Notes
 

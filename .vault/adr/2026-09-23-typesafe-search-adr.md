@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:89d7dfa636a0a21337846f4e3dbd91dc741d91a97b5c3542f343af58313f204d'
+body_hash: 'sha256:5884e798ffe939e5451e403989a86877fdee5cd11d03130430f3bf66b7f1e5d1'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -234,6 +234,21 @@ the engine, credential and constraints are unchanged.
 Resolving the next step from the probe keeps
 `2026-08-26-rag-search-exposure-adr` intact: core reads provisioning, not liveness,
 calls no rag API, and places no rag content in its output.
+
+**Amendment note, 2026-09-23, listing scope**: authorized by the user's delegation of
+full execution of the discovery-fallback work on 2026-09-23 ("all yours"), given after
+the user approved its direction. Evidence: `2026-09-23-typesafe-search-audit`, findings
+adr-listing-exemption and listing-dedup-scope. It refines the "ADR listing stays"
+bullet above; nothing else changes.
+
+- **At discovery.** Listing `.vault/adr/` beside search stays mandatory before a plan or
+  ADR is written, and for work outside a plan.
+- **Under an approved plan.** The decisions in the plan's `related:` stand in for the
+  listing and for the decision search, for Steps that stay inside their scope. The plan
+  was written after that listing ran. A Step that reaches beyond that scope runs both.
+  Code search still runs.
+- **Revisit trigger.** Measured hosted-search recall remains the trigger for revisiting
+  the listing at discovery.
 
 ## Rationale
 
