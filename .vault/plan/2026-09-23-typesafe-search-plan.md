@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-typesafe-search-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:71b6d052be4f2e8c5335792e67a89c6e7b1dd413aa9f0d7ebcb4cbdcb7c7803d'
+body_hash: 'sha256:40ac5c495ea4729ec9d883cadffd97e5014217ca1515f12757c2d8927de883f9'
 ---
 
 # `typesafe-search` plan
@@ -37,7 +37,7 @@ fence regexes and two section scanners, before the search corpus builds on them.
 ## Steps
 
 - [ ] `S01` - Rehome fence-aware markdown scanning (fences, headings, sections, paragraph blocks) into one canonical vaultcore module and migrate the existing fence, heading and section scanners onto it; `src/vaultspec_core/vaultcore/markdown.py, src/vaultspec_core/core/tags.py, src/vaultspec_core/vaultcore/checks/, src/vaultspec_core/mcp_server/tools/documents.py`.
-- [ ] `S02` - Declare the search package contract: result models, question set and public exports; `src/vaultspec_core/search/__init__.py, src/vaultspec_core/search/_models.py, src/vaultspec_core/search/_questions.py`.
+- [x] `S02` - Declare the search package contract: result models, question set and public exports; `src/vaultspec_core/search/__init__.py, src/vaultspec_core/search/_models.py, src/vaultspec_core/search/_questions.py`.
 - [ ] `S03` - Register the hosted-search key as a secret config variable and resolve it from the process environment, then the workspace .env in DEPENDENCY or DEV mode; `src/vaultspec_core/config/config.py, src/vaultspec_core/search/_credential.py, .env.example`.
 - [ ] `S04` - Implement the stdlib Jev transport: pooled HTTPS, bounded concurrency, deadline, retry, failure taxonomy with content rejection, sanitisation, size preflight and answer validation; `src/vaultspec_core/search/_transport.py, src/vaultspec_core/search/tests/`.
 - [ ] `S05` - Implement the vault corpus, lexical ranking, two-stage engine and the search_vault service; `src/vaultspec_core/search/_corpus.py, src/vaultspec_core/search/_lexical.py, src/vaultspec_core/search/_engine.py, src/vaultspec_core/search/_service.py`.
