@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:0dca69ca669f7381a3f01d38c92de3421c41bbfe7f5f59621820d69a72548ae3'
+body_hash: 'sha256:89d7dfa636a0a21337846f4e3dbd91dc741d91a97b5c3542f343af58313f204d'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -83,8 +83,8 @@ search feature as drafted.
   service failure surface.
 - In-process BM25 answers in rag's place. Rejected: it ranks below rag and would steer
   agents away from the better fallback.
-- A typed "not configured" outcome, plus generated guidance that routes agents to rag.
-  **Chosen.**
+- A typed "not configured" outcome whose next step the backend resolves: rag when
+  it is provisioned, the core listing verbs and grep otherwise. **Chosen.**
 
 **Transport.**
 
@@ -196,10 +196,9 @@ The engine is exposed three ways:
 - **`status` field.** Hosted search reports as configured or not configured. This is
   local configuration, not liveness.
 
-When no key is configured, both surfaces return a typed `not_configured` outcome whose
-remediation names the rag invocation from the shared discovery vocabulary. The
-discovery guidance is regenerated to route agents to core's search when it is
-configured, and to rag otherwise. On acceptance, this decision amends the tool
+When no key is configured, or the service fails, both surfaces return a typed
+`not_configured` or `unavailable` outcome carrying the backend-resolved next step
+described in the second amendment note below. On acceptance, this decision amends the tool
 enumeration of `2026-07-09-mcp-tool-schema-adr` and the restricted allowlist of
 `2026-08-01-mcp-read-only-adr`, each by adding `search`.
 
@@ -212,6 +211,30 @@ because a 5-hit worst case exceeded the discovery budget and multi-byte text bro
 character cap. Reference and audit records share one stage-one group, as the evaluated
 prototype did. None reverses the decision.
 
+**Amendment note, 2026-09-23, discovery fallback**: approved by the user in session
+on 2026-09-23 ("ensure the CLI and MCP have parity and all capability is derived from
+the backend, not business logic in CLI and MCP"). Evidence:
+`2026-09-23-typesafe-search-audit`, findings search-degradation, guidance-gate,
+output-handling and surface-drift. It refines the fallback and surface terms above;
+the engine, credential and constraints are unchanged.
+
+- **Backend-resolved fallback.** When hosted search declines or fails, the search
+  backend resolves the next step. It names a vaultspec-rag vault search covering the
+  requested record types when the companion probe reports rag provisioned, and
+  otherwise the core listing verbs (`find`, `vault list`) plus grep. The resolved next
+  step is a typed part of the backend result, not surface prose.
+- **State-free guidance.** Guidance prose carries no runtime condition. Vault questions
+  go to `search`; when it declines, agents run what its reply names. There is no
+  `status` gate.
+- **Thin surfaces.** The CLI and MCP are renderers over one backend result, with
+  identical fields and semantics. Neither holds search or status business logic.
+- **ADR listing stays.** Listing `.vault/adr/` beside search stays mandatory until
+  hosted-search recall is measured.
+
+Resolving the next step from the probe keeps
+`2026-08-26-rag-search-exposure-adr` intact: core reads provisioning, not liveness,
+calls no rag API, and places no rag content in its output.
+
 ## Rationale
 
 The chosen engine is the only evaluated design that meets all three requirements the
@@ -222,8 +245,8 @@ because a relative choice among one record type's summaries recalled what absolu
 per-summary judgments dropped. The full read of the shortlist gives the absolute
 answer, subject and premise signals that a relative ranking cannot.
 
-Routing the fallback at the agent layer delivers "rag when there is no key" without
-reopening the rag-exposure decision. Keeping rag out of core's process keeps rag's
+Naming the fallback in the backend result, and leaving its execution to the agent,
+delivers "rag when there is no key" without reopening the rag-exposure decision. Keeping rag out of core's process keeps rag's
 failure surface out of core's contract. A typed `not_configured` outcome keeps the tool
 list invariant and tells the caller exactly what to run instead.
 
@@ -255,8 +278,9 @@ key, never redirect one.
   abstained on 3 of 5 unanswerable questions across both sets, so it needs a larger
   labelled set before an empty result is treated as proof of absence.
 - **Recall.** Summary-based recall misses answers that live only in body detail: 2 of
-  18 held-out queries, both of which rag ranked first. The "not configured" routing
-  keeps rag available to agents, but a configured key does not. Deepening the lexical
+  18 held-out queries, both of which rag ranked first. The fallback keeps
+  rag available to agents when search declines, but a configured key does not, so the
+  ADR listing stays mandatory beside search. Deepening the lexical
   union is the first remedy to measure, on a fresh query set.
 - **Blocking rule.** Correctness depends on a third party's blocking rule staying
   within what the sanitiser covers. A new trigger would surface as unscored records,

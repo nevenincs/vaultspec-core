@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:0595d7190ee2aca0b34f1da29413c5c77eb07391df689caa346455b36bc9086c'
+body_hash: 'sha256:8e251b2fdd12b9806b7e7d98ecefec008320b0184ac082d1d50e3da58314ff94'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -251,6 +251,56 @@ closes the item at `-->` and reads the fence as text, so
 `src/vaultspec_core/vaultcore/checks/markdown.py:96` edits inside it.
 `non_prose_spans` protects the same fence.
 
+### search-degradation | high | Hosted search declines to one ADR-only rag sentence whether or not rag exists
+
+Without `VAULTSPEC_CORE_TYPESAFE_API_KEY` search returns `not_configured` (CLI exit 0);
+on API failure it returns `unavailable` (CLI exit 1). Both carry one remediation
+sentence (`src/vaultspec_core/search/_remediation.py:23-56`) built on `SEARCH_ADR`
+(`src/vaultspec_core/core/discovery_guidance.py:57`), which names only
+`vaultspec-rag search "<intent>" --type vault --doc-type adr`. Hosted search covers six
+record types, and the sentence is emitted whether or not rag is provisioned, although
+the companion probe already detects it
+(`src/vaultspec_core/core/diagnosis/collectors_companion.py:41-65`). With no key and no
+rag, nothing names `find`, `vault list` or grep. Core never calls rag, and
+`src/vaultspec_core/search/_lexical.py` is a shortlist supplement, not a fallback.
+
+### guidance-gate | high | Discovery routing is gated on a status field that readers cannot reach
+
+`VAULT_SEARCH_ROUTING` (`src/vaultspec_core/core/discovery_guidance.py:70-73`), "When
+`status` reports hosted search configured...", is copied into
+`src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md:13-16`,
+`skills/vaultspec-code-research/SKILL.md:16-18`, `skills/vaultspec-curate/SKILL.md:53`,
+`skills/vaultspec-curate/references/reconciliation-playbook.md:26` and
+`agents/vaultspec-docs-curator.md:37`. Read-only work and dispatched workers skip
+status orientation, and targeted `status <feature>` omits `hosted_search` on CLI and
+MCP, so they never see the gate. "Configured" is not liveness: a rejected key still
+routes agents to hosted search first.
+
+### output-handling | medium | The rules say nothing about reading search output or the unavailable branch
+
+The builtins give no handling for search output: an excerpt as triage versus a whole
+read, what `premise_conflict` means, or the "nothing in the vault answers this"
+verdict. They have no branch for `unavailable`, and the no-semantic fallback
+("discovery verbs and grep") conflicts with "do not lead with grep sweeps". The
+`vaultspec-adr` skill names no coverage-check method, the code-reviewer persona never
+searches for unlinked ADRs, and curate makes a rag health check a precondition for
+decision recall.
+
+### surface-drift | medium | The bundled reference misnames hit fields and the CLI JSON drops answered
+
+`src/vaultspec_core/builtins/reference/cli.md:584` names a hit field `doc_type`; the wire
+field is `type` (`src/vaultspec_core/search/_wire.py:46`), and `feature`, `date`,
+`title` and `supporting` are missing. The vault search options table (`cli.md:576-581`)
+renders as one paragraph. CLI `--json` `not_configured` omits `answered`
+(`src/vaultspec_core/cli/vault_search_cmd.py:119`), while MCP returns `answered: false`
+(`src/vaultspec_core/mcp_server/tools/search.py:164`).
+
+### user-docs | low | README and the framework guide describe only rag for discovery
+
+`README.md` and `docs/framework.md:95-101` name only vaultspec-rag. Hosted search setup
+and the degradation chain appear only in `docs/CLI.md:968-1062,3278-3287` and
+`docs/MCP.md:344-474`.
+
 ## Recommendations
 
 - credential-gate: also require that the running interpreter is the workspace's own
@@ -279,3 +329,17 @@ closes the item at `-->` and reads the fence as text, so
   ceiling.
 - wire-mirrors, comment-markers, budget-constants, credential-description, block-units
   and fence-consumers: fix within the plan's scope. None needs a new decision.
+- search-degradation: resolve the next step in the search backend, from the companion
+  probe and the requested record types: a rag vault search over those types when rag
+  is provisioned, else `find` or `vault list` plus grep. Carry it as a typed part of the
+  result. This refines the fallback decision of `2026-09-23-typesafe-search-adr`.
+- guidance-gate: make the guidance state-free. Vault questions go to `search`; when it
+  declines, run what its reply names. No `status` gate.
+- output-handling: add output handling, the `unavailable` branch and a degraded-mode
+  grep carve-out to the discovery rule, and a coverage-check method to the ADR skill
+  and the code-reviewer persona. Keep the ADR listing mandatory beside search until
+  hosted-search recall is measured.
+- surface-drift: render CLI and MCP from one backend result with identical fields, and
+  fix the reference generator inputs. No new decision beyond the ADR amendment.
+- user-docs: add hosted search and the degradation chain to `README.md` and
+  `docs/framework.md`.
