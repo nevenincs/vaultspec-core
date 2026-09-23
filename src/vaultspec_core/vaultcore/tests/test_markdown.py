@@ -12,12 +12,17 @@ from __future__ import annotations
 import pytest
 
 from vaultspec_core.vaultcore.markdown import (
+    HTML_COMMENT_RE,
+    INLINE_CODE_RE,
     Block,
     Heading,
     LineRole,
     document_title,
+    find_section,
     iter_headings,
+    iter_sections,
     line_roles,
+    non_prose_spans,
     paragraph_blocks,
     parse_atx_heading,
 )
@@ -269,3 +274,77 @@ class TestParagraphBlocks:
     def test_non_positive_maximum_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="max_chars"):
             paragraph_blocks("text", max_chars=0)
+
+
+_SECTIONED = (
+    "# T\n\n## A\n\nalpha\n### A1\nsub\n## Wave `W01` - w\nwave text\n"
+    "```\n## Fenced\n```\n## B\nbeta"
+)
+
+
+class TestSections:
+    def test_sections_run_to_the_next_opening_heading(self) -> None:
+        sections = list(iter_sections(_SECTIONED))
+        assert [s.heading.text for s in sections] == ["A", "Wave `W01` - w", "B"]
+        assert sections[0].body == "\nalpha\n### A1\nsub\n"
+        assert sections[1].body == "wave text\n```\n## Fenced\n```\n"
+        assert sections[2].body == "beta"
+        for section in sections:
+            assert _SECTIONED[section.start : section.end] == section.body
+
+    def test_a_heading_that_does_not_open_extends_the_section_before_it(
+        self,
+    ) -> None:
+        sections = list(
+            iter_sections(_SECTIONED, opens=lambda h: not h.text.startswith("Wave"))
+        )
+        assert [s.heading.text for s in sections] == ["A", "B"]
+        assert sections[0].body == (
+            "\nalpha\n### A1\nsub\n## Wave `W01` - w\nwave text\n```\n## Fenced\n```\n"
+        )
+
+    def test_find_section_by_title_and_level(self) -> None:
+        assert find_section(_SECTIONED, "B") is not None
+        assert find_section(_SECTIONED, "Fenced") is None
+        sub = find_section(_SECTIONED, "A1", level=3)
+        assert sub is not None
+        # Headings of other levels neither open nor end a level-three section.
+        assert sub.body == (
+            "sub\n## Wave `W01` - w\nwave text\n```\n## Fenced\n```\n## B\nbeta"
+        )
+
+    def test_heading_on_the_last_line_has_an_empty_body(self) -> None:
+        section = find_section("text\n## Only", "Only")
+        assert section is not None
+        assert (section.start, section.end, section.body) == (12, 12, "")
+
+
+def _pieces(text: str) -> list[str]:
+    return [text[start:end] for start, end in non_prose_spans(text)]
+
+
+class TestNonProseSpans:
+    def test_inline_code_and_comments(self) -> None:
+        assert _pieces("a `x` b <!-- c --> d") == ["`x`", "<!-- c -->"]
+
+    def test_fence_marker_inside_a_comment_opens_nothing(self) -> None:
+        assert _pieces("<!--\n```\n-->\ntext\n") == ["<!--\n```\n-->"]
+
+    def test_comment_marker_inside_inline_code_opens_nothing(self) -> None:
+        text = "see `<!--` here\n```\ncode\n```\nafter"
+        assert _pieces(text) == ["`<!--`", "```\ncode\n```"]
+
+    def test_unclosed_fence_runs_to_the_end(self) -> None:
+        assert _pieces("x\n```\ncode") == ["```\ncode"]
+
+    def test_fence_wins_over_inline_code_at_the_same_position(self) -> None:
+        assert _pieces("```\n`a`\n```") == ["```\n`a`\n```"]
+
+    def test_comment_forms(self) -> None:
+        text = "<!-->a<!--->b<!-- c -->"
+        assert HTML_COMMENT_RE.findall(text) == ["<!-->", "<!--->", "<!-- c -->"]
+
+    def test_double_backtick_span_may_quote_a_backtick(self) -> None:
+        match = INLINE_CODE_RE.search("x ``a`b`` y")
+        assert match is not None
+        assert match.group(0) == "``a`b``"

@@ -26,8 +26,12 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .markdown import HTML_COMMENT_RE, find_section
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from .markdown import Section
 
 __all__ = [
     "BY_LABEL",
@@ -38,6 +42,7 @@ __all__ = [
     "StepEvidence",
     "append_notes",
     "append_rows",
+    "backtick_cells",
     "format_note",
     "format_row",
     "is_ledger_stem",
@@ -77,27 +82,16 @@ _ROW_RE = re.compile(r"^[ \t]*[-*][ \t]+(?P<cells>.+?)[ \t]*$")
 #: A backtick-quoted cell.
 _CELL_RE = re.compile(r"`([^`]*)`")
 
-#: The ``## Changes`` section, up to the next level-two heading.
-_CHANGES_RE = re.compile(
-    r"^##[ \t]+Changes[ \t]*$(?P<body>.*?)(?=^##[ \t]+|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
+#: The section every mechanical row lives in.
+_CHANGES = "Changes"
 
-#: The ``## Notes`` section, up to the next level-two heading.
-_NOTES_RE = re.compile(
-    r"^##[ \t]+Notes[ \t]*$(?P<body>.*?)(?=^##[ \t]+|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
+#: The section exception notes live in.
+_NOTES = "Notes"
 
 #: A note line: ``- `S01` free text``.
 _NOTE_RE = re.compile(
     r"^[ \t]*[-*][ \t]+`(?P<step>S\d{1,4})`[ \t]*(?P<text>.*?)[ \t]*$"
 )
-
-#: An HTML comment: template guidance for a reader, never a row. Stripped
-#: before any section is parsed so an example inside a hint block cannot
-#: register a Step as covered.
-_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -143,10 +137,20 @@ def is_ledger_stem(stem: str) -> bool:
     return stem.endswith(LEDGER_SUFFIX)
 
 
-def _changes_body(body: str) -> str | None:
-    """Return the ``## Changes`` section text, comments stripped, or ``None``."""
-    match = _CHANGES_RE.search(body)
-    return _COMMENT_RE.sub("", match.group("body")) if match else None
+def backtick_cells(text: str) -> list[str]:
+    """Return the contents of every backtick-quoted cell in *text*, in order."""
+    return _CELL_RE.findall(text)
+
+
+def _section_rows(body: str, title: str) -> str | None:
+    """Return a section's text with comments stripped, or ``None`` when absent.
+
+    Comments are template guidance for a reader, never rows: stripping them
+    before parsing keeps an example inside a hint block from registering a
+    Step as covered.
+    """
+    section = find_section(body, title)
+    return HTML_COMMENT_RE.sub("", section.body) if section is not None else None
 
 
 def parse_ledger_rows(body: str) -> tuple[LedgerRow, ...]:
@@ -164,7 +168,7 @@ def parse_ledger_rows(body: str) -> tuple[LedgerRow, ...]:
     Returns:
         The parsed rows in document order.
     """
-    section = _changes_body(body)
+    section = _section_rows(body, _CHANGES)
     if section is None:
         return ()
 
@@ -173,7 +177,7 @@ def parse_ledger_rows(body: str) -> tuple[LedgerRow, ...]:
         row_match = _ROW_RE.match(line)
         if row_match is None:
             continue
-        cells = _CELL_RE.findall(row_match.group("cells"))
+        cells = backtick_cells(row_match.group("cells"))
         if not cells:
             continue
 
@@ -289,11 +293,11 @@ def note_lines(body: str) -> tuple[tuple[str | None, str], ...]:
     yields ``None`` with its text, so a per-Step record's free prose can be
     re-keyed by the fold.
     """
-    match = _NOTES_RE.search(body)
-    if match is None:
+    section = _section_rows(body, _NOTES)
+    if section is None:
         return ()
     notes: list[tuple[str | None, str]] = []
-    for line in _COMMENT_RE.sub("", match.group("body")).splitlines():
+    for line in section.splitlines():
         if not line.strip():
             continue
         keyed = _NOTE_RE.match(line)
@@ -326,11 +330,11 @@ def append_rows(body: str, rows: Sequence[str]) -> str:
         ValueError: If *body* declares no ``## Changes`` section, which means
             the document is not a ledger and appending would invent one.
     """
-    match = _CHANGES_RE.search(body)
-    if match is None:
+    section = find_section(body, _CHANGES)
+    if section is None:
         message = "document has no '## Changes' section to append to"
         raise ValueError(message)
-    return _append_to_section(body, match, rows)
+    return _append_to_section(body, section, rows)
 
 
 def append_notes(body: str, lines: Sequence[str]) -> str:
@@ -349,25 +353,27 @@ def append_notes(body: str, lines: Sequence[str]) -> str:
     """
     if not lines:
         return body
-    match = _NOTES_RE.search(body)
-    if match is None:
+    section = find_section(body, _NOTES)
+    if section is None:
         trimmed = body.rstrip("\n")
-        return f"{trimmed}\n\n## Notes\n\n{chr(10).join(lines)}\n"
-    return _append_to_section(body, match, lines)
+        return f"{trimmed}\n\n## {_NOTES}\n\n{chr(10).join(lines)}\n"
+    return _append_to_section(body, section, lines)
 
 
-def _append_to_section(body: str, match: re.Match[str], rows: Sequence[str]) -> str:
-    """Append the not-yet-present *rows* to the matched section body."""
-    section = match.group("body")
-    existing = {line.strip() for line in section.splitlines() if line.strip()}
+def _append_to_section(body: str, section: Section, rows: Sequence[str]) -> str:
+    """Append the not-yet-present *rows* to *section* of *body*."""
+    existing = {line.strip() for line in section.body.splitlines() if line.strip()}
     fresh = [row for row in rows if row.strip() not in existing]
     if not fresh:
         return body
 
     # Rebuild the section with exactly one blank line before the appended
     # rows and one after, so repeated appends cannot accumulate whitespace.
-    kept = section.rstrip("\n")
-    if not kept.endswith("\n") and kept:
+    head = body[: section.start]
+    if not head.endswith("\n"):
+        head += "\n"
+    kept = section.body.rstrip("\n")
+    if kept:
         kept += "\n"
     updated = f"{kept}{chr(10).join(fresh)}\n\n"
-    return body[: match.start("body")] + updated + body[match.end("body") :]
+    return head + updated + body[section.end :]

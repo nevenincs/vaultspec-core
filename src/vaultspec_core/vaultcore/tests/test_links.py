@@ -36,6 +36,18 @@ class TestExtractWikiLinks:
     def test_link_with_spaces(self):
         assert extract_wiki_links("[[My Document]]") == Counter({"My Document": 1})
 
+    def test_unclosed_fence_hides_the_rest_of_the_text(self):
+        text = "See [[before]].\n```\n[[in-code]]\n"
+        assert extract_wiki_links(text) == Counter({"before": 1})
+
+    def test_backtick_line_does_not_close_a_tilde_fence(self):
+        text = "~~~\n[[a]]\n```\n[[b]]\n~~~\nSee [[after]]."
+        assert extract_wiki_links(text) == Counter({"after": 1})
+
+    def test_fence_marker_inside_a_comment_opens_no_fence(self):
+        text = "<!-- sample\n```\n-->\nSee [[real]].\n```\n"
+        assert extract_wiki_links(text) == Counter({"real": 1})
+
     def test_duplicate_links_preserve_multiplicity(self):
         text = "[[DocA]] and [[DocA]] again"
         result = extract_wiki_links(text)

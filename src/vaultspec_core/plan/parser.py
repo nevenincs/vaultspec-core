@@ -21,6 +21,13 @@ from vaultspec_core.plan.frontmatter import (
     PlanFrontmatter,
     parse_plan_frontmatter,
 )
+from vaultspec_core.vaultcore.markdown import (
+    HTML_COMMENT_OPEN,
+    HTML_COMMENT_RE,
+    document_title,
+    line_roles,
+    parse_atx_heading,
+)
 from vaultspec_core.vaultcore.parser import parse_frontmatter
 
 if TYPE_CHECKING:
@@ -192,27 +199,27 @@ class PlanParseError(ValueError):
 # ---- Regexes (compiled once) -----------------------------------------------
 
 
-_RE_TITLE = re.compile(r"^# +(?P<title>.+?)\s*$")
-_RE_WAVE_HEADING = re.compile(
-    r"^## +Wave +`(?P<id>W\d{2,}[a-z]?)` *- *(?P<title>.+?)\s*$",
-)
-_RE_EPIC_INTENT = re.compile(r"^## +Epic intent\s*$")
+#: The text of a level-two Wave heading.
+_RE_WAVE_HEADING = re.compile(r"Wave +`(?P<id>W\d{2,}[a-z]?)` *- *(?P<title>.+)")
+#: The text of the level-two heading that opens the Epic intent.
+_EPIC_INTENT_HEADING = "Epic intent"
 #: The section heading that opens a plan's container content. It is a
 #: *structural* token, not authored prose: the serialiser owns it and
 #: re-emits it unconditionally, so the parser consumes it here rather than
 #: buffering it as an unknown block. Buffering it would stack a second copy
 #: on the next round trip.
-_RE_STEPS_HEADING = re.compile(r"^## +Steps\s*$")
+_STEPS_HEADING = "Steps"
+#: The text of a level-three Phase heading.
 _RE_PHASE_HEADING = re.compile(
-    r"^### +Phase +`(?P<path>(?:W\d{2,}[a-z]?\.)?"
-    r"P\d{2,}[a-z]?)` *- *(?P<title>.+?)\s*$",
+    r"Phase +`(?P<path>(?:W\d{2,}[a-z]?\.)?P\d{2,}[a-z]?)` *- *(?P<title>.+)"
 )
 _RE_STEP_ROW = re.compile(
     r"^- +\[(?P<state>[ x])\] +"
     r"`(?P<path>(?:W\d{2,}[a-z]?\.)?(?:P\d{2,}[a-z]?\.)?S\d{2,})` *- *"
     r"(?P<rest>.+?)\s*$",
 )
-_RE_FRONTMATTER_FENCE = re.compile(r"^---\s*$")
+#: Any character but a newline, which a comment mask blanks to a space.
+_NOT_NEWLINE_RE = re.compile(r"[^\n]")
 
 
 # ---- HTML comment masking ---------------------------------------------------
@@ -233,32 +240,18 @@ def mask_html_comments(lines: list[str]) -> list[str]:
     span, and an unterminated ``<!--`` masks everything to the end of the
     document - the same reading a Markdown renderer applies.
     """
-    masked: list[str] = []
-    in_comment = False
-    for line in lines:
-        pieces: list[str] = []
-        cursor = 0
-        while cursor < len(line):
-            if in_comment:
-                close = line.find("-->", cursor)
-                if close == -1:
-                    pieces.append(" " * (len(line) - cursor))
-                    cursor = len(line)
-                else:
-                    pieces.append(" " * (close + 3 - cursor))
-                    cursor = close + 3
-                    in_comment = False
-            else:
-                opening = line.find("<!--", cursor)
-                if opening == -1:
-                    pieces.append(line[cursor:])
-                    cursor = len(line)
-                else:
-                    pieces.append(line[cursor:opening])
-                    cursor = opening
-                    in_comment = True
-        masked.append("".join(pieces))
-    return masked
+    if not lines:
+        return []
+    masked = HTML_COMMENT_RE.sub(_blank, "\n".join(lines))
+    unterminated = masked.find(HTML_COMMENT_OPEN)
+    if unterminated != -1:
+        masked = masked[:unterminated] + _NOT_NEWLINE_RE.sub(" ", masked[unterminated:])
+    return masked.split("\n")
+
+
+def _blank(match: re.Match[str]) -> str:
+    """Return *match*'s text with every character but a newline made a space."""
+    return _NOT_NEWLINE_RE.sub(" ", match.group(0))
 
 
 def mask_html_comments_text(source_text: str) -> str:
@@ -366,33 +359,24 @@ def _extract_title(body: str) -> str:
     Scans the comment-masked body so a ``# ...`` line quoted inside an HTML
     comment can never be mistaken for the document title (issue #313).
     """
-    for line in mask_html_comments(body.splitlines()):
-        match = _RE_TITLE.match(line)
-        if match:
-            return match.group("title")
-    return ""
+    return document_title(mask_html_comments_text(body)) or ""
 
 
 def _extract_epic_intent(body: str) -> EpicIntent | None:
     """Return the ``## Epic intent`` block when present, ``None`` otherwise.
 
     The intent text spans every paragraph from the line after the heading
-    until the next ``##``-or-greater heading. The hidden retirement-ledger
-    comment is filtered out so it is not absorbed into authored prose.
+    until the next heading of level one to three. The hidden
+    retirement-ledger comment is filtered out so it is not absorbed into
+    authored prose.
     """
     lines = body.splitlines()
-    masked_lines = mask_html_comments(lines)
-    for index, masked in enumerate(masked_lines):
-        if _RE_EPIC_INTENT.match(masked):
+    tokens = _line_tokens(lines)
+    for index, token in enumerate(tokens):
+        if token.epic_intent:
             text_lines: list[str] = []
-            for offset, follow_masked in enumerate(
-                masked_lines[index + 1 :], start=index + 1
-            ):
-                if (
-                    follow_masked.startswith("# ")
-                    or follow_masked.startswith("## ")
-                    or follow_masked.startswith("### ")
-                ):
+            for offset in range(index + 1, len(lines)):
+                if tokens[offset].is_section_heading():
                     break
                 follow = lines[offset]
                 if _RE_RETIRED_LEDGER.search(follow):
@@ -408,25 +392,32 @@ def _extract_epic_intent(body: str) -> EpicIntent | None:
 class _LineTokens(NamedTuple):
     """Every structural token a single body line may match.
 
-    Matching all six patterns once per line keeps the walk's branches
+    Matching every pattern once per line keeps the walk's branches
     reading against one immutable snapshot, rather than re-running
     regexes as each branch needs them.
 
     Attributes:
-        title: The ``# ...`` document title match, if any.
+        heading_level: The line's ATX heading level, or ``0`` when the line
+            is not a heading.
+        title: Whether the line is a titled ``# ...`` document heading.
         wave: The ``## Wave`` heading match, if any.
         phase: The ``### Phase`` heading match, if any.
         step: The Step row match, if any.
-        epic_intent: The ``## Epic intent`` heading match, if any.
-        steps_heading: The ``## Steps`` section heading match, if any.
+        epic_intent: Whether the line is the ``## Epic intent`` heading.
+        steps_heading: Whether the line is the ``## Steps`` section heading.
     """
 
-    title: re.Match[str] | None
-    wave: re.Match[str] | None
-    phase: re.Match[str] | None
-    step: re.Match[str] | None
-    epic_intent: re.Match[str] | None
-    steps_heading: re.Match[str] | None
+    heading_level: int = 0
+    title: bool = False
+    wave: re.Match[str] | None = None
+    phase: re.Match[str] | None = None
+    step: re.Match[str] | None = None
+    epic_intent: bool = False
+    steps_heading: bool = False
+
+    def is_section_heading(self) -> bool:
+        """Return whether the line is a heading of level one to three."""
+        return 1 <= self.heading_level <= 3
 
     def opens_a_structural_block(self) -> bool:
         """Return whether this line ends an open Epic intent paragraph.
@@ -442,15 +433,33 @@ class _LineTokens(NamedTuple):
 
 
 def _match_line(line: str) -> _LineTokens:
-    """Return every structural token *line* matches."""
+    """Return every structural token *line* matches, given it is outside code."""
+    heading = parse_atx_heading(line)
+    if heading is None:
+        return _LineTokens(step=_RE_STEP_ROW.match(line))
+    level, text = heading
     return _LineTokens(
-        title=_RE_TITLE.match(line),
-        wave=_RE_WAVE_HEADING.match(line),
-        phase=_RE_PHASE_HEADING.match(line),
-        step=_RE_STEP_ROW.match(line),
-        epic_intent=_RE_EPIC_INTENT.match(line),
-        steps_heading=_RE_STEPS_HEADING.match(line),
+        heading_level=level,
+        title=level == 1 and bool(text),
+        wave=_RE_WAVE_HEADING.fullmatch(text) if level == 2 else None,
+        phase=_RE_PHASE_HEADING.fullmatch(text) if level == 3 else None,
+        epic_intent=level == 2 and text == _EPIC_INTENT_HEADING,
+        steps_heading=level == 2 and text == _STEPS_HEADING,
     )
+
+
+def _line_tokens(lines: list[str]) -> list[_LineTokens]:
+    """Return the structural tokens of every body line.
+
+    Structure is read from the comment-masked lines (issue #313), and a line
+    inside fenced code carries none: a sample Step row or heading in a code
+    block is quoted text, not plan structure.
+    """
+    masked = mask_html_comments(lines)
+    return [
+        _LineTokens() if role.fenced else _match_line(line)
+        for line, role in zip(masked, line_roles(masked), strict=True)
+    ]
 
 
 def _build_wave(match: re.Match[str], index: int) -> Wave:
@@ -506,19 +515,17 @@ def _walk_body(
                 unknown_blocks.append(UnknownBlock(anchor=anchor, content=content))
             buffered_unknown.clear()
 
-    # Every structural decision below reads the *masked* line, in which HTML
-    # comment spans have been blanked out, while every text-preserving branch
-    # (intent prose, unknown blocks, a Step's ``raw_line``) reads the original.
-    # A plan's shipped scaffold quotes the row grammar inside comments purely
-    # as an example; parsing those quotes as live rows is what let a mutation
-    # insert a Wave inside a comment and then fail its own verification
-    # (issue #313).
+    # Every structural decision below reads the tokens of the *masked* line, in
+    # which HTML comment spans have been blanked out, while every
+    # text-preserving branch (intent prose, unknown blocks, a Step's
+    # ``raw_line``) reads the original. A plan's shipped scaffold quotes the
+    # row grammar inside comments purely as an example; parsing those quotes
+    # as live rows is what let a mutation insert a Wave inside a comment and
+    # then fail its own verification (issue #313).
     source_lines = body.splitlines()
-    for index, (line, masked) in enumerate(
-        zip(source_lines, mask_html_comments(source_lines), strict=True), start=1
+    for index, (line, tokens) in enumerate(
+        zip(source_lines, _line_tokens(source_lines), strict=True), start=1
     ):
-        tokens = _match_line(masked)
-
         # 1. H1 Title line
         if tokens.title:
             _flush_unknown("before_title")
@@ -597,12 +604,7 @@ def _walk_body(
 
         # 9. Intent paragraph checking
         if intent_target is not None:
-            stripped = masked.strip()
-            if (
-                stripped.startswith("# ")
-                or stripped.startswith("## ")
-                or stripped.startswith("### ")
-            ):
+            if tokens.is_section_heading():
                 _flush_intent()
                 intent_target = None
             else:

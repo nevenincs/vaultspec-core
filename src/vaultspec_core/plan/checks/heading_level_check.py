@@ -24,15 +24,13 @@ from __future__ import annotations
 import re
 
 from vaultspec_core.plan.checks._base import Finding, Severity
+from vaultspec_core.vaultcore.markdown import iter_headings
 
 __all__ = ["check_heading_levels"]
 
 
-# Any heading naming a container, at any level, capturing the level so the
-# canonical one can be compared against it.
-_RE_CONTAINER_HEADING = re.compile(
-    r"^(?P<hashes>#{1,6}) +(?P<noun>Wave|Phase) +`(?P<id>[^`]+)`",
-)
+# The text of a heading naming a container, at whatever level it stands.
+_RE_CONTAINER_HEADING = re.compile(r"(?P<noun>Wave|Phase) +`(?P<id>[^`]+)`")
 
 #: The one heading level at which the parser recognises each container.
 _CANONICAL_LEVEL = {"Wave": 2, "Phase": 3}
@@ -48,13 +46,13 @@ def check_heading_levels(source_text: str) -> list[Finding]:
         A list of :class:`Finding`, one per mislevelled container heading.
     """
     findings: list[Finding] = []
-    for index, line in enumerate(source_text.splitlines(), start=1):
-        match = _RE_CONTAINER_HEADING.match(line)
+    for heading in iter_headings(source_text):
+        match = _RE_CONTAINER_HEADING.match(heading.text)
         if match is None:
             continue
 
         noun = match.group("noun")
-        level = len(match.group("hashes"))
+        level = heading.level
         canonical = _CANONICAL_LEVEL[noun]
         if level == canonical:
             continue
@@ -70,7 +68,7 @@ def check_heading_levels(source_text: str) -> list[Finding]:
                     "plan while its Step rows survive and re-parent silently, "
                     "so the plan under-reports its own structure."
                 ),
-                line_number=index,
+                line_number=heading.line,
                 fix_hint=(
                     f"Restore the heading to {'#' * canonical} "
                     f"{noun} `{match.group('id')}` - and never let a markdown "

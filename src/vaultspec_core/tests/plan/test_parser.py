@@ -220,6 +220,43 @@ def test_parser_preserves_document_order_with_out_of_sequence_canonical_ids() ->
     ]
 
 
+def test_rows_and_headings_inside_fenced_code_are_not_structure() -> None:
+    """A fenced sample of the row grammar is quoted text, not a live Step.
+
+    The fenced lines stay in the Phase's intent prose, and the heading-shaped
+    comment line inside the sample does not end that intent.
+    """
+    body = (
+        "---\n"
+        "tags:\n"
+        "  - '#plan'\n"
+        "  - '#fenced-sample'\n"
+        "date: '2026-05-05'\n"
+        "tier: L2\n"
+        "related: []\n"
+        "---\n"
+        "\n"
+        "# `fenced-sample` plan\n"
+        "\n"
+        "### Phase `P01` - integration\n"
+        "\n"
+        "A row looks like this:\n"
+        "\n"
+        "```markdown\n"
+        "# sample heading\n"
+        "- [ ] `P01.S09` - quoted action; `src/q.py`.\n"
+        "```\n"
+        "\n"
+        "- [ ] `P01.S01` - first action; `src/a.py`.\n"
+    )
+
+    plan = parse_plan(body)
+
+    assert [s.canonical_id for s in plan.steps] == ["S01"]
+    assert "`P01.S09` - quoted action" in plan.phases[0].intent
+    assert plan.phases[0].intent.endswith("```")
+
+
 # ---- Degradation tolerance --------------------------------------------------
 
 

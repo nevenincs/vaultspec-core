@@ -19,7 +19,12 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from ..markdown import line_roles, parse_atx_heading
+from ..markdown import (
+    HTML_COMMENT_RE,
+    INLINE_CODE_RE,
+    line_roles,
+    parse_atx_heading,
+)
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -74,15 +79,6 @@ KNOWN_PLACEHOLDERS = frozenset(
     }
 )
 
-# HTML comments (<!-- ... -->): placeholders here are template guidance and
-# are removed by the annotations checker; strip them to avoid double-reporting.
-_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-
-# Inline code spans, including multi-backtick spans that themselves contain
-# single backticks (the ``# `{feature}` plan`` heading is documented in prose
-# as ``# `{feature}` plan``). The backreference matches the same run length.
-_INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1", re.DOTALL)
-
 
 def is_template_placeholder(token: str) -> bool:
     """Return ``True`` if *token* is residue from a shipped template.
@@ -130,13 +126,15 @@ def _strip_non_prose(body: str) -> str:
         for line, role in zip(lines, line_roles(lines), strict=True)
         if not role.fenced
     )
-    stripped = _HTML_COMMENT_RE.sub("", stripped)
+    # Placeholders in comments are template guidance the annotations checker
+    # removes; stripping them here avoids reporting them twice.
+    stripped = HTML_COMMENT_RE.sub("", stripped)
     out_lines: list[str] = []
     for line in stripped.split("\n"):
         if parse_atx_heading(line) is not None:
             out_lines.append(line)
         else:
-            out_lines.append(_INLINE_CODE_RE.sub("", line))
+            out_lines.append(INLINE_CODE_RE.sub("", line))
     return "\n".join(out_lines)
 
 

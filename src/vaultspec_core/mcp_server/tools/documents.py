@@ -27,7 +27,6 @@ read converges nothing, and an edit writes to a path the caller named.
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from mcp.server.mcpserver import Context
@@ -39,6 +38,7 @@ from ...cli._migration_hook import ensure_migrated
 from ...core.types import get_context as _get_ctx
 from ...vaultcore.markdown import iter_headings
 from ...vaultcore.models import DocType, vault_today
+from ...vaultcore.parser import split_frontmatter
 from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 from ..results import (
@@ -495,8 +495,12 @@ def _apply_seed_content(
 
     from ...vaultcore.edit_engine import execute_edit
 
-    _frontmatter, body = _split_body(doc_path.read_text(encoding="utf-8"))
-    new_body = body.rstrip("\n") + "\n\n## Context\n\n" + content.strip("\n") + "\n"
+    new_body = (
+        _editable_body(doc_path).rstrip("\n")
+        + "\n\n## Context\n\n"
+        + content.strip("\n")
+        + "\n"
+    )
     result = execute_edit(root_dir, ref=str(doc_path), new_body=new_body)
     if result.status == "failed":
         message = "unknown error"
@@ -511,26 +515,10 @@ def _apply_seed_content(
 # ---------------------------------------------------------------------------
 
 
-_FRONTMATTER_RE = re.compile(r"^(﻿?---[ \t]*\n.*?\n---[ \t]*\n?)(.*)$", re.DOTALL)
-
-
-def _split_body(text: str) -> tuple[str, str]:
-    """Split full document text into ``(frontmatter_block, body)``.
-
-    The frontmatter block keeps its fences and trailing newline, so the body
-    is exactly the bytes after the frontmatter - the portion the edit engine
-    replaces.  A document with no frontmatter yields ``("", text)``.
-
-    Args:
-        text: Full document text (LF line endings).
-
-    Returns:
-        A two-tuple ``(frontmatter_block, body)``.
-    """
-    match = _FRONTMATTER_RE.match(text)
-    if not match:
-        return "", text
-    return match.group(1), match.group(2)
+def _editable_body(doc_path: Path) -> str:
+    """Return the text after *doc_path*'s frontmatter, which an edit replaces."""
+    text = doc_path.read_text(encoding="utf-8")
+    return text[split_frontmatter(text).frontmatter_end :]
 
 
 def _locate_section(body: str, heading: str) -> tuple[int, int] | None:
@@ -643,8 +631,7 @@ def _edit_one(root_dir: Path, index: int, op: EditOperation) -> ItemResult:
             error={"message": f"Cannot resolve document: '{op.target}'"},
         )
 
-    _frontmatter, body = _split_body(doc_path.read_text(encoding="utf-8"))
-    new_body = _compose_body(op, body)
+    new_body = _compose_body(op, _editable_body(doc_path))
     if new_body is None:
         return build_item(
             index,

@@ -31,6 +31,7 @@ non-zero leaves the plan byte-identical" cheap to keep: the write never starts.
 from __future__ import annotations
 
 from vaultspec_core.plan.commands._errors import PlanCommandError
+from vaultspec_core.vaultcore.markdown import HTML_COMMENT_CLOSE, HTML_COMMENT_OPEN
 
 __all__ = [
     "RowContentError",
@@ -41,7 +42,7 @@ __all__ = [
 ]
 
 #: Sequences that would terminate or open an HTML comment mid-document.
-_COMMENT_DELIMITERS = ("<!--", "-->")
+_COMMENT_DELIMITERS = (HTML_COMMENT_OPEN, HTML_COMMENT_CLOSE)
 
 
 class RowContentError(PlanCommandError, ValueError):

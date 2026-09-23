@@ -34,7 +34,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
-from ..markdown import iter_headings
+from ..markdown import HTML_COMMENT_RE, iter_sections
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -51,9 +51,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 __all__ = ["check_body_sections"]
-
-#: An HTML comment block, stripped before content-emptiness is judged.
-_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 #: Content consisting only of ``{placeholder}`` tokens and whitespace, treated
 #: as empty so an unauthored scaffold section does not satisfy the contract.
@@ -79,18 +76,11 @@ def _section_contents(body: str) -> dict[str, str]:
     A later duplicate heading overwrites an earlier one; documents do not
     legitimately repeat a required section.
     """
-    lines = body.split("\n")
-    openers = [
-        heading
-        for heading in iter_headings(body)
-        if heading.level == 2 and not _CONTINUATION_H2_RE.match(heading.text)
-    ]
-    if not openers:
-        return {}
-    ends = [opener.line - 1 for opener in openers[1:]] + [len(lines)]
     return {
-        opener.text: "\n".join(lines[opener.line : end])
-        for opener, end in zip(openers, ends, strict=True)
+        section.heading.text: section.body
+        for section in iter_sections(
+            body, opens=lambda heading: not _CONTINUATION_H2_RE.match(heading.text)
+        )
     }
 
 
@@ -100,7 +90,7 @@ def _is_empty(section_body: str) -> bool:
     A section is empty when, after HTML comments are stripped, nothing but
     whitespace remains, or when the remainder is only ``{placeholder}`` tokens.
     """
-    text = _COMMENT_RE.sub("", section_body).strip()
+    text = HTML_COMMENT_RE.sub("", section_body).strip()
     if not text:
         return True
     return _PLACEHOLDER_ONLY_RE.fullmatch(text) is not None

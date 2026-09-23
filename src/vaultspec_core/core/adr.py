@@ -41,8 +41,6 @@ _KNOWN_ADR_FRONTMATTER_KEYS = frozenset(
     }
 )
 
-_ADR_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
-
 #: The status marker that ends an ADR's H1, ``| (**status:** `accepted`)``,
 #: with the backtick quoting optional so a bare token is still read (and can
 #: be reported and repaired) rather than mistaken for no status at all.
@@ -125,19 +123,17 @@ def rewrite_adr_status(
         The rewritten document, or ``None`` when its body carries no status
         marker to rewrite.
     """
-    _yaml_block, body = split_frontmatter(document)
-    marker = adr_status_marker(body)
+    split = split_frontmatter(document)
+    marker = adr_status_marker(split.body)
     if marker is None:
         return None
-    lines = body.split("\n")
+    lines = split.body.split("\n")
     lines[marker.line - 1] = marker.rewrite(
         lines[marker.line - 1],
         token,
         quoted=marker.quoted if quoted is None else quoted,
     )
-    # split_frontmatter only ever removes a prefix, so the body is the
-    # document's tail and everything before it is kept verbatim.
-    return document[: len(document) - len(body)] + "\n".join(lines)
+    return document[: split.body_start] + "\n".join(lines)
 
 
 def _preserve_unknown_frontmatter_keys(yaml_block: str) -> list[str]:
@@ -233,16 +229,17 @@ def _rewrite_adr_frontmatter(
     Raises:
         VaultSpecError: If ``normalized`` has no parseable frontmatter block.
     """
-    match = _ADR_FRONTMATTER_RE.match(normalized.lstrip())
-    if not match:
+    split = split_frontmatter(normalized)
+    if split.yaml_block is None:
         raise VaultSpecError(f"Could not parse frontmatter of ADR '{source_file}'.")
-    yaml_block, body_content = match.group(1), match.group(2)
-    leading = normalized[: len(normalized) - len(normalized.lstrip())]
+    # Only a byte-order mark and blank lines can precede the opening fence,
+    # so the first ``---`` is that fence and everything before it is kept.
+    leading = normalized[: normalized.index("---")]
 
-    fm_lines = _rebuild_frontmatter_lines(meta, yaml_block)
+    fm_lines = _rebuild_frontmatter_lines(meta, split.yaml_block)
     fm_lines.append("---")
-    if body_content:
-        fm_lines.append(body_content)
+    if split.body:
+        fm_lines.append(split.body)
 
     return leading + "\n".join(fm_lines)
 

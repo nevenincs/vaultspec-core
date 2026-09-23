@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
 from ..markdown import FenceTracker
+from ..parser import split_frontmatter
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -85,10 +86,12 @@ def strip_template_annotations(content: str) -> tuple[str, AnnotationStats]:
       :data:`PRESERVED_HTML_COMMENT_PREFIXES`.
     """
     normalized = content.replace("\r\n", "\n")
-    frontmatter, body, has_frontmatter = _split_frontmatter(normalized)
+    split = split_frontmatter(normalized)
+    frontmatter = normalized[: split.frontmatter_end]
+    body = normalized[split.frontmatter_end :]
 
     frontmatter_comment_count = 0
-    if has_frontmatter:
+    if split.yaml_block is not None:
         frontmatter, frontmatter_comment_count = _strip_frontmatter_comments(
             frontmatter
         )
@@ -275,18 +278,6 @@ def check_annotations(
         )
 
     return result
-
-
-def _split_frontmatter(content: str) -> tuple[str, str, bool]:
-    if not content.startswith("---\n"):
-        return "", content, False
-
-    lines = content.splitlines(keepends=True)
-    for index, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            split_at = index + 1
-            return "".join(lines[:split_at]), "".join(lines[split_at:]), True
-    return "", content, False
 
 
 def _strip_frontmatter_comments(frontmatter: str) -> tuple[str, int]:

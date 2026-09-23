@@ -85,9 +85,10 @@ __all__ = [
 ]
 
 #: Schema string stamped into every cache file.  Bump when the on-disk
-#: payload shape changes so an older cache is treated as a miss rather than
-#: misread.  Tied to the graph wire schema generation (``v3``).
-CACHE_SCHEMA = "vaultspec.vault.graph.cache.v5"
+#: payload shape changes, or when a cached node field such as ``title`` is
+#: derived differently, so an older cache is treated as a miss rather than
+#: misread or served stale.  Tied to the graph wire schema generation (``v3``).
+CACHE_SCHEMA = "vaultspec.vault.graph.cache.v6"
 
 #: Manifest value type: ``(st_size, st_mtime_ns, sha256_hex)`` per file.
 Fingerprint = tuple[int, int, str]

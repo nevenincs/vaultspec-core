@@ -70,6 +70,15 @@ def test_absent_changes_section_yields_nothing() -> None:
     assert ledger_step_ids("# heading\n") == ()
 
 
+def test_changes_heading_inside_fenced_code_is_not_the_section() -> None:
+    body = (
+        "# `demo` ledger\n\n```markdown\n## Changes\n\n- `S07` `M` `sample.py`\n```\n\n"
+        "## Changes\n\n- `S01` `M` `src/a.py`\n"
+    )
+
+    assert ledger_step_ids(body) == ("S01",)
+
+
 def test_malformed_rows_are_skipped_not_raised() -> None:
     body = "## Changes\n\n- no backticks here\n-\n- `S01` `M` `src/a.py`\n"
 
@@ -112,6 +121,13 @@ class TestAppendRows:
         updated = append_rows(LEDGER, [row])
 
         assert updated == LEDGER
+
+    def test_row_appended_to_an_empty_section_starts_its_own_line(self) -> None:
+        body = "# `demo` ledger\n\n## Changes\n\n## Notes\n\n- `S01` note.\n"
+        updated = append_rows(body, [format_row("S01", "M", "src/a.py")])
+
+        assert "## Changes\n- `S01` `M` `src/a.py`\n\n## Notes" in updated
+        assert ledger_step_ids(updated) == ("S01",)
 
     def test_repeated_appends_do_not_accumulate_blank_lines(self) -> None:
         body = LEDGER

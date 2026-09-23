@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 from ...protocol.providers import GeminiModels
 from .. import parse_frontmatter, parse_vault_metadata
-from ..parser import SafeLoader
+from ..parser import SafeLoader, split_frontmatter
 
 pytestmark = [pytest.mark.unit]
 
@@ -112,6 +112,59 @@ class TestParseFrontmatterBOM:
         meta, body = parse_frontmatter(content)
         assert meta["tier"] == "LOW"
         assert "Body." in body
+
+
+class TestSplitFrontmatter:
+    """Where the frontmatter ends and the body begins, as offsets and lines."""
+
+    _DOC = "---\ntags:\n  - '#x'\n---\n\n\n# Title\n\nBody.\n"
+
+    def test_body_is_whole_source_lines_from_body_line(self):
+        split = split_frontmatter(self._DOC)
+        assert split.yaml_block == "tags:\n  - '#x'"
+        assert split.body == "# Title\n\nBody.\n"
+        assert split.body_line == 7
+        assert "\n".join(self._DOC.split("\n")[split.body_line - 1 :]) == split.body
+        assert self._DOC[split.body_start :] == split.body
+
+    def test_frontmatter_end_keeps_blank_lines_with_the_body(self):
+        split = split_frontmatter(self._DOC)
+        assert self._DOC[: split.frontmatter_end] == "---\ntags:\n  - '#x'\n---\n"
+        assert self._DOC[split.frontmatter_end :] == "\n\n# Title\n\nBody.\n"
+
+    def test_bom_stays_with_the_frontmatter_block(self):
+        split = split_frontmatter(_BOM + self._DOC)
+        plain = split_frontmatter(self._DOC)
+        assert split.yaml_block == plain.yaml_block
+        assert split.body == plain.body
+        assert split.body_line == plain.body_line
+        assert split.frontmatter_end == plain.frontmatter_end + 1
+
+    def test_first_body_line_keeps_its_indentation(self):
+        split = split_frontmatter("---\na: 1\n---\n    indented code\nnext\n")
+        assert split.body == "    indented code\nnext\n"
+        assert split.body_line == 4
+
+    def test_without_frontmatter_leading_blank_lines_are_skipped(self):
+        split = split_frontmatter("\n\n  Text\nmore")
+        assert split.yaml_block is None
+        assert split.frontmatter_end == 0
+        assert split.body == "  Text\nmore"
+        assert split.body_line == 3
+
+    def test_crlf_text_counts_lines_by_newline(self):
+        doc = "---\r\na: 1\r\n---\r\n\r\nBody\r\n"
+        split = split_frontmatter(doc)
+        assert split.yaml_block == "a: 1\r"
+        assert doc[: split.frontmatter_end] == "---\r\na: 1\r\n---\r\n"
+        assert split.body == "Body\r\n"
+        assert split.body_line == 5
+
+    def test_closing_fence_must_be_a_whole_line(self):
+        doc = "---\na: 1\n--- not a fence\nb: 2\n---\nBody"
+        split = split_frontmatter(doc)
+        assert split.yaml_block == "a: 1\n--- not a fence\nb: 2"
+        assert split.body == "Body"
 
 
 class TestParseVaultMetadataBOM:

@@ -43,19 +43,49 @@ from itertools import pairwise
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
 
 __all__ = [
+    "HTML_COMMENT_CLOSE",
+    "HTML_COMMENT_OPEN",
+    "HTML_COMMENT_RE",
+    "INLINE_CODE_RE",
     "Block",
     "FenceTracker",
     "Heading",
     "LineRole",
+    "Section",
     "document_title",
+    "find_section",
     "iter_headings",
+    "iter_sections",
     "line_roles",
+    "non_prose_spans",
     "paragraph_blocks",
     "parse_atx_heading",
 ]
+
+#: The sequence that opens an HTML comment.
+HTML_COMMENT_OPEN = "<!--"
+
+#: The sequence that closes an HTML comment.
+HTML_COMMENT_CLOSE = "-->"
+
+#: A complete HTML comment, CommonMark's ``<!-->`` and ``<!--->`` included.
+#: The match is lazy, so a comment ends at its first ``-->``; an opening with
+#: no close is left unmatched.
+HTML_COMMENT_RE = re.compile(
+    rf"{HTML_COMMENT_OPEN}(?:-?>|.*?{HTML_COMMENT_CLOSE})", re.DOTALL
+)
+
+#: An inline code span: a backtick run, its content, and a closing run of the
+#: same length, so a double-backtick span may quote a single backtick.
+INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1", re.DOTALL)
+
+#: Either inline construct that hides prose, for a single leftmost-first scan.
+_COMMENT_OR_CODE_RE = re.compile(
+    rf"{HTML_COMMENT_RE.pattern}|{INLINE_CODE_RE.pattern}", re.DOTALL
+)
 
 #: Whitespace a rule may ignore at a line's edges: CommonMark's spaces and
 #: tabs, plus the line-ending characters a caller's split may leave attached.
@@ -230,6 +260,131 @@ def document_title(text: str) -> str | None:
         ),
         None,
     )
+
+
+@dataclass(frozen=True)
+class Section:
+    """A heading and the raw text it governs.
+
+    Attributes:
+        heading: The heading that opens the section.
+        start: Offset of the line after the heading line, or the end of the
+            text when the heading is its last line.
+        end: Offset where the section stops: the start of the next opening
+            heading's line, or the end of the text.
+        body: The text from ``start`` to ``end``, verbatim, so a caller can
+            splice a replacement back in at those offsets.
+    """
+
+    heading: Heading
+    start: int
+    end: int
+    body: str
+
+
+def iter_sections(
+    text: str,
+    *,
+    level: int = 2,
+    opens: Callable[[Heading], bool] | None = None,
+) -> Iterator[Section]:
+    """Yield each section opened by a heading of *level*, outside fences.
+
+    A section runs to the next heading of the same level that opens one.
+    Headings of other levels neither open nor end it, so a level-two section
+    keeps its level-three subsections.
+
+    Args:
+        text: Markdown text; lines are split on ``\\n``.
+        level: The heading level whose headings delimit sections.
+        opens: Decides whether a heading of *level* opens a section. One that
+            does not is part of the section before it. Every heading opens
+            one when omitted.
+
+    Yields:
+        Each :class:`Section` in document order.
+    """
+    starts = _line_starts(text.split("\n"))
+    openers = [
+        heading
+        for heading in iter_headings(text)
+        if heading.level == level and (opens is None or opens(heading))
+    ]
+    if not openers:
+        return
+    ends = [starts[opener.line - 1] for opener in openers[1:]] + [len(text)]
+    for opener, end in zip(openers, ends, strict=True):
+        start = min(starts[opener.line], len(text))
+        yield Section(heading=opener, start=start, end=end, body=text[start:end])
+
+
+def find_section(text: str, title: str, *, level: int = 2) -> Section | None:
+    """Return the first section of *level* whose heading text is *title*.
+
+    Args:
+        text: Markdown text; lines are split on ``\\n``.
+        title: The heading text, without its ``#`` markers.
+        level: The heading level to look at.
+
+    Returns:
+        The first matching :class:`Section`, or ``None``.
+    """
+    return next(
+        (s for s in iter_sections(text, level=level) if s.heading.text == title),
+        None,
+    )
+
+
+def non_prose_spans(text: str) -> Iterator[tuple[int, int]]:
+    """Yield the spans of *text* that are code or comments rather than prose.
+
+    Three constructs hide prose: fenced code blocks, HTML comments, and inline
+    code spans. Whichever begins first wins, so a fence marker inside a
+    comment, or a comment marker inside a code span, is part of that
+    construct rather than the start of another. A fenced block runs from the
+    start of its opening line to the end of its closing line, or to the end
+    of the text when it never closes.
+
+    Args:
+        text: Markdown text; lines are split on ``\\n``.
+
+    Yields:
+        ``(start, end)`` offsets, in order and never overlapping.
+    """
+    lines = text.split("\n")
+    starts = _line_starts(lines)
+    openers = [
+        index
+        for index, line in enumerate(lines)
+        if FenceTracker().classify(line) is LineRole.FENCE_OPEN
+    ]
+    next_opener = 0
+    cursor = 0
+    match = _COMMENT_OR_CODE_RE.search(text)
+    while True:
+        while next_opener < len(openers) and starts[openers[next_opener]] < cursor:
+            next_opener += 1
+        if match is not None and match.start() < cursor:
+            match = _COMMENT_OR_CODE_RE.search(text, cursor)
+        fence = openers[next_opener] if next_opener < len(openers) else None
+        if fence is not None and (match is None or starts[fence] <= match.start()):
+            cursor = _fence_end(lines, starts, fence, len(text))
+            yield starts[fence], cursor
+        elif match is not None:
+            cursor = match.end()
+            yield match.span()
+        else:
+            return
+
+
+def _fence_end(lines: list[str], starts: list[int], opener: int, limit: int) -> int:
+    """Return the offset just past the fenced block that opens at line *opener*."""
+    tracker = FenceTracker()
+    tracker.classify(lines[opener])
+    for index in range(opener + 1, len(lines)):
+        if tracker.classify(lines[index]) is LineRole.FENCE_CLOSE:
+            return starts[index] + len(lines[index])
+    return limit
 
 
 @dataclass(frozen=True)

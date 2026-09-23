@@ -475,6 +475,15 @@ def test_heading_level_check_flags_promoted_wave() -> None:
     assert "Wave" in findings[0].message
 
 
+def test_heading_checks_ignore_headings_inside_fenced_code() -> None:
+    """A mislevelled or off-vocabulary heading quoted in a code block is text."""
+    sample = "```markdown\n## Phase `P01` - quoted\n## Sprint `X1` - quoted\n```\n"
+    plan = parse_plan(make_clean_plan("L1", rng=random.Random(5), steps=1).render())
+
+    assert check_heading_levels(sample) == []
+    assert check_vocabulary(plan, sample) == []
+
+
 def test_heading_level_check_silent_on_canonical_levels() -> None:
     """Correctly levelled containers produce no findings, at every tier."""
     for tier in ("L1", "L2", "L3", "L4"):

@@ -11,6 +11,8 @@ import logging
 import re
 from collections import Counter
 
+from .markdown import non_prose_spans
+
 __all__ = [
     "extract_related_links",
     "extract_wiki_links",
@@ -22,25 +24,14 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-_CODE_FENCE_RE = re.compile(
-    r"^(?:```|~~~)[^\n]*\n.*?^(?:```|~~~)\s*$",
-    re.MULTILINE | re.DOTALL,
-)
-_INLINE_CODE_RE = re.compile(r"`[^`]+`")
-_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 _WIKI_LINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]")
-_NON_PROSE_RE = re.compile(
-    rf"{_CODE_FENCE_RE.pattern}|{_HTML_COMMENT_RE.pattern}|{_INLINE_CODE_RE.pattern}",
-    re.MULTILINE | re.DOTALL,
-)
 
 
 def strip_non_prose(text: str) -> str:
     """Remove fenced code blocks, inline code spans, and HTML comments.
 
-    The one definition of "prose" for link scanning. ``check_body_links``
-    carried a byte-identical private copy, so every document was stripped
-    twice per check run over the same three regexes.
+    The prose that link scanning reads: *text* without the spans
+    :func:`~vaultspec_core.vaultcore.markdown.non_prose_spans` reports.
 
     Args:
         text: Markdown text to reduce to prose.
@@ -48,9 +39,13 @@ def strip_non_prose(text: str) -> str:
     Returns:
         *text* with its non-prose regions removed.
     """
-    stripped = _CODE_FENCE_RE.sub("", text)
-    stripped = _HTML_COMMENT_RE.sub("", stripped)
-    return _INLINE_CODE_RE.sub("", stripped)
+    parts: list[str] = []
+    cursor = 0
+    for start, end in non_prose_spans(text):
+        parts.append(text[cursor:start])
+        cursor = end
+    parts.append(text[cursor:])
+    return "".join(parts)
 
 
 def extract_wiki_links(content: str) -> Counter[str]:
@@ -133,11 +128,10 @@ def rewrite_wiki_links_as_code_spans(content: str) -> tuple[str, int]:
         replaced += 1
         return f"`{match.group(1).strip()}`"
 
-    for protected in _NON_PROSE_RE.finditer(content):
-        prose = content[cursor : protected.start()]
-        parts.append(_WIKI_LINK_RE.sub(replace, prose))
-        parts.append(protected.group(0))
-        cursor = protected.end()
+    for start, end in non_prose_spans(content):
+        parts.append(_WIKI_LINK_RE.sub(replace, content[cursor:start]))
+        parts.append(content[start:end])
+        cursor = end
     parts.append(_WIKI_LINK_RE.sub(replace, content[cursor:]))
     return "".join(parts), replaced
 

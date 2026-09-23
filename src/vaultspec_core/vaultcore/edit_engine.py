@@ -160,28 +160,6 @@ def resolve_document_path(ref: str, root_dir: Path) -> Path:
     raise EditError(f"Resolved stem '{stem}' has no backing file", {"path": ref})
 
 
-def _split_document(text: str) -> tuple[str, str]:
-    """Split full document text into ``(frontmatter_block, body)``.
-
-    The frontmatter block retains its leading and trailing ``---`` fences
-    and the newline that follows the closing fence, so reassembling with
-    ``frontmatter_block + body`` reproduces the original bytes exactly.
-    A document with no frontmatter fence yields ``("", text)``.
-
-    Args:
-        text: Full document text with LF-normalised line endings.
-
-    Returns:
-        A two-tuple ``(frontmatter_block, body)``.
-    """
-    import re
-
-    match = re.match(r"^(﻿?---[ \t]*\n.*?\n---[ \t]*\n?)(.*)$", text, re.DOTALL)
-    if not match:
-        return "", text
-    return match.group(1), match.group(2)
-
-
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -585,6 +563,7 @@ def _compose_new_text(
         EditError: When the document cannot be read.
     """
     from vaultspec_core.vaultcore.models import refresh_modified_stamp, vault_today
+    from vaultspec_core.vaultcore.parser import split_frontmatter
     from vaultspec_core.vaultcore.related_surgery import read_preserve_newlines
 
     try:
@@ -592,7 +571,10 @@ def _compose_new_text(
     except (OSError, UnicodeDecodeError) as exc:
         raise EditError(f"Cannot read document '{doc_path}': {exc}", {}) from exc
 
-    frontmatter_block, body = _split_document(content)
+    # Split at the fence's end rather than the parsed body's start, so the
+    # blank lines after the fence belong to the body an edit replaces.
+    frontmatter_end = split_frontmatter(content).frontmatter_end
+    frontmatter_block, body = content[:frontmatter_end], content[frontmatter_end:]
 
     if date is not None or tags is not None or related is not None:
         frontmatter_block = _apply_frontmatter_edits(

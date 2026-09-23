@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 from ..core.exceptions import ResourceExistsError, VaultSpecError
 from .body_schema import CURRENT_BODY_SCHEMA
 from .exclusions import is_excluded_vault_path
+from .markdown import HTML_COMMENT_RE
 from .models import DocType
 from .normalize import normalize_vault_date
 from .query_rename import assert_within_docs
@@ -326,7 +327,7 @@ def hydrate_template(
     # adr/plan/exec doc emits warnings about {adr}, {research},
     # {reference}, <display-path> etc. that live inside the template's
     # own guidance comments.
-    scan_target = re.sub(r"<!--.*?-->", "", hydrated, flags=re.DOTALL)
+    scan_target = HTML_COMMENT_RE.sub("", hydrated)
     remaining = re.findall(r"[{<][a-z0-9\-_*]+[}>]", scan_target)
     if "{tier: null}" in scan_target:
         remaining.append("{tier: null}")
