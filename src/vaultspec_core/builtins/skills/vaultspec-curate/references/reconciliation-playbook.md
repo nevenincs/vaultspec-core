@@ -27,12 +27,14 @@ For each cluster of decisions on a shared concept:
   (MCP: `crossref`) judges each ADR against the rest within fixed ceilings: at most 50
   ADRs a sweep, 46 paid requests and 60 seconds an ADR. `--isolated` takes only ADRs
   that link no other ADR. Take one sweep per curation run and report its `next_after`,
-  `remaining`, and `stopped` in the audit; the next sweep resumes with
-  `--after <next_after>` on the orchestrator's go-ahead. On `not_configured` or a
-  `stopped` sweep, run the next step the reply names. Each `link` verdict is a candidate
-  missing link; each `weak` verdict is a declared link judged below the threshold. The
-  `relation` label says which pairs to read in full; it does not classify the pair for
-  you.
+  `remaining`, and `stopped` in the audit; the next sweep repeats the selector with
+  `--after <next_after>` on the orchestrator's go-ahead. On `not_configured`, run the
+  next step the reply names. On `stopped`, report the reason; a sweep stopped on time or
+  a transient failure is resumed later, and one stopped on refusals needs the provider
+  checked first. A source that is `unavailable` inside a sweep that did not stop was
+  refused on its own text: record it. Each `link` verdict is a candidate missing link;
+  each `weak` verdict is a declared link judged below the threshold. The `relation`
+  label says which pairs to read in full; it does not classify the pair for you.
 - Surface the cluster by meaning. Search decisions and vault facts with
   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
   run the next step its reply names. Semantic recall finds same-topic ADRs that share no

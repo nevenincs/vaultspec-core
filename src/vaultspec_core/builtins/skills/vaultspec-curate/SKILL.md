@@ -52,16 +52,20 @@ The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
   `vaultspec-core vault graph --json` for the supersession and relatedness edges.
 - **Reconcile decision-vs-decision.** Start from one bounded cross-reference sweep:
   `vaultspec-core vault adr crossref --all` (MCP: `crossref`), `--feature`, or
-  `--isolated`, resumed from a reported `--after <next_after>`. One sweep judges at most
-  50 ADRs within fixed request and time ceilings, at up to 46 paid requests each. Run
-  one sweep per curation run; report its `next_after`, `remaining`, and `stopped`, and
-  start another only on the orchestrator's go-ahead. On `not_configured` or a failed
-  sweep, run the next step the reply names. Read the ADRs behind each `link` verdict and
-  each `weak` declared link, and judge them. Then search decisions and vault facts with
-  `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
-  run the next step its reply names. Surface the ADRs covering the same concept, read
-  them whole, and judge agreement, duplication, contradiction, or fragmentation (a
-  refinement chain or sibling accepted records on one scope).
+  `--isolated`; a resumed sweep repeats its selector and adds the reported
+  `--after <next_after>`. One sweep judges at most 50 ADRs within fixed request and time
+  ceilings, at up to 46 paid requests each. Run one sweep per curation run; report its
+  `next_after`, `remaining`, and `stopped`, and start another only on the orchestrator's
+  go-ahead. On `not_configured`, run the next step the reply names. On `stopped`, report
+  the reason; a sweep stopped on time or a transient failure is resumed later, and one
+  stopped on refusals needs the provider checked first. A source that is `unavailable`
+  inside a sweep that did not stop was refused on its own text: record it. Read the ADRs
+  behind each `link` verdict and each `weak` declared link, and judge them. Then search
+  decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
+  `search`); when it declines or fails, run the next step its reply names. Surface the
+  ADRs covering the same concept, read them whole, and judge agreement, duplication,
+  contradiction, or fragmentation (a refinement chain or sibling accepted records on one
+  scope).
 - **Reconcile decision-vs-code.** For each live decision,
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
   file whole, and confirm the decision is implemented; grep to confirm exact symbols.
