@@ -224,7 +224,9 @@ def line_roles(lines: Iterable[str]) -> list[LineRole]:
     """Classify every line of a document against its fenced code blocks.
 
     Takes lines rather than text so each caller keeps its own split: the
-    returned roles align index for index with the lines it passed.
+    returned roles align index for index with the lines it passed. A line
+    that begins inside an HTML comment is :attr:`LineRole.TEXT` and carries
+    no structure, exactly as :func:`non_prose_spans` reads it.
 
     Args:
         lines: The document's lines, in order, with or without line endings.
@@ -232,8 +234,7 @@ def line_roles(lines: Iterable[str]) -> list[LineRole]:
     Returns:
         One :class:`LineRole` per input line.
     """
-    tracker = FenceTracker()
-    return [tracker.classify(line) for line in lines]
+    return _scan(list(lines))[0]
 
 
 def parse_atx_heading(line: str) -> tuple[int, str] | None:
@@ -392,7 +393,10 @@ def non_prose_spans(text: str) -> Iterator[tuple[int, int]]:
     Three constructs hide prose: fenced code blocks, HTML comments, and inline
     code spans. Whichever begins first wins, so a fence marker inside a
     comment, or a comment marker inside a code span, is part of that
-    construct rather than the start of another. A fenced block runs from the
+    construct rather than the start of another. The exception is a code span
+    that would reach a line opening a fence: a code span cannot cross a
+    block, so the fence wins and the span's opening run is literal text.
+    A fenced block runs from the
     start of its opening line to the end of its closing line, or to the end
     of the text when it never closes.
 
@@ -402,43 +406,90 @@ def non_prose_spans(text: str) -> Iterator[tuple[int, int]]:
     Yields:
         ``(start, end)`` offsets, in order and never overlapping.
     """
-    lines = text.split("\n")
+    yield from _scan(text.split("\n"))[1]
+
+
+def _scan(lines: list[str]) -> tuple[list[LineRole], list[tuple[int, int]]]:
+    """Classify *lines* and collect the spans that hide prose, in one pass.
+
+    The one home of the rule that a line beginning inside an HTML comment is
+    not markdown structure: it is never fed to the fence tracker, so it
+    neither opens nor closes a fence or a list item, and its role is
+    :attr:`LineRole.TEXT`. Every other line outside a fence is fed in order,
+    so a list item opened in prose carries its margin to the fences nested in
+    it.
+
+    An inline code span cannot cross a block boundary, so the lines a
+    multi-line code match reaches are still fed. A code match is held until
+    the scan passes its end; if a fence opens on a line it reaches, the fence
+    wins, the match is dropped as a stray backtick run, and only the
+    constructs wholly before the fence line are kept.
+
+    Args:
+        lines: The document's lines, joined by ``\\n`` to form the text the
+            span offsets index.
+
+    Returns:
+        One role per line, and the non-prose ``(start, end)`` spans in order.
+    """
+    text = "\n".join(lines)
     starts = _line_starts(lines)
-    # Lines are fed to one tracker in order, skipping those that begin inside
-    # a comment or a code span, so a list item opened in prose carries its
-    # margin to the fences nested in it. The next inline construct is found
-    # once and kept until it is passed; it never begins before the cursor.
     tracker = FenceTracker()
+    roles: list[LineRole] = []
+    spans: list[tuple[int, int]] = []
+    # The end of the last comment or fence: a line starting before it is
+    # comment text, never structure.
     cursor = 0
+    fence_start: int | None = None
     match = _COMMENT_OR_CODE_RE.search(text)
     for index, line in enumerate(lines):
-        while match is not None and match.start() < starts[index]:
-            cursor = match.end()
-            yield match.span()
-            match = _COMMENT_OR_CODE_RE.search(text, cursor)
-        if starts[index] < cursor or tracker.classify(line) is not LineRole.FENCE_OPEN:
+        start = starts[index]
+        if fence_start is not None:
+            role = tracker.classify(line)
+            roles.append(role)
+            if role is LineRole.FENCE_CLOSE:
+                cursor = start + len(line)
+                spans.append((fence_start, cursor))
+                fence_start = None
+                if match is None or match.start() < cursor:
+                    match = _COMMENT_OR_CODE_RE.search(text, cursor)
             continue
-        cursor = _fence_end(lines, starts, tracker, index, len(text))
-        yield starts[index], cursor
-        if match is not None and match.start() < cursor:
-            match = _COMMENT_OR_CODE_RE.search(text, cursor)
+        while match is not None and match.start() < start:
+            is_code = match.group(1) is not None
+            if is_code and match.end() > start:
+                break
+            spans.append(match.span())
+            if not is_code:
+                cursor = match.end()
+            match = _COMMENT_OR_CODE_RE.search(text, match.end())
+        if start < cursor:
+            roles.append(LineRole.TEXT)
+            continue
+        role = tracker.classify(line)
+        roles.append(role)
+        if role is LineRole.FENCE_OPEN:
+            fence_start = start
+            if match is not None and match.start() < start:
+                # The held code match runs into this fence: its opening run
+                # is literal text, and the scan resumes after the fence.
+                spans.extend(_inline_spans(text, match.end(1), start - 1))
+                match = None
+    if fence_start is not None:
+        # An unclosed fence runs to the end, swallowing every later construct.
+        spans.append((fence_start, len(text)))
+        match = None
+    while match is not None:
+        spans.append(match.span())
+        match = _COMMENT_OR_CODE_RE.search(text, match.end())
+    return roles, spans
+
+
+def _inline_spans(text: str, pos: int, endpos: int) -> Iterator[tuple[int, int]]:
+    """Yield the comments and code spans wholly inside ``text[pos:endpos]``."""
+    match = _COMMENT_OR_CODE_RE.search(text, pos, endpos)
     while match is not None:
         yield match.span()
-        match = _COMMENT_OR_CODE_RE.search(text, match.end())
-
-
-def _fence_end(
-    lines: list[str], starts: list[int], tracker: FenceTracker, opener: int, limit: int
-) -> int:
-    """Return the offset just past the fenced block that opens at line *opener*.
-
-    *tracker* has just classified the opening line, so it carries the fence
-    and the margin it opened at.
-    """
-    for index in range(opener + 1, len(lines)):
-        if tracker.classify(lines[index]) is LineRole.FENCE_CLOSE:
-            return starts[index] + len(lines[index])
-    return limit
+        match = _COMMENT_OR_CODE_RE.search(text, match.end(), endpos)
 
 
 @dataclass(frozen=True)
@@ -473,16 +524,20 @@ class _Span:
     """No heading line separates this span from the one before it."""
 
 
-def _line_starts(lines: list[str]) -> list[int]:
-    """Return the character offset of each line in the joined text, plus the end."""
+def _line_starts(lines: list[str], measure: Callable[[str], int] = len) -> list[int]:
+    """Return the offset of each line in the joined text, plus the end.
+
+    Offsets count characters unless *measure* sizes each line in another
+    unit; the ``\\n`` joining two lines counts one in any unit.
+    """
     starts = [0]
     for line in lines:
-        starts.append(starts[-1] + len(line) + 1)
+        starts.append(starts[-1] + measure(line) + 1)
     return starts
 
 
 def _span_length(starts: list[int], start: int, end: int) -> int:
-    """Return the character length of lines ``start..end`` joined by ``\\n``."""
+    """Return the size of lines ``start..end`` joined by ``\\n``, in *starts*' unit."""
     return starts[end] - starts[start] - 1
 
 
@@ -533,18 +588,19 @@ def _content_spans(lines: list[str]) -> list[_Span]:
     return spans
 
 
-def _split_oversized(span: _Span, starts: list[int], max_chars: int) -> list[_Span]:
+def _split_oversized(span: _Span, sizes: list[int], max_chars: int) -> list[_Span]:
     """Cut *span* at line boundaries into pieces of at most *max_chars*.
 
-    A single line longer than *max_chars* becomes a piece of its own rather
-    than being cut mid-line: an excerpt that splits a line is no longer a
-    verbatim slice of the source.
+    *sizes* holds the line offsets in the unit *max_chars* counts. A single
+    line longer than *max_chars* becomes a piece of its own rather than being
+    cut mid-line: an excerpt that splits a line is no longer a verbatim slice
+    of the source.
     """
-    if _span_length(starts, span.start, span.end) <= max_chars:
+    if _span_length(sizes, span.start, span.end) <= max_chars:
         return [span]
     cuts = [span.start]
     for index in range(span.start + 1, span.end):
-        if _span_length(starts, cuts[-1], index + 1) > max_chars:
+        if _span_length(sizes, cuts[-1], index + 1) > max_chars:
             cuts.append(index)
     # Pieces of one span have no heading between them. Letting them rejoin is
     # safe: each cut exists because the two sides together exceed max_chars,
@@ -558,21 +614,22 @@ def _split_oversized(span: _Span, starts: list[int], max_chars: int) -> list[_Sp
 
 
 def _merge_small(
-    spans: list[_Span], starts: list[int], *, max_chars: int, min_chars: int
+    spans: list[_Span], sizes: list[int], *, max_chars: int, min_chars: int
 ) -> list[_Span]:
     """Fold each span into the one before it while that one is below *min_chars*.
 
     A span is folded only when no heading separates the two (so both share a
     heading path and the result holds no heading line) and the merged span
     still fits *max_chars*: the maximum is a bound, the minimum only a target.
+    *sizes* holds the line offsets in the unit both bounds count.
     """
     merged: list[_Span] = []
     for span in spans:
         if merged and span.joinable:
             last = merged[-1]
             if (
-                _span_length(starts, last.start, last.end) < min_chars
-                and _span_length(starts, last.start, span.end) <= max_chars
+                _span_length(sizes, last.start, last.end) < min_chars
+                and _span_length(sizes, last.start, span.end) <= max_chars
             ):
                 merged[-1] = replace(last, end=span.end)
                 continue
@@ -581,7 +638,11 @@ def _merge_small(
 
 
 def paragraph_blocks(
-    text: str, *, max_chars: int = 1400, min_chars: int = 240
+    text: str,
+    *,
+    max_chars: int = 1400,
+    min_chars: int = 240,
+    measure: Callable[[str], int] = len,
 ) -> list[Block]:
     """Split *text* into verbatim blocks for excerpting.
 
@@ -601,6 +662,10 @@ def paragraph_blocks(
             ``\\n`` and numbered from 1.
         max_chars: The size bound a block is split to respect.
         min_chars: The size below which a block absorbs its successor.
+        measure: The size of one line in the unit *max_chars* and
+            *min_chars* count; characters by default. A caller bounding
+            blocks in UTF-8 bytes passes the encoded length. The ``\\n``
+            between two lines counts one in any unit.
 
     Returns:
         The blocks in document order.
@@ -612,10 +677,11 @@ def paragraph_blocks(
         raise ValueError(f"max_chars must be positive, got {max_chars}")
     lines = text.split("\n")
     starts = _line_starts(lines)
+    sizes = starts if measure is len else _line_starts(lines, measure)
     pieces = [
         piece
         for span in _content_spans(lines)
-        for piece in _split_oversized(span, starts, max_chars)
+        for piece in _split_oversized(span, sizes, max_chars)
     ]
     return [
         Block(
@@ -625,6 +691,6 @@ def paragraph_blocks(
             text=text[starts[span.start] : starts[span.end] - 1],
         )
         for span in _merge_small(
-            pieces, starts, max_chars=max_chars, min_chars=min_chars
+            pieces, sizes, max_chars=max_chars, min_chars=min_chars
         )
     ]

@@ -123,6 +123,39 @@ class TestFences:
         lines = ["```", "- item", "```", "    ```", "x"]
         assert line_roles(lines) == [OPEN, CODE, CLOSE, TEXT, TEXT]
 
+    def test_lines_inside_a_comment_neither_open_nor_close_a_list_item(
+        self,
+    ) -> None:
+        # The comment's closing line sits at column 0 but is comment text, so
+        # the item stays open and the fence nested under it is a fence.
+        lines = ["- item <!--", "note", "-->", "    ```", "    x", "    ```"]
+        assert line_roles(lines) == [TEXT, TEXT, TEXT, OPEN, CODE, CLOSE]
+        text = "\n".join(lines)
+        assert _pieces(text) == ["<!--\nnote\n-->", "    ```\n    x\n    ```"]
+
+    @pytest.mark.parametrize("gap", [[""], []], ids=["blank-line", "no-blank-line"])
+    def test_a_stray_backtick_does_not_swallow_a_later_fence(
+        self, gap: list[str]
+    ) -> None:
+        # The lone backtick would pair with the fence's first backtick, but a
+        # code span cannot cross into a fence line: the fence wins.
+        lines = ["A stray ` backtick.", *gap, "```", "  x  ", "```"]
+        assert line_roles(lines) == [TEXT] * (1 + len(gap)) + [OPEN, CODE, CLOSE]
+        assert _pieces("\n".join(lines)) == ["```\n  x  \n```"]
+
+    def test_code_before_a_stray_backtick_and_after_the_fence_is_kept(self) -> None:
+        text = "`a` then ` stray\n```\nx\n```\n`b`"
+        assert _pieces(text) == ["`a`", "```\nx\n```", "`b`"]
+
+    def test_a_code_span_across_lines_without_a_fence_is_kept(self) -> None:
+        text = "see `a\nb` here\n- item"
+        assert _pieces(text) == ["`a\nb`"]
+        assert line_roles(text.split("\n")) == [TEXT] * 3
+
+    def test_fence_marker_inside_a_comment_is_not_a_fence(self) -> None:
+        lines = ["<!--", "```", "-->", "text   "]
+        assert line_roles(lines) == [TEXT] * 4
+
     def test_backtick_info_string_may_not_contain_a_backtick(self) -> None:
         assert line_roles(["``` a`b", "x"]) == [TEXT, TEXT]
         assert line_roles(["~~~ a`b", "x"]) == [OPEN, CODE]
@@ -296,6 +329,23 @@ class TestParagraphBlocks:
         text = f"aa\n{long_line}\nbb"
         blocks = paragraph_blocks(text, max_chars=10, min_chars=5)
         assert [b.text for b in blocks] == ["aa", long_line, "bb"]
+
+    def test_bound_counts_the_units_measure_returns(self) -> None:
+        # Each line is five characters but fifteen UTF-8 bytes: a character
+        # bound keeps the paragraph whole, a byte bound splits it so every
+        # block fits.
+        line = "\N{CJK UNIFIED IDEOGRAPH-4E2D}" * 5
+        text = "\n".join([line] * 4)
+        by_chars = paragraph_blocks(text, max_chars=30, min_chars=0)
+        by_bytes = paragraph_blocks(
+            text,
+            max_chars=30,
+            min_chars=0,
+            measure=lambda part: len(part.encode("utf-8")),
+        )
+        assert [b.text for b in by_chars] == [text]
+        assert [b.text for b in by_bytes] == [line] * 4
+        assert all(len(b.text.encode("utf-8")) <= 30 for b in by_bytes)
 
     def test_heading_path_nests_and_resets(self) -> None:
         text = (

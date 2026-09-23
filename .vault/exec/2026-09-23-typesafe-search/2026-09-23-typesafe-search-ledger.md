@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:d439edae81d3d824aa55b87b5d2cf6a19bca716b42a5b0fbeff7fe1c1d078130'
+body_hash: 'sha256:a4553b4bcaba907bc51cf4ad4db5d61a988cb7709ed8558c4574889138851e01'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -240,3 +240,7 @@ related:
 - `S06` `M` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
 - `S06` `A` `src/vaultspec_core/search/_wire.py`
 - `S06` `verify:` `pytest search, mcp search/context/surface, cli search, config` -> `pass`
+- `S01` `M` `src/vaultspec_core/search/_corpus.py`
+- `S01` `M` `src/vaultspec_core/search/_models.py`
+- `S01` `M` `src/vaultspec_core/search/tests/test_corpus.py`
+- `S01` `verify:` `pytest -m repo test_repository_corpus` -> `pass`

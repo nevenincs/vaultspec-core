@@ -240,6 +240,20 @@ class TestBlocks:
         assert all(len(block.text.encode()) <= EXCERPT_BYTES for block in blocks)
         assert sum(b.line_end - b.line_start + 1 for b in blocks) == len(lines)
 
+    def test_a_multibyte_block_fits_the_excerpt_in_bytes(self, tmp_path: Path) -> None:
+        # Three bytes per character: a block bounded in characters would be
+        # about three times the excerpt's byte budget.
+        line = f"The cache key {CJK * 12} is the fingerprint."
+        lines = [line] * (2 * EXCERPT_BYTES // len(line))
+        write_record(tmp_path, "adr", "2026-01-02-cache-adr", "\n".join(lines) + "\n")
+
+        (record,) = load_records(tmp_path)
+        blocks = blocks_of(record)
+
+        assert len(blocks) > 1
+        assert all(len(block.text.encode()) <= EXCERPT_BYTES for block in blocks)
+        assert sum(b.line_end - b.line_start + 1 for b in blocks) == len(lines)
+
     def test_empty_body_has_no_blocks(self, tmp_path: Path) -> None:
         write_record(tmp_path, "plan", "2026-01-02-demo-plan", "")
 

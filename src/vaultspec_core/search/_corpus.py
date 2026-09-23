@@ -364,6 +364,12 @@ def read_version(record: Record) -> RecordVersion | None:
             line_start=block.line_start + offset,
             line_end=block.line_end + offset,
         )
-        for block in paragraph_blocks(split.body, max_chars=EXCERPT_BYTES)
+        # The excerpt is clipped in UTF-8 bytes, so a block bounded in
+        # characters could overrun it and lose its tail.
+        for block in paragraph_blocks(
+            split.body,
+            max_chars=EXCERPT_BYTES,
+            measure=lambda line: len(line.encode("utf-8")),
+        )
     )
     return RecordVersion(blob_hash=git_blob_oid(raw), blocks=blocks)

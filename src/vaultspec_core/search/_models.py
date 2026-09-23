@@ -72,11 +72,11 @@ MAX_RESULTS: Final = SHORTLIST_SIZE + SHORTLIST_LEXICAL
 
 #: UTF-8 bytes of a hit's answering excerpt, kept as whole lines with
 #: ``core.windowing.clip_lines``. Records are cut into blocks of at most this
-#: many characters, so the block the provider picks is the text returned
-#: whole: clipping longer blocks from the top dropped the answer when it closed
-#: the block. Only a single longer line, or multi-byte text, is still clipped.
-#: Bytes, not characters, because the reply budget is measured in bytes: a character
-#: cap let a CJK or emoji excerpt cost three or four times its ASCII size.
+#: many bytes, so the block the provider picks is the text returned whole:
+#: clipping longer blocks from the top dropped the answer when it closed the
+#: block. Only a single line longer than the cap is still clipped. Bytes, not
+#: characters, because the reply budget is measured in bytes: a character cap
+#: let a CJK or emoji excerpt cost three or four times its ASCII size.
 #: Sized with :data:`SUPPORTING_BYTES` against the costliest page: CJK text
 #: one character per line, whose newlines JSON doubles, under five-level
 #: heading paths at every cap. Eleven such hits measured 34,163 reply bytes

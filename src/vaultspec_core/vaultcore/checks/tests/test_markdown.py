@@ -89,6 +89,22 @@ class TestApplyMarkdownHygiene:
         assert cleaned == body.replace("Inner step \n", "Inner step\n")
         assert (stats.trailing_whitespace, stats.blank_runs) == (1, 0)
 
+    def test_fence_under_an_item_holding_a_comment_is_protected(self):
+        # The comment's closing line at column 0 is comment text, not a line
+        # that closes the item, so the fence under the item keeps its code.
+        body = "- item <!--\nnote\n-->\n    ```\n    x   \n\n\n    y\n    ```\n"
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body
+        assert stats.total == 0
+
+    def test_fence_after_a_stray_backtick_is_protected(self):
+        # A lone backtick in prose cannot pair across the fence line, so the
+        # fence's whitespace stays as written.
+        body = "A stray ` backtick.\n\n```\n  x  \n\n\n```\n"
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body
+        assert stats.total == 0
+
     def test_idempotent(self):
         once, _ = apply_markdown_hygiene("a   \n\n\n\nb\n\n\n")
         twice, stats = apply_markdown_hygiene(once)
