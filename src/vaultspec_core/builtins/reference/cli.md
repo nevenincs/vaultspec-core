@@ -45,8 +45,17 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.4`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.2.4`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core vault search`
+
+MCP tools:
+
+- `search`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -77,6 +86,8 @@ hand-edit between the markers.
   round-trip).
 - `vaultspec-core vault rename` - Rename a document's file and re-point incoming related
   references.
+- `vaultspec-core vault search` - Ask the vault a question and read the passages that
+  answer it.
 - `vaultspec-core vault add` - Create a new .vault/ document from a template.
 - `vaultspec-core vault stats` - Show vault statistics and metrics.
 - `vaultspec-core vault list` - List vault documents, optionally filtered by type.

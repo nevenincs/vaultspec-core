@@ -212,7 +212,7 @@ markers.
 
 <!-- vaultspec:generated:begin mcp-tool-inventory -->
 
-The server exposes 10 tools.
+The server exposes 11 tools.
 
 | Tool            | Purpose                                                                                                                                  | Annotations                     |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
@@ -221,6 +221,7 @@ The server exposes 10 tools.
 | `edit`          | Apply one or more body-prose edits to vault documents.                                                                                   | destructive, not idempotent     |
 | `status`        | Orient in a vaultspec project, project-wide or targeted.                                                                                 | read-only, idempotent           |
 | `check`         | Run the vault health-check suite, optionally repairing.                                                                                  | non-destructive, idempotent     |
+| `search`        | Answer a question from the vault, quoting the passage that answers.                                                                      | read-only, idempotent           |
 | `plan_progress` | Mark plan steps closed or open by canonical identifier.                                                                                  | non-destructive, idempotent     |
 | `plan_edit`     | Author plan steps: add, insert, edit, or remove.                                                                                         | destructive, not idempotent     |
 | `log`           | Append one Step's rows to its plan's execution ledger.                                                                                   | non-destructive, idempotent     |
@@ -236,7 +237,10 @@ from the recorded surface of that release, so it empties itself when the next on
 
 <!-- vaultspec:generated:begin unreleased-mcp-surface -->
 
-The latest published release is `0.2.4`, and every tool above is in it.
+The latest published release is `0.2.4`. These tools are on this branch and not in that
+release, so a host installing the published server will not see them:
+
+- `search`
 
 <!-- vaultspec:generated:end unreleased-mcp-surface -->
 
