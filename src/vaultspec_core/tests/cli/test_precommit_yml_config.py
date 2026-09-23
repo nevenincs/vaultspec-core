@@ -127,8 +127,9 @@ class TestMigrateRemoveYaml:
     def test_declined_leftovers_of_both_spellings_are_removed(
         self, tmp_path: Path
     ) -> None:
-        (tmp_path / _YAML).write_text(_FOREIGN, encoding="utf-8")
-        (tmp_path / _YML).write_text(_FOREIGN, encoding="utf-8")
+        # Each spelling carries only vaultspec's hooks, so each is removed.
+        scaffold_precommit(tmp_path)
+        (tmp_path / _YML).write_bytes((tmp_path / _YAML).read_bytes())
         _decline(tmp_path)
 
         result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)

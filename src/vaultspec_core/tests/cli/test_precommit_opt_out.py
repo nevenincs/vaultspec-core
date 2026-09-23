@@ -374,9 +374,9 @@ class TestMigrateHonoursTheDecline:
         from vaultspec_core.tests.cli.conftest import run_vaultspec
 
         root = _bare_workspace(factory.root)
+        scaffold_precommit(root)
         _decline(root)
         _hookless_prek(root)
-        (root / _CONFIG).write_text("repos: []\n", encoding="utf-8")
         before = (root / "prek.toml").read_bytes()
 
         result = run_vaultspec(
@@ -399,14 +399,54 @@ class TestMigrateHonoursTheDecline:
     def test_dry_run_keeps_the_leftover(self, tmp_path: Path) -> None:
         from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
 
+        scaffold_precommit(tmp_path)
         _decline(tmp_path)
-        (tmp_path / _CONFIG).write_text("repos: []\n", encoding="utf-8")
+        before = (tmp_path / _CONFIG).read_bytes()
 
         result = migrate_hooks_to_prek(tmp_path, dry_run=True, remove_yaml=True)
 
         assert result.status == "declined"
         assert result.yaml_removed is True
-        assert (tmp_path / _CONFIG).exists()
+        assert (tmp_path / _CONFIG).read_bytes() == before
+
+    def test_remove_yaml_keeps_the_operators_own_hooks(self, tmp_path: Path) -> None:
+        """Declining refuses vaultspec's hooks, not the operator's.
+
+        With no prek.toml the YAML may still be the config the hook runner
+        reads, so deleting it would silently drop the operator's own gates.
+        """
+        import yaml
+
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        (tmp_path / _CONFIG).write_text(
+            "repos:\n- repo: local\n  hooks:\n"
+            "  - id: ruff\n    entry: ruff check\n    language: system\n",
+            encoding="utf-8",
+        )
+        scaffold_precommit(tmp_path)
+        _decline(tmp_path)
+
+        result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)
+
+        assert result.status == "declined"
+        assert result.yaml_removed is False
+        data = yaml.safe_load((tmp_path / _CONFIG).read_text(encoding="utf-8"))
+        ids = [h["id"] for r in data["repos"] for h in r["hooks"]]
+        assert ids == ["ruff"]
+
+    def test_remove_yaml_leaves_a_config_without_vaultspec_hooks(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        (tmp_path / _CONFIG).write_text("repos: []\n", encoding="utf-8")
+        _decline(tmp_path)
+
+        result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)
+
+        assert result.yaml_removed is False
+        assert (tmp_path / _CONFIG).read_text(encoding="utf-8") == "repos: []\n"
 
 
 class TestConfigLockSentinel:

@@ -320,6 +320,42 @@ def _replace_or_append_block(raw: str, block: str) -> str:
     return raw + separator + block
 
 
+def _strip_declined_leftovers(
+    target: Path, detail: str, *, dry_run: bool
+) -> PrekMigrationResult:
+    """Remove vaultspec's hooks from a declined workspace's YAML configs.
+
+    Only vaultspec-managed hooks are removed, exactly as uninstall removes
+    them: a config left with nothing else is deleted, and one that still
+    carries the operator's own hooks is rewritten without ours and kept. The
+    declaration refused vaultspec's hooks, not the operator's, and with no
+    ``prek.toml`` the YAML may still be the config the hook runner reads.
+    """
+    from .precommit import managed_strip_outcome, strip_managed_precommit_hooks
+
+    removed: list[str] = []
+    stripped: list[str] = []
+    for config in existing_precommit_configs(target):
+        outcome = managed_strip_outcome(config)
+        if outcome == "unchanged":
+            continue
+        if not dry_run:
+            strip_managed_precommit_hooks(config)
+        (removed if outcome == "delete" else stripped).append(config.name)
+
+    notes = [detail]
+    if removed:
+        notes.append(f"removed leftover {', '.join(removed)}")
+    if stripped:
+        notes.append(
+            f"removed vaultspec hooks from {', '.join(stripped)} and kept the "
+            "operator's own hooks"
+        )
+    return PrekMigrationResult(
+        status="declined", detail="; ".join(notes), yaml_removed=bool(removed)
+    )
+
+
 def migrate_hooks_to_prek(
     target: Path,
     *,
@@ -340,9 +376,9 @@ def migrate_hooks_to_prek(
 
     A workspace whose committed declaration sets ``hooks.pre_commit`` to
     ``false`` has refused the hooks, so nothing is transplanted and the
-    status is ``declined``. ``remove_yaml`` still deletes any leftover YAML
-    hook config in that state: the declaration already says the file is
-    unwanted, and the operator asked for the removal.
+    status is ``declined``. ``remove_yaml`` then removes vaultspec's hooks
+    from any leftover YAML config, deleting the file only when nothing else
+    is left in it.
 
     Args:
         target: Workspace root directory.
@@ -352,10 +388,11 @@ def migrate_hooks_to_prek(
         remove_yaml: Also delete every superseded YAML hook config
             (``.pre-commit-config.yaml`` and ``.pre-commit-config.yml``)
             once the canonical hooks are verifiably present in
-            ``prek.toml``, or when the workspace declined the hooks.
-            Deletion is refused in every other state; prek silently ignores
-            the YAML, so leaving it is safe and removing it is a tidiness
-            action, never a repair.
+            ``prek.toml``. In a declined workspace only vaultspec's hooks are
+            removed, and the file only when nothing else remains. Deletion is
+            refused in every other state; prek silently ignores the YAML, so
+            leaving it is safe and removing it is a tidiness action, never a
+            repair.
 
     Returns:
         A :class:`PrekMigrationResult` describing what happened.
@@ -371,17 +408,8 @@ def migrate_hooks_to_prek(
             "transplanted (run 'vaultspec-core spec precommit enable' to "
             "restore them)"
         )
-        leftovers = existing_precommit_configs(target)
-        if remove_yaml and leftovers:
-            if not dry_run:
-                for leftover in leftovers:
-                    leftover.unlink()
-            names = ", ".join(p.name for p in leftovers)
-            return PrekMigrationResult(
-                status="declined",
-                detail=f"{detail}; removed leftover {names}",
-                yaml_removed=True,
-            )
+        if remove_yaml:
+            return _strip_declined_leftovers(target, detail, dry_run=dry_run)
         return PrekMigrationResult(status="declined", detail=detail)
 
     if mode is None:

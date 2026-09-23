@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:b618795e4864464569449aa6716b7514789584bcad9a5bbeeef6f1aee75ffeac'
+body_hash: 'sha256:19291c4c4b6da5fdce743c5d89b1f236afe94b700756282a813a8e5b03cdaaa5'
 ---
 
 # `commit-gate` plan
@@ -37,15 +37,15 @@ Issues addressed:
 
 ## Steps
 
-- [x] `S03` - stop dev init from installing a commit hook, and correct the contributor docs that describe the retired whole-vault and annotation-cleanup hooks; `dev/init/hooks.py, dev/init/plan.py, dev/init/README.md, justfile, docs/framework.md, docs/syntax.md`.
+- [ ] `S03` - stop dev init from installing a commit hook, and correct the contributor docs that describe the retired whole-vault and annotation-cleanup hooks; `dev/init/hooks.py, dev/init/plan.py, dev/init/README.md, justfile, docs/framework.md, docs/syntax.md`.
 - [x] `S01` - apply the authorized amendment retiring the canonical sanitize-hook clause; `.vault/adr/2026-05-15-template-annotation-sanitization-adr.md`.
 - [x] `S04` - resolve the hook config in prek order, adding .pre-commit-config.yml, across scaffold, boundary, migrate, collector, gitignore lock subjects and uninstall; `src/vaultspec_core/core/precommit.py, prek_boundary.py, diagnosis/collectors_precommit.py, gitignore.py, uninstall.py`.
-- [x] `S05` - narrow the provider guard to per-machine artifacts derived from the managed-ignore source, with unstage-only remediation; `src/vaultspec_core/core/git_artifacts.py, src/vaultspec_core/cli/root_doctor.py`.
+- [ ] `S05` - narrow the provider guard to per-machine artifacts derived from the managed-ignore source, with unstage-only remediation; `src/vaultspec_core/core/git_artifacts.py, src/vaultspec_core/cli/root_doctor.py`.
 - [x] `S06` - build the staged-document check runner: per-document checkers over passed paths, related-link resolution against a name listing, and a subset-safety test per admitted checker; `src/vaultspec_core/vaultcore/checks/staged.py (new)`.
-- [x] `S02` - attribute blocking findings against each staged document's HEAD version, so only introduced errors block; `src/vaultspec_core/vaultcore/checks/staged.py`.
-- [x] `S07` - add the read-only commit-gate verb running the staged runner and the provider guard in one process, with file-scoped output and no mutating hints; `src/vaultspec_core/cli/root.py and a new cli verb module`.
-- [x] `S08` - make vaultspec-commit-gate the one canonical hook, retire vault-fix, spec-check and check-provider-artifacts, and extend the read-only guard to the new entry and its output; `src/vaultspec_core/core/enums.py, src/vaultspec_core/core/precommit.py, .pre-commit-config.yaml, dev/guards/test_automation_contracts.py`.
-- [x] `S09` - document the gate and the CI home of corpus checks, regenerate the CLI reference, and record before and after commit timings on the core vault and the 30k corpus; `docs/, src/vaultspec_core/builtins/reference/`.
+- [ ] `S02` - attribute blocking findings against each staged document's HEAD version, so only introduced errors block; `src/vaultspec_core/vaultcore/checks/staged.py`.
+- [ ] `S07` - add the read-only commit-gate verb running the staged runner and the provider guard in one process, with file-scoped output and no mutating hints; `src/vaultspec_core/cli/root.py and a new cli verb module`.
+- [ ] `S08` - make vaultspec-commit-gate the one canonical hook, retire vault-fix, spec-check and check-provider-artifacts, and extend the read-only guard to the new entry and its output; `src/vaultspec_core/core/enums.py, src/vaultspec_core/core/precommit.py, .pre-commit-config.yaml, dev/guards/test_automation_contracts.py`.
+- [ ] `S09` - document the gate and the CI home of corpus checks, regenerate the CLI reference, and record before and after commit timings on the core vault and the 30k corpus; `docs/, src/vaultspec_core/builtins/reference/`.
 
 ## Parallelization
 

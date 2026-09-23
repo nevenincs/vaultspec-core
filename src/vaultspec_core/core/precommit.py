@@ -12,7 +12,7 @@ import io
 import logging
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from ruamel.yaml import YAML, YAMLError
 
@@ -43,6 +43,7 @@ __all__ = [
     "canonical_precommit_hooks_for_mode",
     "entry_prefix_for_mode",
     "hook_defs_for_mode",
+    "managed_strip_outcome",
     "scaffold_precommit",
     "strip_managed_precommit_hooks",
 ]
@@ -265,6 +266,32 @@ def _drop_managed_hook_entries(repos: list[Any]) -> bool:
         if not hooks:
             repos.remove(r)
     return changed
+
+
+def managed_strip_outcome(
+    config_file: Path,
+) -> Literal["delete", "rewrite", "unchanged"]:
+    """Report what :func:`strip_managed_precommit_hooks` would do, writing nothing.
+
+    Returns:
+        ``"delete"`` when only managed hooks (and nothing else) would remain to
+        remove, ``"rewrite"`` when managed hooks would be stripped and other
+        content kept, and ``"unchanged"`` when there is nothing managed to
+        strip or the file cannot be read.
+    """
+    handler = _precommit_yaml()
+    try:
+        data = _as_mapping(handler.load(config_file.read_text(encoding="utf-8")))
+    except (YAMLError, OSError, UnicodeDecodeError):
+        return "unchanged"
+    if data is None:
+        return "unchanged"
+    repos = _as_list(data.get("repos", []))
+    if repos is None or not _drop_managed_hook_entries(repos):
+        return "unchanged"
+    if repos or len(data) > 1:
+        return "rewrite"
+    return "delete"
 
 
 def strip_managed_precommit_hooks(config_file: Path) -> bool:
