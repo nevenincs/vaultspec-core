@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:98125bc797203927307dcda89dc4ea317457ffcd2a04f3a06baefc3ba7a0b8d1'
+body_hash: 'sha256:e352daae968c57c7eb842ec371b75839a07946b95124bf8f9501b2cdeb2e96a9'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -225,3 +225,9 @@ related:
 - `S11` `verify:` `rename-and-edit load test 40 serial runs` -> `pass`
 - `S05` `M` `.vault/research/2026-09-23-typesafe-search-research.md`
 - `S05` `verify:` `run_product_eval live: excerpt 19/21 dev, 12/18 held-out` -> `pass`
+- `S09` `M` `justfile`
+- `S09` `M` `.github/workflows/merge-gate.yml`
+- `S09` `M` `.github/workflows/release.yml`
+- `S09` `M` `.github/workflows/main-health.yml`
+- `S09` `M` `dev/guards/test_ci_check_shape.py`
+- `S09` `verify:` `just check-workflow` -> `pass`
