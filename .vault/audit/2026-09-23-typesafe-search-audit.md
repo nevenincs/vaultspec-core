@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:3c1a0cc92c10aa7061cc63c4f5735393e7ea4ac63dbe390218636d56b6c5f79b'
+body_hash: 'sha256:6310468714b54eb645cf2a77eadcd54e67b9b59de5f77af95df1f6da8a296715'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -425,6 +425,144 @@ are terminal-only, so wire parity holds.
 takes `--feature` and `--date` and `vault list` takes `--feature`. The amendment asks
 only for types, so this conforms.
 
+### discovery-fallback-rereview | low | The fix round resolves both high findings and every medium and low one; result PASS
+
+The re-review covered commits `1b536b3b`, `03959c68`, `10a18f38`, `571a188c`,
+`080df9e6`, `293f3beb` and `26d590bd` against the plan-close findings above, the
+discovery-fallback amendment of `2026-09-23-typesafe-search-adr`, and the envelope and
+tool-schema decisions (`2026-08-23-envelope-optimization-adr`,
+`2026-07-09-mcp-tool-schema-adr`). It re-traced only changed behavior: the result-schema
+change through every tool that publishes it, the wording module into both search
+surfaces, the next-step filters into the command, the note writer against mdformat, the
+verify flag through the backend, CLI and MCP, and the rewritten builtins against their
+`.vaultspec/` copies.
+
+Result: `PASS`. No critical or high finding is open. There are 2 medium and 4 low
+findings below.
+
+Gates, run on a clean export of `26d590bd` so peer sessions' uncommitted work was
+excluded:
+
+- pytest over `search`, `mcp_server` (including the tool-size guard in
+  `test_context_budget.py`), the CLI status, vault search, exec and reference tests, the
+  vaultcore exec ledger, fold and recovery tests, `test_discovery_guidance` and
+  `dev/guards`: 886 passed.
+- `just check-markdown`: 3 ok, run on the worktree, whose Markdown matched `HEAD`.
+- `just check-type-strict`: 0 errors over 701 files.
+
+Resolved, with evidence:
+
+- **docs-bare-commands.** `1b536b3b` spells the entry point in `README.md`,
+  `docs/framework.md` and `docs/MCP.md`, and `dev/guards` passes.
+- **ledger-note-escaping.** `format_note`
+  (`src/vaultspec_core/vaultcore/exec_ledger.py:296`) sets any word holding a
+  markdown-significant character as a code span in mdformat's own form. A probe of 20
+  notes found each one idempotent under re-rendering and accepted by mdformat. The inputs
+  included private paths, `*`, `<`, `&`, `~~`, links, unbalanced and doubled backticks,
+  and backslashes. Existing ledgers are never re-rendered on append (`exec_log.py:325`),
+  so they cannot churn. `check-markdown` passes.
+- **status-companion-parity.** MCP `status` now spreads `discovery_fields` from
+  `discovery_capability` (`src/vaultspec_core/mcp_server/tools/orientation.py:310`).
+  This matches the amendment's thin-surfaces bullet, so no ADR amendment is needed.
+  `test_search_tool.py` holds both status surfaces' keys equal on a provisioned
+  workspace.
+- **status-companion-prose.** `_companion_line`
+  (`src/vaultspec_core/cli/status_cmd.py:252`) states provisioning only.
+- **verdict-vocabulary.** The discovery rule and the ADR skill quote each negative
+  verdict with its wire value. `test_discovery_guidance.py:189,197` reads the builtin
+  text against `SearchVerdict`, so a reworded sentence fails the guard. The guard is not
+  tautological.
+- **surface-wording.** `src/vaultspec_core/search/_wording.py` is the one home for
+  outcome labels, the unscored note, the premise note and `NO_PASSAGE`. The CLI and MCP
+  summary import them. What remains in `cli/vault_search_cmd.py` is layout: the hit
+  header, the `also` locator line and styles. It carries no outcome wording.
+- **next-step-scope.** `_scope_flags` (`src/vaultspec_core/search/_remediation.py:68`)
+  admits a feature only through `normalize_feature_tag`, which requires kebab-case, and a
+  date only as `normalize_vault_date` re-renders it in `yyyy-mm-dd` form. Neither can
+  place arbitrary text in the command. A malformed filter is dropped, and
+  `test_a_malformed_filter_never_reaches_the_command` covers the drop. `vault list` takes
+  both flags through the shared `DateFilterOption`, and `vaultspec-rag search --help`
+  lists `--feature` and `--date`.
+
+Verified to hold:
+
+- **Result schemas.** `_collapse_nullable`
+  (`src/vaultspec_core/mcp_server/envelope.py:330`) reaches only `LeanResult` and
+  `LeanShape`, so it changes only the `status`, `check` and `search` schemas.
+  Every other tool's schema is unchanged. Synthetic replies with every nullable field
+  null or omitted were built through `_structured` and validated with Draft 2020-12
+  against each tool's published schema: status rollup and trace, `check` with a pathless
+  finding, and search `ok`, `not_configured` and `unavailable`. All 8 validate. Required
+  nullable keys (`next_open_step`, `latest_activity`, `record_stem`, `CheckFinding.path`,
+  and `CompanionCapability.mode` and `version`) keep `null`. The in-memory MCP client in
+  the tool tests also validates each reply against its output schema. Both ceilings were
+  lowered, not raised, as the envelope ADR's ratchet requires.
+- **Builtins.** No builtin gates on `status` or runtime state. The `.vaultspec/` copies
+  of all ten touched files equal the builtins at `26d590bd`.
+- **Boundaries.** The fix round's code and tests cite no vault record. They add no
+  suppressions, skips or mocks.
+
+### log-verify-parity | medium | MCP log takes one verify per call while the CLI flag is repeatable
+
+`LogRequest.verify` (`src/vaultspec_core/vaultcore/exec_log.py:76`) holds a tuple, and
+`vault exec log --verify` (`src/vaultspec_core/cli/exec_cmd.py:245`) is repeatable.
+MCP `log` still takes `verify: str | None`
+(`src/vaultspec_core/mcp_server/tools/exec.py:93,128`), although `rows` and `notes` on
+the same tool are lists. An agent can reach the same ledger with one call per check,
+because appends are idempotent. The capability is therefore reachable, but the two
+surfaces take different shapes. That breaks the user's parity mandate. The exception is
+recorded only in the S07 ledger note, which is not a home for decisions. The
+status-companion-parity finding was closed the same way.
+
+### adr-listing-exemption | medium | The discovery rule exempts approved plans from the ADR listing the amendment keeps mandatory
+
+`src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md:25` (`10a18f38`) says
+that under an approved plan the plan's linked decisions satisfy the decision listing.
+The amendment's "ADR listing stays" bullet
+(`.vault/adr/2026-09-23-typesafe-search-adr.md:231`) keeps the listing mandatory beside
+search until hosted-search recall is measured. It grants no exemption. The change was a
+friction fix outside the first review's recommendations, and the rule now relaxes an
+accepted decision's term without an amendment.
+
+### listing-dedup-scope | low | Running a declined search's listing once as step 4 can narrow the decision listing
+
+The rule (`vaultspec-discovery.builtin.md:42`) merges a declined search's
+`vaultspec-core vault list` next step with step 4 ("run it once"). Since `080df9e6`,
+that next step carries the request's types, `--feature` and `--date`
+(`_remediation.py:88`). A declined `--type research --feature x` search then names
+`vaultspec-core vault list research --feature x`. Run once as step 4, it replaces the
+all-feature `vault list adr` that step 4 requires. Two fixes, each Step-local, interact.
+
+### companion-null-vs-absent | low | A failed companion probe is null on the CLI but an omitted key on MCP
+
+`discovery_fields` (`src/vaultspec_core/search/_capability.py:115`) yields
+`"companion": None`. CLI `status --json` sends it as null. The MCP envelope prunes the
+optional null, and its schema now publishes no null branch. `docs/MCP.md:690` says the
+tool returns `null`. `test_status_rollup_carries_the_backend_discovery_record`
+(`mcp_server/tests/test_orientation_tools.py:109`) reads keys with `payload.get`, so the
+test cannot tell an absent key from a null one. This affects only the probe-failure
+path.
+
+### schema-null-invariant | low | Schema omissibility and null pruning are derived separately with no guard tying them
+
+The schema drops a null branch when the key is not in the schema's `required`
+(`envelope.py:206`). The wire prunes a null when the field is not `is_required()`
+(`envelope.py:414`), and only on models it reaches through lists or directly. No result
+model today is aliased or nested in a dict or dataclass, so every current reply
+validates. A future model that is aliased or nested that way would publish no null
+branch and still send null. Schema-validating hosts would then refuse the reply, and no
+test would notice first.
+
+### ledger-hand-repair | low | The existing S03 ledger note was repaired by hand, not through the writer
+
+`1b536b3b` hand-escaped `search/\_models.py` and `search/\_credential.py` in the
+machine-owned ledger
+(`.vault/exec/2026-09-23-discovery-fallback/2026-09-23-discovery-fallback-ledger.md:142`).
+The recommendation named the writer or `vault check --fix`. The line passes the gate. If
+it were ever re-rendered through `format_note`, as `exec_fold.py:215` re-renders notes,
+the backslashes would become literal characters inside a code span. No path re-renders
+this ledger today, so nothing else is needed.
+
 ## Recommendations
 
 - credential-gate: also require that the running interpreter is the workspace's own
@@ -491,3 +629,20 @@ only for types, so this conforms.
   unscored sentences beside `SearchVerdict.sentence`. No new decision is needed.
 - next-step-scope: carry the feature filter, and the date filter for rag, into
   `NextStep.command`. No new decision is needed.
+- log-verify-parity: make MCP `log` take `verify: list[str] | None`, as it takes `rows`
+  and `notes`, and pay for the schema bytes within the ratchet. If the budget cannot
+  absorb that, record the single-verify exception in the governing ADR with user
+  authorization. The in-scope owner is S07, which touched `mcp_server/tools/exec.py`. No
+  new decision is needed for the list form.
+- adr-listing-exemption: either drop the approved-plan exemption from the discovery rule
+  and sync, or amend the "ADR listing stays" bullet of `2026-09-23-typesafe-search-adr`
+  to grant it. The amendment needs user authorization. Owner: S04.
+- listing-dedup-scope: limit the "run it once" merge to a next step that lists `adr` with
+  no feature or date filter, or drop the merge. Owner: S04.
+- companion-null-vs-absent: correct `docs/MCP.md` to say the key is omitted when the
+  probe failed, or send the same representation on both surfaces. Make the parity test
+  compare key presence. Owner: S01 and S05.
+- schema-null-invariant: add a guard that builds each `LeanResult` with every nullable
+  field `None`, passes it through `_structured`, and validates it against the tool's
+  published schema. Owner: S01. No new decision is needed.
+- ledger-hand-repair: record only; no action.
