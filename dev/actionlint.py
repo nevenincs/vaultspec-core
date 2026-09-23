@@ -77,7 +77,9 @@ ARCHIVES: dict[tuple[str, str], tuple[str, str]] = {
     ),
 }
 
-BASE_URL = "https://github.com/rhysd/actionlint/releases/download"
+#: The release artefact path under the download host, which `_download` joins
+#: to a literal `https://` origin.
+RELEASE_PATH = "rhysd/actionlint/releases/download"
 
 #: Exit codes, from `dev/EXIT-CODES.md`: 0 OK, 1 FAILED, 127 TOOL_MISSING.
 OK = 0
@@ -112,9 +114,15 @@ def _cache_root() -> Path:
     return Path.cwd() / ".venv" / "tools" / "actionlint" / VERSION
 
 
-def _download(url: str, into: Path) -> None:
-    """Fetch `url` to `into`, failing loudly rather than partially."""
-    with urllib.request.urlopen(url, timeout=120) as response:
+def _download(path: str, into: Path) -> None:
+    """Fetch one release artefact to `into`, failing loudly rather than partially.
+
+    The caller passes a PATH, never a URL, and the scheme and host are written
+    here as literal text. That is the whole scheme control: a variable URL can
+    carry `file:` or any other scheme urlopen happens to handle, and this way
+    the only reachable origin is the one this line spells out.
+    """
+    with urllib.request.urlopen(f"https://github.com/{path}", timeout=120) as response:
         into.write_bytes(response.read())
 
 
@@ -160,17 +168,40 @@ def _extract_member(archive: Path, suffix: str, destination: Path) -> None:
             destination.write_bytes(extracted.read())
 
 
-def ensure() -> Path:
-    """Return a verified actionlint executable, downloading it once if needed.
+def find() -> Path | None:
+    """Return an actionlint already available here, without provisioning one.
 
-    An actionlint already on PATH is used as-is. That is deliberate: a
-    developer who installed it with their package manager should not have a
-    second copy downloaded behind their back, and the version skew that
-    creates is visible in the report actionlint prints.
+    This is what the CHECK path asks, and the distinction is the contract: the
+    workflow check verifies workflows and changes nothing, so a missing
+    executable is a refusal naming the provisioning command, never a download
+    nobody asked for. A check that quietly fetches a binary is a check
+    that behaves differently the first time it runs.
+
+    An actionlint on PATH wins over the provisioned copy: a developer who
+    installed it with their package manager should not have a second copy used
+    behind their back, and the version skew that creates is visible in the
+    report actionlint prints.
     """
     on_path = shutil.which("actionlint")
     if on_path:
         return Path(on_path)
+    key = _platform_key()
+    if key not in ARCHIVES:
+        return None
+    binary = _cache_root() / ("actionlint.exe" if key[0] == "windows" else "actionlint")
+    return binary if binary.is_file() else None
+
+
+def ensure() -> Path:
+    """Return a verified actionlint executable, downloading it once if needed.
+
+    Provisioning, not checking: reached through ``--install``, which the
+    repository's tool setup runs to install the pinned version. The check path
+    uses :func:`find` and refuses instead.
+    """
+    available = find()
+    if available is not None:
+        return available
 
     key = _platform_key()
     if key not in ARCHIVES:
@@ -188,10 +219,10 @@ def ensure() -> Path:
         return binary
 
     root.mkdir(parents=True, exist_ok=True)
-    url = f"{BASE_URL}/v{VERSION}/actionlint_{VERSION}_{suffix}"
+    artefact = f"{RELEASE_PATH}/v{VERSION}/actionlint_{VERSION}_{suffix}"
     with tempfile.TemporaryDirectory() as scratch:
         archive = Path(scratch) / suffix
-        _download(url, archive)
+        _download(artefact, archive)
         _verify(archive, expected)
         # ONE member, written to a path this function chose. Not
         # `extractall`: an archive names its own paths, and honouring them is
@@ -207,21 +238,51 @@ def ensure() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run actionlint over the repository's workflows."""
+    """Run actionlint over the repository's workflows, or provision it.
+
+    ``--install`` is the provisioning entry point the repository's tool setup
+    runs; every other invocation is the read-only check, which refuses rather
+    than downloading. Remaining arguments are actionlint's own.
+    """
     args = list(sys.argv[1:] if argv is None else argv)
-    try:
-        binary = ensure()
-    except SystemExit as failure:
-        print(str(failure), file=sys.stderr)
-        return TOOL_MISSING
-    except OSError as failure:
-        print(f"could not provision actionlint: {failure}", file=sys.stderr)
+    if "--install" in args:
+        try:
+            binary = ensure()
+        except SystemExit as failure:
+            print(str(failure), file=sys.stderr)
+            return TOOL_MISSING
+        except OSError as failure:
+            print(f"could not provision actionlint: {failure}", file=sys.stderr)
+            return TOOL_MISSING
+        print(f"actionlint {VERSION} available at {binary}")
+        return OK
+
+    binary = find()
+    if binary is None:
+        print(
+            "actionlint is not available, so workflows cannot be checked. This check "
+            f"installs nothing: provision the pinned version ({VERSION}) with "
+            "`python -m dev.actionlint --install`, which the repository's tool setup "
+            "runs, or put actionlint on PATH.",
+            file=sys.stderr,
+        )
         return TOOL_MISSING
     # shellcheck and pyflakes are disabled EXPLICITLY rather than left to
     # whether a runner happens to carry them. actionlint silently skips a
     # missing external linter, so leaving them implicit means the gate checks
     # a different set of things on every machine and nobody can tell which.
-    command = [str(binary), "-no-color", "-shellcheck=", "-pyflakes=", *args]
+    # Runner labels are provisioned by infrastructure outside this codebase.
+    # Keep actionlint's workflow parsing and all code-owned checks without
+    # turning this project into a registry for fleet topology.
+    command = [
+        str(binary),
+        "-no-color",
+        "-shellcheck=",
+        "-pyflakes=",
+        "-ignore",
+        'label ".+" is unknown',
+        *args,
+    ]
     return subprocess.call(command)
 
 
