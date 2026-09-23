@@ -240,10 +240,13 @@ def cmd_exec_log(
         ),
     ] = None,
     verify: Annotated[
-        str | None,
+        list[str] | None,
         typer.Option(
             "--verify",
-            help="Check that was run, as '<command>=pass' or '<command>=fail'",
+            help=(
+                "Check that was run, as '<command>=pass' or '<command>=fail'; "
+                "repeatable"
+            ),
         ),
     ] = None,
     by: Annotated[
@@ -271,8 +274,9 @@ def cmd_exec_log(
     Creates the ledger on first use, so an executor logging its first Step
     never has to know whether the document exists yet. The ledger is
     append-only: existing rows are never rewritten, and re-logging the same
-    row is idempotent rather than duplicating it. ``--verify`` and ``--by``
-    add one row each; ``--note`` adds a ``## Notes`` line under the Step id.
+    row is idempotent rather than duplicating it. Each ``--verify`` adds a
+    row, ``--by`` adds one, and each ``--note`` adds a ``## Notes`` line
+    under the Step id.
     """
     apply_target(target, json_output=json_output)
     from vaultspec_core.cli import _add_ops
@@ -283,7 +287,7 @@ def cmd_exec_log(
     console = get_console()
     root_dir = _get_ctx().root_dir
     rows = _add_ops.parse_row_specs(console, row or [])
-    verify_pair = _add_ops.parse_verify(console, verify)
+    verify_pairs = _add_ops.parse_verify(console, verify or [])
 
     try:
         outcome = _add_ops.log_ledger_rows(
@@ -293,7 +297,7 @@ def cmd_exec_log(
             plan_stem=related,
             step=step,
             rows=rows,
-            verify=verify_pair,
+            verify=verify_pairs,
             by=by,
             notes=note or [],
             dry_run=dry_run,

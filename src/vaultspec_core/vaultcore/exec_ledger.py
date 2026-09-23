@@ -26,7 +26,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .markdown import HTML_COMMENT_RE, find_section
+from .markdown import HTML_COMMENT_RE, INLINE_CODE_RE, find_section
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -92,6 +92,18 @@ _NOTES = "Notes"
 _NOTE_RE = re.compile(
     r"^[ \t]*[-*][ \t]+`(?P<step>S\d{1,4})`[ \t]*(?P<text>.*?)[ \t]*$"
 )
+
+#: Characters mdformat rewrites in plain inline text: it escapes each where
+#: it could open emphasis, a link, raw HTML, a code span, a character
+#: reference or a strikethrough, and the backslash that is an escape itself.
+_MARKDOWN_SIGNIFICANT = frozenset("\\*_[]<&~`")
+
+#: One word of a note: a run of non-space characters and code spans, a span
+#: kept whole even when it holds a space.
+_NOTE_WORD_RE = re.compile(rf"(?:{INLINE_CODE_RE.pattern}|\S)+", re.DOTALL)
+
+#: A run of backticks inside a code span's content.
+_BACKTICK_RUN_RE = re.compile(r"`+")
 
 
 @dataclass(frozen=True)
@@ -282,8 +294,60 @@ def format_row(step_id: str, op: str, *paths: str) -> str:
 
 
 def format_note(step_id: str, text: str) -> str:
-    """Render one ``## Notes`` line for *step_id*."""
-    return f"- `{step_id}` {' '.join(text.split())}"
+    """Render one ``## Notes`` line for *step_id*.
+
+    Whitespace collapses to single spaces, and the line reads back as the
+    text was written without any hand escaping. A word holding a character
+    markdown would take as syntax - the ``_`` of a private module's path, a
+    ``*``, a ``<`` - is set as inline code, as the ledger sets every path in
+    its rows; code spans the text already has are kept. Every span is
+    written in mdformat's own form, so the line passes the markdown check
+    and rendering an already rendered note changes nothing.
+
+    Args:
+        step_id: The Step the note belongs to.
+        text: The note, as plain text with optional code spans.
+
+    Returns:
+        The note line, without a trailing newline.
+    """
+    words = _NOTE_WORD_RE.finditer(" ".join(text.split()))
+    return f"- `{step_id}` {' '.join(_inert_word(m.group()) for m in words)}"
+
+
+def _inert_word(word: str) -> str:
+    """Render one note word so markdown reads it back as written."""
+    if _MARKDOWN_SIGNIFICANT.isdisjoint(INLINE_CODE_RE.sub("", word)):
+        return INLINE_CODE_RE.sub(lambda span: _code_span(_span_content(span)), word)
+    return _code_span(INLINE_CODE_RE.sub(_span_content, word))
+
+
+def _span_content(span: re.Match[str]) -> str:
+    """Return a matched code span's content as CommonMark reads it.
+
+    One space is stripped from each end when both ends have one and the
+    content is not all spaces: that pair only pads the span.
+    """
+    content = span.group(2)
+    if content.startswith(" ") and content.endswith(" ") and content.strip():
+        return content[1:-1]
+    return content
+
+
+def _code_span(content: str) -> str:
+    """Write *content* as a code span in the form mdformat writes one.
+
+    The fence is one backtick longer than the longest run inside, padded by
+    a space on each side when there is a run, so the content's own backticks
+    neither close the span nor merge with its fence.
+    """
+    longest = max(map(len, _BACKTICK_RUN_RE.findall(content)), default=0)
+    if longest:
+        fence = "`" * (longest + 1)
+        return f"{fence} {content} {fence}"
+    if content.startswith(" ") and content.endswith(" ") and content.strip():
+        return f"` {content} `"
+    return f"`{content}`"
 
 
 def note_lines(body: str) -> tuple[tuple[str | None, str], ...]:

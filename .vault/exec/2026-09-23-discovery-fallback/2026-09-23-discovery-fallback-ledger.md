@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:017becb1b8cfeb7ad9bf2cb4006458789521421c3afaca29d41616bb94827dc8'
+body_hash: 'sha256:1b063c8285bf630d7012600720c0fbdb53567949a479c1e80fe6c150f66f85ba'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -119,6 +119,17 @@ related:
 - `S01` `M` `src/vaultspec_core/mcp_server/tests/test_orientation_tools.py`
 - `S01` `verify:` `just check-python check-type check-type-strict check-size check-complexity check-nesting check-markdown` -> `pass`
 - `S01` `verify:` `pytest mcp_server search cli/test_vault_status cli/test_vault_search_cmd cli reference drift dev/guards` -> `pass`
+- `S07` `M` `src/vaultspec_core/vaultcore/exec_ledger.py`
+- `S07` `M` `src/vaultspec_core/vaultcore/exec_log.py`
+- `S07` `M` `src/vaultspec_core/vaultcore/tests/test_exec_ledger.py`
+- `S07` `M` `src/vaultspec_core/cli/exec_cmd.py`
+- `S07` `M` `src/vaultspec_core/cli/_add_ops.py`
+- `S07` `M` `src/vaultspec_core/mcp_server/tools/exec.py`
+- `S07` `M` `src/vaultspec_core/tests/cli/test_exec_ledger_cli.py`
+- `S07` `verify:` `just check-python check-type check-type-strict check-size check-complexity check-nesting check-markdown` -> `pass`
+- `S07` `verify:` `vault check all` -> `pass`
+- `S07` `verify:` `pytest test_exec_ledger test_exec_fold test_exec_recovery cli/test_exec_ledger_cli cli/test_ledger_merge cli/test_step_aware_exec mcp test_log_tool test_context_budget` -> `pass`
+- `S07` `by:` `opus-high`
 
 ## Notes
 
@@ -126,3 +137,4 @@ related:
 - `S02` Builtins touched only to swap the routing sentence for the new constant; the S04 rewrite owns their prose. SEARCH_ADR removed: no builtin or backend offers the rag ADR search any more
 - `S03` Whole-tree check-python and check-type fail only in the concurrent env-var centralisation lane (search tests, CredentialSource import in search/\_models.py, deleted search/\_credential.py); none in S03 files
 - `S04` S04 dev/guards test_cli_language_contract fails on README.md and docs/ from the concurrent user-docs lane; check-markdown flags this ledger's S03 note (unescaped underscores), machine-owned and left as written
+- `S07` A row cell still cannot carry a backtick: the row parser reads single-backtick cells, so a verify command such as pytest -k `x` is out of reach of this fix; MCP log keeps one verify per call

@@ -63,7 +63,8 @@ class LogRequest:
         plan_stem: Stem of the parent plan the ledger records.
         step: Canonical Step id or display path being logged.
         rows: Parsed ``(op, paths)`` pairs from :func:`parse_row_spec`.
-        verify: ``(command, result)`` for a ``verify:`` row, or ``None``.
+        verify: ``(command, result)`` per check that ran, one ``verify:``
+            row each, in order.
         by: The persona for a ``by:`` row, or ``None``.
         notes: Exception notes, one ``## Notes`` line each.
     """
@@ -72,7 +73,7 @@ class LogRequest:
     plan_stem: str
     step: str
     rows: tuple[tuple[str, tuple[str, ...]], ...] = ()
-    verify: tuple[str, str] | None = None
+    verify: tuple[tuple[str, str], ...] = ()
     by: str | None = None
     notes: tuple[str, ...] = ()
 
@@ -277,8 +278,7 @@ def log_step(
     step_id = target_step.canonical_id
 
     rendered = [format_row(step_id, op, *paths) for op, paths in request.rows]
-    if request.verify is not None:
-        rendered.append(format_row(step_id, VERIFY_LABEL, *request.verify))
+    rendered += [format_row(step_id, VERIFY_LABEL, *pair) for pair in request.verify]
     if request.by:
         rendered.append(format_row(step_id, BY_LABEL, request.by.strip()))
     notes = [format_note(step_id, text) for text in request.notes if text.strip()]

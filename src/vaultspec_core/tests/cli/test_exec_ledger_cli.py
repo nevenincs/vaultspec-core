@@ -226,6 +226,25 @@ def test_malformed_row_is_refused(
     assert not _ledger_path(synthetic_project).exists()
 
 
+def test_every_verify_flag_is_recorded(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
+    setup_test_plan(synthetic_project)
+
+    result = _log(
+        runner,
+        synthetic_project,
+        "P01.S01",
+        "M:src/foo.py",
+        bare=("--verify", "ruff check=pass", "--verify", "pytest -q=fail"),
+    )
+
+    assert result.exit_code == 0, result.output
+    text = _ledger_text(synthetic_project)
+    first = text.index("- `S01` `verify:` `ruff check` -> `pass`")
+    assert first < text.index("- `S01` `verify:` `pytest -q` -> `fail`")
+
+
 @pytest.mark.parametrize("spec", ["pytest", "pytest=maybe", "=pass"])
 def test_malformed_verify_is_refused(
     runner: CliRunner, synthetic_project: Path, spec: str

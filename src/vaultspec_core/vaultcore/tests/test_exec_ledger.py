@@ -2,18 +2,27 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from typing import TYPE_CHECKING
+
 import pytest
 
 from vaultspec_core.vaultcore.checks.markdown import apply_markdown_hygiene
 from vaultspec_core.vaultcore.exec_ledger import (
+    VERIFY_LABEL,
     append_notes,
     append_rows,
     format_note,
     format_row,
     is_ledger_stem,
     ledger_step_ids,
+    note_lines,
     parse_ledger_rows,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 #: A freshly scaffolded ledger: its ``## Changes`` section holds only the
 #: template's hint comment.
@@ -297,3 +306,52 @@ class TestNotes:
             (None, "bullet"),
         )
         assert note_lines("## Changes\n\n- `S01` `M` `a.py`\n") == ()
+
+
+class TestMarkdownCheck:
+    """What the writer emits passes the markdown gate without hand escaping."""
+
+    _NOTES = (
+        "search/_models.py and search/_credential.py moved",
+        "a *starred* claim, 2 * 3 and snake_case",
+        "left a scaffold in `src/new.py`.",
+        "ran `just check-python`; html <div>, [x](y), ~~gone~~ and &amp;",
+        "don`t and ``a`b`` quote backticks",
+    )
+
+    def test_rows_and_notes_pass_mdformat_check(self, tmp_path: Path) -> None:
+        rows = append_rows(
+            LEDGER,
+            [
+                format_row("S03", "M", "src/pkg/_private.py"),
+                format_row(
+                    "S03", VERIFY_LABEL, "pytest -k not_slow and *_test", "pass"
+                ),
+            ],
+        )
+        body = append_notes(rows, [format_note("S03", note) for note in self._NOTES])
+        ledger = tmp_path / "ledger.md"
+        ledger.write_text(body, encoding="utf-8", newline="\n")
+
+        checked = subprocess.run(
+            [sys.executable, "-m", "mdformat", "--check", str(ledger)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert checked.returncode == 0, checked.stderr
+
+    def test_a_note_reads_back_as_written(self) -> None:
+        body = append_notes(LEDGER, [format_note("S03", note) for note in self._NOTES])
+        texts = [text for step, text in note_lines(body) if step == "S03"]
+
+        assert texts[0] == "`search/_models.py` and `search/_credential.py` moved"
+        assert texts[2] == "left a scaffold in `src/new.py`."
+
+    def test_rendering_a_rendered_note_changes_nothing(self) -> None:
+        lines = [format_note("S03", note) for note in self._NOTES]
+        body = append_notes(LEDGER, lines)
+        again = [format_note("S03", text) for step, text in note_lines(body) if step]
+
+        assert again[1:] == lines

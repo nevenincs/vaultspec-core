@@ -125,7 +125,7 @@ def register_exec_tools(mcp: MCPServer[None]) -> None:
                 plan_stem=plan,
                 step=step,
                 rows=tuple(parse_row_spec(spec) for spec in rows or []),
-                verify=parse_verify_spec(verify) if verify else None,
+                verify=(parse_verify_spec(verify),) if verify else (),
                 by=by,
                 notes=tuple(notes or []),
             )
