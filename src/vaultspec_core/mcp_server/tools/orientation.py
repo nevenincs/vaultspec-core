@@ -24,12 +24,14 @@ from pydantic import Field
 
 from ... import __version__
 from ...core.types import get_context as _get_ctx
+from ...search import hosted_search_config
 from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
 
+    from ...search import HostedSearchConfig
     from ...vaultcore.checks import CheckResult
     from ...vaultcore.orientation import GroundingTrace, Rollup
 
@@ -146,6 +148,21 @@ class PlanTraceLine(LeanModel):
     error: str | None = None
 
 
+class HostedSearchStatus(LeanModel):
+    """Whether hosted vault search can run, as the rollup reports it.
+
+    The wire projection of :class:`~vaultspec_core.search.HostedSearchConfig`,
+    which never carries the key either.
+
+    Attributes:
+        configured: Whether a hosted-search key is configured.
+        source: Where the key was found, when configured.
+    """
+
+    configured: bool
+    source: str | None = None
+
+
 class StatusResult(LeanModel):
     """The whole-call result of a ``status`` invocation.
 
@@ -167,6 +184,9 @@ class StatusResult(LeanModel):
         trace_kind: How the target resolved - ``"plan"`` or ``"feature"``
             (trace mode only).
         plans: One trace per plan under the target (trace mode only).
+        hosted_search: Whether hosted vault search has a key configured, and
+            from which source (rollup mode only). Local configuration, not
+            liveness: a configured key may still be rejected.
     """
 
     tool_schema_version: str
@@ -178,6 +198,7 @@ class StatusResult(LeanModel):
     target: str | None = None
     trace_kind: str | None = None
     plans: list[PlanTraceLine] = Field(default_factory=list)
+    hosted_search: HostedSearchStatus | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -262,11 +283,17 @@ class CheckResultModel(LeanModel):
 # ---------------------------------------------------------------------------
 
 
-def _rollup_to_result(rollup: Rollup) -> StatusResult:
+def _rollup_to_result(
+    rollup: Rollup, hosted_search: HostedSearchConfig
+) -> StatusResult:
     """Adapt a :class:`Rollup` into the ``status`` rollup result."""
     return StatusResult(
         tool_schema_version=__version__,
         kind="rollup",
+        hosted_search=HostedSearchStatus(
+            configured=hosted_search.configured,
+            source=hosted_search.source.value if hosted_search.source else None,
+        ),
         features_total=rollup.active_features_total,
         features=[
             FeatureStatus(
@@ -495,11 +522,11 @@ def register_orientation_tools(
 
         With no ``target``, returns the project rollup: active features with
         their lifecycle status, plans in flight with tier and completion and
-        the next open step, and the vault totals, plus the tool-schema
-        version. With a ``target`` (a feature tag or a plan stem/path),
-        returns the grounding trace for the matching plan(s): each step
-        mapped to its execution record, the grounding documents, and the
-        completion facts. Returns no blob hashes.
+        the next open step, the vault totals, whether ``search`` has a key
+        configured, and the tool-schema version. With a ``target`` (a feature
+        tag or a plan stem/path), returns the grounding trace for the
+        matching plan(s): each step mapped to its execution record, the
+        grounding documents, and the completion facts. Returns no blob hashes.
 
         Args:
             ctx: The MCP request context (unused; logging routes through the
@@ -523,7 +550,9 @@ def register_orientation_tools(
         root_dir = _get_ctx().target_dir
         if target is None:
             logger.info("status: project rollup")
-            return _rollup_to_result(compute_rollup(root_dir))
+            return _rollup_to_result(
+                compute_rollup(root_dir), hosted_search_config(root_dir)
+            )
 
         logger.info("status: trace target=%r", target)
         try:

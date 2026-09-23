@@ -54,7 +54,7 @@ from pydantic import BaseModel, GetJsonSchemaHandler, TypeAdapter
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-__all__ = ["LeanModel", "compact_result", "describe", "tool_description"]
+__all__ = ["LeanEnum", "LeanModel", "compact_result", "describe", "tool_description"]
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -160,6 +160,38 @@ class LeanModel(BaseModel):
                 for name, prop in cast("dict[str, Any]", properties).items()
             }
         return produced
+
+
+class LeanEnum:
+    """``Annotated`` marker that ships an enum as its values alone.
+
+    :class:`LeanModel` cannot reach an enum: Pydantic renders one as a shared
+    ``$defs`` entry carrying the enum class's docstring and a derived title,
+    and the reference to it costs bytes of its own. The values are what a
+    caller can act on, so annotating a field ``Annotated[SomeEnum,
+    LeanEnum()]`` inlines ``{"enum": [...], "type": "string"}`` in place; the
+    unreferenced definition is then dropped from the schema. Validation and
+    serialisation are untouched - only the schema changes.
+    """
+
+    def __get_pydantic_json_schema__(
+        self, core_schema: Any, handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        """Render the enum inline, without its docstring or title.
+
+        Args:
+            core_schema: The pydantic-core schema for the enum.
+            handler: The next handler in the generation chain.
+
+        Returns:
+            The enum's schema fragment, inlined.
+        """
+        produced = handler.resolve_ref_schema(handler(core_schema))
+        return {
+            key: value
+            for key, value in produced.items()
+            if key not in ("description", "title")
+        }
 
 
 def _strip_titles(node: Any) -> Any:

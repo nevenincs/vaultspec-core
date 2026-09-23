@@ -5,7 +5,7 @@ An MCPServer's tool definitions are serialized into every LLM
 request  - keeping them compact is a hard requirement.
 
 The budget is the concern here; the ``test_tool_surface`` module covers what
-the same ten tools do end-to-end and the annotation matrix they declare.
+the same eleven tools do end-to-end and the annotation matrix they declare.
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from vaultspec_core.core.types import init_paths
 from vaultspec_core.mcp_server.app import create_server
 from vaultspec_core.vaultcore.models import DocType
 
+from .conftest import EXPECTED_TOOLS
+
 if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
-#: Aggregate ceiling for the full ten-tool wire surface, in characters.
+#: Aggregate ceiling for the full eleven-tool wire surface, in characters.
 #:
 #: This is a **ratchet, not a target**. The measured surface is 43,919 chars
 #: (~5.4K tokens at the 3.46 chars/token measured for this codebase's JSON),
@@ -50,29 +52,27 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: ledger writer) joined the surface: one verb per artifact was the decision,
 #: and a ledger row logged through ``invoke`` would cost a host confirmation
 #: on every Step. Measured at 20,0xx chars with ``log`` at ~1.1K.
-MAX_TOOL_DEFINITION_CHARS = 20_200
+#:
+#: Raised a second time, from 20,200, when hosted vault search joined the
+#: surface as its ninth hot tool: a first-class tool rather than a gateway
+#: verb, because ``invoke`` costs a host confirmation on every call. Measured
+#: 20,199 before and 23,853 after (+3,654). ``search`` itself is 3,261
+#: (description 582, input 727, output 1,799). ``status`` grew 315 for its
+#: ``hosted_search`` field. ``find`` grew 78: its feature, date and type
+#: filters now share one declaration with ``search``, which lists the record
+#: types and describes each filter. The ceiling keeps a margin of 47.
+MAX_TOOL_DEFINITION_CHARS = 23_900
 
-#: Aggregate ceiling for the read-only surface (four tools), same rules.
-#: Measured at 9,194 chars.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 9_500
+#: Aggregate ceiling for the read-only surface (five tools), same rules.
+#: Measured at 9,194 chars. Raised from 9,500 by the same three changes, which
+#: all reach this surface, since ``search`` is read-only: measured 9,446
+#: before and 13,100 after (+3,654), with a margin of 50.
+MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 13_150
 
-# Maximum number of tools: the tiered surface is eight hot tools plus the
+# Maximum number of tools: the tiered surface is nine hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.
-MAX_TOOL_COUNT = 10
-
-# Exact expected tool surface.
-EXPECTED_TOOLS = {
-    "check",
-    "create",
-    "discover",
-    "edit",
-    "find",
-    "invoke",
-    "log",
-    "plan_edit",
-    "plan_progress",
-    "status",
-}
+# Raised from 10 by exactly one, for ``search``, the ninth hot tool.
+MAX_TOOL_COUNT = 11
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ async def test_read_only_tool_definitions_within_context_budget(
 ) -> None:
     """The read-only surface has its own ceiling and its own regressions.
 
-    Read-only registers four of the ten tools, so a change that bloats a
+    Read-only registers five of the eleven tools, so a change that bloats a
     shared result model surfaces here at a different ratio than on the full
     surface. Guarding only the full surface let this one drift furthest -
     it was the least covered of the two.

@@ -43,28 +43,13 @@ from vaultspec_core.mcp_server.watchdog import (
     watchdog_disabled,
 )
 
+from .conftest import EXPECTED_TOOLS
+
 pytestmark = pytest.mark.unit
 
 _RESOLVER_SNIPPET = (
     "from vaultspec_core.mcp_server.watchdog import resolve_stdin_client_pid;"
     "print(resolve_stdin_client_pid(), flush=True)"
-)
-
-#: The ten tools the served surface must advertise; a lifecycle test only
-#: counts once the spawned server has proven it serves exactly these.
-_EXPECTED_TOOLS = frozenset(
-    {
-        "status",
-        "find",
-        "create",
-        "edit",
-        "plan_progress",
-        "plan_edit",
-        "log",
-        "check",
-        "discover",
-        "invoke",
-    }
 )
 
 _POLL_MARGIN_SECONDS = 5.0
@@ -78,7 +63,7 @@ def _assert_server_serves(stdin_pipe: IO[bytes], stdout_pipe: IO[bytes]) -> None
     Drives the real newline-delimited JSON-RPC exchange over the given
     binary pipes: ``initialize`` must identify the server,
     ``notifications/initialized`` completes the handshake, and
-    ``tools/list`` must return exactly the ten-tool surface. Liveness
+    ``tools/list`` must return exactly the full tool surface. Liveness
     alone is never the pass criterion for a running MCP service.
     """
 
@@ -114,7 +99,7 @@ def _assert_server_serves(stdin_pipe: IO[bytes], stdout_pipe: IO[bytes]) -> None
     send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     tools_result = recv(2)
     names = {tool["name"] for tool in tools_result["tools"]}
-    assert names == _EXPECTED_TOOLS, names
+    assert names == EXPECTED_TOOLS, names
 
 
 def _wait_for_pid_exit(pid: int, timeout: float) -> bool:
@@ -420,7 +405,7 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
         serving_line = client.stdout.readline().strip()
         assert serving_line.startswith("SERVING name=vaultspec-core-mcp "), serving_line
         served_tools = set(serving_line.split("tools=", 1)[1].split(","))
-        assert served_tools == _EXPECTED_TOOLS, served_tools
+        assert served_tools == EXPECTED_TOOLS, served_tools
 
         client.kill()
         client.wait(timeout=60)
@@ -990,7 +975,7 @@ def test_real_server_parent_pid_flag_reaps_on_override_death(
     )
     try:
         # Functional floor: prove the server serves MCP over its own pipes
-        # (handshake identifies it; tools/list is the exact ten-tool
+        # (handshake identifies it; tools/list is the exact full-tool
         # surface) before the override-death lifecycle assertion counts.
         assert server.stdin is not None
         assert server.stdout is not None

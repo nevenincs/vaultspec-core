@@ -41,6 +41,7 @@ from ...vaultcore.markdown import iter_headings
 from ...vaultcore.models import DocType, vault_today
 from ...vaultcore.parser import split_frontmatter
 from ..envelope import LeanModel, compact_result
+from ..filters import DateFilter, FeatureFilter, TypeFilter
 from ..isolation import isolated_context as _isolated_context
 from ..results import (
     MAX_BATCH_ITEMS,
@@ -66,7 +67,13 @@ __all__ = ["register_document_tools"]
 
 #: The default document-search types when the caller supplies no ``type``
 #: filter; exec and audit are excluded unless explicitly requested.
-_DEFAULT_TYPES = ["adr", "plan", "research", "reference"]
+_DEFAULT_TYPES = (DocType.ADR, DocType.PLAN, DocType.RESEARCH, DocType.REFERENCE)
+
+#: ``find``'s record-type filter: the shared declaration, with the default this
+#: tool applies stated from :data:`_DEFAULT_TYPES` rather than restated.
+_FindTypes = Annotated[
+    TypeFilter, Field(description=f"Default: {', '.join(_DEFAULT_TYPES)}.")
+]
 
 
 class FindEntry(LeanModel):
@@ -857,7 +864,7 @@ def _matches_text(doc: Any, needle: str) -> bool:
 
 def _find_documents(
     feature: str | None,
-    types: list[str] | None,
+    types: list[DocType] | None,
     date: str | None,
     body: str,
     limit: int,
@@ -989,9 +996,9 @@ def register_document_tools(
     @_isolated_context
     async def find(
         ctx: Context[Any, Any],
-        feature: str | None = None,
-        type: list[str] | None = None,
-        date: str | None = None,
+        feature: FeatureFilter = None,
+        type: _FindTypes = None,
+        date: DateFilter = None,
         text: str | None = None,
         body: Literal["none", "excerpt", "full"] = "none",
         json: bool = False,
@@ -1006,15 +1013,10 @@ def register_document_tools(
         result carries the document's current ``blob_hash`` and a
         ``resource_uri``, a ``file://`` locator the host reads directly
         rather than a resource this server serves; inline the text instead by
-        setting ``body``.  The
-        ``type`` filter defaults to adr, plan, research, reference; exec and
-        audit are excluded unless explicitly requested.
+        setting ``body``.
 
         Args:
             ctx: The MCP request context.
-            feature: Feature filter without ``#`` (switches to search mode).
-            type: Document-type filter (switches to search mode).
-            date: Exact-date filter (switches to search mode).
             text: Case-insensitive substring over document stem and feature
                 (switches to search mode). Composes with the other filters,
                 and is matched over identifiers rather than document bodies -

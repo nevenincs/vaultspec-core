@@ -32,6 +32,7 @@ from .tools import (
     register_gateway_tools,
     register_orientation_tools,
     register_plan_tools,
+    register_search_tools,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,19 +80,22 @@ def _build_instructions(*, read_only: bool) -> str:
             "Vaultspec-core MCP server in read-only mode (tool-schema version "
             f"{__version__}). It exposes only 'status' (project orientation and "
             "grounding traces), 'find' (document and feature discovery with blob "
-            "hashes and resource links), 'check' (vault health validation without "
-            "repair), and 'discover' (read-only search of the verb catalog). "
-            "Mutation tools and the invocation gateway are deliberately absent."
+            "hashes and resource links), 'search' (ranked vault records with the "
+            "passage that answers a question), 'check' (vault health validation "
+            "without repair), and 'discover' (read-only search of the verb "
+            "catalog). Mutation tools and the invocation gateway are deliberately "
+            "absent."
         )
 
     return (
         "Vaultspec-core MCP server (tool-schema version "
         f"{__version__}). These tools cover the vaultspec workflow. Hot path: "
         "'status' (project orientation and grounding traces), 'find' (document "
-        "and feature discovery with blob hashes and resource links), 'create' "
-        "(batch document scaffolding from templates), 'edit' (batch body-prose "
-        "editing with optimistic-concurrency guards), 'plan_progress' (mark "
-        "plan steps checked/unchecked), 'plan_edit' (add/insert/edit/remove "
+        "and feature discovery with blob hashes and resource links), 'search' "
+        "(ranked vault records with the passage that answers a question), "
+        "'create' (batch document scaffolding from templates), 'edit' (batch "
+        "body-prose editing with optimistic-concurrency guards), 'plan_progress' "
+        "(mark plan steps checked/unchecked), 'plan_edit' (add/insert/edit/remove "
         "plan steps), 'log' (append a Step's rows to its plan's execution "
         "ledger), and 'check' (vault health checks with optional fix). "
         "Long tail: 'discover' searches the full verb catalog and returns "
@@ -141,6 +145,7 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
     # are registered, so no write-capable tool reaches the advertised catalog.
     register_document_tools(mcp, include_mutations=not read_only)
     register_orientation_tools(mcp, include_fix=not read_only)
+    register_search_tools(mcp)
     if not read_only:
         register_plan_tools(mcp)
         register_exec_tools(mcp)
