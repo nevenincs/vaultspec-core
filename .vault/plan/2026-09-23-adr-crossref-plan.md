@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-adr-crossref-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:9a2bb8a87f0b0c248826e2f646e6b52acf65f7bc89a385feaed6a04daa95adf8'
+body_hash: 'sha256:aac0fcd19ae51c757c659a3a33d0889fb2b515771806f0e1accc5b638d48b3e5'
 ---
 
 # `adr-crossref` plan
@@ -38,9 +38,9 @@ the crossref credential import moves to the config-layer resolver.
 - [x] `S01` - Record the prefilter evidence and the bounded cross-referencing decision; `.vault/research/2026-09-23-adr-crossref-research.md, .vault/adr/2026-09-23-adr-crossref-adr.md`.
 - [x] `S02` - Extract the related-link writer from vault link add into core, under the document write lock with graph-cache invalidation; `src/vaultspec_core/vaultcore/related_links.py, src/vaultspec_core/cli/link_cmd.py`.
 - [x] `S03` - Build the crossref backend - corpus, fingerprint, code stage, questions, engine, service and wire projection - with offline tests against the scripted provider; `src/vaultspec_core/crossref/`.
-- [x] `S04` - Add the vault adr crossref CLI verb and regenerate the CLI reference and handbook; `src/vaultspec_core/cli/vault_crossref_cmd.py, docs/CLI.md, src/vaultspec_core/builtins/reference/cli.md`.
-- [x] `S05` - Add the crossref MCP tool on both surfaces with the read-only argument guard, and ratchet the surface budget by its measured size; `src/vaultspec_core/mcp_server/tools/crossref.py, src/vaultspec_core/mcp_server/app.py, docs/MCP.md`.
-- [x] `S06` - Adopt the cross-reference step in the ADR and curation workflows and name the tool in the CLI rule and personas, then sync; `src/vaultspec_core/builtins/skills/, src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md, src/vaultspec_core/builtins/agents/`.
+- [ ] `S04` - Add the vault adr crossref CLI verb and regenerate the CLI reference and handbook; `src/vaultspec_core/cli/vault_crossref_cmd.py, docs/CLI.md, src/vaultspec_core/builtins/reference/cli.md`.
+- [ ] `S05` - Add the crossref MCP tool on both surfaces with the read-only argument guard, and ratchet the surface budget by its measured size; `src/vaultspec_core/mcp_server/tools/crossref.py, src/vaultspec_core/mcp_server/app.py, docs/MCP.md`.
+- [ ] `S06` - Adopt the cross-reference step in the ADR and curation workflows and name the tool in the CLI rule and personas, then sync; `src/vaultspec_core/builtins/skills/, src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md, src/vaultspec_core/builtins/agents/`.
 - [x] `S07` - Add the live cross-reference evaluation under the typesafe marker; `src/vaultspec_core/crossref/tests/test_live.py`.
 - [ ] `S08` - Record the amendments to the tool-schema and read-only decisions and regenerate the feature index; `.vault/adr/2026-07-09-mcp-tool-schema-adr.md, .vault/adr/2026-08-01-mcp-read-only-adr.md`.
 - [ ] `S09` - Review the integrated feature at plan close into the rolling audit; `.vault/audit/`.

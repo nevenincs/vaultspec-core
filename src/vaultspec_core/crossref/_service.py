@@ -22,7 +22,8 @@ The service owns the decisions above the engine:
   optional cursor, up to its size; its outcome names the last source
   processed, so the next run starts after it. A source the provider refuses
   counts as processed only once a later source shows the provider reads; a
-  run of refusals stops the sweep before them. No sweep state is stored.
+  refusal nothing settles stops the sweep before it. No sweep state is
+  stored.
 """
 
 from __future__ import annotations
@@ -75,8 +76,8 @@ _RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED})
 
 #: Failures that can belong to one ADR's text rather than to the provider or
 #: the key. A sweep holds such a refusal open and judges on: a later source the
-#: provider reads shows the refusal was the ADR's own, while a run of refusals
-#: looks like an edge blocking every request and stops the sweep before it.
+#: provider reads shows the refusal was the ADR's own, while a refusal nothing
+#: settles may be an edge blocking every request and stops the sweep before it.
 _PER_SOURCE = frozenset(
     {UnavailableReason.CONTENT_REJECTED, UnavailableReason.REQUEST_TOO_LARGE}
 )
@@ -302,12 +303,12 @@ def crossref_sweep(
     stand alone, and one selector is required.
 
     A source the provider refuses to read, or that cannot fit in a request, is
-    held open while the sweep judges on. When a later source is read, the
-    refusal was the ADR's own and the cursor moves past it; at the end of the
-    selection a provider that read something earlier vouches for it. Refusals
-    that reach the run limit, and any other failure, stop the sweep with the
-    cursor before the first refusal still open, so a resumed run retries them.
-    The cursor names the last source processed.
+    held open while the sweep judges on, past *max_sources* by at most two
+    more sources if it must. When a later source is read, the refusal was the
+    ADR's own and the cursor moves past both. A refusal nothing settles - a
+    run reaching the refusal limit, or the selection or the extra room ending
+    first - stops the sweep, as does any other failure, with the cursor before
+    the first refusal still open. The cursor names the last source processed.
 
     Args:
         root: The workspace root.
@@ -340,7 +341,8 @@ def crossref_sweep(
     cursor = _resolve(after, records).stem if after else None
     if cursor is not None:
         selection = [record for record in selection if record.stem > cursor]
-    taken = selection[: sweep_size(max_sources)]
+    size = sweep_size(max_sources)
+    taken = selection[:size]
     credential = _credential(root, environ)
     if credential is None:
         declined = tuple(_declined(root, record.stem) for record in taken[:1])
@@ -367,13 +369,15 @@ def crossref_sweep(
     run_deadline = time.monotonic() + RUN_DEADLINE
     outcomes: list[CrossrefOutcome] = []
     processed = 0
-    # Refused sources whose refusal is not yet known to be their own: a later
-    # source the provider reads confirms them, a run of them stops the sweep.
+    # Refused sources whose refusal is not yet known to be their own. Only a
+    # later source the provider reads settles them; until then the sweep may
+    # judge past its size, by at most the refusal limit, to find that read.
     pending: list[str] = []
-    provider_read = False
     stopped: str | None = None
     try:
-        for record in taken:
+        for position, record in enumerate(selection):
+            if position >= size + (MAX_REFUSALS - 1 if pending else 0):
+                break
             if run_deadline - time.monotonic() < MIN_SOURCE_SECONDS:
                 stopped = UnavailableReason.DEADLINE.value
                 break
@@ -383,10 +387,6 @@ def crossref_sweep(
             )
             outcomes.append(outcome)
             if outcome.status is CrossrefStatus.OK:
-                usage = outcome.usage
-                provider_read = provider_read or (
-                    usage is not None and usage.input_tokens > 0
-                )
                 processed += len(pending) + 1
                 pending = []
                 cursor = record.stem
@@ -397,14 +397,11 @@ def crossref_sweep(
                     continue
             stopped = outcome.reason.value if outcome.reason else "unavailable"
             break
-        else:
-            # The batch ended on refusals. At the end of the selection no later
-            # source can confirm them, so a provider that read this sweep
-            # vouches for them; otherwise the next run retries them first.
-            if pending and len(taken) == len(selection) and provider_read:
-                processed += len(pending)
-                cursor = pending[-1]
-                pending = []
+        if pending and stopped is None:
+            # No read settled these refusals: the selection or the room to
+            # probe ran out. Say so, so the caller settles them itself rather
+            # than resuming onto them unaware.
+            stopped = UnavailableReason.CONTENT_REJECTED.value
     finally:
         if owned:
             active.close()

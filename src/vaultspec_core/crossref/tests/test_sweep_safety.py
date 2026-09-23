@@ -127,28 +127,41 @@ def test_a_resume_that_lands_on_a_refused_adr_moves_past_it(tmp_path: Path) -> N
     _small_vault(tmp_path)
     write_adr(tmp_path, "2026-01-04-refused-adr", implementation=BLOCKED)
 
-    first = _sweep(tmp_path, all_adrs=True, max_sources=4)
-    # The batch ended on the refusal, with no later source to confirm it.
+    first = _sweep(tmp_path, all_adrs=True, max_sources=3)
     assert first.next_after == "2026-01-03-declared-adr"
-    assert first.remaining == 5
 
-    second = _sweep(tmp_path, all_adrs=True, after=first.next_after, max_sources=50)
+    # A one-source sweep lands on the refusal and judges one more to settle it.
+    second = _sweep(tmp_path, all_adrs=True, after=first.next_after, max_sources=1)
 
-    assert second.outcomes[0].reason is UnavailableReason.CONTENT_REJECTED
+    assert [o.source for o in second.outcomes] == [
+        "2026-01-04-refused-adr",
+        "2026-01-10-filler-adr",
+    ]
     assert second.stopped is None
-    assert second.remaining == 0
-    assert second.next_after is None
+    assert second.next_after == "2026-01-10-filler-adr"
+    assert second.remaining == 3
 
 
-def test_a_refusal_at_the_end_of_the_selection_is_vouched_for(tmp_path: Path) -> None:
+def test_a_refusal_no_read_can_settle_stops_the_sweep(tmp_path: Path) -> None:
     _small_vault(tmp_path)
     write_adr(tmp_path, "2026-01-99-refused-adr", implementation=BLOCKED)
 
     sweep = _sweep(tmp_path, all_adrs=True, max_sources=50)
 
     assert sweep.outcomes[-1].reason is UnavailableReason.CONTENT_REJECTED
-    assert sweep.stopped is None
-    assert sweep.remaining == 0
+    assert sweep.stopped == UnavailableReason.CONTENT_REJECTED.value
+    assert sweep.remaining == 1
+    assert sweep.next_after == "2026-01-13-filler-adr"
+
+
+def test_a_selection_of_refused_adrs_alone_stops_the_sweep(tmp_path: Path) -> None:
+    _small_vault(tmp_path)
+    write_adr(tmp_path, "2026-01-04-refused-adr", implementation=BLOCKED)
+
+    sweep = _sweep(tmp_path, refs=["2026-01-04-refused-adr"])
+
+    assert sweep.stopped == UnavailableReason.CONTENT_REJECTED.value
+    assert sweep.remaining == 1
 
 
 def test_a_sweep_needs_one_clear_selector(tmp_path: Path) -> None:

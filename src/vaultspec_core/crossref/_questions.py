@@ -145,7 +145,10 @@ MIN_SOURCE_SECONDS: Final = 15.0
 #: everything.
 MAX_REFUSALS: Final = 3
 
-#: Sources one sweep judges at most, and when the caller names no count.
+#: Sources one sweep judges at most, and when the caller names no count. A
+#: sweep holding a refusal open may judge up to ``MAX_REFUSALS - 1`` more to
+#: find the read that settles it, so no sweep judges more than
+#: ``MAX_SOURCES + MAX_REFUSALS - 1`` sources.
 MAX_SOURCES: Final = 50
 DEFAULT_SOURCES: Final = 10
 
