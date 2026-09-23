@@ -69,6 +69,60 @@ class TestFences:
         # A four-space-indented run inside a fence is content, not a closer.
         assert line_roles(["```", "    ```", "```"]) == [OPEN, CODE, CLOSE]
 
+    def test_fence_nested_in_a_list_item_is_measured_from_its_content(
+        self,
+    ) -> None:
+        lines = [
+            "1. Outer",
+            "   - Inner",
+            "",
+            "     ```bash",
+            "     echo  ",
+            "",
+            "     ```",
+            "   after",
+        ]
+        assert line_roles(lines) == [TEXT, TEXT, TEXT, OPEN, CODE, CODE, CLOSE, TEXT]
+
+    def test_fence_follows_list_nesting_to_any_depth(self) -> None:
+        lines = ["- a", "  - b", "    - c", "      ~~~", "      x", "      ~~~"]
+        assert line_roles(lines) == [TEXT, TEXT, TEXT, OPEN, CODE, CLOSE]
+
+    def test_blank_lines_keep_a_list_item_open(self) -> None:
+        lines = ["- item", "", "", "    ```", "    x", "    ```"]
+        assert line_roles(lines) == [TEXT, TEXT, TEXT, OPEN, CODE, CLOSE]
+
+    def test_indented_code_inside_a_list_item_is_not_a_fence(self) -> None:
+        # Four spaces past the item's content column is indented code.
+        assert line_roles(["- item", "", "      ```", "      x"]) == [TEXT] * 4
+
+    def test_a_line_at_the_margin_closes_the_list_item(self) -> None:
+        lines = ["- item", "prose at the margin", "    ```", "    x"]
+        assert line_roles(lines) == [TEXT] * 4
+
+    def test_a_list_marker_needs_whitespace_after_it(self) -> None:
+        assert line_roles(["-item", "    ```", "1.5 GHz", "    ```"]) == [TEXT] * 4
+
+    def test_a_list_fence_closes_at_or_left_of_its_margin(self) -> None:
+        # The closer may sit anywhere from the margin to three spaces past
+        # the column the fence opened at; four past is content.
+        assert line_roles(["- item", "    ```", "x", "```"]) == [
+            TEXT,
+            OPEN,
+            CODE,
+            CLOSE,
+        ]
+        assert line_roles(["- item", "  ```", "      ```", "     ```"]) == [
+            TEXT,
+            OPEN,
+            CODE,
+            CLOSE,
+        ]
+
+    def test_lines_inside_a_fence_open_no_list_item(self) -> None:
+        lines = ["```", "- item", "```", "    ```", "x"]
+        assert line_roles(lines) == [OPEN, CODE, CLOSE, TEXT, TEXT]
+
     def test_backtick_info_string_may_not_contain_a_backtick(self) -> None:
         assert line_roles(["``` a`b", "x"]) == [TEXT, TEXT]
         assert line_roles(["~~~ a`b", "x"]) == [OPEN, CODE]
@@ -267,6 +321,11 @@ class TestParagraphBlocks:
             )
         ]
 
+    def test_fence_nested_in_a_list_item_stays_whole(self) -> None:
+        text = "- item\n\n    ```\n    a\n\n    b\n    ```\n"
+        blocks = paragraph_blocks(text, min_chars=0)
+        assert [(b.line_start, b.line_end) for b in blocks] == [(1, 1), (3, 7)]
+
     def test_blank_text_has_no_blocks(self) -> None:
         assert paragraph_blocks("") == []
         assert paragraph_blocks("\n  \n\t\n# Title only\n") == []
@@ -339,6 +398,18 @@ class TestNonProseSpans:
 
     def test_fence_wins_over_inline_code_at_the_same_position(self) -> None:
         assert _pieces("```\n`a`\n```") == ["```\n`a`\n```"]
+
+    def test_fence_nested_in_a_list_item_hides_its_content(self) -> None:
+        text = "- see `x`\n\n    ```\n    [[not-a-link]]\n    ```\n- `y`\n"
+        assert _pieces(text) == [
+            "`x`",
+            "    ```\n    [[not-a-link]]\n    ```",
+            "`y`",
+        ]
+
+    def test_list_item_inside_a_comment_sets_no_margin(self) -> None:
+        text = "<!--\n- item\n-->\n    ~~~\n    code\n"
+        assert _pieces(text) == ["<!--\n- item\n-->"]
 
     def test_comment_forms(self) -> None:
         text = "<!-->a<!--->b<!-- c -->"

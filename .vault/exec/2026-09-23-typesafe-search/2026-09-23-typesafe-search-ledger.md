@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:0a7150e5e35f0005fcea9042d7de02c107526f20fb6f7354f7035bb26767881b'
+body_hash: 'sha256:aecb6e7c2a89862b331d14e32514bdb1a69be966e67352ea80f7060dfd6ed243'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -203,4 +203,6 @@ related:
 - `S05` `A` `src/vaultspec_core/mcp_server/tests/test_tool_description.py`
 - `S05` `A` `src/vaultspec_core/search/tests/reply_budget.py`
 - `S05` `verify:` `pytest tests/cli` -> `pass`
-
+- `S01` `M` `src/vaultspec_core/vaultcore/markdown.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/tests/test_markdown.py`
+- `S01` `verify:` `pytest vaultcore` -> `pass`

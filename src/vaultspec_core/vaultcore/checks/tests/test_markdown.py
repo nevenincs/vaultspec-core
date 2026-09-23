@@ -70,6 +70,25 @@ class TestApplyMarkdownHygiene:
         assert cleaned == body
         assert stats.total == 0
 
+    def test_fence_nested_in_a_list_item_is_protected(self):
+        # The fence sits five spaces in, under the inner item's content
+        # column, so it is code and its whitespace is left alone; the
+        # trailing space on the prose line outside it is still stripped.
+        body = (
+            "1. Outer step\n"
+            "   - Inner step \n"
+            "\n"
+            "     ```bash\n"
+            "     echo a   \n"
+            "\n"
+            "\n"
+            "     echo b\n"
+            "     ```\n"
+        )
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body.replace("Inner step \n", "Inner step\n")
+        assert (stats.trailing_whitespace, stats.blank_runs) == (1, 0)
+
     def test_idempotent(self):
         once, _ = apply_markdown_hygiene("a   \n\n\n\nb\n\n\n")
         twice, stats = apply_markdown_hygiene(once)

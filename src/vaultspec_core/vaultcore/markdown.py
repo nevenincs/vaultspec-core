@@ -20,14 +20,28 @@ block parser:
   followed only by whitespace. A fence left unclosed runs to the end of the
   text: a document cannot end inside a code sample and have the tail read as
   prose.
+- A **list item** moves the margin those three spaces are counted from, so a
+  fence nested in a list item is a fence however deep the nesting. An item
+  starts on a line outside any fence, indented at most three spaces past the
+  current margin, with ``-``, ``+``, ``*``, or one to nine digits and ``.``
+  or ``)``, followed by whitespace or the end of the line. Its content
+  column, the new margin, is where the text after the marker begins, or one
+  column past the marker when the marker ends the line or is followed by
+  more than four spaces. The item stays open while every non-blank line
+  outside a fence is indented to its content column or further; blank lines
+  and the lines inside a fence never close it. A fence closes on a line
+  indented at most three spaces past the margin it opened at, or less. A
+  fence-shaped line four or more spaces past the margin is indented code,
+  in or out of a list, and opens nothing. Tabs count as one column.
 - An **ATX heading** is a line outside any fence indented by at most three
   spaces, holding one to six ``#`` followed by a space, a tab, or the end of
   the line. An optional closing run of ``#`` preceded by whitespace is not
   part of the text.
 
-Setext headings, indented code blocks, list nesting, and HTML blocks are out
-of scope: no vault document depends on them for structure, and modelling them
-would need the block parser this module exists to avoid.
+Setext headings, indented code blocks, block quotes, lazy continuation lines,
+and HTML blocks are out of scope: no vault document depends on them for
+structure, and modelling them would need the block parser this module exists
+to avoid.
 
 Lines are split on ``\\n`` only. A trailing ``\\r`` from CRLF text is treated
 as line-ending whitespace by every rule, so callers need not normalise first,
@@ -91,9 +105,19 @@ _COMMENT_OR_CODE_RE = re.compile(
 #: tabs, plus the line-ending characters a caller's split may leave attached.
 _LINE_WHITESPACE = " \t\r\n"
 
-#: A fence-shaped line: up to three spaces, a run of three or more backticks
-#: or tildes, and whatever follows on the line.
+#: A fence-shaped line from its margin: up to three spaces, a run of three or
+#: more backticks or tildes, and whatever follows on the line.
 _FENCE_RE = re.compile(r" {0,3}(?P<run>`{3,}|~{3,})(?P<rest>.*)")
+
+#: A list item's marker from its first non-space character, and the
+#: whitespace separating it from the item's content; the line ending is
+#: stripped first, so no gap means the marker ends the line.
+_LIST_ITEM_RE = re.compile(r"(?P<marker>[-+*]|\d{1,9}[.)])(?:(?P<gap>[ \t]+).*)?")
+
+#: The widest gap after a list marker that still sets the content column.
+#: A wider one starts indented code, and the content column is one past the
+#: marker.
+_LIST_GAP_LIMIT = 4
 
 #: An ATX heading line with its line ending removed. The hashes must be
 #: followed by a space, a tab, or nothing at all.
@@ -132,13 +156,18 @@ class FenceTracker:
     whose own state decides whether a line is eligible to open a fence at all
     - a line inside a multi-line HTML comment is comment text, not a fence -
     so they feed it only the lines that can carry markdown structure.
+
+    Besides the open fence it carries the content columns of the open list
+    items, innermost last, which set the margin a fence is measured from.
     """
 
-    __slots__ = ("_char", "_length")
+    __slots__ = ("_char", "_items", "_length", "_margin")
 
     def __init__(self) -> None:
         self._char = ""
         self._length = 0
+        self._margin = 0
+        self._items: list[int] = []
 
     def classify(self, line: str) -> LineRole:
         """Return *line*'s role and advance past it.
@@ -149,24 +178,46 @@ class FenceTracker:
         Returns:
             The line's :class:`LineRole` given every line fed before it.
         """
-        match = _FENCE_RE.match(line)
-        if not self._char:
-            if match is None:
-                return LineRole.TEXT
+        indent = len(line) - len(line.lstrip(" "))
+        if self._char:
+            return self._close_or_code(line, indent)
+        if not line.strip(_LINE_WHITESPACE):
+            return LineRole.TEXT
+        # A non-blank line left of an item's content column is outside it.
+        while self._items and self._items[-1] > indent:
+            self._items.pop()
+        margin = self._items[-1] if self._items else 0
+        match = _FENCE_RE.match(line, margin)
+        if match is not None:
             run = match.group("run")
-            if run[0] == "`" and "`" in match.group("rest"):
-                return LineRole.TEXT
-            self._char, self._length = run[0], len(run)
-            return LineRole.FENCE_OPEN
+            if run[0] != "`" or "`" not in match.group("rest"):
+                self._char, self._length, self._margin = run[0], len(run), margin
+                return LineRole.FENCE_OPEN
+        if indent - margin <= 3:
+            self._open_item(line, indent)
+        return LineRole.TEXT
+
+    def _close_or_code(self, line: str, indent: int) -> LineRole:
+        """Classify a line inside the open fence."""
+        match = _FENCE_RE.match(line, min(indent, self._margin))
         if (
             match is not None
             and match.group("run")[0] == self._char
             and len(match.group("run")) >= self._length
             and not match.group("rest").strip(_LINE_WHITESPACE)
         ):
-            self._char, self._length = "", 0
+            self._char, self._length, self._margin = "", 0, 0
             return LineRole.FENCE_CLOSE
         return LineRole.CODE
+
+    def _open_item(self, line: str, indent: int) -> None:
+        """Open a list item when *line*, indented by *indent*, starts one."""
+        item = _LIST_ITEM_RE.fullmatch(line.rstrip(_LINE_WHITESPACE), indent)
+        if item is None:
+            return
+        gap = len(item.group("gap") or "")
+        width = gap if 0 < gap <= _LIST_GAP_LIMIT else 1
+        self._items.append(indent + len(item.group("marker")) + width)
 
 
 def line_roles(lines: Iterable[str]) -> list[LineRole]:
@@ -353,34 +404,37 @@ def non_prose_spans(text: str) -> Iterator[tuple[int, int]]:
     """
     lines = text.split("\n")
     starts = _line_starts(lines)
-    openers = [
-        index
-        for index, line in enumerate(lines)
-        if FenceTracker().classify(line) is LineRole.FENCE_OPEN
-    ]
-    next_opener = 0
+    # Lines are fed to one tracker in order, skipping those that begin inside
+    # a comment or a code span, so a list item opened in prose carries its
+    # margin to the fences nested in it. The next inline construct is found
+    # once and kept until it is passed; it never begins before the cursor.
+    tracker = FenceTracker()
     cursor = 0
     match = _COMMENT_OR_CODE_RE.search(text)
-    while True:
-        while next_opener < len(openers) and starts[openers[next_opener]] < cursor:
-            next_opener += 1
-        if match is not None and match.start() < cursor:
-            match = _COMMENT_OR_CODE_RE.search(text, cursor)
-        fence = openers[next_opener] if next_opener < len(openers) else None
-        if fence is not None and (match is None or starts[fence] <= match.start()):
-            cursor = _fence_end(lines, starts, fence, len(text))
-            yield starts[fence], cursor
-        elif match is not None:
+    for index, line in enumerate(lines):
+        while match is not None and match.start() < starts[index]:
             cursor = match.end()
             yield match.span()
-        else:
-            return
+            match = _COMMENT_OR_CODE_RE.search(text, cursor)
+        if starts[index] < cursor or tracker.classify(line) is not LineRole.FENCE_OPEN:
+            continue
+        cursor = _fence_end(lines, starts, tracker, index, len(text))
+        yield starts[index], cursor
+        if match is not None and match.start() < cursor:
+            match = _COMMENT_OR_CODE_RE.search(text, cursor)
+    while match is not None:
+        yield match.span()
+        match = _COMMENT_OR_CODE_RE.search(text, match.end())
 
 
-def _fence_end(lines: list[str], starts: list[int], opener: int, limit: int) -> int:
-    """Return the offset just past the fenced block that opens at line *opener*."""
-    tracker = FenceTracker()
-    tracker.classify(lines[opener])
+def _fence_end(
+    lines: list[str], starts: list[int], tracker: FenceTracker, opener: int, limit: int
+) -> int:
+    """Return the offset just past the fenced block that opens at line *opener*.
+
+    *tracker* has just classified the opening line, so it carries the fence
+    and the margin it opened at.
+    """
     for index in range(opener + 1, len(lines)):
         if tracker.classify(lines[index]) is LineRole.FENCE_CLOSE:
             return starts[index] + len(lines[index])
