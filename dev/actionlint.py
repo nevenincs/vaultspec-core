@@ -75,6 +75,22 @@ ARCHIVES: dict[tuple[str, str], tuple[str, str]] = {
         "linux_arm64.tar.gz",
         "325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6",
     ),
+    ("darwin", "x86_64"): (
+        "darwin_amd64.tar.gz",
+        "5b44c3bc2255115c9b69e30efc0fecdf498fdb63c5d58e17084fd5f16324c644",
+    ),
+    ("darwin", "arm64"): (
+        "darwin_arm64.tar.gz",
+        "aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f",
+    ),
+    ("windows", "amd64"): (
+        "windows_amd64.zip",
+        "6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9",
+    ),
+    ("windows", "aarch64"): (
+        "windows_arm64.zip",
+        "cadcf7ea4efe3a68728893813643cebe1185e5b1d4be5b96245f65c9a4d5ea41",
+    ),
 }
 
 #: The release artefact path under the download host, which `_download` joins
