@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Final
 
+from ._questions import SHORTLIST_LEXICAL, SHORTLIST_SIZE
+
 if TYPE_CHECKING:
     from ..core.windowing import Window
     from ..vaultcore.models import DocType
@@ -53,10 +55,11 @@ __all__ = [
 #: sit well inside the discovery reply budget.
 DEFAULT_RESULTS: Final = 5
 
-#: The most hits one search returns. A search reads about eleven records in
-#: full, so a larger page would only list weaker candidates, and ten hits with
-#: their excerpts stay under the envelope's hard reply ceiling.
-MAX_RESULTS: Final = 10
+#: The most hits one search returns: every record a search reads in full, so
+#: raising the limit reaches the whole ranking and no page needs an offset.
+#: Eleven hits with capped excerpts stay under the envelope's hard reply
+#: ceiling.
+MAX_RESULTS: Final = SHORTLIST_SIZE + SHORTLIST_LEXICAL
 
 #: Characters of a hit's answering excerpt a surface carries, clipped at a
 #: line boundary with ``core.windowing.clip_text``. Blocks run to about 1,400

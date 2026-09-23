@@ -143,3 +143,13 @@ def test_clip_text_cuts_at_the_limit_without_a_late_boundary() -> None:
 def test_clip_text_refuses_a_non_positive_limit(limit: int) -> None:
     with pytest.raises(ValueError, match="positive"):
         clip_text("text", limit)
+
+
+def test_a_window_that_cannot_be_resumed_reports_no_resume_point() -> None:
+    """A per-request ranking reports its total and marker but no next page."""
+    rows, window = apply_window(_rows(11), limit=5, pageable=False)
+
+    assert len(rows) == 5
+    assert window.as_fields() == {"returned": 5, "total": 11, "truncated": True}
+    notice = elision_line(window, "hits")
+    assert notice == "... 6 more hits (11 total; raise the limit)"

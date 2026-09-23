@@ -20,8 +20,11 @@ Four fields make a bounded contract, and all four are required (a fifth,
     back than matched" once ``offset`` is non-zero, and it is the first
     that a caller can act on.
 ``next_offset``
-    Where to resume, or ``None`` at the end. Paging is not optional: a cap
-    with no way past it converts a saturation failure into a workflow one.
+    Where to resume, or ``None`` at the end. A cap with no way past it
+    converts a saturation failure into a workflow one, so every window has
+    one: a listing resumes by offset, and a ranking computed per request -
+    whose whole result fits under its ceiling - is reached whole by raising
+    the limit instead, so its window is not pageable and names no offset.
 
 It lives in the shared core rather than under the CLI because bounding a
 return is a property of the domain, not of one presentation: the repair
@@ -63,11 +66,16 @@ class Window:
         total: Rows that matched before the cap was applied.
         returned: Rows actually carried by this response.
         offset: Index of the first returned row within the full result.
+        pageable: Whether a caller can resume past this window. A ranking
+            computed per request - a search's judged shortlist - cannot be
+            resumed by offset without recomputing it, so its window reports
+            the total and the truncation marker but no resume point.
     """
 
     total: int
     returned: int
     offset: int = 0
+    pageable: bool = True
 
     @property
     def truncated(self) -> bool:
@@ -76,9 +84,13 @@ class Window:
 
     @property
     def next_offset(self) -> int | None:
-        """The offset that resumes after this window, or ``None`` at the end."""
+        """The offset that resumes after this window.
+
+        ``None`` at the end, and always ``None`` for a window that is not
+        pageable.
+        """
         nxt = self.offset + self.returned
-        return nxt if nxt < self.total else None
+        return nxt if self.pageable and nxt < self.total else None
 
     def as_fields(self) -> dict[str, object]:
         """Render the window as envelope keys.
@@ -133,6 +145,7 @@ def apply_window[T](
     *,
     limit: int | None = None,
     offset: int = 0,
+    pageable: bool = True,
 ) -> tuple[list[T], Window]:
     """Cut *rows* to a bounded window and describe what was cut.
 
@@ -146,6 +159,8 @@ def apply_window[T](
             values above :data:`MAX_LIMIT` are clamped down.
         offset: Rows to skip, for resuming a previous window. Negative
             offsets are treated as zero.
+        pageable: ``False`` for a result the caller cannot resume by offset;
+            see :attr:`Window.pageable`.
 
     Returns:
         The bounded rows and the :class:`Window` describing them.
@@ -154,7 +169,9 @@ def apply_window[T](
     start = max(0, offset)
     end = start + _resolve_limit(limit)
     window_rows = list(rows[start:end])
-    return window_rows, Window(total=total, returned=len(window_rows), offset=start)
+    return window_rows, Window(
+        total=total, returned=len(window_rows), offset=start, pageable=pageable
+    )
 
 
 def windowed_section[T](
@@ -200,6 +217,8 @@ def elision_line(window: Window, noun: str) -> str | None:
     if not window.truncated:
         return None
     hidden = window.total - (window.offset + window.returned)
+    if not window.pageable:
+        return f"... {hidden:,} more {noun} ({window.total:,} total; raise the limit)"
     return (
         f"... {hidden:,} more {noun} "
         f"({window.total:,} total; --offset {window.next_offset} for the next page)"

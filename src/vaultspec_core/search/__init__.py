@@ -7,6 +7,7 @@ to the agent-level fallback. It never calls vaultspec-rag.
 
 from __future__ import annotations
 
+from ._corpus import SEARCHABLE_TYPES as SEARCHABLE_TYPES
 from ._credential import hosted_search_config as hosted_search_config
 from ._lexical import tokenize as tokenize
 from ._models import DEFAULT_RESULTS as DEFAULT_RESULTS
@@ -30,6 +31,7 @@ __all__ = [
     "EXCERPT_CHARS",
     "MAX_QUERY_CHARS",
     "MAX_RESULTS",
+    "SEARCHABLE_TYPES",
     "SUPPORTING_CHARS",
     "CredentialSource",
     "Excerpt",

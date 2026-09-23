@@ -104,7 +104,7 @@ def search_vault(
     records = load_records(root, doc_types=doc_types, feature=feature, date=date)
     size = _page_size(limit)
     if not records:
-        _, window = apply_window((), limit=size)
+        _, window = apply_window((), limit=size, pageable=False)
         return SearchOutcome(status=SearchStatus.OK, query=query, window=window)
     owned = client is None
     if client is None:
@@ -141,7 +141,7 @@ def search_vault(
     finally:
         if owned:
             client.close()
-    hits, window = apply_window(ranking.hits, limit=size)
+    hits, window = apply_window(ranking.hits, limit=size, pageable=False)
     return SearchOutcome(
         status=SearchStatus.OK,
         query=query,
