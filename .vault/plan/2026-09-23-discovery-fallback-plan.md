@@ -13,7 +13,7 @@ related:
   - '[[2026-09-23-typesafe-search-audit]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:6345e4e261140577dac2dda9c562e0e090e587e40585e94cb0f8ca63f804c59b'
+body_hash: 'sha256:9ee8ad8e3d621041cba58344ca7bd2844bf788c8a552fbe7ee0770535266185a'
 ---
 
 # `discovery-fallback` plan
@@ -54,7 +54,7 @@ No new costly decision is involved beyond the amendment.
 - [x] `S04` - Rewrite the bundled discovery guidance with single-home routing, search output handling, the unavailable branch and a degraded-mode grep carve-out, add a coverage-check method to the ADR skill and code-reviewer, then sync; `src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md, src/vaultspec_core/builtins/skills/vaultspec-code-research/, src/vaultspec_core/builtins/skills/vaultspec-curate/, src/vaultspec_core/builtins/skills/vaultspec-adr/, src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md, src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
 - [x] `S05` - Add hosted search and the degradation chain to the user discovery narrative and align the CLI and MCP remediation wording; `README.md, docs/framework.md, docs/CLI.md, docs/MCP.md`.
 - [x] `S07` - Emit ledger notes and verify lines that pass the markdown check, and repair existing rows through the writer; `src/vaultspec_core/vaultcore/exec_ledger.py`.
-- [ ] `S06` - Review the plan's changes against the amended ADR and append the findings to the rolling audit; `.vault/audit/2026-09-23-typesafe-search-audit.md`.
+- [x] `S06` - Review the plan's changes against the amended ADR and append the findings to the rolling audit; `.vault/audit/2026-09-23-typesafe-search-audit.md`.
 
 ## Parallelization
 

@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:6310468714b54eb645cf2a77eadcd54e67b9b59de5f77af95df1f6da8a296715'
+body_hash: 'sha256:77fff1ac75c432be3cfd1539f7488dfd41d0112d8900edfc571ddaaaa7d2039f'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -563,6 +563,100 @@ it were ever re-rendered through `format_note`, as `exec_fold.py:215` re-renders
 the backslashes would become literal characters inside a code span. No path re-renders
 this ledger today, so nothing else is needed.
 
+### discovery-fallback-final-rereview | low | The last fix round resolves every open medium and low finding; result PASS
+
+This re-review covered `1d0af619`, `477ca227` and `902bade5` against the six findings
+left open by the previous re-review, the listing-scope amendment of
+`2026-09-23-typesafe-search-adr`, and the envelope and tool-schema decisions. It
+re-traced only the changed behavior and how it interacts with the rest.
+
+Result: `PASS`. No critical or high finding is open. There are 4 new low findings
+below.
+
+The open findings are resolved as follows:
+
+- **log-verify-parity: resolved.** MCP `log` takes `verify: list[str] | None`
+  (`src/vaultspec_core/mcp_server/tools/exec.py:93`). Each spec goes through
+  `parse_verify_spec` into the shared `LogRequest` tuple (`exec.py:128`). A malformed
+  entry fails the whole call before anything is written: the ledger does not exist
+  after `test_malformed_requests_are_protocol_errors`
+  (`mcp_server/tests/test_log_tool.py:100,114`). Two checks land as two rows
+  (`test_log_tool.py:64,78`). `docs/MCP.md:938` matches the code.
+- **adr-listing-exemption: resolved.** The amendment note
+  (`.vault/adr/2026-09-23-typesafe-search-adr.md:238-251`) and the rule
+  (`src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md:23-30`) agree on
+  every term. The listing runs before a plan or ADR is written and for work outside a
+  plan. Under an approved plan, linked decisions stand in for both the decision search
+  and the listing, and code search still runs. The `.vaultspec/` copies equal the
+  builtins. The comment at `core/discovery_guidance.py:65` states the same scope and
+  cites no record.
+- **listing-dedup-scope: resolved.** Only a listing of all types or of `adr`, with no
+  `--feature` or `--date`, counts as step 4 (`vaultspec-discovery.builtin.md:43-44`).
+  `next_step` spells a multi-type request as the bare `vault list`
+  (`search/_remediation.py:120`), so that listing still counts. A filtered listing no
+  longer replaces the all-feature ADR listing.
+- **companion-null-vs-absent: resolved.** `discovery_fields` drops the key
+  (`search/_capability.py:114-119`), and both surfaces spread it
+  (`cli/status_cmd.py:294`, `mcp_server/tools/orientation.py:310`). The parity test
+  compares key presence (`test_orientation_tools.py:114-117`). `docs/CLI.md:863-865`
+  and `docs/MCP.md:689-690` say the key is absent.
+- **schema-null-invariant: resolved.** `mcp_server/tests/test_result_schema_nulls.py`
+  builds null-filled and nested replies from each tool's declared result type and
+  validates `_structured` output against the published schema. It can fail. With
+  `_structured` replaced by an unpruned `model_dump` in a scratch harness, 4 of 22 cases
+  fail (`search` and `status`, both fills, "None is not of type 'string'"). A new model
+  or field is covered without editing the file.
+- **ledger-hand-repair**: record only, unchanged.
+
+Mandates: parity holds, because both status surfaces and both log surfaces share one
+backend entry point and one request type. No duplicate type or helper was added. The
+changed code, tests and docs cite no vault record. They add no suppression, skip or
+mock. The new tests assert behavior, not copied output.
+
+Gates, run on the worktree, whose only difference from `902bade5` is line endings
+(`git diff --ignore-cr-at-eol` is empty):
+
+- `pytest` over `mcp_server`, `search`, `core/tests`, `tests/test_discovery_guidance.py`,
+  the corpus and budget tests, the CLI status, exec and vault-search tests, `dev/guards`
+  and `dev/tests`: 1230 passed, 3 deselected, 4 warnings.
+- `just check-markdown`: ok.
+- `just check-type-strict`: ok.
+- `vaultspec-core vault check all`: 1 warning, see ledger-annotations.
+
+### budget-headroom | low | Both text ratchets now sit within a handful of units of their ceilings
+
+The always-on layer counts 3198 words against `ALWAYS_ON_WORD_BUDGET = 3200`
+(`core/corpus_contracts.py:59`). The discovery rule grew from 419 to 449 words in
+`1d0af619`. The tool-definition surface measures 26,111 characters against
+`MAX_TOOL_DEFINITION_CHARS = 26_115` (`mcp_server/tests/test_context_budget.py:93`).
+Both gates pass. The next wording fix to any always-on rule, or to any tool parameter,
+will trip a gate unless it trims first. This repeats the pressure behind the
+tool-surface-ratchet recommendation.
+
+### schema-null-guard-scope | low | The null guard fills a dict-typed field with an empty dict, so a model nested in a dict is never exercised
+
+`_concrete` returns `{}` for any `dict` origin (`test_result_schema_nulls.py:81`). The
+original finding named a model nested in a dict as one of the unguarded shapes. No
+result model nests one today, since every `dict` field is `dict[str, Any]`
+(`mcp_server/results.py:70`), so no reply escapes the guard now. A future
+`dict[str, SomeModel]` would. `_tool_contracts` also takes `vault_root` only to discard
+it (`test_result_schema_nulls.py:115`).
+
+### sync-test-asyncio-mark | low | The new companion test is synchronous under a module-wide asyncio mark
+
+`test_a_failed_companion_probe_omits_the_key_on_both_surfaces`
+(`mcp_server/tests/test_orientation_tools.py:121`) is a plain function in a module whose
+`pytestmark` applies `asyncio`. The run emits a PytestWarning for it. Two older tests
+share the pattern (`test_hook_verb_denial.py:161`, `test_tool_surface.py:340`). The
+test still runs and asserts. The warning is noise that could hide a real one.
+
+### ledger-annotations | low | The discovery-fallback ledger keeps two template comment blocks that vault check flags
+
+`vaultspec-core vault check all` warns that
+`.vault/exec/2026-09-23-discovery-fallback/2026-09-23-discovery-fallback-ledger.md:13,24`
+retains 2 HTML comment blocks. It is the only one of 88 ledgers that still carries them.
+The warning predates this round and is fixable. The check passes with the warning.
+
 ## Recommendations
 
 - credential-gate: also require that the running interpreter is the workspace's own
@@ -646,3 +740,12 @@ this ledger today, so nothing else is needed.
   field `None`, passes it through `_structured`, and validates it against the tool's
   published schema. Owner: S01. No new decision is needed.
 - ledger-hand-repair: record only; no action.
+- budget-headroom: decide the tool-surface-ratchet recommendation before the next rule
+  or parameter wording change, and give the always-on word budget the same treatment.
+  Restating a ceiling is a decision; trimming is not.
+- schema-null-guard-scope: generate one entry for a `dict` whose value type is a model
+  or dataclass, and drop the unused `vault_root` parameter. Test-only; no new decision.
+- sync-test-asyncio-mark: exempt the synchronous tests from the module mark, or move them
+  to a module without it. Test-only; no new decision.
+- ledger-annotations: run `vaultspec-core vault check annotations --fix` on the ledger.
+  No new decision.
