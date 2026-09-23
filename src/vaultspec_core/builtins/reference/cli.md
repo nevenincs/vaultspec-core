@@ -45,8 +45,13 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.4`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.2.4`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core commit-gate`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -63,6 +68,8 @@ hand-edit between the markers.
 - `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
+- `vaultspec-core commit-gate` - Check the files a commit stages, in one read-only
+  process.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
 - `vaultspec-core status` - Orient in a vaultspec vault: rollup, or a grounding trace
   for a target.

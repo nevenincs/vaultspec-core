@@ -26,6 +26,7 @@ from __future__ import annotations
 # The names pulled in here are re-exported for compatibility with call sites
 # that imported them directly from this module.
 from vaultspec_core.cli.root_app import app, main
+from vaultspec_core.cli.root_commit_gate import cmd_commit_gate
 from vaultspec_core.cli.root_doctor import cmd_check_providers, cmd_doctor
 from vaultspec_core.cli.root_install import cmd_install, cmd_uninstall
 from vaultspec_core.cli.root_preflight import logger, run_preflight
@@ -44,6 +45,7 @@ app.command("install")(cmd_install)
 app.command("uninstall")(cmd_uninstall)
 app.command("sync")(cmd_sync)
 app.command("check-providers", hidden=True)(cmd_check_providers)
+app.command("commit-gate")(cmd_commit_gate)
 app.command("doctor")(cmd_doctor)
 
 

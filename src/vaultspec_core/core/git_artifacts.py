@@ -11,10 +11,13 @@ from __future__ import annotations
 import logging
 import subprocess
 from pathlib import Path, PurePosixPath
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from .gitattributes import has_valid_block as _ga_has_valid_block
 from .gitignore import get_recommended_entries, managed_lock_candidates
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,8 @@ ManagedBlock = Literal["gitignore", "gitattributes"]
 
 __all__ = [
     "check_staged_provider_artifacts",
+    "per_machine_paths",
+    "staged_paths",
 ]
 
 
@@ -312,29 +317,20 @@ def _covered_by_entry(path: str, entry: str) -> bool:
     return path == pattern
 
 
-def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
-    """Return staged paths that are per-machine artifacts.
-
-    A path is per-machine when the managed ``.gitignore`` block covers it:
-    snapshots, the install manifest, lock sentinels and the vault's local
-    caches, as :func:`~vaultspec_core.core.gitignore.get_recommended_entries`
-    computes them. Deriving the guard from that same source keeps the two from
-    drifting. Team-shared projections such as ``CLAUDE.md``, ``.mcp.json`` and
-    the provider rule directories are not in the block, so they pass.
+def staged_paths(root: Path) -> list[str]:
+    """Return the paths staged for commit in *root*, deletions excluded.
 
     Runs ``git diff --cached --name-only --diff-filter=ACMR``. The ``ACMR``
     filter excludes staged deletions so remediation commits are not blocked by
     the hook that recommends them.
 
     Args:
-        cwd: Workspace root to run ``git`` in.  Defaults to the caller's
-            current working directory (pre-commit hook behaviour).  Tests pass
-            an explicit path to avoid mutating global process state.
+        root: Workspace root to run ``git`` in.
 
     Returns:
-        The staged per-machine paths, as ``git`` printed them.
+        Root-relative paths as ``git`` prints them; empty when *root* is not a
+        repository or ``git`` is unavailable.
     """
-    root = cwd if cwd is not None else Path.cwd()
     try:
         result = subprocess.run(
             [
@@ -348,15 +344,52 @@ def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
+    return result.stdout.strip().splitlines()
 
+
+def per_machine_paths(root: Path, paths: Iterable[str]) -> list[str]:
+    """Return the *paths* that are per-machine artifacts.
+
+    A path is per-machine when the managed ``.gitignore`` block covers it:
+    snapshots, the install manifest, lock sentinels and the vault's local
+    caches, as :func:`~vaultspec_core.core.gitignore.get_recommended_entries`
+    computes them. Deriving the guard from that same source keeps the two from
+    drifting. Team-shared projections such as ``CLAUDE.md``, ``.mcp.json`` and
+    the provider rule directories are not in the block, so they pass.
+
+    Args:
+        root: Workspace root the paths are relative to.
+        paths: Root-relative candidate paths.
+
+    Returns:
+        The per-machine paths among *paths*, in their given spelling.
+    """
     entries = get_recommended_entries(root)
-    violations: list[str] = []
-    for path in result.stdout.strip().splitlines():
-        normalized = path.replace("\\", "/")
-        if any(_covered_by_entry(normalized, entry) for entry in entries):
-            violations.append(path)
-    return violations
+    return [
+        path
+        for path in paths
+        if any(_covered_by_entry(path.replace("\\", "/"), entry) for entry in entries)
+    ]
+
+
+def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
+    """Return staged paths that are per-machine artifacts.
+
+    Combines :func:`staged_paths` and :func:`per_machine_paths`.
+
+    Args:
+        cwd: Workspace root to run ``git`` in.  Defaults to the caller's
+            current working directory (pre-commit hook behaviour).  Tests pass
+            an explicit path to avoid mutating global process state.
+
+    Returns:
+        The staged per-machine paths, as ``git`` printed them.
+    """
+    root = cwd if cwd is not None else Path.cwd()
+    return per_machine_paths(root, staged_paths(root))
