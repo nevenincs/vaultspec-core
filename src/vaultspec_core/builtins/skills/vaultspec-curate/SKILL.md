@@ -61,10 +61,10 @@ The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
   stopped on a refusal (`content_rejected` or `request_too_large`) means no read settled
   it: cross-reference one other ADR on its own, and if that is judged, cross-reference
   the first refused ADR on its own. If it is refused again, its refusal is its own:
-  record it and resume with `--after` set to it. Otherwise resume as usual. A source
-  that is `unavailable` inside a sweep that did not stop was refused on its own text:
-  record it. Read the ADRs behind each `link` verdict and each `weak` declared link, and
-  judge them. Then search decisions and vault facts with
+  record it and resume with `--after` set to it. Otherwise resume as usual. Every
+  refused source at or before `next_after` was refused on its own text, whether or not
+  the sweep stopped: record it. Read the ADRs behind each `link` verdict and each `weak`
+  declared link, and judge them. Then search decisions and vault facts with
   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
   run the next step its reply names. Surface the ADRs covering the same concept, read
   them whole, and judge agreement, duplication, contradiction, or fragmentation (a

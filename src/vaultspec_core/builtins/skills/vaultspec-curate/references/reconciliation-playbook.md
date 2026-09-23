@@ -34,11 +34,11 @@ For each cluster of decisions on a shared concept:
   or `request_too_large`) means no read settled it: cross-reference one other ADR on its
   own, and if that is judged, cross-reference the first refused ADR on its own. If it is
   refused again, its refusal is its own: record it and resume with `--after` set to it.
-  Otherwise resume as usual. A source that is `unavailable` inside a sweep that did not
-  stop was refused on its own text: record it. Each `link` verdict is a candidate
-  missing link; each `weak` verdict is a declared link judged below the threshold. The
-  `relation` label says which pairs to read in full; it does not classify the pair for
-  you.
+  Otherwise resume as usual. Every refused source at or before `next_after` was refused
+  on its own text, whether or not the sweep stopped: record it. Each `link` verdict is a
+  candidate missing link; each `weak` verdict is a declared link judged below the
+  threshold. The `relation` label says which pairs to read in full; it does not classify
+  the pair for you.
 - Surface the cluster by meaning. Search decisions and vault facts with
   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
   run the next step its reply names. Semantic recall finds same-topic ADRs that share no
