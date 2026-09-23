@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:ec6401dee946c1e1dfb5129dd07f2ad6f7c94fede51b38340486e65ddaeb81dd'
+body_hash: 'sha256:45221341655aafa305532677182185e0fa29f4f36e336e4080992cf107caea75'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -247,3 +247,5 @@ related:
 - `S10` `M` `src/vaultspec_core/plan/serialiser.py`
 - `S10` `verify:` `pytest checks, plan` -> `pass`
 - `S09` `verify:` `basedpyright guard` -> `pass`
+- `S09` `M` `src/vaultspec_core/search/tests/test_live.py`
+- `S09` `verify:` `pytest -m typesafe test_live.py with the key only in the workspace .env` -> `pass`

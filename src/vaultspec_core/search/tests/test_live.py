@@ -1,8 +1,10 @@
 """Hosted vault search against the live TypeSafe API.
 
-Deselected by default: select with ``-m typesafe`` and export
-``VAULTSPEC_CORE_TYPESAFE_API_KEY``. Selecting it without a key fails rather
-than passing vacuously, because a green run must mean the provider answered.
+Deselected by default: select with ``-m typesafe``. The key is resolved for
+this checkout as the product resolves it: ``VAULTSPEC_CORE_TYPESAFE_API_KEY``
+from the environment, else from the workspace ``.env``. Selecting it without a
+key fails rather than passing vacuously, because a green run must mean the
+provider answered.
 
 The vault is synthetic and small, written so that each question has exactly
 one record that owns its answer and several that only touch the subject: a
@@ -15,23 +17,24 @@ is reported as unanswered - not scores copied from a run.
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 from vaultspec_core.search import SearchStatus, search_vault
-from vaultspec_core.search._credential import CREDENTIAL_VARIABLE
+from vaultspec_core.search._credential import CREDENTIAL_VARIABLE, resolve_credential
 from vaultspec_core.vaultcore.models import DocType
 
 from .test_corpus import file_lines, write_record
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from vaultspec_core.search import SearchOutcome
 
 pytestmark = [pytest.mark.typesafe]
+
+#: The checkout this suite runs from, whose ``.env`` may hold the key.
+WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
 
 #: The sentence the decision record owns; the question below paraphrases it.
 ANSWER = (
@@ -92,10 +95,16 @@ Every fix shipped as its own release, and the changelog became unreadable.
 
 @pytest.fixture
 def environ() -> dict[str, str]:
-    key = os.environ.get(CREDENTIAL_VARIABLE, "").strip()
-    if not key:
-        pytest.fail(f"the typesafe marker needs {CREDENTIAL_VARIABLE} to be set")
-    return {CREDENTIAL_VARIABLE: key}
+    # Resolved for this checkout exactly as the product resolves it - the
+    # process environment first, then the workspace .env - so the live run
+    # also proves the key loads from where a contributor keeps it.
+    credential = resolve_credential(WORKSPACE_ROOT)
+    if credential is None:
+        pytest.fail(
+            f"the typesafe marker needs {CREDENTIAL_VARIABLE} in the environment "
+            f"or in {WORKSPACE_ROOT / '.env'}"
+        )
+    return {CREDENTIAL_VARIABLE: credential.key}
 
 
 @pytest.fixture
