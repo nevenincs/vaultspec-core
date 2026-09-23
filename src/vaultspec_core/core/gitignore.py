@@ -6,7 +6,9 @@ import logging
 from pathlib import Path
 
 from .enums import ManagedState, Tool
+from .exceptions import VaultSpecError
 from .helpers import advisory_lock, atomic_write_bytes
+from .prek_boundary import PREK_CONFIG_NAME
 from .workspace_mode import read_hooks_declaration
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,33 @@ def _lock_subjects(target: Path) -> tuple[Path, ...]:
     return tuple(sorted(s for s in subjects if _is_within(s, target)))
 
 
+def _retired_lock_subjects(target: Path) -> frozenset[Path]:
+    """Return the lock subjects Core will not lock again in *target*.
+
+    ``.pre-commit-config.yaml`` is locked only by the hook scaffold, which
+    never runs once the workspace declares ``hooks.pre_commit`` false or
+    ``prek.toml`` owns the hook boundary. Its sentinel then has no producer, so
+    it is neither worth an ignore line nor worth keeping on disk. The subject
+    stays in :func:`_lock_subjects` because a sentinel committed before the
+    retirement is still Core's to disown.
+
+    A malformed declaration makes the scaffold refuse loudly rather than skip,
+    so it retires nothing here: listing a sentinel that never appears costs one
+    inert line, and pruning must not act on a policy nobody could read.
+
+    Args:
+        target: Workspace root directory.
+    """
+    config = target / ".pre-commit-config.yaml"
+    if (target / PREK_CONFIG_NAME).exists():
+        return frozenset({config})
+    try:
+        declined = not read_hooks_declaration(target).pre_commit
+    except VaultSpecError:
+        return frozenset()
+    return frozenset({config}) if declined else frozenset()
+
+
 def _is_within(path: Path, root: Path) -> bool:
     """Return ``True`` when *path* is contained by *root*."""
     try:
@@ -116,13 +145,15 @@ def managed_lock_candidates(target: Path) -> tuple[str, ...]:
 
 
 def prune_orphaned_lock_sentinels(target: Path) -> list[str]:
-    """Delete Core-owned lock sentinels whose subject file no longer exists.
+    """Delete Core-owned lock sentinels that nothing will lock again.
 
     A sentinel outlives its subject when a managed file is retired - most
     notably ``.pre-commit-config.yaml.lock`` after a checkout migrates to
-    ``prek.toml``.  The managed block ignores such an orphan, so this is
-    housekeeping rather than the thing that keeps it out of ``git status``:
-    a sentinel whose subject is gone has nothing left to lock.
+    ``prek.toml``.  A sentinel whose subject is gone has nothing left to lock.
+    Nor does one whose subject Core has stopped locking (see
+    :func:`_retired_lock_subjects`), even while a leftover subject remains on
+    disk; the managed block stops ignoring that sentinel, so removing it is
+    what keeps it out of ``git status``.
 
     Only empty sentinels are removed: ``advisory_lock`` never writes to the file,
     so a non-empty ``.lock`` sibling belongs to someone else and is left alone.
@@ -134,8 +165,9 @@ def prune_orphaned_lock_sentinels(target: Path) -> list[str]:
         Root-relative POSIX paths of the sentinels actually removed.
     """
     removed: list[str] = []
+    retired = _retired_lock_subjects(target)
     for subject in _lock_subjects(target):
-        if subject.exists():
+        if subject.exists() and subject not in retired:
             continue
         sentinel = _sentinel_for(subject)
         try:
@@ -221,10 +253,17 @@ def get_recommended_entries(target: Path) -> list[str]:
         # this same surface, so deriving both from it keeps the block and the
         # untracker in step.  Listing a sentinel that never materialises costs
         # one inert line; omitting one that does costs the reader a per-machine
-        # artefact in their first commit.
+        # artefact in their first commit.  A subject Core has retired is the
+        # exception: nothing will produce its sentinel, and the pruner removes
+        # any it left behind.
         if framework_installed:
+            retired = {
+                _sentinel_for(subject).relative_to(target).as_posix()
+                for subject in _retired_lock_subjects(target)
+            }
             for lock_path in managed_lock_candidates(target):
-                entries.add(f"/{lock_path}")
+                if lock_path not in retired:
+                    entries.add(f"/{lock_path}")
 
         # ``.pre-commit-config.yaml`` is team-shared while a workspace wants
         # hooks, so it is deliberately absent from the block above even though

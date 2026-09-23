@@ -407,3 +407,53 @@ class TestMigrateHonoursTheDecline:
         assert result.status == "declined"
         assert result.yaml_removed is True
         assert (tmp_path / _CONFIG).exists()
+
+
+class TestConfigLockSentinel:
+    """``/.pre-commit-config.yaml.lock`` is listed only while something takes it.
+
+    The scaffold is the only thing that locks the config, and it does not run
+    once the workspace declines the hooks or ``prek.toml`` owns them.
+    """
+
+    def test_default_workspace_lists_the_sentinel(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+
+        assert f"/{_CONFIG}.lock" in get_recommended_entries(factory.root)
+
+    def test_declined_workspace_omits_the_sentinel(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        _decline(factory.root)
+
+        entries = get_recommended_entries(factory.root)
+
+        assert f"/{_CONFIG}.lock" not in entries
+        assert f"/{_CONFIG}" in entries
+
+    def test_prek_owned_workspace_omits_the_sentinel(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        _hookless_prek(factory.root)
+
+        assert f"/{_CONFIG}.lock" not in get_recommended_entries(factory.root)
+
+    def test_sync_removes_the_sentinel_beside_a_leftover_config(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """A sentinel no longer ignored must not linger as untracked noise."""
+        factory.install()
+        sentinel = factory.root / f"{_CONFIG}.lock"
+        assert sentinel.is_file()
+        _decline(factory.root)
+
+        factory.sync()
+
+        assert (factory.root / _CONFIG).exists()
+        assert not sentinel.exists()
+        text = (factory.root / ".gitignore").read_text(encoding="utf-8")
+        assert f"/{_CONFIG}.lock\n" not in text
