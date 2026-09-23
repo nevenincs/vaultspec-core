@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:8186733ae2f5d6205c7259d454648d61666714d7770178e845b09b882308a9a8'
+body_hash: 'sha256:59b5f900a4be4c2b476bbf55885c6924bc26f19e4e2067c8138f868d7f26067c'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -59,3 +59,13 @@ related:
 - `S05` `M` `docs/CLI.md`
 - `S05` `M` `src/vaultspec_core/builtins/reference/cli.md`
 - `S05` `verify:` `pytest src/vaultspec_core/mcp_server` -> `pass`
+- `S06` `M` `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`
+- `S06` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S06` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/references/reconciliation-playbook.md`
+- `S06` `M` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
+- `S06` `M` `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`
+- `S06` `verify:` `pytest test_cli_reference_drift test_corpus_contracts test_discovery_guidance test_cli_language_contract test_template_annotations` -> `pass`
+
+## Notes
+
+- `S06` S06: vaultspec-core sync previewed no changes; this repository refreshes its tracked .vaultspec snapshots in a separate framework commit, so only the builtin sources changed.

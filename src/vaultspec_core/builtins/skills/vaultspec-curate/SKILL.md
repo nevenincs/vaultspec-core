@@ -50,7 +50,11 @@ The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
 - **Ground.** Build the decision inventory: `vaultspec-core vault list adr --json` for
   the set, the body H1 (and any legacy status section) for each declared status, and
   `vaultspec-core vault graph --json` for the supersession and relatedness edges.
-- **Reconcile decision-vs-decision.** Search decisions and vault facts with
+- **Reconcile decision-vs-decision.** Start from a bounded cross-reference sweep:
+  `vaultspec-core vault adr crossref --all` (MCP: `crossref`), or `--feature`, resumed
+  with `--after <next_after>` until nothing remains. Each run judges at most 50 ADRs
+  within fixed request and time ceilings. Read the ADRs behind each `link` verdict and
+  each `weak` declared link, and judge them. Then search decisions and vault facts with
   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
   run the next step its reply names. Surface the ADRs covering the same concept, read
   them whole, and judge agreement, duplication, contradiction, or fragmentation (a

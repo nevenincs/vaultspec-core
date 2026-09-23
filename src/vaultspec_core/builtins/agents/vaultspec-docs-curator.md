@@ -34,12 +34,14 @@ body heading. Record `supersedes` and `superseded_by` edges from
 
 ## Reconcile
 
-- Decision against decision: Search decisions and vault facts with
-  `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
-  run the next step its reply names. Read the candidates whole, judge agreement,
-  duplication, contradiction, or fragmentation. Walk each supersession chain end to end.
-  Refinements chained as supersessions, or sibling `accepted` records on one scope, are
-  one fragmented decision.
+- Decision against decision: start with `vaultspec-core vault adr crossref --all --json`
+  (or `--feature <feature>`), resumed with `--after <next_after>` until `remaining` is
+  0\. Read the ADRs behind each `link` verdict and each `weak` declared link. Then search
+  decisions and vault facts with `vaultspec-core vault search "<question>"`; when it
+  declines or fails, run the next step its reply names. Read the candidates whole, judge
+  agreement, duplication, contradiction, or fragmentation. Walk each supersession chain
+  end to end. Refinements chained as supersessions, or sibling `accepted` records on one
+  scope, are one fragmented decision.
 - Decision against code:
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
   whole, confirm with grep that the decision is implemented. For a retired decision,
@@ -59,6 +61,9 @@ body heading. Record `supersedes` and `superseded_by` edges from
   (`vaultspec-core vault adr supersede`, `vaultspec-core vault set-frontmatter`,
   `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
   `vaultspec-core vault link`), never a raw edit of frontmatter.
+- Apply directly, once confirmed by reading both ADRs: a missing cross-reference, with
+  `vaultspec-core vault link add`. Never remove a `weak` declared link; record it with a
+  recommendation.
 - Apply directly, boundary conformance: replace restated evidence in an ADR with a stem
   citation; strip decision language from a research or audit body where an accepted ADR
   records the same decision, leaving a one-line pointer. Two invariants: no fact is
