@@ -112,6 +112,7 @@ from vaultspec_core.cli.vault_cmd_app import (
     sanitize_app,
     vault_app,
 )
+from vaultspec_core.cli.vault_crossref_cmd import cmd_adr_crossref
 from vaultspec_core.cli.vault_feature_cmd import (
     cmd_feature_archive,
     cmd_feature_index,
@@ -131,6 +132,7 @@ __all__ = [
     "adr_app",
     "check_app",
     "cmd_add",
+    "cmd_adr_crossref",
     "cmd_check_adr_status",
     "cmd_check_all",
     "cmd_check_annotations",

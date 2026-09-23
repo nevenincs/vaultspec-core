@@ -123,6 +123,7 @@ of that release; it is never hand-maintained.
 
 Commands:
 
+- `vaultspec-core vault adr crossref`
 - `vaultspec-core vault search`
 
 MCP tools:
@@ -231,6 +232,8 @@ full options.
 
 #### Adr
 
+- `vaultspec-core vault adr crossref` - Find the ADRs a decision should cross-reference,
+  within fixed bounds.
 - `vaultspec-core vault adr supersede` - Supersede an old ADR with a new ADR.
 
 #### Plan
@@ -1549,6 +1552,99 @@ Supersede an old ADR with a new ADR.
 
   ```bash
   vaultspec-core vault adr supersede 2026-05-17-old-adr-stem --by 2026-05-26-new-adr-stem
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault adr crossref
+
+```bash
+vaultspec-core vault adr crossref [OPTIONS] [REFS]...
+```
+
+Find the ADRs a decision should cross-reference. Each source ADR is judged against every
+other ADR in the vault, and the reply lists the ones it should link and the links it
+already declares that were judged weak. With `--apply`, the new links are written into
+the source's `related:` field. The same backend serves the MCP `crossref` tool.
+
+The judgment runs in three stages, each with a fixed ceiling, so a run's cost does not
+grow with the size of the vault:
+
+- Every other ADR is ranked by code alone: the code identifiers the two decisions share
+  (module and file paths, CLI verbs, configuration variables) and the overlap between
+  the source's decision text and each candidate's title. Nothing is sent.
+- The best 192 candidates are put to hosted search as Choice questions of at most 32
+  options each.
+- The best 32 of the combined ranking, plus up to 8 declared links outside them, are
+  judged in pairs.
+
+A source costs at most 46 requests and 60 seconds. A sweep takes at most 50 sources and
+300 seconds, and the vault may hold at most 5,000 ADRs.
+
+Cross-referencing uses the hosted-search key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
+[environment variables](#environment-variables)) and sends ADR text to the TypeSafe API.
+Without a key it sends nothing, reports that it is not configured, and names the listing
+to use instead.
+
+Output lists each source, then its verdicts. A `link` verdict means the source should
+link that ADR; it is marked `new`, `declared`, or `written`. A `weak` verdict is a link
+the source already declares, judged below the threshold. Weak links are listed for a
+reader to check and are never removed. Each verdict also carries an advisory relation:
+`supersedes`, `refines`, `depends_on`, `conflicts`, `shared_artifact`, `topic_only`, or
+`unrelated`. It tells an author which pairs to read in full; it does not decide
+anything.
+
+#### Arguments
+
+- `REFS` - ADRs to cross-reference: a stem, filename, path, or `[[wiki-link]]`. One ADR
+  is judged on its own; several make a sweep.
+
+#### Options
+
+- `--feature TAG` (`-f`) - Sweep this feature's ADRs.
+- `--all` (default off) - Sweep every ADR that still governs. Superseded and rejected
+  ADRs are skipped unless named.
+- `--isolated` (default off) - Sweep only ADRs that link no other ADR.
+- `--after STEM` - Resume a sweep after this stem: the `next_after` a previous sweep
+  reported. Sweeps run in stem order and store no state.
+- `--max-sources N` (default `10`) - Most ADRs one sweep judges, from `1` to `50`.
+- `--apply` (default off) - Write each new `link` verdict into the source's `related:`,
+  as each source finishes. Nothing is removed, and no candidate is written to.
+- `--json` (default off) - Emit machine-readable output
+  (`vaultspec.vault.adr.crossref.v1`).
+- `--target` (`-t`) - Target directory (defaults to current working directory).
+
+Under `--json`, `data.sources` holds one entry per source judged, with its `status`
+(`ok`, `not_configured`, or `unavailable`), its `verdicts` (`stem`, `kind`, `score`,
+`relation`, `status`, `declared`, and `applied` when written), and the counts `links`,
+`written`, and `verdicts_total`. A reply carries at most 80 verdict rows; a source whose
+rows were cut has `truncated` set. `data` also carries the totals `judged`, `links`, and
+`written`, the number of sources `remaining`, `next_after` when sources remain,
+`stopped` when a sweep ended early, and `usage` when anything was sent.
+
+Exit codes:
+
+- `0` - Every source taken was judged (envelope `status` `unchanged`, or `updated` when
+  `--apply` wrote links), or hosted search is not configured (envelope `status`
+  `skipped`).
+- `1` - Hosted search is configured but a source could not be judged (envelope `status`
+  `failed`). A sweep stops there and reports where to resume.
+- `2` - Invalid input: no source or sweep option, a `REFS` entry that is not an ADR of
+  this vault, a vault with more than 5,000 ADRs, or `--max-sources` outside `1..50`.
+
+#### Examples
+
+- **Check a newly drafted ADR before presenting it**:
+
+  ```bash
+  vaultspec-core vault adr crossref 2026-09-23-adr-crossref-adr
+  ```
+
+- **Link the ADRs that link nothing yet, ten at a time**:
+
+  ```bash
+  vaultspec-core vault adr crossref --isolated --apply
+  vaultspec-core vault adr crossref --isolated --apply --after 2026-03-23-roadmap-adr
   ```
 
 ______________________________________________________________________

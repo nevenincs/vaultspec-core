@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:6ac9333cb58f1111ef6eb18fff785a07947bca2790c3b380f6b42a54ffeae38a'
+body_hash: 'sha256:04b5d70cbdafc7bd09368836dcc5192ede70085a33edb59b35a1278344f32bb2'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -38,3 +38,9 @@ related:
 - `S03` `A` `src/vaultspec_core/crossref/tests/vault.py`
 - `S03` `M` `pyproject.toml`
 - `S03` `verify:` `ruff check and basedpyright on src/vaultspec_core/crossref` -> `pass`
+- `S04` `A` `src/vaultspec_core/cli/vault_crossref_cmd.py`
+- `S04` `A` `src/vaultspec_core/tests/cli/test_vault_crossref_cmd.py`
+- `S04` `M` `src/vaultspec_core/cli/vault_cmd.py`
+- `S04` `M` `docs/CLI.md`
+- `S04` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S04` `verify:` `pytest tests/cli/test_vault_crossref_cmd.py dev/guards/test_cli_handbook_drift.py tests/cli/test_cli_reference_drift.py tests/cli/test_cli_reference_generated.py` -> `pass`
