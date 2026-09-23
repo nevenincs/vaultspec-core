@@ -55,9 +55,9 @@ def cmd_doctor(
         typer.Option(
             "--gate-errors",
             help=(
-                "Exit 0 on warnings; fail (exit 2) only on errors. For the "
-                "pre-commit gate, where warning-level provider-mirror lag is an "
-                "expected steady state that must not block commits."
+                "Exit 0 on warnings; fail (exit 2) only on errors. For CI and "
+                "other automation gates, where warning-level provider-mirror lag "
+                "is an expected steady state that must not fail the run."
             ),
         ),
     ] = False,
@@ -982,12 +982,11 @@ def doctor_exit_code(
 def _gate(exit_code: int, *, gate_errors: bool) -> int:
     """Fold the warning exit to 0 when *gate_errors* is set.
 
-    The doctor's native contract is 0/1/2 for ok/warnings/errors. The
-    pre-commit gate opts into error-only blocking with ``--gate-errors``:
+    The doctor's native contract is 0/1/2 for ok/warnings/errors. An
+    automation gate opts into error-only blocking with ``--gate-errors``:
     warning-level provider-mirror lag is the expected steady state after any
-    builtins change (``check-provider-artifacts`` forbids committing the
-    regenerated mirror), so a warning-strict gate would deadlock every commit.
-    Errors (exit 2) still fail; a clean run (0) is unaffected.
+    builtins change, so a warning-strict gate would fail every run. Errors
+    (exit 2) still fail; a clean run (0) is unaffected.
 
     Args:
         exit_code: The native doctor exit code (0, 1, or 2).

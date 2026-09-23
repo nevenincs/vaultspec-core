@@ -250,8 +250,12 @@ your installation route.
 and selection rules.
 
 **Pre-commit hooks.** Generated configuration doesn't activate a Git hook. If you use
-pre-commit, run `pre-commit install` to activate it. The generated hooks check the whole
-vault rather than only staged files, and never modify documents.
+pre-commit or prek, run `pre-commit install` or `prek install` to activate it. The
+generated configuration has one hook, [`commit-gate`](CLI.md#commit-gate). It checks
+only the staged vault documents, blocks only on errors the commit introduces, and never
+modifies documents. It doesn't check the vault as a whole: run
+`vaultspec-core vault check all` in CI for orphans, feature coverage, and cross-document
+references.
 
 Use the [pre-commit controls](CLI.md#vaultspec-core-spec-precommit) to enable or disable
 configuration generation. These settings don't remove an existing configuration or

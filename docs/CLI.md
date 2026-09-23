@@ -2214,8 +2214,8 @@ reported as warnings and are not modified.
 - `--target DIR` (`-t`, default cwd) - Diagnose a directory other than the current one.
 - `--json` (default off) - Emit the diagnosis as JSON.
 - `--gate-errors` (default off) - Exit `0` on warnings and fail (exit `2`) only on
-  errors. Intended for the pre-commit gate, where warning-level provider-mirror lag is
-  an expected steady state that must not block a commit.
+  errors. Intended for CI and other automation gates, where warning-level
+  provider-mirror lag is an expected steady state that must not fail the run.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 
