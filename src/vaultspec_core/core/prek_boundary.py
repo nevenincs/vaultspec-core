@@ -223,6 +223,8 @@ class PrekMigrationResult:
     Attributes:
         status: One of ``migrated`` (block written), ``unchanged``
             (canonical hooks already present, byte-for-byte no-op),
+            ``declined`` (the workspace declaration refuses the hooks;
+            nothing transplanted),
             ``no_prek_config`` (``prek.toml`` absent; nothing to migrate
             into), ``unparseable`` (``prek.toml`` is not valid TOML;
             refusing to append to a broken file), or ``conflicting``
@@ -274,6 +276,12 @@ def migrate_hooks_to_prek(
     TOML outside the markers is never parsed for writing, only read for
     the boundary assessment.
 
+    A workspace whose committed declaration sets ``hooks.pre_commit`` to
+    ``false`` has refused the hooks, so nothing is transplanted and the
+    status is ``declined``. ``remove_yaml`` still deletes a leftover
+    ``.pre-commit-config.yaml`` in that state: the declaration already says
+    the file is unwanted, and the operator asked for the removal.
+
     Args:
         target: Workspace root directory.
         mode: Provisioning mode to render entries for; resolved from the
@@ -281,15 +289,35 @@ def migrate_hooks_to_prek(
         dry_run: Report the outcome without writing anything.
         remove_yaml: Also delete the superseded ``.pre-commit-config.yaml``
             once the canonical hooks are verifiably present in
-            ``prek.toml``. Deletion is refused in every other state; prek
-            silently ignores the YAML, so leaving it is safe and removing
-            it is a tidiness action, never a repair.
+            ``prek.toml``, or when the workspace declined the hooks.
+            Deletion is refused in every other state; prek silently ignores
+            the YAML, so leaving it is safe and removing it is a tidiness
+            action, never a repair.
 
     Returns:
         A :class:`PrekMigrationResult` describing what happened.
     """
     from .helpers import atomic_write
-    from .workspace_mode import resolve_render_mode
+    from .workspace_mode import read_hooks_declaration, resolve_render_mode
+
+    config_path = target / PREK_CONFIG_NAME
+    yaml_path = target / ".pre-commit-config.yaml"
+
+    if not read_hooks_declaration(target).pre_commit:
+        detail = (
+            "the workspace declaration sets hooks.pre_commit to false; no hooks "
+            "transplanted (run 'vaultspec-core spec precommit enable' to "
+            "restore them)"
+        )
+        if remove_yaml and yaml_path.exists():
+            if not dry_run:
+                yaml_path.unlink()
+            return PrekMigrationResult(
+                status="declined",
+                detail=detail + "; removed leftover .pre-commit-config.yaml",
+                yaml_removed=True,
+            )
+        return PrekMigrationResult(status="declined", detail=detail)
 
     if mode is None:
         mode = resolve_render_mode(target)
@@ -308,9 +336,6 @@ def migrate_hooks_to_prek(
             status="unparseable",
             detail="prek.toml is not valid TOML; fix it before migrating",
         )
-
-    config_path = target / PREK_CONFIG_NAME
-    yaml_path = target / ".pre-commit-config.yaml"
 
     if boundary.hooks_present:
         result = PrekMigrationResult(

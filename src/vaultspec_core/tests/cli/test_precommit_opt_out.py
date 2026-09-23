@@ -338,3 +338,72 @@ class TestDoctorHonoursTheDecline:
         assert "info" in row
         assert "warn" not in row
         assert (factory.root / _CONFIG).exists()
+
+
+class TestMigrateHonoursTheDecline:
+    """``spec precommit migrate`` must not write the hooks a workspace refused."""
+
+    def test_prek_toml_is_left_byte_identical(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        import json
+
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        root = _bare_workspace(factory.root)
+        _decline(root)
+        _hookless_prek(root)
+        before = (root / "prek.toml").read_bytes()
+
+        result = run_vaultspec(
+            runner, "spec", "precommit", "migrate", "--json", target=root
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "declined"
+        assert payload["data"]["yaml_removed"] is False
+        assert "spec precommit enable" in payload["data"]["detail"]
+        assert (root / "prek.toml").read_bytes() == before
+
+    def test_remove_yaml_removes_the_leftover_and_adds_no_hooks(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        import json
+
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        root = _bare_workspace(factory.root)
+        _decline(root)
+        _hookless_prek(root)
+        (root / _CONFIG).write_text("repos: []\n", encoding="utf-8")
+        before = (root / "prek.toml").read_bytes()
+
+        result = run_vaultspec(
+            runner,
+            "spec",
+            "precommit",
+            "migrate",
+            "--remove-yaml",
+            "--json",
+            target=root,
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "declined"
+        assert payload["data"]["yaml_removed"] is True
+        assert not (root / _CONFIG).exists()
+        assert (root / "prek.toml").read_bytes() == before
+
+    def test_dry_run_keeps_the_leftover(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        _decline(tmp_path)
+        (tmp_path / _CONFIG).write_text("repos: []\n", encoding="utf-8")
+
+        result = migrate_hooks_to_prek(tmp_path, dry_run=True, remove_yaml=True)
+
+        assert result.status == "declined"
+        assert result.yaml_removed is True
+        assert (tmp_path / _CONFIG).exists()
