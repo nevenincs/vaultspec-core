@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:e00e44d4cc77d62880ed4887e7e963e8dc416ba968fd6bfaeb316c13866b0cc7'
+body_hash: 'sha256:82a6d4ffc53ad92debe4dc81211d2a0479458ede7ec299442c756b2afc7c9a4a'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -46,3 +46,5 @@ related:
 - `S04` `A` `src/vaultspec_core/search/_transport.py`
 - `S04` `A` `src/vaultspec_core/search/tests/scripted_provider.py`
 - `S04` `A` `src/vaultspec_core/search/tests/test_transport.py`
+- `S03` `M` `src/vaultspec_core/search/__init__.py`
+
