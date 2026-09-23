@@ -37,6 +37,7 @@ from pydantic import Field
 
 from ...cli._migration_hook import ensure_migrated
 from ...core.types import get_context as _get_ctx
+from ...vaultcore.markdown import iter_headings
 from ...vaultcore.models import DocType, vault_today
 from ..envelope import LeanModel, compact_result
 from ..isolation import isolated_context as _isolated_context
@@ -511,7 +512,6 @@ def _apply_seed_content(
 
 
 _FRONTMATTER_RE = re.compile(r"^(﻿?---[ \t]*\n.*?\n---[ \t]*\n?)(.*)$", re.DOTALL)
-_HEADING_RE = re.compile(r"^(#{1,6})\s")
 
 
 def _split_body(text: str) -> tuple[str, str]:
@@ -533,46 +533,38 @@ def _split_body(text: str) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
-def _heading_level(line: str) -> int | None:
-    """Return the ATX heading level of *line*, or ``None`` if not a heading.
-
-    Args:
-        line: A single body line.
-
-    Returns:
-        The number of leading ``#`` (1-6) for a heading line; ``None``
-        otherwise.
-    """
-    match = _HEADING_RE.match(line)
-    return len(match.group(1)) if match else None
-
-
-def _locate_section(lines: list[str], heading: str) -> tuple[int, int] | None:
+def _locate_section(body: str, heading: str) -> tuple[int, int] | None:
     """Locate a section by exact heading-line text (first match).
 
-    The section spans from its heading line through to the next heading of
-    the same or a higher level (fewer or equal ``#``), or end of body.
+    Only real headings address or bound a section: a heading-shaped line
+    inside fenced code is sample text. The section spans from its heading
+    line through to the next heading of the same or a higher level (fewer or
+    equal ``#``), or end of body.
 
     Args:
-        lines: The body split on ``\\n``.
+        body: The document body.
         heading: The exact heading-line text to match (whitespace-trimmed).
 
     Returns:
-        A ``(heading_index, section_end_index)`` half-open line range, or
-        ``None`` when no line matches the heading text.
+        A ``(heading_index, section_end_index)`` half-open range over
+        ``body.split("\\n")``, or ``None`` when no heading line matches the
+        heading text.
     """
     wanted = heading.strip()
-    for i, line in enumerate(lines):
-        if line.strip() != wanted:
+    lines = body.split("\n")
+    headings = list(iter_headings(body))
+    for position, found in enumerate(headings):
+        if lines[found.line - 1].strip() != wanted:
             continue
-        level = _heading_level(line)
-        end = len(lines)
-        for k in range(i + 1, len(lines)):
-            klevel = _heading_level(lines[k])
-            if klevel is not None and level is not None and klevel <= level:
-                end = k
-                break
-        return i, end
+        end = next(
+            (
+                later.line - 1
+                for later in headings[position + 1 :]
+                if later.level <= found.level
+            ),
+            len(lines),
+        )
+        return found.line - 1, end
     return None
 
 
@@ -593,7 +585,7 @@ def _compose_body(op: EditOperation, body: str) -> str | None:
         return "\n" + content.strip("\n") + "\n"
 
     lines = body.split("\n")
-    located = _locate_section(lines, op.section or "")
+    located = _locate_section(body, op.section or "")
     if located is None:
         return None
     start, end = located

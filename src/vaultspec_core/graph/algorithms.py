@@ -1,7 +1,7 @@
 """Pure helper functions backing the vault graph build and analysis passes.
 
-Node-content helpers (:func:`extract_title`, :func:`extract_feature`,
-:func:`edge_kind`, :func:`docnode_from_attrs`) and graph algorithms
+Node-content helpers (:func:`extract_feature`, :func:`edge_kind`,
+:func:`docnode_from_attrs`) and graph algorithms
 (:func:`top_n`, :func:`betweenness_centrality`, :func:`pagerank`) used by
 :class:`~vaultspec_core.graph.api.VaultGraph` during construction and
 :meth:`~vaultspec_core.graph.api.VaultGraph.metrics`.  None of these touch the
@@ -30,7 +30,6 @@ __all__ = [
     "docnode_from_attrs",
     "edge_kind",
     "extract_feature",
-    "extract_title",
     "pagerank",
     "top_n",
 ]
@@ -38,15 +37,6 @@ __all__ = [
 # PageRank damping factor.  Pinned so node-size hints are reproducible across
 # builds and exactly testable; matches the networkx default of 0.85.
 PAGERANK_ALPHA = 0.85
-
-
-def extract_title(body: str) -> str | None:
-    """Return the text of the first ``# ...`` heading, or ``None``."""
-    for line in body.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("# "):
-            return stripped[2:].strip()
-    return None
 
 
 def extract_feature(tags: set[str]) -> str | None:

@@ -19,11 +19,12 @@ Surfaces, all as warnings so the suite never hard-fails an existing corpus:
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING
 
+from ...core.adr import adr_status_marker, rewrite_adr_status
 from ...core.enums import AdrStatus
 from ...core.helpers import atomic_write
+from ..markdown import iter_headings
 from ..models import refresh_modified_stamp, vault_today
 from ._base import CheckDiagnostic, CheckResult, Severity
 
@@ -36,13 +37,6 @@ __all__ = ["check_adr_status"]
 
 logger = logging.getLogger(__name__)
 
-# H1 status token: captures the optional backtick quoting and the raw token.
-# Mirrors the pattern used by ``adr_supersede`` so the two stay in lockstep.
-_H1_STATUS_RE = re.compile(
-    r"^#\s+.*\|\s+\(\*\*status:\*\*\s+(?P<open>`?)(?P<token>[^`)]+?)(?P<close>`?)\)\s*$"
-)
-_LEGACY_STATUS_RE = re.compile(r"^##\s+Status\s*$", re.MULTILINE)
-
 _CANONICAL_TOKENS = ", ".join(s.value for s in AdrStatus)
 
 
@@ -51,29 +45,12 @@ def _is_adr(path: Path) -> bool:
     return path.parent.name == "adr" and path.suffix == ".md"
 
 
-def _find_h1_status(body: str) -> tuple[int, str, bool] | None:
-    """Locate the H1 status declaration in *body*.
-
-    Args:
-        body: The document body (markdown after the frontmatter).
-
-    Returns:
-        ``(line_index, token, quoted)`` for the first matching H1, or ``None``
-        when no H1-inline status is present. ``quoted`` is ``True`` when the
-        token is wrapped in backticks.
-    """
-    for index, line in enumerate(body.split("\n")):
-        if not line.startswith("# "):
-            continue
-        # Anchor to the document's first H1: status lives on the title line, so
-        # a title without a status marker means "no parseable status" rather
-        # than deferring to some later heading that happens to carry one.
-        match = _H1_STATUS_RE.match(line)
-        if match:
-            quoted = bool(match.group("open")) and bool(match.group("close"))
-            return index, match.group("token").strip(), quoted
-        return None
-    return None
+def _has_legacy_status_section(body: str) -> bool:
+    """Return ``True`` when *body* declares status in a ``## Status`` section."""
+    return any(
+        heading.level == 2 and heading.text == "Status"
+        for heading in iter_headings(body)
+    )
 
 
 def _normalize_h1_quote(doc_path: Path, root_dir: Path, token: str) -> bool:
@@ -115,26 +92,10 @@ def _normalize_h1_quote_locked(doc_path: Path, token: str) -> bool:
         return False
 
     newline = "\r\n" if "\r\n" in raw else "\n"
-    content = raw.replace("\r\n", "\n")
-
-    lines = content.split("\n")
-    changed = False
-    for index, line in enumerate(lines):
-        if not line.startswith("# "):
-            continue
-        match = _H1_STATUS_RE.match(line)
-        if not match:
-            break
-        prefix = line[: match.start("open")]
-        suffix = line[match.end("close") :]
-        lines[index] = f"{prefix}`{token}`{suffix}"
-        changed = True
-        break
-
-    if not changed:
+    rendered = rewrite_adr_status(raw.replace("\r\n", "\n"), token, quoted=True)
+    if rendered is None:
         return False
 
-    rendered = "\n".join(lines)
     # The quoting rewrite is a content mutation, so refresh the recency stamp in
     # the same pass (mirroring adr_supersede); the helper preserves the line
     # ending convention, so apply it before reapplying CRLF below.
@@ -176,10 +137,10 @@ def check_adr_status(
             continue
 
         rel_path = path.relative_to(root_dir)
-        h1 = _find_h1_status(body)
+        marker = adr_status_marker(body)
 
-        if h1 is None:
-            if _LEGACY_STATUS_RE.search(body):
+        if marker is None:
+            if _has_legacy_status_section(body):
                 result.diagnostics.append(
                     CheckDiagnostic(
                         path=rel_path,
@@ -208,7 +169,7 @@ def check_adr_status(
                 )
             continue
 
-        _, token, quoted = h1
+        token, quoted = marker.token, marker.quoted
         status = AdrStatus.from_token(token)
 
         if status is None:

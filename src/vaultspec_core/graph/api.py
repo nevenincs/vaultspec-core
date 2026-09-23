@@ -38,6 +38,7 @@ from ..vaultcore import (
     parse_vault_metadata,
     scan_vault,
 )
+from ..vaultcore.markdown import document_title
 from ..vaultcore.models import DocumentMetadata
 from . import api_export, rendering
 from .algorithms import (
@@ -45,7 +46,6 @@ from .algorithms import (
     betweenness_centrality,
     edge_kind,
     extract_feature,
-    extract_title,
     pagerank,
     top_n,
 )
@@ -454,7 +454,7 @@ class VaultGraph:
         node.frontmatter = raw_fm
         node.body = body
         node.word_count = len(body.split())
-        node.title = extract_title(body)
+        node.title = document_title(body)
 
     def _assemble_from_by_stem(self, by_stem: dict[str, list[DocNode]]) -> None:
         """Run the shared graph-assembly passes over the collected nodes.

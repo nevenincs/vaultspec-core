@@ -62,6 +62,14 @@ class TestApplyMarkdownHygiene:
         assert stats.trailing_whitespace == 0
         assert stats.blank_runs == 0
 
+    def test_nested_fence_sample_stays_inside_the_outer_fence(self):
+        # The inner ``` lines cannot close a four-backtick fence, and an info
+        # string never closes one, so the sample's whitespace is untouched.
+        body = "````md\n```python\nx = 1   \n\n\ny = 2\n```\n````\n"
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body
+        assert stats.total == 0
+
     def test_idempotent(self):
         once, _ = apply_markdown_hygiene("a   \n\n\n\nb\n\n\n")
         twice, stats = apply_markdown_hygiene(once)

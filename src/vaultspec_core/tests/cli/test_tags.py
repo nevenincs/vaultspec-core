@@ -94,6 +94,10 @@ class TestFindBlocks:
         blocks = find_blocks(content)
         assert blocks == []
 
+    def test_shorter_fence_line_does_not_close_longer_fence(self):
+        content = '````md\n```\n<vaultspec type="config">\n</vaultspec>\n````\n'
+        assert find_blocks(content) == []
+
     def test_real_tag_after_code_fence(self):
         content = (
             "```\n"

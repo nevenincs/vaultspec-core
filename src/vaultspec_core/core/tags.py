@@ -34,9 +34,6 @@ _OPEN_RE = re.compile(
 # Closing: </vaultspec> or # </vaultspec>
 _CLOSE_RE = re.compile(r"^(?P<prefix>#\s*)?</vaultspec>\s*$")
 
-# Code fence detection (``` or ~~~, optionally with language tag).
-_FENCE_RE = re.compile(r"^(`{3,}|~{3,})")
-
 
 class TagError(VaultSpecError):
     """Raised when ``<vaultspec>`` managed tags are in an invalid state.
@@ -72,10 +69,6 @@ class TagBlock:
     content_end: int
 
 
-def _is_inside_fence(fence_state: str | None) -> bool:
-    return fence_state is not None
-
-
 def find_blocks(content: str) -> list[TagBlock]:
     """Find all ``<vaultspec>`` blocks in *content*.
 
@@ -92,28 +85,20 @@ def find_blocks(content: str) -> list[TagBlock]:
         TagError: On unclosed opening tags, duplicate block types, or nested
             ``<vaultspec>`` tags.
     """
+    # Imported here: importing the vaultcore package at module scope would
+    # load the whole vault layer into every core import.
+    from ..vaultcore.markdown import line_roles
+
     lines = content.splitlines()
     blocks: list[TagBlock] = []
     seen_types: dict[str, int] = {}
     open_tag: tuple[str, int] | None = None  # (type, line_number)
-    fence: str | None = None
 
-    for i, line in enumerate(lines):
+    for i, (line, role) in enumerate(zip(lines, line_roles(lines), strict=True)):
+        if role.fenced:
+            continue
         lineno = i + 1
         stripped = line.strip()
-
-        # Track fenced code blocks.
-        fence_match = _FENCE_RE.match(stripped)
-        if fence_match:
-            marker = fence_match.group(1)
-            if fence is None:
-                fence = marker[0]  # track which char opened the fence
-            elif stripped.startswith(fence):
-                fence = None
-            continue
-
-        if _is_inside_fence(fence):
-            continue
 
         # Check for opening tag.
         open_match = _OPEN_RE.match(stripped)

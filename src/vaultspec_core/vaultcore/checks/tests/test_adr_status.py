@@ -55,6 +55,16 @@ class TestCanonicalStatus:
         result = check_adr_status(tmp_path, snapshot=snap)
         assert result.is_clean
 
+    def test_h1_inside_fenced_code_is_not_the_title(self, tmp_path: Path) -> None:
+        """A sample H1 in a code block ahead of the title carries no authority."""
+        body = (
+            "```markdown\n# `x` adr: `Sample` | (**status:** `approved`)\n```\n\n"
+            + _adr_body("# `demo` adr: `Title` | (**status:** `accepted`)")
+        )
+        _, snap = _snapshot(tmp_path, "2026-01-01-demo-adr", body)
+        result = check_adr_status(tmp_path, snapshot=snap)
+        assert result.is_clean
+
     def test_every_canonical_value_is_clean(self, tmp_path: Path) -> None:
         for value in (s.value for s in AdrStatus):
             _, snap = _snapshot(

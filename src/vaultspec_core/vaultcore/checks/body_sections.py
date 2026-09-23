@@ -34,6 +34,7 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from ..markdown import iter_headings
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -50,9 +51,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 __all__ = ["check_body_sections"]
-
-#: A level-two heading line (``## Title``), excluding deeper ``### `` headings.
-_H2_RE = re.compile(r"^##[ \t]+(?P<title>\S.*?)\s*$", re.MULTILINE)
 
 #: An HTML comment block, stripped before content-emptiness is judged.
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
@@ -73,24 +71,27 @@ _CONTINUATION_H2_RE = re.compile(r"Wave\b|Epic intent\Z")
 def _section_contents(body: str) -> dict[str, str]:
     """Map each ``## `` heading title in *body* to its raw content.
 
-    Content runs from just after the heading line to the next section-opening
-    ``## `` heading or the end of the document. Wave and Epic-intent headings
-    do not open a section: the plan template places them under ``## Steps``
-    while rendering them at the same level, so they extend the section they
-    follow. A later duplicate heading overwrites an earlier one; documents do
-    not legitimately repeat a required section.
+    Content runs from the line after the heading to the next section-opening
+    ``## `` heading or the end of the document. Headings inside fenced code
+    are sample text, not structure. Wave and Epic-intent headings do not open
+    a section: the plan template places them under ``## Steps`` while
+    rendering them at the same level, so they extend the section they follow.
+    A later duplicate heading overwrites an earlier one; documents do not
+    legitimately repeat a required section.
     """
-    contents: dict[str, str] = {}
+    lines = body.split("\n")
     openers = [
-        match
-        for match in _H2_RE.finditer(body)
-        if not _CONTINUATION_H2_RE.match(match.group("title"))
+        heading
+        for heading in iter_headings(body)
+        if heading.level == 2 and not _CONTINUATION_H2_RE.match(heading.text)
     ]
-    for i, match in enumerate(openers):
-        start = match.end()
-        end = openers[i + 1].start() if i + 1 < len(openers) else len(body)
-        contents[match.group("title")] = body[start:end]
-    return contents
+    if not openers:
+        return {}
+    ends = [opener.line - 1 for opener in openers[1:]] + [len(lines)]
+    return {
+        opener.text: "\n".join(lines[opener.line : end])
+        for opener, end in zip(openers, ends, strict=True)
+    }
 
 
 def _is_empty(section_body: str) -> bool:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from contextlib import ExitStack
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..config import get_config
@@ -14,6 +15,8 @@ from ..vaultcore import (
     refresh_modified_stamp,
     vault_today,
 )
+from ..vaultcore.markdown import iter_headings
+from ..vaultcore.parser import split_frontmatter
 from . import types as _t
 from .enums import AdrStatus
 from .exceptions import ResourceNotFoundError, VaultSpecError
@@ -39,9 +42,102 @@ _KNOWN_ADR_FRONTMATTER_KEYS = frozenset(
 )
 
 _ADR_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
-_ADR_STATUS_HEADING_RE = re.compile(
-    r"^(#\s+.*\|\s+\(\*\*status:\*\*\s+`?)([^`)]+)(`?\)\s*)$"
+
+#: The status marker that ends an ADR's H1, ``| (**status:** `accepted`)``,
+#: with the backtick quoting optional so a bare token is still read (and can
+#: be reported and repaired) rather than mistaken for no status at all.
+_ADR_STATUS_MARKER_RE = re.compile(
+    r"\|\s+\(\*\*status:\*\*\s+(?P<open>`?)(?P<token>[^`)]+?)(?P<close>`?)\)\s*$"
 )
+
+
+@dataclass(frozen=True)
+class AdrStatusMarker:
+    """The status token on an ADR's title heading, located for reading or rewriting.
+
+    Attributes:
+        line: The title heading's 1-based line within the scanned body.
+        token: The raw status token, stripped, not yet validated against
+            :class:`~vaultspec_core.core.enums.AdrStatus`.
+        quoted: Whether the token is wrapped in backticks on both sides.
+        start: Column where the token begins, opening backtick included.
+        end: Column after the token ends, closing backtick included.
+    """
+
+    line: int
+    token: str
+    quoted: bool
+    start: int
+    end: int
+
+    def rewrite(self, heading_line: str, token: str, *, quoted: bool) -> str:
+        """Return *heading_line* with this marker's token replaced by *token*."""
+        value = f"`{token}`" if quoted else token
+        return heading_line[: self.start] + value + heading_line[self.end :]
+
+
+def adr_status_marker(body: str) -> AdrStatusMarker | None:
+    """Locate the status marker on the first H1 of an ADR *body*.
+
+    Decision authority lives on the title line alone: a title without a
+    marker means "no parseable status", never a deferral to some later
+    heading - an example H1 in a code sample included - that happens to
+    carry one.
+
+    Args:
+        body: The ADR body, without frontmatter.
+
+    Returns:
+        The marker, or ``None`` when the body has no H1 or its first H1
+        carries no status marker.
+    """
+    title = next((h for h in iter_headings(body) if h.level == 1), None)
+    if title is None:
+        return None
+    heading_line = body.split("\n")[title.line - 1]
+    match = _ADR_STATUS_MARKER_RE.search(heading_line)
+    if match is None:
+        return None
+    return AdrStatusMarker(
+        line=title.line,
+        token=match.group("token").strip(),
+        quoted=bool(match.group("open")) and bool(match.group("close")),
+        start=match.start("open"),
+        end=match.end("close"),
+    )
+
+
+def rewrite_adr_status(
+    document: str, token: str, *, quoted: bool | None = None
+) -> str | None:
+    """Return the full ADR *document* with its status token replaced.
+
+    Every byte outside the token is preserved, frontmatter included.
+
+    Args:
+        document: The full ADR text, frontmatter included, ``\\n`` line
+            endings.
+        token: The status value to write.
+        quoted: Whether to wrap *token* in backticks; ``None`` keeps the
+            existing marker's quoting.
+
+    Returns:
+        The rewritten document, or ``None`` when its body carries no status
+        marker to rewrite.
+    """
+    _yaml_block, body = split_frontmatter(document)
+    marker = adr_status_marker(body)
+    if marker is None:
+        return None
+    lines = body.split("\n")
+    lines[marker.line - 1] = marker.rewrite(
+        lines[marker.line - 1],
+        token,
+        quoted=marker.quoted if quoted is None else quoted,
+    )
+    # split_frontmatter only ever removes a prefix, so the body is the
+    # document's tail and everything before it is kept verbatim.
+    return document[: len(document) - len(body)] + "\n".join(lines)
 
 
 def _preserve_unknown_frontmatter_keys(yaml_block: str) -> list[str]:
@@ -151,28 +247,6 @@ def _rewrite_adr_frontmatter(
     return leading + "\n".join(fm_lines)
 
 
-def _supersede_status_heading(normalized: str) -> str:
-    """Rewrite the first ADR H1 status token to ``superseded``.
-
-    Args:
-        normalized: The document text, normalized to ``\\n`` line endings.
-
-    Returns:
-        The document text with its status token rewritten, or unchanged if no
-        H1 heading matches the expected ``|  (**status:** \\`...\\`)`` shape.
-    """
-    lines_list = normalized.split("\n")
-    for i, line in enumerate(lines_list):
-        if not line.startswith("# "):
-            continue
-        match = _ADR_STATUS_HEADING_RE.match(line)
-        if not match:
-            continue
-        lines_list[i] = f"{match.group(1)}{AdrStatus.SUPERSEDED.value}{match.group(3)}"
-        break
-    return "\n".join(lines_list)
-
-
 def adr_supersede(
     old_adr: str,
     by_new_adr: str,
@@ -260,7 +334,9 @@ def _apply_supersession(
     old_meta, _ = parse_vault_metadata(old_normalized)
     old_meta.superseded_by = new_stem
 
-    old_normalized_body = _supersede_status_heading(old_normalized)
+    old_normalized_body = (
+        rewrite_adr_status(old_normalized, AdrStatus.SUPERSEDED.value) or old_normalized
+    )
     final_old_content = _rewrite_adr_frontmatter(
         old_normalized_body, old_meta, old_file
     )
@@ -295,11 +371,8 @@ def _apply_supersession(
 
 def adr_status_from_body(body: str) -> AdrStatus | None:
     """Read decision authority from the first H1, never a later example heading."""
-    for line in body.splitlines():
-        if line.startswith("# "):
-            match = _ADR_STATUS_HEADING_RE.match(line)
-            return AdrStatus.from_token(match.group(2).strip()) if match else None
-    return None
+    marker = adr_status_marker(body)
+    return AdrStatus.from_token(marker.token) if marker is not None else None
 
 
 def _reject_ancestor_cycle(

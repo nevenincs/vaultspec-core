@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
+from ..markdown import FenceTracker
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -23,8 +23,6 @@ PRESERVED_HTML_COMMENT_PREFIXES = ("RETIRED:",)
 
 These are machine-owned vault comments, not generated template guidance.
 """
-
-_FENCE_RE = re.compile(r"^(?P<indent> {0,3})(?P<fence>`{3,}|~{3,})")
 
 __all__ = [
     "PRESERVED_HTML_COMMENT_PREFIXES",
@@ -326,26 +324,15 @@ def _strip_html_comments(markdown: str) -> tuple[str, tuple[int, int]]:
     output: list[str] = []
     removed = 0
     malformed_removed = 0
-    fence_char: str | None = None
-    fence_len = 0
+    # Fed only outside comments: a fence marker inside an open comment is
+    # comment text and must neither open nor close a fence.
+    fences = FenceTracker()
     in_comment = False
     malformed_comment = False
 
     for line in lines:
         stripped = line.lstrip()
-        fence = _markdown_fence(line)
-        if not in_comment and fence is not None:
-            marker_char, marker_len = fence
-            if fence_char is None:
-                fence_char = marker_char
-                fence_len = marker_len
-            elif marker_char == fence_char and marker_len >= fence_len:
-                fence_char = None
-                fence_len = 0
-            output.append(line)
-            continue
-
-        if fence_char is not None:
+        if not in_comment and fences.classify(line).fenced:
             output.append(line)
             continue
 
@@ -460,12 +447,3 @@ def _strip_standalone_comment_sequence(line: str) -> tuple[str, int, int] | None
     if not kept_comments:
         return "", html_comments, malformed_comments
     return indent + " ".join(kept_comments) + newline, html_comments, malformed_comments
-
-
-def _markdown_fence(line: str) -> tuple[str, int] | None:
-    """Return the opening/closing fence marker char and length, if present."""
-    match = _FENCE_RE.match(line)
-    if match is None:
-        return None
-    marker = match.group("fence")
-    return marker[0], len(marker)
