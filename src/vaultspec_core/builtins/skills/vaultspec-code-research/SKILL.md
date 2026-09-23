@@ -12,8 +12,10 @@ skill terminates within one run.
 
 ## Steps
 
-- Locate by meaning: `vaultspec-rag search "<concept and domain nouns>" --type code`,
-  and the governing decisions with
+- Locate code by meaning:
+  `vaultspec-rag search "<concept and domain nouns>" --type code`. When `status` reports
+  hosted search configured, search decisions and vault facts with
+  `vaultspec-core vault search "<question>"` (MCP: `search`); otherwise use
   `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Read the epicenter or
   nearest analogue whole, then confirm exact symbols with grep. Where `vaultspec-rag` is
   unavailable, the `vaultspec-core` discovery verbs and grep carry the same sequence.

@@ -14,11 +14,14 @@ single source of truth that
 against, which is what stops the wordings diverging again without also freezing
 each document's role-specific framing.
 
-Two properties matter and are enforced by that test:
+Three properties matter and are enforced by that test:
 
 * The fallback sentence is identical everywhere, so a reader who has seen it
   once does not have to re-read a variant to check whether it says something
   new.
+* rag's decision search is only ever offered inside the routing sentence, so
+  no builtin sends a decision question to rag where core's hosted search is
+  configured.
 * No builtin invents a rag CLI flag. Several of rag's strongest capabilities -
   intent ranking, relevance feedback, and the noise-domain filters - exist only
   on its MCP tools and as inline query tokens, with no CLI flag at all. Prose
@@ -52,6 +55,22 @@ SEARCH_CODE = '`vaultspec-rag search "<concept and domain nouns>" --type code`'
 #: The directed ``--doc-type adr`` filter, not catch-all ``--type vault``,
 #: which is materially noisier for decision recall.
 SEARCH_ADR = '`vaultspec-rag search "<intent>" --type vault --doc-type adr`'
+
+#: Canonical spelling for asking the vault a question through core's hosted
+#: search, which answers with the passage and its line range and abstains when
+#: nothing answers.
+SEARCH_VAULT = '`vaultspec-core vault search "<question>"`'
+
+#: The single sentence routing decision and vault-fact questions.
+#:
+#: The branch is observed state, not a guess: ``status`` reports whether hosted
+#: search is configured, and without a key core's search only returns
+#: ``not_configured``, so rag's decision search is the route. Code search is
+#: rag's alone and is not routed.
+VAULT_SEARCH_ROUTING = (
+    "When `status` reports hosted search configured, search decisions and vault "
+    f"facts with {SEARCH_VAULT} (MCP: `search`); otherwise use {SEARCH_ADR}."
+)
 
 #: rag CLI flags that exist, as of the floor in
 #: :data:`~vaultspec_core.core.diagnosis.collectors_companion.RAG_MINIMUM_VERSION`.
@@ -112,7 +131,13 @@ DISCOVERY_HOME = "rules/vaultspec-discovery.builtin.md"
 
 #: Sentences the home must define. A sentence missing from the home is a
 #: broken registry, not a missing citation.
-DISCOVERY_CANONICAL_SENTENCES = (DISCOVERY_FALLBACK, SEARCH_CODE, SEARCH_ADR)
+DISCOVERY_CANONICAL_SENTENCES = (
+    DISCOVERY_FALLBACK,
+    SEARCH_CODE,
+    SEARCH_ADR,
+    SEARCH_VAULT,
+    VAULT_SEARCH_ROUTING,
+)
 
 #: Entry points allowed to spell ``vaultspec-rag`` out instead of citing the
 #: rule. Each is a role whose job is search itself; a reader arriving there

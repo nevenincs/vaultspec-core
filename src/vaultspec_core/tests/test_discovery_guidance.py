@@ -6,10 +6,15 @@ when it is absent) are defined once, in ``rules/vaultspec-discovery.builtin.md``
 Every other entry point cites the rule by name; the four roles whose job is
 search itself are registered restaters and carry the invocation verbatim.
 
+Decision and vault-fact questions are routed by one sentence: core's hosted
+search when ``status`` reports it configured, rag's decision search otherwise.
+rag's decision search appears nowhere except as that sentence's fallback.
+
 No test here counts anything. Each asserts a relation between the registry in
 ``core.discovery_guidance`` and the tree:
 the home defines every canonical sentence, restaters restate, citers cite,
-and any rag invocation anywhere is spelled the canonical way.
+any rag or hosted-search invocation anywhere is spelled the canonical way, and
+rag's decision search is always the routed fallback.
 """
 
 from __future__ import annotations
@@ -31,6 +36,8 @@ from vaultspec_core.core.discovery_guidance import (
     RAG_SEARCH_FLAGS,
     SEARCH_ADR,
     SEARCH_CODE,
+    SEARCH_VAULT,
+    VAULT_SEARCH_ROUTING,
 )
 
 if TYPE_CHECKING:
@@ -41,6 +48,9 @@ pytestmark = [pytest.mark.unit]
 _BUILTINS = builtins_root()
 _RAG = "vaultspec-rag"
 _RAG_SEARCH = re.compile(r"`vaultspec-rag search [^`]*`")
+# An invocation carries a quoted question; the bare verb name and its usage
+# signature are references, not instructions, and are not held to a spelling.
+_VAULT_SEARCH = re.compile(r'`vaultspec-core vault search "[^`]*`')
 
 
 def _rel(path: Path) -> str:
@@ -148,6 +158,24 @@ class TestSequenceHasOneHome:
         )
 
 
+class TestDecisionSearchIsRouted:
+    def test_rag_decision_search_appears_only_as_the_routed_fallback(self):
+        """Every SEARCH_ADR spelling sits inside VAULT_SEARCH_ROUTING.
+
+        Offered on its own, rag's decision search would bypass a configured
+        hosted search. Covers references too: a playbook read beside its
+        SKILL.md still instructs the search it names.
+        """
+        adr = _normalized(SEARCH_ADR)
+        routing = _normalized(VAULT_SEARCH_ROUTING)
+        offenders = [
+            _rel(p) for p in _builtin_docs() if adr in _read(p).replace(routing, "")
+        ]
+        assert not offenders, (
+            f"rag decision search offered outside the routing sentence: {offenders}"
+        )
+
+
 class TestInvocationsAreCanonical:
     def test_every_rag_search_invocation_is_a_canonical_spelling(self):
         """Any ``vaultspec-rag search`` span, anywhere, is SEARCH_CODE or SEARCH_ADR.
@@ -164,6 +192,16 @@ class TestInvocationsAreCanonical:
             if span not in allowed
         ]
         assert not offenders, f"non-canonical rag invocations: {offenders}"
+
+    def test_every_hosted_search_invocation_is_the_canonical_spelling(self):
+        """Any hosted-search invocation with a question, anywhere, is SEARCH_VAULT."""
+        offenders = [
+            (_rel(p), span)
+            for p in _builtin_docs()
+            for span in _VAULT_SEARCH.findall(_read(p))
+            if span != SEARCH_VAULT
+        ]
+        assert not offenders, f"non-canonical hosted-search invocations: {offenders}"
 
     def test_no_builtin_spells_an_mcp_only_capability_as_a_cli_flag(self):
         """Intent ranking, feedback, and domain filters have no CLI flag."""

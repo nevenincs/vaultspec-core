@@ -50,10 +50,13 @@ The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
 - **Ground.** Build the decision inventory: `vaultspec-core vault list adr --json` for
   the set, the body H1 (and any legacy status section) for each declared status, and
   `vaultspec-core vault graph --json` for the supersession and relatedness edges.
-- **Reconcile decision-vs-decision.** Use
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr` to surface ADRs covering
-  the same concept, read them whole, and judge agreement, duplication, contradiction, or
-  fragmentation (a refinement chain or sibling accepted records on one scope).
+- **Reconcile decision-vs-decision.** When `status` reports hosted search configured,
+  search decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
+  `search`); otherwise use
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Surface the ADRs
+  covering the same concept, read them whole, and judge agreement, duplication,
+  contradiction, or fragmentation (a refinement chain or sibling accepted records on one
+  scope).
 - **Reconcile decision-vs-code.** For each live decision,
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
   file whole, and confirm the decision is implemented; grep to confirm exact symbols.
