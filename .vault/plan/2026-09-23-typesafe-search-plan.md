@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-typesafe-search-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:52aa286beeb331446b85681b7e559aad8af3284afac4b1dbfcf541835402cd27'
+body_hash: 'sha256:2e1fc893f1f5fed64ca4b7485c0a8a6a0a0abdac4f8dcddf1980dc0921440bcd'
 ---
 
 # `typesafe-search` plan
@@ -48,8 +48,8 @@ fence regexes and two section scanners, before the search corpus builds on them.
 - [x] `S10` - Rehome the remaining fence, heading and frontmatter duplicates onto the canonical scanner and parser, and bump the graph cache schema for the changed title reading; `src/vaultspec_core/vaultcore/links.py, src/vaultspec_core/plan/parser.py, src/vaultspec_core/plan/checks/heading_level_check.py, src/vaultspec_core/vaultcore/exec_fold.py, src/vaultspec_core/mcp_server/tools/documents.py, src/vaultspec_core/graph/cache.py`.
 - [x] `S11` - Move the byte-preserving write-path frontmatter splitters onto the canonical splitter, with YAML-block offsets and lone-CR support, keeping body_hash digests byte-identical; `src/vaultspec_core/vaultcore/parser.py, src/vaultspec_core/vaultcore/body_hash.py, src/vaultspec_core/vaultcore/models.py, src/vaultspec_core/vaultcore/hydration.py, src/vaultspec_core/vaultcore/exec_recovery.py, src/vaultspec_core/vaultcore/rename_ops.py, src/vaultspec_core/vaultcore/query_rename.py, src/vaultspec_core/vaultcore/related_surgery.py`.
 - [x] `S12` - Rehome the frontmatter re-rendering helpers and the related-block walkers onto one canonical implementation each; `src/vaultspec_core/core/adr.py, src/vaultspec_core/core/rules.py, src/vaultspec_core/vaultcore/checks/frontmatter.py, src/vaultspec_core/vaultcore/rename_ops.py, src/vaultspec_core/vaultcore/query_rename.py, src/vaultspec_core/vaultcore/related_surgery.py`.
-- [ ] `S13` - Register every environment variable the code reads in the config registry, route all reads through config, and resolve the hosted-search credential in the config layer; `src/vaultspec_core/config/, .env.example, src/vaultspec_core/search/_credential.py, src/vaultspec_core/cli/, src/vaultspec_core/core/, src/vaultspec_core/mcp_server/, src/vaultspec_core/triggers/`.
-- [ ] `S14` - Guard environment-variable drift: every variable read or registered is documented in .env.example, and no read happens outside the config layer; `dev/guards/, src/vaultspec_core/config/tests/`.
+- [x] `S13` - Register every environment variable the code reads in the config registry, route all reads through config, and resolve the hosted-search credential in the config layer; `src/vaultspec_core/config/, .env.example, src/vaultspec_core/search/_credential.py, src/vaultspec_core/cli/, src/vaultspec_core/core/, src/vaultspec_core/mcp_server/, src/vaultspec_core/triggers/`.
+- [x] `S14` - Guard environment-variable drift: every variable read or registered is documented in .env.example, and no read happens outside the config layer; `dev/guards/, src/vaultspec_core/config/tests/`.
 
 ## Parallelization
 
