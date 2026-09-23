@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:88b6a4013689b74e1f86b2d0e7dd78a68eafe36f3d3bc8a3e49098641bcb739c'
+body_hash: 'sha256:62fb6b6f9a017ce7a84b966d83b50fec47c6d26b584bc24834193bf5fe14e193'
 related:
   - "[[2026-09-23-commit-gate-research]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"
@@ -130,23 +130,6 @@ vaultspec hooks, including one whose install stopped managing it. It refreshes o
 existing managed `prek.toml` block, never adds one, and leaves a declined workspace
 untouched (amended 2026-09-23 on the user's instruction to enroll the hook changes in the
 per-release schema migrations).
-
-**Duplicate listings.** A copy of vaultspec's hooks in a config prek does not read (a
-`.pre-commit-config.yml` behind a `.pre-commit-config.yaml`, or any YAML behind `prek.toml`)
-never runs. Doctor reports it as a warning naming the unread file, and nothing repairs it,
-because the file is the operator's. The config prek does read listing a canonical hook more
-than once runs it repeatedly on every commit. That covers the gate twice in one YAML, two
-managed blocks in `prek.toml`, and a managed block beside a hand-written copy. Doctor reports
-it as an error, and `sync`, `spec precommit migrate` and the 0.2.5 migration repair it:
-
-- a YAML config keeps its first entry of each canonical hook, across every local repo;
-- `prek.toml` keeps one managed block, or none when the operator's own copy stands, since
-  vaultspec never edits outside its markers.
-
-The repairs log what they removed. The commit gate itself reports neither condition (amended
-2026-09-23 after the user asked that duplicates be surfaced this way. Their answer to the
-design question did not arrive, so the recommended option was implemented and awaits their
-confirmation).
 
 **Revision of prior decisions.** This record realizes the pre-commit section of
 `2026-02-24-vault-doctor-suite-adr`: staged files passed by the runner, error-only

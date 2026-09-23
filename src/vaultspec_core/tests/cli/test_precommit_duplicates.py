@@ -184,3 +184,65 @@ class TestDoctorWeighsThem:
 
     def test_a_shadowed_copy_is_a_warning(self) -> None:
         assert self._exit_code(PrecommitSignal.SHADOWED) == 1
+
+
+class TestHandWrittenDuplicatesAreTheOperatorsToFix:
+    """A duplicate outside vaultspec's markers is an error no repair may clear."""
+
+    _TWICE_BY_HAND = _HAND_WRITTEN + "\n" + _HAND_WRITTEN
+
+    def test_doctor_reports_it_and_migrate_refuses_it(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        prek = tmp_path / "prek.toml"
+        prek.write_text(self._TWICE_BY_HAND, encoding="utf-8")
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.DUPLICATED
+
+        result = migrate_hooks_to_prek(tmp_path)
+
+        assert result.status == "conflicting"
+        assert "remove the extra copies by hand" in result.detail
+        assert prek.read_text(encoding="utf-8") == self._TWICE_BY_HAND
+
+    def test_sync_warns_instead_of_claiming_a_repair(
+        self, factory: WorkspaceFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        factory.install()
+        (factory.root / _YAML).unlink()
+        prek = factory.root / "prek.toml"
+        prek.write_text(self._TWICE_BY_HAND, encoding="utf-8")
+        caplog.set_level("WARNING", logger="vaultspec_core.core.prek_boundary")
+
+        factory.sync()
+
+        assert prek.read_text(encoding="utf-8") == self._TWICE_BY_HAND
+        assert any("by hand" in r.message for r in caplog.records)
+
+
+class TestPruningLeavesOnlyWhatItEmptied:
+    def test_a_first_local_repo_the_merge_emptied_is_removed(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.precommit import scaffold_precommit
+
+        text = (
+            "repos:\n- repo: local\n  hooks:\n  - id: vault-fix\n    entry: x\n"
+            "- repo: local\n  hooks:\n" + _ENTRY
+        )
+        (tmp_path / _YAML).write_text(text, encoding="utf-8")
+
+        scaffold_precommit(tmp_path, mode=InstallMode.DEPENDENCY)
+
+        rendered = (tmp_path / _YAML).read_text(encoding="utf-8")
+        assert "hooks: []" not in rendered
+        assert rendered.count("repo: local") == 1
+
+    def test_an_empty_stanza_the_operator_wrote_is_kept(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.precommit import scaffold_precommit
+
+        text = "repos:\n- repo: local\n  hooks: []\n- repo: local\n  hooks:\n" + _ENTRY
+        (tmp_path / _YAML).write_text(text, encoding="utf-8")
+
+        scaffold_precommit(tmp_path, mode=InstallMode.DEPENDENCY)
+
+        assert (tmp_path / _YAML).read_text(encoding="utf-8").count("repo: local") == 2

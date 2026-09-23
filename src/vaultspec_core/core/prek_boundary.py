@@ -427,6 +427,59 @@ def refresh_managed_prek_block(
     return change
 
 
+#: Why a duplicate can outlive every repair: vaultspec never edits outside its
+#: own markers, so a canonical hook the operator wrote twice stays theirs.
+UNOWNED_DUPLICATE_DETAIL = (
+    "prek.toml lists vaultspec's commit gate more than once outside "
+    "vaultspec's managed block; those entries are yours, so remove the extra "
+    "copies by hand"
+)
+
+
+def unowned_duplicate(target: Path) -> bool:
+    """Whether ``prek.toml`` lists a canonical hook twice outside vaultspec's block.
+
+    Answered from the file as it stands, ignoring every managed block, so it
+    says what no repair can clear without writing anything first.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        ``True`` when the operator-owned part of ``prek.toml`` itself lists a
+        canonical hook more than once.
+    """
+    from .commands import CANONICAL_HOOK_IDS
+
+    try:
+        raw = (target / PREK_CONFIG_NAME).read_bytes().decode("utf-8")
+        lines = raw.splitlines()
+        outside = tomllib.loads("\n".join(_without_spans(lines, _managed_spans(lines))))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return False
+    hooks = _local_hooks(outside)
+    ids = [str(h.get("id")) for h in hooks if h.get("id") in CANONICAL_HOOK_IDS]
+    return len(ids) > len(set(ids))
+
+
+def repair_managed_prek_block(target: Path) -> None:
+    """Repair vaultspec's block in ``prek.toml`` and say what is left undone.
+
+    The shared repair behind ``sync`` and the preflight executor. It logs the
+    change :func:`refresh_managed_prek_block` made, and warns when a duplicate
+    remains that only the operator can remove, so neither caller reports a fix
+    that did not happen.
+
+    Args:
+        target: Workspace root directory.
+    """
+    change = refresh_managed_prek_block(target)
+    if change:
+        logger.warning("prek.toml: %s", change)
+    if unowned_duplicate(target):
+        logger.warning("%s", UNOWNED_DUPLICATE_DETAIL)
+
+
 def _strip_declined_leftovers(
     target: Path, detail: str, *, dry_run: bool
 ) -> PrekMigrationResult:
@@ -549,6 +602,11 @@ def migrate_hooks_to_prek(
         if boundary.hooks_present
         else None
     )
+    if boundary.hooks_present and unowned_duplicate(target):
+        detail = UNOWNED_DUPLICATE_DETAIL
+        if change:
+            detail = f"{change} in prek.toml; {detail}"
+        return PrekMigrationResult(status="conflicting", detail=detail)
     if change:
         result = PrekMigrationResult(status="migrated", detail=f"{change} in prek.toml")
     elif boundary.hooks_present:

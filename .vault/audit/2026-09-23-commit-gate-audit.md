@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:559728692da7af4338788be188a488b797b06d31fb8a3ad929235d8c2fce252f'
+body_hash: 'sha256:737398d1829aee7853d7c49fdb11c3939c231d731b35175114188b200230ae8e'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
   - "[[2026-09-23-commit-gate-adr]]"
@@ -143,6 +143,31 @@ reports it as unreadable.
 Result of the S10 review: PASS. All three findings are fixed and each has a failing-first
 test. The reviewer also noted that any later migration shipping in 0.2.5 must target
 `0.2.6`, because a workspace converged from this branch already records `0.2.5`.
+
+### s11-unowned-duplicate-unrepairable | medium | a prek.toml duplicate outside vaultspec's markers was an error every repair claimed to handle and none could
+
+The review of S11 found that with the canonical hook hand-written twice and no managed block:
+doctor exited 2 and pointed at `spec precommit migrate`, `migrate` answered `unchanged`, and
+`sync` and the repair executor silently did nothing. Fixed in S11 follow-up work: the new
+`unowned_duplicate` check in `src/vaultspec_core/core/prek_boundary.py` answers from the file
+without writing. With it, `migrate` reports `conflicting` and exits 1, `sync` and the executor
+warn via `repair_managed_prek_block`, and doctor's text names hand-written copies as the
+operator's to remove.
+
+### s11-emptied-first-local-repo | low | the dedupe left an emptied first local repo behind as `hooks: []`
+
+Fixed: `_reconcile_precommit_repos` now drops any local repo the merge itself emptied,
+including the first, and keeps an empty stanza the operator wrote.
+
+### s11-amendment-ahead-of-approval | low | the duplicate-listings amendment sat in the accepted ADR while its design question was unanswered
+
+Resolved by moving the decision into the proposed
+`2026-09-23-commit-gate-duplicate-listings-adr` and restoring the accepted record to its
+authorized content. The plan records that S11 executed ahead of that record's acceptance.
+Acceptance is now the user's to give.
+
+Result of the S11 review: PASS. The medium and the first low are fixed with failing-first
+tests; the second low awaits the user's acceptance of the proposed record.
 
 ## Recommendations
 

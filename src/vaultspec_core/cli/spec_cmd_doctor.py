@@ -555,8 +555,9 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         PrecommitSignal.DUPLICATED: (
             "the hook config prek reads lists a vaultspec hook more than once, "
             "so it runs repeatedly on every commit - 'vaultspec-core sync' "
-            "removes the extra copies (with prek.toml: 'vaultspec-core spec "
-            "precommit migrate')"
+            "removes the copies vaultspec manages (with prek.toml: "
+            "'vaultspec-core spec precommit migrate'); copies written by hand "
+            "outside vaultspec's managed block are yours to remove"
         ),
         PrecommitSignal.SHADOWED: (
             "vaultspec hooks are also listed in a config file prek does not "

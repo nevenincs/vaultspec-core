@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:f8e06a01a73fc763e7ba94975d9b0315a12e98285108157ffedf4837b9335e42'
+body_hash: 'sha256:6b9071539cc4e02fa08f3ffb90f5947b081449ebe76a0ff46c70c0319646871f'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -114,6 +114,8 @@ related:
 - `S12` `M` `.vaultspec/system/01-core.md`
 - `S12` `M` `.vaultspec/system/02-operations.md`
 - `S12` `verify:` `vaultspec-core spec doctor builtins` -> `pass`
+- `S11` `A` `.vault/adr/2026-09-23-commit-gate-duplicate-listings-adr.md`
+- `S11` `M` `src/vaultspec_core/tests/cli/test_precommit_duplicates.py`
 
 ## Notes
 
@@ -123,3 +125,4 @@ related:
 - `S09` the deployed .vaultspec/reference mirror is left for the next release carry-forward, matching how it has been refreshed from the packaged builtins after each release
 - `S10` full run also hit the load-sensitive MCP stdin-EOF entrypoint test; it passes alone twice and is untouched here
 - `S12` deployed copies re-seeded with install --upgrade; its refresh of the release-tracked .vaultspec/reference/cli.md was put back to the committed content, per the carry-forward deferral
+- `S11` the duplicate-listings decision moved to a proposed ADR; S11 stands ahead of its acceptance and is withdrawn if it is rejected

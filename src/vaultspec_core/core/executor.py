@@ -284,10 +284,10 @@ def _execute_repair_precommit(target: Path, _step: ResolutionStep) -> None:
     added.
     """
     from .commands import scaffold_precommit
-    from .prek_boundary import PREK_CONFIG_NAME, refresh_managed_prek_block
+    from .prek_boundary import PREK_CONFIG_NAME, repair_managed_prek_block
 
     if (target / PREK_CONFIG_NAME).exists():
-        refresh_managed_prek_block(target)
+        repair_managed_prek_block(target)
         return
     scaffold_precommit(target)
 

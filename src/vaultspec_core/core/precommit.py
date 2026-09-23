@@ -470,8 +470,7 @@ def _reconcile_precommit_repos(
     """Reconcile the local repos' hooks in *data* against *canonical_hooks*.
 
     Creates a local repo when none exists; otherwise merges via
-    :func:`_merge_local_repo_hooks` and drops any local repo the merge left
-    without hooks.
+    :func:`_merge_local_repo_hooks` and drops any local repo the merge emptied.
 
     Returns:
         ``True`` when *data* should be written back to disk.
@@ -492,10 +491,13 @@ def _reconcile_precommit_repos(
         if hooks is None:
             return False
         hook_lists.append(hooks)
+    had_hooks = [bool(hooks) for hooks in hook_lists]
     if not _merge_local_repo_hooks(hook_lists, canonical_hooks):
         return False
-    for local_repo, hooks in zip(local_repos[1:], hook_lists[1:], strict=True):
-        if not hooks:
+    # Only a repo the merge itself emptied goes: an empty stanza the operator
+    # wrote is theirs, and one the merge emptied is residue vaultspec created.
+    for local_repo, hooks, had in zip(local_repos, hook_lists, had_hooks, strict=True):
+        if had and not hooks:
             repos.remove(local_repo)
     return True
 

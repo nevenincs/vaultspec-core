@@ -6,9 +6,10 @@ date: '2026-09-23'
 tier: L1
 related:
   - '[[2026-09-23-commit-gate-adr]]'
+  - '[[2026-09-23-commit-gate-duplicate-listings-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:58e8365f59e47dc072afa1edb39733cf008cbacf206c577225d2ef03daa5cb9b'
+body_hash: 'sha256:a66d894254e79e345f1a322925b44ab6855eac7cd728c6c4b87cc382912cd1e6'
 ---
 
 # `commit-gate` plan
@@ -19,7 +20,7 @@ Replace the three whole-vault commit hooks with one staged-document gate, and st
 
 Approved 2026-09-23
 
-Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too. After the plan closed, the user asked on 2026-09-23 that the hook changes be enrolled in the per-release schema migrations; S10 does that under the amended convergence clause of the ADR. The user then asked that duplicate hook listings be surfaced, as a warning for copies prek does not read and as a repaired error for live duplicates. S11 implements the recommended design, since the user's answer to the design question did not arrive; it awaits their confirmation.
+Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too. After the plan closed, the user asked on 2026-09-23 that the hook changes be enrolled in the per-release schema migrations; S10 does that under the amended convergence clause of the ADR. The user then asked that duplicate hook listings be surfaced, as a warning for copies prek does not read and as a repaired error for live duplicates. S11 implements the recommended design recorded in the proposed `2026-09-23-commit-gate-duplicate-listings-adr`. It executed ahead of that record's acceptance because the user's answer to the design question did not arrive, and it is withdrawn if the record is rejected.
 
 Decision coverage:
 
