@@ -88,6 +88,14 @@ Open `.vault/` in [Obsidian](https://obsidian.md) to browse its linked documents
 optional [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package adds
 semantic search across the vault and your code.
 
+Hosted vault search is also optional. Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` and
+`vaultspec-core vault search` (MCP: `search`) answers questions about the vault with the
+passage that answers them. Every search sends vault text to the TypeSafe API. Without a
+key, everything else works. A vault search then names what to run instead: a
+vaultspec-rag vault search when the workspace provisions vaultspec-rag, otherwise
+`vaultspec-core vault list` and grep. Code search is always vaultspec-rag's job. See
+[`vault search`](docs/CLI.md#vaultspec-core-vault-search).
+
 ## Support and license
 
 vaultspec-core is in beta. Report bugs, ask questions, or propose changes on the

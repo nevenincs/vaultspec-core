@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:195e9a63f15185108b0fbb59fa652e0174fd18819bd556ea09617049ea819086'
+body_hash: 'sha256:8125351eb231543e17a9767d2d3e7d0e9510f9a7a8a9b12e073ab2c224c15f35'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -79,6 +79,12 @@ related:
 - `S03` `M` `docs/CLI.md`
 - `S03` `verify:` `just fix-markdown, framework-reference, check-markdown, framework-reference-check, check-size check-complexity check-nesting; ruff and ty clean on S03 files; pytest test_cli_reference_generated test_cli_reference_drift guards/test_cli_handbook_drift guards/test_cli_reference_contract_helpers` -> `pass`
 - `S03` `by:` `opus-high`
+- `S05` `M` `README.md`
+- `S05` `M` `docs/framework.md`
+- `S05` `M` `docs/CLI.md`
+- `S05` `M` `docs/MCP.md`
+- `S05` `verify:` `just framework-reference-check` -> `pass`
+- `S05` `by:` `opus-medium`
 
 ## Notes
 

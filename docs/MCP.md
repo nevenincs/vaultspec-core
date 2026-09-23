@@ -158,8 +158,9 @@ the server, grant trust, or bypass provider approval.
 
 Call the `status` tool with no arguments. It returns a rollup report:
 `tool_schema_version`, the workspace's features with document counts and lifecycle
-status, and any plans in flight with their completion and next open step. A populated
-report confirms the server found the workspace.
+status, any plans in flight with their completion and next open step, and
+`hosted_search`, whether [`search`](#search) has a key configured. A populated report
+confirms the server found the workspace.
 
 Call `find` with no arguments. It returns the feature listing, for example
 `[{"name": "auth", "doc_count": 4, "weight": 7}, ...]`. A non-empty listing confirms the
@@ -380,17 +381,28 @@ configured and where it was found.
 **Outcomes.** The `status` field is one of three values:
 
 - `ok`: the vault was judged. `answered` says whether any record was judged to answer
-  the question. It is a verdict on the whole vault only when `usage.unscored` is `0`: a
-  record the provider would not read in full was not judged. `hits` is empty only when
-  every record was read.
-- `not_configured`: no key is set and nothing was sent. `remediation` names the variable
-  and the vaultspec-rag command to run instead. The server never calls vaultspec-rag
-  itself; you or your agent run the fallback.
+  the question, and `verdict` words it: `answered`, `nothing_answers`, or
+  `none_read_answers` when the provider would not read some records in full. `answered`
+  is a verdict on the whole vault only when `usage.unscored` is `0`: a record the
+  provider would not read in full was not judged. `hits` is empty only when every record
+  was read.
+- `not_configured`: no key is set and nothing was sent.
 - `unavailable`: a key is set but the search failed. `reason` names the failure:
   `credential_rejected`, `content_rejected`, `rate_limited`, `transport`, `deadline`,
   `invalid_response`, or `request_too_large`. `content_rejected` means the provider
-  refused to read the question itself, or every record the ranking needed. `remediation`
-  gives the next step. No partial ranking is returned.
+  refused to read the question itself, or every record the ranking needed. No partial
+  ranking is returned.
+
+**Next step.** A `not_configured` or `unavailable` reply carries `next_step`, the search
+to run instead, and `remediation`, one sentence giving the reason and that step.
+`next_step.kind` is `rag_search` when the workspace provisions vaultspec-rag, and
+`command` is a vaultspec-rag vault search over the requested record types. Otherwise
+`kind` is `listing`, and `command` is `vaultspec-core vault list`, with the type when
+one was requested; run it or `find`, then grep `.vault/` for the passage. `types` lists
+the record types the step covers, and `<intent>` in `command` stands for your question.
+Provisioning is read from the workspace configuration, not checked for liveness. The
+server never calls vaultspec-rag itself; you or your agent run the step. `search` covers
+the vault only: use vaultspec-rag for code.
 
 **Hits.** Each hit reports `path`, `type`, `feature`, `date`, `title`, `score` (the
 ranking score), `answers` (the probability that the record states the answer),
@@ -431,6 +443,7 @@ Example response:
 {
   "status": "ok",
   "answered": true,
+  "verdict": "answered",
   "hits": [
     {
       "path": ".vault/adr/2026-07-12-search-api-adr.md",
@@ -464,14 +477,20 @@ Example response:
 }
 ```
 
-Example response with no key configured:
+Example response with no key configured, for a request with `type` `["adr"]` in a
+workspace that provisions vaultspec-rag:
 
 ```json
 {
   "status": "not_configured",
   "answered": false,
   "hits": [],
-  "remediation": "Hosted vault search is not configured: set VAULTSPEC_CORE_TYPESAFE_API_KEY to enable it, or search with `vaultspec-rag search \"<intent>\" --type vault --doc-type adr`."
+  "next_step": {
+    "kind": "rag_search",
+    "types": ["adr"],
+    "command": "vaultspec-rag search \"<intent>\" --type vault --doc-type adr"
+  },
+  "remediation": "Hosted vault search is not configured: set VAULTSPEC_CORE_TYPESAFE_API_KEY to enable it, or run `vaultspec-rag search \"<intent>\" --type vault --doc-type adr`."
 }
 ```
 
@@ -664,8 +683,10 @@ plan completion percent), the plans currently in flight (stem, feature, tier, op
 closed step counts, completion percent, and the next open step), vault-wide totals, and
 `hosted_search`. That field reports whether [`search`](#search) has a key (`configured`)
 and, when it does, where the key was found (`source`: `environment` or `dotenv`). It
-describes configuration, not whether the key works. Every response carries a
-`tool_schema_version` field so a client can detect a server upgrade.
+describes configuration, not whether the key works. Unlike the CLI's `status --json`,
+the tool carries no vaultspec-rag companion field: a declined `search` names the
+companion route in its own `next_step`. Every response carries a `tool_schema_version`
+field so a client can detect a server upgrade.
 
 Pass a target to trace one plan or feature instead. The response then reports each
 plan's steps in full detail (canonical ID, display path, checked state, the ledger stem

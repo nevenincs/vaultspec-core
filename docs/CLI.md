@@ -857,9 +857,12 @@ framework health.
 The rollup's Discovery section says which vault search to reach for. First it says
 whether hosted vault search (`vaultspec-core vault search`) is configured and whether
 the key came from the `environment` or the workspace `dotenv`. It then shows whether the
-`vaultspec-rag` companion is provisioned. Both lines report configuration, not liveness:
-a configured key can still be rejected when a search runs. Under `--json` they are
-`data.hosted_search` (`configured`, `source`) and `data.companion`.
+`vaultspec-rag` companion is provisioned, which decides the next step a declined vault
+search names. Both lines report configuration, not liveness: a configured key can still
+be rejected when a search runs, and a provisioned companion can still be down. Under
+`--json` they are `data.hosted_search` (`configured`, `source`) and `data.companion`
+(`package`, `signal`, `mode`, `version`, `floor`, `health_authority`, or `null` when the
+probe failed).
 
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace - a plan-line header, then each step (display path, checkbox state, a
@@ -979,12 +982,16 @@ every search, so there is no index to build or refresh. The same search backs th
 
 Hosted search is enabled by a TypeSafe key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
 [environment variables](#environment-variables)). Every search sends the question and
-vault text to the TypeSafe API. Without a key the command sends nothing and reports that
-hosted search is not configured. It also names the search to run instead: a
-`vaultspec-rag` vault search over the requested record types when the workspace
-provisions rag, otherwise `vaultspec-core vault list` (MCP: `find`) and grep.
-`vaultspec-core status` shows whether a key is configured and where it came from. The
-key itself never appears in any output.
+vault text to the TypeSafe API. Without a key the command sends nothing and reports
+`not configured`. When a configured search fails, it reports `unavailable` with the
+reason and returns no partial ranking. Either way it prints one sentence: why hosted
+search did not rank, then the search to run instead. That is a `vaultspec-rag` vault
+search over the requested record types when the workspace provisions `vaultspec-rag`,
+otherwise `vaultspec-core vault list` (MCP: `find`), with the type when one was
+requested, and grep of `.vault/`. Provisioning is read from the workspace configuration;
+core never calls `vaultspec-rag`. Hosted search covers the vault only; code search is
+`vaultspec-rag`'s. `vaultspec-core status` shows whether a key is configured and where
+it came from. The key itself never appears in any output.
 
 Output starts with a verdict: `answered`, or `nothing in the vault answers this`. When
 the provider would not read some records in full, the verdict reads
@@ -1028,13 +1035,13 @@ with `section`, `line_start`, `line_end`, `text`, and `truncated`. `line_end` is
 last line `text` holds, and `truncated` marks a passage that goes on past it. A
 `supporting` excerpt is present only when the answer spans two passages. The
 `not_configured` and `unavailable` replies carry a `next_step` (`kind` `rag_search` or
-`listing`, the `types` it covers, and the `command` to run) and a `remediation` sentence
-that words it, and `unavailable` also carries its `reason`: `credential_rejected`,
-`content_rejected`, `rate_limited`, `transport`, `deadline`, `invalid_response`, or
-`request_too_large`. `usage` reports the requests, tokens, and time a search spent, and
-`unscored`, the number of records the provider would not read in full. `answered` is
-`false` for the whole vault only when `unscored` is `0`. The JSON carries non-ASCII text
-as UTF-8 rather than `\u` escapes.
+`listing`, the `types` it covers, and the `command` to run, where `<intent>` stands for
+your question) and a `remediation` sentence that words it, and `unavailable` also
+carries its `reason`: `credential_rejected`, `content_rejected`, `rate_limited`,
+`transport`, `deadline`, `invalid_response`, or `request_too_large`. `usage` reports the
+requests, tokens, and time a search spent, and `unscored`, the number of records the
+provider would not read in full. `answered` is `false` for the whole vault only when
+`unscored` is `0`. The JSON carries non-ASCII text as UTF-8 rather than `\u` escapes.
 
 Exit codes:
 
