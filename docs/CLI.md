@@ -980,9 +980,11 @@ every search, so there is no index to build or refresh. The same search backs th
 Hosted search is enabled by a TypeSafe key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
 [environment variables](#environment-variables)). Every search sends the question and
 vault text to the TypeSafe API. Without a key the command sends nothing and reports that
-hosted search is not configured. It also names the `vaultspec-rag` search to run
-instead. `vaultspec-core status` shows whether a key is configured and where it came
-from. The key itself never appears in any output.
+hosted search is not configured. It also names the search to run instead: a
+`vaultspec-rag` vault search over the requested record types when the workspace
+provisions rag, otherwise `vaultspec-core vault list` (MCP: `find`) and grep.
+`vaultspec-core status` shows whether a key is configured and where it came from. The
+key itself never appears in any output.
 
 Output starts with a verdict: `answered`, or `nothing in the vault answers this`. When
 the provider would not read some records in full, the verdict reads
@@ -1015,21 +1017,24 @@ were shown, the number withheld.
 The type, feature, and date filters are applied before anything is sent: a record they
 exclude never leaves the machine.
 
-Under `--json`, `data.status` is `ok`, `not_configured`, or `unavailable`. An `ok` reply
-carries `answered`, the `hits`, and the window fields `returned`, `total`, and
-`truncated`. Each hit carries the same fields as a hit from the MCP `search` tool:
-`path`, `type`, `feature`, `date`, `title`, `score`, `answers` (the probability that the
-record states the answer), `premise_conflict`, each score to three decimal places,
-`blob_hash`, and an `excerpt` with `section`, `line_start`, `line_end`, `text`, and
-`truncated`. `line_end` is the last line `text` holds, and `truncated` marks a passage
-that goes on past it. A `supporting` excerpt is present only when the answer spans two
-passages. The `not_configured` and `unavailable` replies carry a `remediation` sentence,
-and `unavailable` also carries its `reason`: `credential_rejected`, `content_rejected`,
-`rate_limited`, `transport`, `deadline`, `invalid_response`, or `request_too_large`.
-`usage` reports the requests, tokens, and time a search spent, and `unscored`, the
-number of records the provider would not read in full. `answered` is `false` for the
-whole vault only when `unscored` is `0`. The JSON carries non-ASCII text as UTF-8 rather
-than `\u` escapes.
+Under `--json`, `data` carries the same fields as the MCP `search` result. `data.status`
+is `ok`, `not_configured`, or `unavailable`, and every reply carries `answered` and the
+`hits`. An `ok` reply adds `verdict` (`answered`, `nothing_answers`, or
+`none_read_answers`, the three verdicts above) and the window fields `returned`,
+`total`, and `truncated`. Each hit carries: `path`, `type`, `feature`, `date`, `title`,
+`score`, `answers` (the probability that the record states the answer),
+`premise_conflict`, each score to three decimal places, `blob_hash`, and an `excerpt`
+with `section`, `line_start`, `line_end`, `text`, and `truncated`. `line_end` is the
+last line `text` holds, and `truncated` marks a passage that goes on past it. A
+`supporting` excerpt is present only when the answer spans two passages. The
+`not_configured` and `unavailable` replies carry a `next_step` (`kind` `rag_search` or
+`listing`, the `types` it covers, and the `command` to run) and a `remediation` sentence
+that words it, and `unavailable` also carries its `reason`: `credential_rejected`,
+`content_rejected`, `rate_limited`, `transport`, `deadline`, `invalid_response`, or
+`request_too_large`. `usage` reports the requests, tokens, and time a search spent, and
+`unscored`, the number of records the provider would not read in full. `answered` is
+`false` for the whole vault only when `unscored` is `0`. The JSON carries non-ASCII text
+as UTF-8 rather than `\u` escapes.
 
 Exit codes:
 

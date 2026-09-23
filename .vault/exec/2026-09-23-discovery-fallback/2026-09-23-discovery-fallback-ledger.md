@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:0f07be11ef8698087828e35ac0a81d4212aa6cdc79d58fccbbd7a446b240ed3c'
+body_hash: 'sha256:195e9a63f15185108b0fbb59fa652e0174fd18819bd556ea09617049ea819086'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -73,8 +73,15 @@ related:
 - `S02` `M` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
 - `S02` `verify:` `just check-python check-type check-markdown check-size check-complexity check-nesting; pytest test_discovery_guidance core/tests cli/test_sync search/test_remediation` -> `pass`
 - `S02` `by:` `opus-high`
+- `S03` `M` `src/vaultspec_core/cli/reference_gen.py`
+- `S03` `M` `src/vaultspec_core/tests/cli/test_cli_reference_generated.py`
+- `S03` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S03` `M` `docs/CLI.md`
+- `S03` `verify:` `just fix-markdown, framework-reference, check-markdown, framework-reference-check, check-size check-complexity check-nesting; ruff and ty clean on S03 files; pytest test_cli_reference_generated test_cli_reference_drift guards/test_cli_handbook_drift guards/test_cli_reference_contract_helpers` -> `pass`
+- `S03` `by:` `opus-high`
 
 ## Notes
 
 - `S01` MCP status does not carry the companion record: it measured +439 tool-definition chars against a ceiling the envelope ADR forbids raising; the companion reaches agents as the search next step instead
 - `S02` Builtins touched only to swap the routing sentence for the new constant; the S04 rewrite owns their prose. SEARCH_ADR removed: no builtin or backend offers the rag ADR search any more
+- `S03` Whole-tree check-python and check-type fail only in the concurrent env-var centralisation lane (search tests, CredentialSource import in search/_models.py, deleted search/_credential.py); none in S03 files
