@@ -88,17 +88,19 @@ class TestCheckProvidersIgnoresDeletions:
 
     def test_staged_deletion_is_not_flagged(self, tmp_path: Path) -> None:
         _init_git_repo(tmp_path)
-        # Track .mcp.json then stage its removal.
-        (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
-        _run_git(tmp_path, "add", ".mcp.json")
-        _run_git(tmp_path, "commit", "-q", "-m", "track mcp")
-        _run_git(tmp_path, "rm", "--cached", ".mcp.json")
+        # Track the per-machine manifest, then stage its removal.
+        manifest = tmp_path / ".vaultspec" / "providers.json"
+        manifest.parent.mkdir()
+        manifest.write_text("{}", encoding="utf-8")
+        _run_git(tmp_path, "add", "-f", ".vaultspec/providers.json")
+        _run_git(tmp_path, "commit", "-q", "-m", "track manifest")
+        _run_git(tmp_path, "rm", "--cached", ".vaultspec/providers.json")
 
         # Sanity check: confirm the staged change is indeed a deletion.
         staged = _run_git(
             tmp_path, "diff", "--cached", "--name-only", "--diff-filter=D"
         )
-        assert ".mcp.json" in staged.stdout.splitlines()
+        assert ".vaultspec/providers.json" in staged.stdout.splitlines()
 
         violations = check_staged_provider_artifacts(cwd=tmp_path)
 
@@ -106,12 +108,14 @@ class TestCheckProvidersIgnoresDeletions:
 
     def test_staged_addition_is_flagged(self, tmp_path: Path) -> None:
         _init_git_repo(tmp_path)
-        (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
-        _run_git(tmp_path, "add", ".mcp.json")
+        manifest = tmp_path / ".vaultspec" / "providers.json"
+        manifest.parent.mkdir()
+        manifest.write_text("{}", encoding="utf-8")
+        _run_git(tmp_path, "add", "-f", ".vaultspec/providers.json")
 
         violations = check_staged_provider_artifacts(cwd=tmp_path)
 
-        assert ".mcp.json" in violations
+        assert ".vaultspec/providers.json" in violations
 
 
 # ---- Domain 1: untrack historically-committed managed paths -----------------

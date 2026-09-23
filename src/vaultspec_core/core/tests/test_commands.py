@@ -194,62 +194,6 @@ def test_precommit_collector_detects_states(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_provider_artifact_patterns_catch_known_files() -> None:
-    """PROVIDER_ARTIFACT_PATTERNS must match known provider artifact paths."""
-    from vaultspec_core.core.commands import PROVIDER_ARTIFACT_PATTERNS
-
-    # Paths that MUST be caught
-    must_catch = [
-        ".mcp.json",
-        "providers.lock",
-        "CLAUDE.md",
-        "GEMINI.md",
-        "AGENTS.md",
-        ".claude/rules/foo.md",
-        ".gemini/rules/bar.md",
-        ".codex/config.toml",
-        ".agents/workflows/test.md",
-        ".vaultspec/_snapshots/foo.json",
-    ]
-    # Paths that must NOT be caught
-    must_pass = [
-        "src/commands.py",
-        "tests/test_foo.py",
-        ".vault/adr/my-adr.md",
-        ".vaultspec/my-rule.md",
-        "pyproject.toml",
-    ]
-
-    for path in must_catch:
-        normalized = path.replace("\\", "/")
-        matched = False
-        for pattern in PROVIDER_ARTIFACT_PATTERNS:
-            if pattern.endswith("/"):
-                if normalized.startswith(pattern):
-                    matched = True
-                    break
-            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
-                matched = True
-                break
-        assert matched, f"Expected {path!r} to match a provider artifact pattern"
-
-    for path in must_pass:
-        normalized = path.replace("\\", "/")
-        matched = False
-        for pattern in PROVIDER_ARTIFACT_PATTERNS:
-            if pattern.endswith("/"):
-                if normalized.startswith(pattern):
-                    matched = True
-                    break
-            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
-                matched = True
-                break
-        assert not matched, (
-            f"Expected {path!r} to NOT match any provider artifact pattern"
-        )
-
-
-@pytest.mark.unit
 def test_install_sets_precommit_managed_flag(tmp_path: Path) -> None:
     """install_run must set precommit_managed=True in the manifest."""
     try:

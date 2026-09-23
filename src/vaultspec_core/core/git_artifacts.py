@@ -2,19 +2,19 @@
 
 Covers the git-index bookkeeping side of install/upgrade (dropping managed
 paths that were committed before they became ignored) and the pre-commit
-``check-providers`` hook's staged-file scan against
-:data:`PROVIDER_ARTIFACT_PATTERNS`.
+``check-providers`` hook's staged-file scan against the per-machine paths the
+managed ``.gitignore`` block covers.
 """
 
 from __future__ import annotations
 
 import logging
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from .gitattributes import has_valid_block as _ga_has_valid_block
-from .gitignore import managed_lock_candidates
+from .gitignore import get_recommended_entries, managed_lock_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 ManagedBlock = Literal["gitignore", "gitattributes"]
 
 __all__ = [
-    "PROVIDER_ARTIFACT_PATTERNS",
     "check_staged_provider_artifacts",
 ]
 
@@ -297,43 +296,56 @@ def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     return actually_untracked
 
 
-# Patterns that must never be committed.  Used by the
-# check-provider-artifacts pre-commit hook.
-PROVIDER_ARTIFACT_PATTERNS: tuple[str, ...] = (
-    ".mcp.json",
-    "providers.lock",
-    "CLAUDE.md",
-    "GEMINI.md",
-    "AGENTS.md",
-    ".claude/",
-    ".gemini/",
-    ".codex/",
-    ".agents/",
-    ".vaultspec/_snapshots/",
-)
+def _covered_by_entry(path: str, entry: str) -> bool:
+    """Whether root-relative *path* falls under managed ignore *entry*.
+
+    Every managed entry is root-anchored: it either starts with ``/`` or has a
+    slash before its end, which is how gitignore anchors a pattern. So a
+    directory entry matches by prefix, a glob entry matches the whole path, and
+    anything else matches exactly.
+    """
+    pattern = entry.removeprefix("/")
+    if pattern.endswith("/"):
+        return path.startswith(pattern)
+    if any(char in pattern for char in "*?["):
+        return PurePosixPath(path).full_match(pattern)
+    return path == pattern
 
 
 def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
-    """Return staged file paths that match provider artifact patterns.
+    """Return staged paths that are per-machine artifacts.
 
-    Runs ``git diff --cached --name-only --diff-filter=ACMR`` and filters
-    against :data:`PROVIDER_ARTIFACT_PATTERNS`.  The ``ACMR`` filter excludes
-    staged deletions so remediation commits (``git rm --cached ...``) are
-    not blocked by the hook that recommends them.
+    A path is per-machine when the managed ``.gitignore`` block covers it:
+    snapshots, the install manifest, lock sentinels and the vault's local
+    caches, as :func:`~vaultspec_core.core.gitignore.get_recommended_entries`
+    computes them. Deriving the guard from that same source keeps the two from
+    drifting. Team-shared projections such as ``CLAUDE.md``, ``.mcp.json`` and
+    the provider rule directories are not in the block, so they pass.
+
+    Runs ``git diff --cached --name-only --diff-filter=ACMR``. The ``ACMR``
+    filter excludes staged deletions so remediation commits are not blocked by
+    the hook that recommends them.
 
     Args:
-        cwd: Directory to run ``git`` in.  Defaults to the caller's current
-            working directory (pre-commit hook behaviour).  Tests pass an
-            explicit path to avoid mutating global process state.
-    """
-    cmd = ["git"]
-    if cwd is not None:
-        cmd.extend(["-C", str(cwd)])
-    cmd.extend(["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+        cwd: Workspace root to run ``git`` in.  Defaults to the caller's
+            current working directory (pre-commit hook behaviour).  Tests pass
+            an explicit path to avoid mutating global process state.
 
+    Returns:
+        The staged per-machine paths, as ``git`` printed them.
+    """
+    root = cwd if cwd is not None else Path.cwd()
     try:
         result = subprocess.run(
-            cmd,
+            [
+                "git",
+                "-C",
+                str(root),
+                "diff",
+                "--cached",
+                "--name-only",
+                "--diff-filter=ACMR",
+            ],
             capture_output=True,
             text=True,
             check=True,
@@ -341,19 +353,10 @@ def check_staged_provider_artifacts(cwd: Path | None = None) -> list[str]:
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-    staged = result.stdout.strip().splitlines()
+    entries = get_recommended_entries(root)
     violations: list[str] = []
-    for path in staged:
+    for path in result.stdout.strip().splitlines():
         normalized = path.replace("\\", "/")
-        parts = normalized.split("/")
-        for pattern in PROVIDER_ARTIFACT_PATTERNS:
-            if pattern.endswith("/"):
-                # Directory pattern: match any path segment exactly
-                dirname = pattern.rstrip("/")
-                if any(seg == dirname for seg in parts):
-                    violations.append(path)
-                    break
-            elif normalized == pattern or parts[-1] == pattern:
-                violations.append(path)
-                break
+        if any(_covered_by_entry(normalized, entry) for entry in entries):
+            violations.append(path)
     return violations

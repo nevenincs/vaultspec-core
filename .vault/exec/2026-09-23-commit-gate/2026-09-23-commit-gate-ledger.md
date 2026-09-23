@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:eb06a4149612f18f89508e811e0abbe25cd2e909d6dd74c248bf9ffbfc1de546'
+body_hash: 'sha256:35ce92506aa91ab0c5cbf9d7e26cfbe2c16009eeea9b85032a2e20249dace1ac'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -30,7 +30,15 @@ related:
 - `S04` `M` `src/vaultspec_core/cli/spec_cmd_doctor.py`
 - `S04` `A` `src/vaultspec_core/tests/cli/test_precommit_yml_config.py`
 - `S04` `verify:` `ty check` -> `pass`
+- `S05` `M` `src/vaultspec_core/core/git_artifacts.py`
+- `S05` `M` `src/vaultspec_core/cli/root_doctor.py`
+- `S05` `M` `src/vaultspec_core/core/commands.py`
+- `S05` `M` `src/vaultspec_core/core/tests/test_commands.py`
+- `S05` `M` `src/vaultspec_core/tests/cli/test_flow_bugs.py`
+- `S05` `A` `src/vaultspec_core/tests/cli/test_provider_guard.py`
+- `S05` `verify:` `ty check` -> `pass`
 
 ## Notes
 
 - `S03` authorized by the user's direct request to fix just init; not governed by the proposed ADR
+- `S05` full-suite run also hit test_rename_concurrency under -n auto; it passes 3/3 alone and is untouched by this Step
