@@ -36,10 +36,8 @@ For each cluster of decisions on a shared concept:
 
 For each `accepted` decision (and each `superseded` / `deprecated` one, inverted):
 
-- Locate the implementation by meaning:
-  `vaultspec-rag search "<concept and domain nouns>" --type code` (narrow with
-  `--language`, `--path`, `--include-path`, `--function-name`, `--class-name`,
-  `--prefer production`).
+- Locate the implementation per the `vaultspec-discovery` rule. For code search, narrow
+  with `--include-path`, `--function-name`, `--class-name`, or `--prefer production`.
 - Read the epicenter file whole. Confirm the decision is actually implemented as the ADR
   describes.
 - Confirm exact symbols and insertion points with a targeted grep.

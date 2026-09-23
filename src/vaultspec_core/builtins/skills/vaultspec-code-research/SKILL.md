@@ -12,12 +12,9 @@ skill terminates within one run.
 
 ## Steps
 
-- Discover per the `vaultspec-discovery` rule, including its decision search and ADR
-  listing. Locate code by meaning:
-  `vaultspec-rag search "<concept and domain nouns>" --type code`. Read the epicenter or
-  nearest analogue whole, then confirm exact symbols with grep. Where `vaultspec-rag` is
-  unavailable, locate code with a targeted grep, and say in your report that discovery
-  ran without semantic search.
+- Discover per the `vaultspec-discovery` rule: locate code by meaning, read the
+  epicenter or nearest analogue whole, confirm exact symbols with grep, and list the
+  decisions.
 - Scaffold: `vaultspec-core vault add reference --feature {feature}` (or the `create`
   tool). Read `.vaultspec/templates/reference.md`; its hint blocks fix the body shape.
 - Audit in this run, or dispatch the `vaultspec-reference-auditor` persona to locate and

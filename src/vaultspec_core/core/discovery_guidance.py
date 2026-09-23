@@ -16,9 +16,9 @@ each document's role-specific framing.
 
 Three properties matter and are enforced by that test:
 
-* The fallback sentence is identical everywhere, so a reader who has seen it
-  once does not have to re-read a variant to check whether it says something
-  new.
+* The code-search invocation and the fallback sentence live in the
+  discovery rule alone. Other builtins cite the rule, so a reader never has
+  to compare a variant against the original.
 * No builtin offers rag's vault search. Decision and vault-fact questions go
   to core's ``search``, whose reply names the search to run when it declines
   or fails, resolved from what the workspace provisions; guidance that chose a
@@ -33,7 +33,7 @@ Three properties matter and are enforced by that test:
 
 from __future__ import annotations
 
-#: The single sentence every builtin uses for rag's absence.
+#: The discovery rule's sentence for rag's absence.
 #:
 #: rag is the only semantic code search, so its absence changes the locate
 #: step for code: a targeted grep takes its place. That is the one case where
@@ -152,26 +152,19 @@ DISCOVERY_CANONICAL_SENTENCES = (
     VAULT_SEARCH_ROUTING,
 )
 
-#: Entry points allowed to spell ``vaultspec-rag``'s code search out instead of
-#: citing the rule. Each is a role whose job is locating code; a reader
-#: arriving there needs the invocation, not a pointer. Everything else cites
-#: :data:`DISCOVERY_RULE` by name. Vault search and its routing sentence are
-#: not restated anywhere: they live in the home alone. Paths are relative to
-#: the builtins root.
-DISCOVERY_RESTATERS = frozenset(
+#: Entry points allowed to name ``vaultspec-rag`` outside the home. Each keeps
+#: rag's code index current before a reconciliation, a step no other role
+#: takes; for the search itself and the fallback it cites :data:`DISCOVERY_RULE`
+#: like everything else. No builtin restates the code-search invocation or the
+#: fallback: both live in the home alone. Paths are relative to the builtins
+#: root.
+RAG_INDEX_CHECKERS = frozenset(
     {
-        # Auditing a codebase into a Reference: search is the deliverable.
-        "agents/vaultspec-reference-auditor.md",
-        # Reconciles ADRs against code: locating the implementation is the task.
         "agents/vaultspec-docs-curator.md",
-        # The skill that exists to locate code for the pipeline.
-        "skills/vaultspec-code-research/SKILL.md",
-        # Curator's skill; same reason as the persona.
         "skills/vaultspec-curate/SKILL.md",
     }
 )
 
 #: Vocabulary that marks a restatement of the sequence rather than a citation.
-#: A file using it without citing the rule and without being a registered
-#: restater has grown a second definition.
+#: A file using it without citing the rule has grown a second definition.
 DISCOVERY_SEQUENCE_MARKER = "epicenter"

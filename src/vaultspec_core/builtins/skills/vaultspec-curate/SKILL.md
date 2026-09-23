@@ -28,11 +28,11 @@ Reconciliation reasons over a structurally-correct corpus. Before any semantic w
 
 - **Structural hygiene to the CLI.** Run `vaultspec-core vault check all --fix`. This
   repairs frontmatter, links, names, stamps, and template drift. Never hand-fix these.
-- **Check the code index.** `vaultspec-rag` powers code recall, and a fresh worktree is
-  often unindexed. Confirm with `vaultspec-rag server doctor`; if the code index is
-  empty, run `vaultspec-rag index --type code`. Where `vaultspec-rag` is unavailable,
-  locate code with a targeted grep, and say in your report that discovery ran without
-  semantic search. Decision recall does not depend on it.
+- **Check the code index.** Decision recall goes through the `vaultspec-discovery`
+  rule's search and ADR listing. Code recall needs the `vaultspec-rag` index, and a
+  fresh worktree is often unindexed. Confirm with `vaultspec-rag server doctor`; if the
+  code index is empty, run `vaultspec-rag index --type code`. When `vaultspec-rag` is
+  unavailable, use the rule's fallback.
 
 ## Workflow
 
@@ -52,9 +52,9 @@ The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
   the `vaultspec-discovery` rule's decision search and ADR listing, read them whole, and
   judge agreement, duplication, contradiction, or fragmentation (a refinement chain or
   sibling accepted records on one scope).
-- **Reconcile decision-vs-code.** For each live decision,
-  `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
-  file whole, and confirm the decision is implemented; grep to confirm exact symbols.
+- **Reconcile decision-vs-code.** For each live decision, locate the implementation per
+  the `vaultspec-discovery` rule, read the epicenter file whole, and confirm the
+  decision is implemented; grep to confirm exact symbols.
 - **Reconcile document-vs-document.** For each feature with an ADR, read its lifecycle
   documents against the boundary: restated grounding in the ADR, displaced decisions in
   research or audit bodies, forked facts across documents.

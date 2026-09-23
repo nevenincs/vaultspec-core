@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:40baad0f3b757030896bc535c8857618ab990911b60030a52d44ebbe9677046b'
+body_hash: 'sha256:6b8e9cf051f7479bcf254e74f831705cf106e92f066eabb8a6ff3f8f449e384a'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -108,6 +108,10 @@ related:
 - `S04` `by:` `opus-medium`
 - `S03` `verify:` `just check-type-strict` -> `pass`
 - `S05` `verify:` `pytest dev/guards/test_cli_language_contract.py` -> `pass`
+- `S04` `M` `src/vaultspec_core/builtins/system/03-vaultspec.md`
+- `S04` `M` `.vaultspec/system/03-vaultspec.md`
+- `S04` `verify:` `install --upgrade and sync` -> `pass`
+- `S04` `verify:` `pytest test_discovery_guidance test_corpus_contracts test_seed_builtins test_sync test_install, just check-markdown check-python check-type` -> `pass`
 
 ## Notes
 

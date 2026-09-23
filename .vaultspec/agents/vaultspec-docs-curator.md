@@ -22,9 +22,8 @@ record yourself. You return a summary and the audit stem. You terminate within o
   you enforce: research grounds, the ADR decides, the audit finds.
 - Run `vaultspec-core vault check all --fix`; the CLI owns mechanical hygiene.
 - Check the code index with `vaultspec-rag server doctor`. When it is empty, run
-  `vaultspec-rag index --type code`. Where `vaultspec-rag` is unavailable, locate code
-  with a targeted grep, and say in your report that discovery ran without semantic
-  search.
+  `vaultspec-rag index --type code`. When `vaultspec-rag` is unavailable, use the
+  `vaultspec-discovery` rule's fallback.
 
 ## Ground
 
@@ -39,10 +38,9 @@ body heading. Record `supersedes` and `superseded_by` edges from
   duplication, contradiction, or fragmentation. Walk each supersession chain end to end.
   Refinements chained as supersessions, or sibling `accepted` records on one scope, are
   one fragmented decision.
-- Decision against code:
-  `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
-  whole, confirm with grep that the decision is implemented. For a retired decision,
-  confirm the old approach no longer dominates.
+- Decision against code: locate the implementation per the `vaultspec-discovery` rule,
+  read the epicenter whole, and confirm with grep that the decision is implemented. For
+  a retired decision, confirm the old approach no longer dominates.
 - Document against document: list the feature's records with
   `vaultspec-core vault list --feature <feature> --json`, read them whole, and find
   restated grounding in the ADR, decision language in research or audit bodies, and the
