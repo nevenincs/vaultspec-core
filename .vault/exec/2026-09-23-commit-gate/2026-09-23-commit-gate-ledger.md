@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:870c0e0d6dd652f77346be180c6e7ed41b599fc96065f9472880c9855c4ab732'
+body_hash: 'sha256:dadea4a98c9ec07b0eb2717539605191fed7aaedd164e327dad867e469dc3b4d'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -76,6 +76,10 @@ related:
 - `S03` `M` `dev/init/contract.py`
 - `S07` `M` `src/vaultspec_core/cli/root_commit_gate.py`
 - `S07` `M` `src/vaultspec_core/tests/cli/test_commit_gate_cli.py`
+- `S08` `M` `src/vaultspec_core/vaultcore/checks/structure.py`
+- `S08` `M` `src/vaultspec_core/core/diagnosis/collectors_provider.py`
+- `S08` `M` `src/vaultspec_core/cli/spec_cmd_doctor.py`
+- `S08` `verify:` `pytest doctor and checks` -> `pass`
 
 ## Notes
 

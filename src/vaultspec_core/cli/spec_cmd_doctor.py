@@ -953,8 +953,7 @@ def doctor_exit_code(
         # ProviderDirSignal.MIXED is a soft, informational signal: it means the
         # provider directory carries extra files vaultspec does not own. That is
         # benign (genuine managed-content drift surfaces via ContentSignal), so
-        # it must not fail the doctor exit code and block markdown commits via
-        # the bundled spec-check hook (issue #122).
+        # it must not fail the doctor exit code (issue #122).
         if prov.config in (
             ConfigSignal.MISSING,
             ConfigSignal.FOREIGN,
