@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:cff8140aaf958fd35328d4d8f7b49cdd5414144637f4602ee0aa6c5b46f0bdb0'
+body_hash: 'sha256:6ed3926787980eadbe8f4c3550f25d777eaaa8f95297068e70fb5c4fee1e3a9d'
 ---
 
 # `commit-gate` plan
@@ -37,7 +37,7 @@ Issues addressed:
 
 ## Steps
 
-- [ ] `S03` - stop dev init from installing a commit hook, and correct the contributor docs that describe the retired whole-vault and annotation-cleanup hooks; `dev/init/hooks.py, dev/init/plan.py, dev/init/README.md, justfile, docs/framework.md, docs/syntax.md`.
+- [x] `S03` - stop dev init from installing a commit hook, and correct the contributor docs that describe the retired whole-vault and annotation-cleanup hooks; `dev/init/hooks.py, dev/init/plan.py, dev/init/README.md, justfile, docs/framework.md, docs/syntax.md`.
 - [x] `S01` - apply the authorized amendment retiring the canonical sanitize-hook clause; `.vault/adr/2026-05-15-template-annotation-sanitization-adr.md`.
 - [x] `S04` - resolve the hook config in prek order, adding .pre-commit-config.yml, across scaffold, boundary, migrate, collector, gitignore lock subjects and uninstall; `src/vaultspec_core/core/precommit.py, prek_boundary.py, diagnosis/collectors_precommit.py, gitignore.py, uninstall.py`.
 - [x] `S05` - narrow the provider guard to per-machine artifacts derived from the managed-ignore source, with unstage-only remediation; `src/vaultspec_core/core/git_artifacts.py, src/vaultspec_core/cli/root_doctor.py`.

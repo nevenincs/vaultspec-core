@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:bcb310ffeac85b57b6d6d5dee93cafb8e1b87781662634e7e92030a24781f17c'
+body_hash: 'sha256:42304920050900d873481a411956969243a4c40fa2e0e350f80cf7da6db2b7b4'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -71,6 +71,9 @@ related:
 - `S04` `M` `src/vaultspec_core/tests/cli/test_precommit_yml_config.py`
 - `S02` `M` `src/vaultspec_core/vaultcore/checks/tests/test_staged_gate.py`
 - `S05` `M` `src/vaultspec_core/tests/cli/test_provider_guard.py`
+- `S03` `D` `dev/init/hooks.py`
+- `S03` `M` `dev/init/__main__.py`
+- `S03` `M` `dev/init/contract.py`
 
 ## Notes
 
