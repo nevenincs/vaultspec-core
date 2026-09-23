@@ -22,6 +22,7 @@ from .exclusions import is_excluded_vault_path
 from .markdown import HTML_COMMENT_RE
 from .models import DocType
 from .normalize import normalize_vault_date
+from .parser import split_frontmatter
 from .query_rename import assert_within_docs
 
 __all__ = [
@@ -364,10 +365,10 @@ def _inject_modified(content: str, date: str) -> str:
         Content without a recognisable frontmatter ``date:`` line is
         returned unchanged.
     """
-    fence = re.match(r"^---\s*\n(.*?\n)---", content, re.DOTALL)
-    if not fence:
+    split = split_frontmatter(content)
+    if not split.at_start:
         return content
-    frontmatter_block = fence.group(1)
+    frontmatter_block = content[split.yaml_start : split.yaml_end]
 
     if re.search(r"^modified:", frontmatter_block, re.MULTILINE):
         return content
@@ -376,7 +377,7 @@ def _inject_modified(content: str, date: str) -> str:
     if not date_line:
         return content
 
-    insert_at = fence.start(1) + date_line.end()
+    insert_at = split.yaml_start + date_line.end()
     return content[:insert_at] + f"modified: '{date}'\n" + content[insert_at:]
 
 
@@ -388,14 +389,14 @@ def _inject_body_schema(content: str) -> str:
     always writes :data:`CURRENT_BODY_SCHEMA` rather than preserving a template
     token; legacy schemas are available only through hash attestation.
     """
-    fence = re.match(r"^---\s*\n(.*?\n)---", content, re.DOTALL)
-    if not fence:
+    split = split_frontmatter(content)
+    if not split.at_start:
         return content
-    frontmatter_block = fence.group(1)
+    frontmatter_block = content[split.yaml_start : split.yaml_end]
     schema_line = re.search(r"^body_schema:[^\n]*\n", frontmatter_block, re.MULTILINE)
     if schema_line:
-        start = fence.start(1) + schema_line.start()
-        end = fence.start(1) + schema_line.end()
+        start = split.yaml_start + schema_line.start()
+        end = split.yaml_start + schema_line.end()
         return (
             content[:start] + f"body_schema: '{CURRENT_BODY_SCHEMA}'\n" + content[end:]
         )
@@ -403,7 +404,7 @@ def _inject_body_schema(content: str) -> str:
     modified_line = re.search(r"^modified:[^\n]*\n", frontmatter_block, re.MULTILINE)
     if not modified_line:
         return content
-    insert_at = fence.start(1) + modified_line.end()
+    insert_at = split.yaml_start + modified_line.end()
     return (
         content[:insert_at]
         + f"body_schema: '{CURRENT_BODY_SCHEMA}'\n"

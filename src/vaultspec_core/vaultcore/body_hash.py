@@ -63,6 +63,8 @@ from __future__ import annotations
 import hashlib
 import re
 
+from .parser import split_frontmatter
+
 __all__ = [
     "BODY_HASH_FIELD",
     "BODY_HASH_PREFIX",
@@ -85,15 +87,6 @@ BODY_HASH_PREFIX = "sha256:"
 #: Canonical serialized form: the prefix followed by 64 lowercase hex
 #: characters. Anything else is not a fingerprint this module wrote.
 _CANONICAL_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-
-#: Leading frontmatter fence, tolerating a BOM and LF/CRLF/CR endings.
-#: Group 2 is the frontmatter block including the trailing EOL of its last
-#: line; the match ends after the closing fence's own EOL, so the body is
-#: whatever follows the match.
-_FENCE_RE = re.compile(
-    r"^(﻿?)---[ \t]*(?:\r\n|\r|\n)(.*?(?:\r\n|\r|\n))---[ \t]*(?:\r\n|\r|\n|\Z)",
-    re.DOTALL,
-)
 
 #: Frontmatter ``body_hash:`` line, capturing indentation so an indented
 #: key is rewritten in place rather than duplicated.
@@ -169,8 +162,11 @@ def strip_frontmatter(text: str) -> str:
     if text.startswith("﻿"):
         text = text[1:]
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-    fence = _FENCE_RE.match(normalized)
-    return normalized if fence is None else normalized[fence.end() :]
+    # Only a fence on the first line is frontmatter here: the fingerprint's
+    # definition predates the parser's tolerance of leading blank lines, and
+    # a digest must never move with it.
+    split = split_frontmatter(normalized)
+    return normalized[split.frontmatter_end :] if split.at_start else normalized
 
 
 def document_body_digest(text: str) -> str:
@@ -231,13 +227,13 @@ def set_body_hash(text: str, digest: str | None = None) -> str:
     """
     from .rename_ops import split_keepends
 
-    fence = _FENCE_RE.match(text)
-    if fence is None:
+    split = split_frontmatter(text)
+    if not split.at_start:
         return text
 
     value = digest if digest is not None else document_body_digest(text)
-    block_start = fence.start(2)
-    block_end = fence.end(2)
+    block_start = split.yaml_start
+    block_end = split.yaml_end
     pairs = split_keepends(text[block_start:block_end])
     canonical = f"'{value}'"
 

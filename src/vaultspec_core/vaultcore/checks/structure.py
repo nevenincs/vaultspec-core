@@ -16,8 +16,10 @@ from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
 from ..models import vault_today
+from ..parser import split_frontmatter
 from ..rename_ops import rename_document_path as _rename_document_path
 from ..rename_ops import rewrite_incoming_refs as _rewrite_incoming_refs
+from ..rename_ops import split_keepends
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -200,30 +202,18 @@ def ensure_index_directory_tag(content: str) -> tuple[str, bool]:
         the YAML block sequence under ``tags:`` and leaves the rest of
         the file unchanged.
     """
-    lines = content.splitlines(keepends=True)
-    in_frontmatter = False
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
+        return content, False
+    yaml = content[split.yaml_start : split.yaml_end]
+    lines = [text + ending for text, ending in split_keepends(yaml)]
     in_tags = False
-    fence_count = 0
     insert_idx: int | None = None
     has_index_tag = False
     tag_indent: str = "  "
 
     for idx, line in enumerate(lines):
         stripped = line.strip()
-        if stripped == "---":
-            fence_count += 1
-            if fence_count == 1:
-                in_frontmatter = True
-                continue
-            # Closing fence: stop scanning; if we were in tags, plant
-            # before the fence.
-            if in_tags and insert_idx is None:
-                insert_idx = idx
-            break
-
-        if not in_frontmatter:
-            continue
-
         if stripped.startswith("tags:"):
             in_tags = True
             continue
@@ -246,6 +236,9 @@ def ensure_index_directory_tag(content: str) -> tuple[str, bool]:
             # End of tags block: plant before this non-tag line.
             in_tags = False
             insert_idx = idx
+    if in_tags and insert_idx is None:
+        # The tags block runs to the closing fence: plant before the fence.
+        insert_idx = len(lines)
 
     if has_index_tag:
         return content, False
@@ -261,7 +254,10 @@ def ensure_index_directory_tag(content: str) -> tuple[str, bool]:
     newline = "\r\n" if "\r\n" in content else "\n"
     new_line = f"{tag_indent}- '{_INDEX_TAG}'{newline}"
     new_lines = [*lines[:insert_idx], new_line, *lines[insert_idx:]]
-    return "".join(new_lines), True
+    return (
+        content[: split.yaml_start] + "".join(new_lines) + content[split.yaml_end :],
+        True,
+    )
 
 
 def _detect_legacy_root_indexes(

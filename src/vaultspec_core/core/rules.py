@@ -359,6 +359,7 @@ def rule_promote(
         refresh_modified_stamp,
         vault_today,
     )
+    from ..vaultcore.parser import split_frontmatter
     from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 
     # 1. Locate the originating audit document
@@ -423,19 +424,15 @@ derived_from:
         meta.promoted_to.append(new_rule_ref)
 
     # Rebuild the audit's frontmatter to update promoted_to, preserving rest
-    match = re.match(
-        r"^---\s*\n(.*?)\n---\s*\n?(.*)$", normalized_content.lstrip(), re.DOTALL
-    )
-    if not match:
+    split = split_frontmatter(normalized_content)
+    if split.yaml_block is None:
         raise VaultSpecError(
             f"Could not parse frontmatter of audit file '{audit_file}'."
         )
 
-    yaml_block = match.group(1)
-    audit_body = match.group(2)
-    leading_whitespace = normalized_content[
-        : len(normalized_content) - len(normalized_content.lstrip())
-    ]
+    yaml_block = split.yaml_block
+    audit_body = split.body
+    leading_whitespace = normalized_content[: split.frontmatter_start]
 
     # Rebuild frontmatter keys
     lines = ["---"]

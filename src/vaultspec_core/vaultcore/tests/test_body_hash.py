@@ -15,6 +15,9 @@ digests. No mocks, patches, or skips.
 from __future__ import annotations
 
 import hashlib
+import itertools
+import re
+from pathlib import Path
 
 import pytest
 
@@ -25,6 +28,7 @@ from vaultspec_core.vaultcore.body_hash import (
     document_body_digest,
     is_canonical_digest,
     set_body_hash,
+    strip_frontmatter,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -196,3 +200,98 @@ class TestSetBodyHash:
     def test_explicit_digest_is_written_verbatim(self):
         explicit = _sha256("something else")
         assert f"body_hash: '{explicit}'" in set_body_hash(_LF_DOC, explicit)
+
+
+#: The fingerprint's fence rule as it was first written, kept only here as the
+#: reference the shared frontmatter splitter must reproduce exactly: a digest
+#: that moved for any input would report bodies stale that never changed.
+_REFERENCE_FENCE_RE = re.compile(
+    r"^(\ufeff?)---[ \t]*(?:\r\n|\r|\n)(.*?(?:\r\n|\r|\n))---[ \t]*(?:\r\n|\r|\n|\Z)",
+    re.DOTALL,
+)
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+_SKIPPED_DIRS = frozenset({".venv", ".git", "node_modules"})
+
+_ANY_DIGEST = BODY_HASH_PREFIX + "0" * 64
+
+
+def _reference_strip(text: str) -> str:
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    fence = _REFERENCE_FENCE_RE.match(normalized)
+    return normalized if fence is None else normalized[fence.end() :]
+
+
+def _assert_matches_reference(text: str) -> None:
+    assert strip_frontmatter(text) == _reference_strip(text), repr(text)
+    assert document_body_digest(text) == body_digest(_reference_strip(text))
+    written = set_body_hash(text, _ANY_DIGEST)
+    fence = _REFERENCE_FENCE_RE.match(text)
+    if fence is None:
+        assert written == text, repr(text)
+        return
+    # The writer may change only the lines between the reference fences.
+    start, end = fence.span(2)
+    assert written[:start] == text[:start], repr(text)
+    assert written[len(written) - (len(text) - end) :] == text[end:], repr(text)
+
+
+class TestFenceMatchesReference:
+    """The fingerprint reads frontmatter exactly as its original fence rule."""
+
+    def test_every_repository_markdown_file(self) -> None:
+        paths = [
+            path
+            for path in _REPO_ROOT.rglob("*.md")
+            if not _SKIPPED_DIRS.intersection(path.relative_to(_REPO_ROOT).parts)
+        ]
+        assert len(paths) > 100
+        for path in paths:
+            _assert_matches_reference(
+                path.read_bytes().decode("utf-8", "surrogateescape")
+            )
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "---\ntags: [a]\n---\n\n# H\n",
+            "---\r\ntags: [a]\r\n---\r\n\r\n# H\r\n",
+            "---\rtags: [a]\r---\r\r# H\r",
+            "---\r\ntags: [a]\na: 1\r---\n# H\r\n",
+            "\ufeff---\ntags: [a]\n---\n# H\n",
+            "# No frontmatter\n\nProse.\n",
+            "---\ntags: [a]\n---",
+            "---\ntags: [a]\n---\n",
+            "---\ntags: [a]\n# never closed\n",
+            "---\ntags: [a]\n---\n# H\n\n---\n\nAfter a thematic break.\n",
+            "\n---\ntags: [a]\n---\n# H\n",
+            "  ---\ntags: [a]\n---\n# H\n",
+            "---  \ntags: [a]\n---\t\n# H\n",
+            "---\r\n---\r\n# H\r\n",
+            "---\n\n---\na: 1\n---\n# H\n",
+            "---\na: 1\n----\n---\n# H\n",
+            "---\na: 1\n--- x\n---\n# H\n",
+            "",
+            "---",
+        ],
+    )
+    def test_named_input_classes(self, text: str) -> None:
+        _assert_matches_reference(text)
+
+    def test_generated_line_sequences(self) -> None:
+        parts = ["---", "--- ", "----", "", "a: 1", "\ufeff", "# H", "  ---"]
+        count = 0
+        for size in range(1, 5):
+            for lines in itertools.product(parts, repeat=size):
+                for first, second in itertools.product(["\n", "\r\n", "\r"], repeat=2):
+                    text = lines[0] + "".join(
+                        (first if index % 2 else second) + line
+                        for index, line in enumerate(lines[1:])
+                    )
+                    for candidate in (text, text + first):
+                        _assert_matches_reference(candidate)
+                        count += 1
+        assert count > 40_000

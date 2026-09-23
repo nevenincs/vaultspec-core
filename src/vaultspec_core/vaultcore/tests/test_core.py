@@ -166,6 +166,44 @@ class TestSplitFrontmatter:
         assert split.yaml_block == "a: 1\n--- not a fence\nb: 2"
         assert split.body == "Body"
 
+    def test_closing_fence_is_the_first_fence_line_after_the_opening(self):
+        split = split_frontmatter("---\n\n---\na: 1\n---\nbody")
+        assert split.yaml_block == ""
+        assert split.body == "a: 1\n---\nbody"
+
+    def test_yaml_span_holds_the_lines_between_the_fences(self):
+        doc = _BOM + "---\na: 1\nb: 2\n---\nbody"
+        split = split_frontmatter(doc)
+        assert doc[split.yaml_start : split.yaml_end] == "a: 1\nb: 2\n"
+        assert split.frontmatter_start == 1
+        assert split.at_start is True
+        assert split.unclosed is False
+
+    def test_lone_cr_line_endings(self):
+        doc = "---\ra: 1\r---\r\rbody\r"
+        split = split_frontmatter(doc)
+        assert split.yaml_block == "a: 1"
+        assert doc[split.yaml_start : split.yaml_end] == "a: 1\r"
+        assert split.body == "body\r"
+        assert split.body_line == 5
+
+    def test_a_crlf_pair_is_one_line_break(self):
+        split = split_frontmatter("---\r\n---\r\nbody")
+        assert split.yaml_block is None
+        assert split.body == "---\r\n---\r\nbody"
+
+    def test_frontmatter_after_blank_lines_is_not_at_start(self):
+        split = split_frontmatter("\n---\na: 1\n---\nbody")
+        assert split.yaml_block == "a: 1"
+        assert split.frontmatter_start == 1
+        assert split.at_start is False
+
+    def test_unclosed_opening_fence_is_reported(self):
+        unclosed = split_frontmatter("---\na: 1\nbody\n")
+        assert unclosed.yaml_block is None
+        assert unclosed.unclosed is True
+        assert split_frontmatter("text\n---\na: 1\n").unclosed is False
+
 
 class TestParseVaultMetadataBOM:
     """The rigid vault-metadata scanner must also see through a leading BOM."""

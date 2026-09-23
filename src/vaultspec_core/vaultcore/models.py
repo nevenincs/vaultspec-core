@@ -287,22 +287,19 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
         the scaffold-time half of decision D3.
     """
     from .body_hash import document_body_digest, set_body_hash
+    from .parser import split_frontmatter
     from .rename_ops import split_keepends
 
-    # Match the leading frontmatter fence, tolerating LF, CRLF, and classic-Mac
-    # CR line endings. A per-line regex scan with ``re.MULTILINE`` would silently
-    # skip a CR-only document because Python only recognises ``\n`` as a line
-    # boundary; instead, capture the frontmatter body (group 2) INCLUDING the
-    # trailing EOL of its last line, then operate line-by-line via
-    # ``split_keepends`` so every line's exact terminator is preserved.
-    fence = re.match(
-        r"^(﻿?)---[ \t]*(?:\r\n|\r|\n)(.*?(?:\r\n|\r|\n))---", text, re.DOTALL
-    )
-    if not fence:
+    # Only frontmatter on the document's first line is stamped, the position
+    # the fingerprint below attests. The YAML lines are edited as
+    # ``split_keepends`` pairs, so every line's exact terminator - LF, CRLF,
+    # or a classic-Mac CR - is preserved.
+    split = split_frontmatter(text)
+    if not split.at_start:
         return text
 
-    block_start = fence.start(2)
-    block_end = fence.end(2)
+    block_start = split.yaml_start
+    block_end = split.yaml_end
     pairs = split_keepends(text[block_start:block_end])
     canonical = f"'{today.isoformat()}'"
 

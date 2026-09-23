@@ -12,6 +12,7 @@ import re
 from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
+from ..parser import split_frontmatter
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -227,13 +228,13 @@ def _fix_frontmatter_locked(doc_path: Path, root_dir: Path) -> str | None:
         return None
     content, source_newline = source
 
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", content.lstrip(), re.DOTALL)
-    if not match:
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
         return None
 
-    yaml_block = match.group(1)
-    body = match.group(2)
-    leading_whitespace = content[: len(content) - len(content.lstrip())]
+    yaml_block = split.yaml_block
+    body = split.body
+    leading_whitespace = content[: split.frontmatter_start]
     fixes_applied: list[str] = []
 
     # Parse current state

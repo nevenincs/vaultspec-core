@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, TypedDict, cast
 
 from .models import DocType
 from .normalize import WINDOWS_RESERVED_NAMES
+from .parser import split_frontmatter
 from .query_listing import VaultDocument, list_documents
 from .rename_ops import split_keepends
 
@@ -358,47 +359,28 @@ def rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, bo
     old_tag = f"#{old}"
     new_tag = f"#{new}"
 
-    bom = ""
-    body = content
-    if body.startswith("\ufeff"):
-        bom = "\ufeff"
-        body = body[1:]
-    # Model each line as a mutable ``[content, ending]`` pair so the rewrite
-    # replaces only the content of the single tag line it targets while every
-    # other byte - including mixed/CR-only endings, an absent trailing
-    # terminator, and exotic in-line separators in body prose - survives
-    # verbatim. Splitting on \r\n / \r / \n only (never the exotic Unicode
-    # separators) is what fixes the corruption.
-    pairs = split_keepends(body)
+    # A document with no frontmatter has no tags block, and one whose fence
+    # never closes is malformed: treating the rest of the file as frontmatter
+    # could mutate body lines that merely look like tag entries.
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
+        return content, False
+
+    # Model each YAML line as a mutable ``[content, ending]`` pair so the
+    # rewrite replaces only the content of the single tag line it targets
+    # while every other byte - a byte-order mark, mixed/CR-only endings, and
+    # the whole body - survives verbatim. Splitting on \r\n / \r / \n only
+    # (never the exotic Unicode separators) is what fixes the corruption.
+    pairs = split_keepends(content[split.yaml_start : split.yaml_end])
 
     out: list[list[str]] = []
     changed = False
-    in_frontmatter = False
-    closed = False
-    fence = 0
     i = 0
     n = len(pairs)
 
     while i < n:
         line, ending = pairs[i]
         stripped = line.strip()
-
-        if stripped == "---":
-            fence += 1
-            out.append([line, ending])
-            i += 1
-            if fence == 1:
-                in_frontmatter = True
-                continue
-            # Closing fence reached: copy the remainder of the file verbatim.
-            closed = True
-            out.extend(pairs[i:])
-            break
-
-        if not in_frontmatter:
-            out.append([line, ending])
-            i += 1
-            continue
 
         if stripped.startswith("tags:"):
             after = line.split("tags:", 1)[1].strip()
@@ -445,18 +427,10 @@ def rewrite_feature_tag_block(content: str, old: str, new: str) -> tuple[str, bo
         out.append([line, ending])
         i += 1
 
-    # Refuse to persist a rewrite of a document whose frontmatter never closed:
-    # an opening ``---`` with no terminating fence is malformed, and treating the
-    # whole file as frontmatter could mutate body lines that merely look like
-    # tag entries. Mirror the closing-fence guard in ``rewrite_incoming_refs``.
-    if in_frontmatter and not closed:
-        return content, False
-
     # Reassemble from the pairs: each line carries its own original terminator,
-    # so the trailing newline (or its absence) and every mixed ending are
-    # reproduced exactly. The BOM is re-prepended.
-    result = bom + "".join(c + e for c, e in out)
-    return result, changed
+    # so every mixed ending is reproduced exactly.
+    block = "".join(c + e for c, e in out)
+    return content[: split.yaml_start] + block + content[split.yaml_end :], changed
 
 
 # -- S08: plan computation + collision detection ----------------------------
@@ -699,21 +673,16 @@ def _count_related_refs(md_path: Path, old_stems_lower: set[str]) -> int:
     except (OSError, UnicodeDecodeError):
         return 0
 
+    # Read the same YAML lines, split the same way (only \r\n / \r / \n, never
+    # the exotic Unicode separators), as ``rewrite_incoming_refs`` so the
+    # dry-run predicted count matches what the cascade would actually rewrite.
+    split = split_frontmatter(text)
+    if split.yaml_block is None:
+        return 0
     count = 0
-    in_frontmatter = False
     in_related = False
-    # Use the same canonical line-splitting as the cascade (only \r\n / \r / \n,
-    # never the exotic Unicode separators) so the dry-run predicted count matches
-    # what ``rewrite_incoming_refs`` would actually rewrite.
-    for line, _ending in split_keepends(text):
+    for line, _ending in split_keepends(text[split.yaml_start : split.yaml_end]):
         stripped = line.strip()
-        if stripped == "---":
-            if not in_frontmatter:
-                in_frontmatter = True
-                continue
-            break
-        if not in_frontmatter:
-            continue
         if stripped.startswith("related:"):
             in_related = True
             continue

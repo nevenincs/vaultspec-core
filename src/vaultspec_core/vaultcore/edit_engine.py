@@ -428,94 +428,81 @@ def _serialise_block_list(key: str, values: list[str]) -> list[str]:
 
 
 def _rewrite_frontmatter_field(
-    frontmatter_block: str,
+    yaml_lines: str,
     key: str,
     new_lines: list[str],
 ) -> str:
     """Replace (or insert) a single frontmatter *key*'s lines.
 
-    Operates only inside the leading ``---`` fence and touches only the
-    block belonging to *key*; every other key, comment, and unknown field
-    is preserved byte-for-byte.  When *key* is absent it is inserted
-    immediately before the closing fence.
+    Touches only the block belonging to *key*; every other key, comment,
+    and unknown field is preserved byte-for-byte.  When *key* is absent it
+    is inserted after the last YAML line, directly above the closing fence.
 
     Args:
-        frontmatter_block: The frontmatter, including both ``---`` fences.
+        yaml_lines: The frontmatter's YAML lines, each ending in ``\\n``.
         key: The top-level key to rewrite (``date``, ``tags``, ``related``).
         new_lines: The replacement lines for the key's block.
 
     Returns:
-        The rewritten frontmatter block.
+        The rewritten YAML lines.
     """
-    lines = frontmatter_block.split("\n")
+    lines = yaml_lines.split("\n")
     out: list[str] = []
     in_block = False
     replaced = False
-    close_idx: int | None = None
 
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-
+    for line in lines:
         if in_block:
             # The key's block continues through indented list items only.
             if line[:1] in (" ", "\t"):
                 continue
             in_block = False
 
-        # Closing fence: remember its position for an insert-if-absent.
-        if stripped == "---" and i > 0 and close_idx is None and out:
-            close_idx = len(out)
-
-        if (
-            not in_block
-            and (stripped == f"{key}:" or stripped.startswith(f"{key}:"))
-            and not stripped.startswith("-")
+        stripped = line.strip()
+        if (stripped == f"{key}:" or stripped.startswith(f"{key}:")) and (
+            not stripped.startswith("-")
         ):
             # Found the key line (block, inline, or empty form). Replace its
             # whole block with the new rendering.
             out.extend(new_lines)
             replaced = True
             in_block = True
-            close_idx = None
             continue
 
         out.append(line)
 
     if not replaced:
-        # Insert before the closing fence (the last `---`).
-        insert_at = len(out) - 1
-        for j in range(len(out) - 1, -1, -1):
-            if out[j].strip() == "---":
-                insert_at = j
-                break
+        # The final line break leaves an empty last element; the key goes
+        # just before it, so it ends the YAML lines.
+        insert_at = len(out) - 1 if out and out[-1] == "" else len(out)
         out[insert_at:insert_at] = new_lines
 
     return "\n".join(out)
 
 
 def _apply_frontmatter_edits(
-    frontmatter_block: str,
+    yaml_lines: str,
     *,
     date: str | None,
     tags: list[str] | None,
     related: list[str] | None,
 ) -> str:
-    """Apply the provided field edits to a frontmatter block.
+    """Apply the provided field edits to a frontmatter's YAML lines.
 
     Only the fields explicitly supplied (non-``None``) are rewritten; every
-    other key is preserved.  Returns the edited block (still fenced).
+    other key is preserved.
 
     Args:
-        frontmatter_block: The frontmatter, including both ``---`` fences.
+        yaml_lines: The frontmatter's YAML lines, each ending in ``\\n``.
         date: New ``date`` value, or ``None`` to leave unchanged.
         tags: New ``tags`` list, or ``None`` to leave unchanged.
         related: New ``related`` list of ``[[wiki-link]]`` strings, or
             ``None`` to leave unchanged.
 
     Returns:
-        The frontmatter block with the requested fields replaced.
+        The YAML lines with the requested fields replaced.
     """
-    block = frontmatter_block
+    block = yaml_lines
     if date is not None:
         block = _rewrite_frontmatter_field(block, "date", [f"date: '{date}'"])
     if tags is not None:
@@ -573,18 +560,21 @@ def _compose_new_text(
 
     # Split at the fence's end rather than the parsed body's start, so the
     # blank lines after the fence belong to the body an edit replaces.
-    frontmatter_end = split_frontmatter(content).frontmatter_end
-    frontmatter_block, body = content[:frontmatter_end], content[frontmatter_end:]
+    split = split_frontmatter(content)
+    head = content[: split.yaml_start]
+    yaml_lines = content[split.yaml_start : split.yaml_end]
+    closing_fence = content[split.yaml_end : split.frontmatter_end]
+    body = content[split.frontmatter_end :]
 
     if date is not None or tags is not None or related is not None:
-        frontmatter_block = _apply_frontmatter_edits(
-            frontmatter_block, date=date, tags=tags, related=related
+        yaml_lines = _apply_frontmatter_edits(
+            yaml_lines, date=date, tags=tags, related=related
         )
 
     if new_body is not None:
         body = new_body
 
-    proposed = frontmatter_block + body
+    proposed = head + yaml_lines + closing_fence + body
     proposed = refresh_modified_stamp(proposed, vault_today())
     return proposed, source_newline
 

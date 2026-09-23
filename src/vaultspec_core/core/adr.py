@@ -232,9 +232,7 @@ def _rewrite_adr_frontmatter(
     split = split_frontmatter(normalized)
     if split.yaml_block is None:
         raise VaultSpecError(f"Could not parse frontmatter of ADR '{source_file}'.")
-    # Only a byte-order mark and blank lines can precede the opening fence,
-    # so the first ``---`` is that fence and everything before it is kept.
-    leading = normalized[: normalized.index("---")]
+    leading = normalized[: split.frontmatter_start]
 
     fm_lines = _rebuild_frontmatter_lines(meta, split.yaml_block)
     fm_lines.append("---")

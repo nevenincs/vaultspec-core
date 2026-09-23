@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from ..core.helpers import atomic_write
+from .parser import split_frontmatter
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -165,7 +166,6 @@ def rename_document_path(src: Path, dst: Path) -> bool:
 
 
 _RELATED_ENTRY_RE = re.compile(r'^(\s*-\s*["\']?\[\[)(.+?)(\]\]["\']?.*)$')
-_FRONTMATTER_LINE_BUDGET = 200
 _MARKDOWN_SUFFIX = ".md"
 
 
@@ -277,26 +277,21 @@ def _scan_related_block(
     pairs: list[list[str]],
     rename_map: dict[str, str],
     rename_map_lower: dict[str, str],
-) -> tuple[list[tuple[bool, str, str]], list[int], bool, bool]:
+) -> tuple[list[tuple[bool, str, str]], list[int]]:
     """Rewrite matching ``related:`` entries in *pairs* in place.
 
     Args:
-        pairs: ``[content, ending]`` line pairs for the whole document; the
-            content of rewritten lines is mutated in place.
+        pairs: ``[content, ending]`` pairs of the frontmatter's YAML lines;
+            the content of rewritten lines is mutated in place.
         rename_map: Exact-case ``old_stem`` -> terminal ``new_stem`` map.
         rename_map_lower: Lowercased mirror of *rename_map*.
 
     Returns:
-        A ``(events, drop_idx, budget_exceeded, fence_missing)`` tuple where
-        ``events`` holds ``(dropped, target, new_target)`` triples in line
-        order, ``drop_idx`` holds the indices of duplicate lines to delete,
-        and ``fence_missing`` is True when a frontmatter block opened but
-        never closed.
+        A ``(events, drop_idx)`` tuple where ``events`` holds
+        ``(dropped, target, new_target)`` triples in line order and
+        ``drop_idx`` holds the indices of duplicate lines to delete.
     """
-    in_frontmatter = False
     in_related = False
-    fence_closed = False
-    budget_exceeded = False
     # Tracks wiki-link targets already present in the ``related:`` block so
     # duplicate lines the rewrite would otherwise introduce can be dropped
     # (e.g. when two sources collapse onto the same terminal or when the
@@ -306,27 +301,8 @@ def _scan_related_block(
     events: list[tuple[bool, str, str]] = []
 
     for idx, pair in enumerate(pairs):
-        # Guard against a missing closing fence: if the file is not a real
-        # vault document, bail out of the scan after a fixed line budget
-        # rather than scanning prose forever. ``idx`` indexes logical lines
-        # (the pairs), matching the pre-pair behaviour.
-        if in_frontmatter and idx > _FRONTMATTER_LINE_BUDGET:
-            budget_exceeded = True
-            break
-
         line = pair[0]
-        stripped = line.strip()
-        if stripped == "---":
-            if in_frontmatter:
-                fence_closed = True
-                break
-            in_frontmatter = True
-            continue
-
-        if not in_frontmatter:
-            continue
-
-        if stripped.startswith("related:"):
+        if line.strip().startswith("related:"):
             in_related = True
             continue
 
@@ -365,7 +341,7 @@ def _scan_related_block(
         seen_targets.add(new_target)
         events.append((False, target, new_target))
 
-    return events, drop_idx, budget_exceeded, in_frontmatter and not fence_closed
+    return events, drop_idx
 
 
 def _rewrite_document_refs(
@@ -382,28 +358,38 @@ def _rewrite_document_refs(
     if content is None:
         return
 
-    # Preserve a UTF-8 BOM if present; the scanner strips it so the opening
-    # ``---`` fence matches but the write-back restores it.  Use the
-    # ``﻿`` escape rather than the literal character so the source is
-    # legible in editors that hide zero-width glyphs.
-    bom = ""
-    if content.startswith("﻿"):
-        bom = "﻿"
-        content = content[1:]
-
-    # Model each line as a mutable ``[content, ending]`` pair so the rewrite
-    # touches only the content of the lines it targets and every other byte -
-    # including exotic in-line separators and a CR-only or absent trailing
-    # terminator - survives verbatim.
-    pairs = split_keepends(content)
-    events, drop_idx, budget_exceeded, fence_missing = _scan_related_block(
-        pairs, rename_map, rename_map_lower
-    )
-
     try:
         rel = md_path.relative_to(root_dir)
     except ValueError:
         rel = md_path
+
+    split = split_frontmatter(content)
+    if split.unclosed:
+        # Frontmatter whose fence never closes has no known extent: rewriting
+        # it could corrupt body lines. Surface it only when it links a renamed
+        # document, so an unrelated malformed file stays quiet.
+        lowered = content.lower()
+        if any(f"[[{old}" in lowered for old in rename_map_lower):
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel,
+                    message=(
+                        "Frontmatter fence never closes; related links were "
+                        "not rewritten"
+                    ),
+                    severity=Severity.WARNING,
+                )
+            )
+        return
+    if split.yaml_block is None:
+        return
+
+    # Model each YAML line as a mutable ``[content, ending]`` pair so the
+    # rewrite touches only the content of the lines it targets and every other
+    # byte - a byte-order mark, exotic in-line separators, and a CR-only or
+    # absent trailing terminator - survives verbatim.
+    pairs = split_keepends(content[split.yaml_start : split.yaml_end])
+    events, drop_idx = _scan_related_block(pairs, rename_map, rename_map_lower)
 
     for dropped, target, new_target in events:
         if dropped:
@@ -418,22 +404,6 @@ def _rewrite_document_refs(
             CheckDiagnostic(path=rel, message=message, severity=Severity.INFO)
         )
 
-    # Surface a warning diagnostic when the frontmatter exceeds the line
-    # budget so operators can investigate documents whose frontmatter may
-    # have been skipped mid-scan.
-    if budget_exceeded:
-        result.diagnostics.append(
-            CheckDiagnostic(
-                path=rel,
-                message=(
-                    "Frontmatter exceeds "
-                    f"{_FRONTMATTER_LINE_BUDGET} lines; "
-                    "ref rewrite stopped at budget"
-                ),
-                severity=Severity.WARNING,
-            )
-        )
-
     if not events:
         return
 
@@ -444,20 +414,11 @@ def _rewrite_document_refs(
     for del_idx in sorted(drop_idx, reverse=True):
         del pairs[del_idx]
 
-    # If the scan never saw a closing fence we are in unknown territory;
-    # skip writing rather than risk corrupting a file whose frontmatter
-    # layout we misread.
-    if fence_missing:
-        logger.warning(
-            "Skipping rewrite of %s: closing frontmatter fence not found",
-            md_path,
-        )
-        return
-
-    # Reassemble from the pairs: each line carries its own original
-    # terminator, so the trailing newline (or its absence) and every
-    # mixed/CR-only ending are reproduced exactly. The BOM is re-prepended.
-    new_content = bom + "".join(c + e for c, e in pairs)
+    new_content = (
+        content[: split.yaml_start]
+        + "".join(c + e for c, e in pairs)
+        + content[split.yaml_end :]
+    )
     try:
         atomic_write(md_path, new_content)
     except OSError as exc:

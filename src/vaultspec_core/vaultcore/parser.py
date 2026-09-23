@@ -130,25 +130,41 @@ except ImportError:
     _yaml_load = _simple_yaml_load
 
 
-#: The frontmatter block from its opening fence: the YAML runs to the first
-#: line that is a closing ``---`` fence, and the match ends after that line.
-_FRONTMATTER_RE = re.compile(r"---\s*\n(.*?)\n---[ \t]*(?:\r?\n|\Z)", re.DOTALL)
+#: A line break: ``\r\n``, a lone ``\r``, or ``\n``. A ``\r`` counts alone
+#: only when no ``\n`` follows it, so a CRLF pair is never read as two
+#: breaks.
+_BREAK = r"(?:\r\n|\r(?!\n)|\n)"
+_LINE_BREAK_RE = re.compile(_BREAK)
+
+#: An opening fence line: ``---``, trailing spaces or tabs, and a line break.
+_OPENING_FENCE_RE = re.compile(rf"---[ \t]*(?:{_BREAK}|\Z)")
+
+#: The frontmatter block from its opening fence line: the YAML runs to the
+#: first closing ``---`` line, and the match ends after that line's break.
+#: The break before the closing fence is ``\n`` or a lone ``\r``, so under
+#: CRLF the YAML text keeps its final ``\r``.
+_FRONTMATTER_RE = re.compile(
+    rf"---[ \t]*{_BREAK}(?P<yaml>.*?)(?P<close>\n|\r(?!\n))---[ \t]*(?:{_BREAK}|\Z)",
+    re.DOTALL,
+)
 
 #: Whitespace indenting a line, which an opening fence may carry.
-_LINE_INDENT_RE = re.compile(r"[^\S\n]*")
+_LINE_INDENT_RE = re.compile(r"[^\S\r\n]*")
 
 
 @dataclass(frozen=True)
 class FrontmatterSplit:
     """A document divided at its frontmatter, with the body's position in it.
 
-    Offsets and line numbers index the text exactly as it was passed in. For
-    text read the way the vault graph reads it (``\\r\\n`` and ``\\r``
-    normalised to ``\\n``), ``body_line`` is the body's line in the file.
+    Offsets and line numbers index the text exactly as it was passed in, and
+    a line ends at ``\\r\\n``, a lone ``\\r``, or ``\\n``. For text read the
+    way the vault graph reads it (``\\r\\n`` and ``\\r`` normalised to
+    ``\\n``), ``body_line`` is the body's line in the file.
 
     Attributes:
-        yaml_block: The YAML between the fences, or ``None`` when the text
-            carries no parseable frontmatter.
+        yaml_block: The YAML between the fences, without the line break that
+            ends its last line, or ``None`` when the text carries no
+            parseable frontmatter.
         body: The body: every line from the first non-blank line after the
             frontmatter (or of the text, when there is none), each line kept
             whole. A leading byte-order mark is never part of it.
@@ -159,7 +175,22 @@ class FrontmatterSplit:
         body_start: Offset where the body begins; ``body`` is the text from
             here to the end.
         body_line: The 1-based line on which the body begins; the text's
-            lines from this one on, joined by ``\\n``, are the body.
+            lines from this one on are the body.
+        frontmatter_start: Offset of the opening fence's ``---``, so the text
+            before it (a byte-order mark, blank lines, indentation) can be
+            kept when the frontmatter is rebuilt; ``0`` without frontmatter.
+        yaml_start: Offset of the first line after the opening fence line;
+            ``0`` without frontmatter.
+        yaml_end: Offset of the closing fence line, so the text between
+            ``yaml_start`` and ``yaml_end`` is the YAML lines with every line
+            break intact: the span an in-place frontmatter edit rewrites.
+            ``0`` without frontmatter.
+        at_start: Whether the frontmatter exists and its opening fence is the
+            text's first line, after at most a byte-order mark. Writers that
+            stamp or fingerprint a document require this position, so a
+            document with anything before its fence is left alone.
+        unclosed: Whether an opening fence line starts the text's content but
+            no closing fence follows it.
     """
 
     yaml_block: str | None
@@ -167,6 +198,11 @@ class FrontmatterSplit:
     frontmatter_end: int
     body_start: int
     body_line: int
+    frontmatter_start: int = 0
+    yaml_start: int = 0
+    yaml_end: int = 0
+    at_start: bool = False
+    unclosed: bool = False
 
 
 def _first_content_line(text: str, pos: int) -> int:
@@ -181,11 +217,11 @@ def _first_content_line(text: str, pos: int) -> int:
         remaining line is blank.
     """
     while pos < len(text):
-        newline = text.find("\n", pos)
-        end = len(text) if newline == -1 else newline
+        brk = _LINE_BREAK_RE.search(text, pos)
+        end = len(text) if brk is None else brk.start()
         if text[pos:end].strip():
             return pos
-        pos = end + 1
+        pos = len(text) if brk is None else brk.end()
     return len(text)
 
 
@@ -204,6 +240,10 @@ def split_frontmatter(content: str) -> FrontmatterSplit:
     skipped too; the body's first line is kept whole, so its position is a
     line of the source.
 
+    The frontmatter is the lines between an opening ``---`` line and the
+    first closing ``---`` line after it, each fence line allowing trailing
+    spaces or tabs.
+
     Args:
         content: Raw markdown text, optionally beginning with ``---`` fenced
             YAML frontmatter.
@@ -211,24 +251,38 @@ def split_frontmatter(content: str) -> FrontmatterSplit:
     Returns:
         The :class:`FrontmatterSplit`.
     """
-    start = _first_content_line(content, 1 if content.startswith("\ufeff") else 0)
+    bom = 1 if content.startswith("\ufeff") else 0
+    start = _first_content_line(content, bom)
     indent = _LINE_INDENT_RE.match(content, start)
     fence = indent.end() if indent is not None else start
-    match = (
-        _FRONTMATTER_RE.match(content, fence)
-        if content.startswith("---", fence)
-        else None
-    )
-    yaml_block = match.group(1) if match else None
-    frontmatter_end = match.end() if match else 0
-    body_start = _first_content_line(content, match.end()) if match else start
+    opened = _OPENING_FENCE_RE.match(content, fence) is not None
+    match = _FRONTMATTER_RE.match(content, fence) if opened else None
+    if match is None:
+        return FrontmatterSplit(
+            yaml_block=None,
+            body=content[start:],
+            frontmatter_end=0,
+            body_start=start,
+            body_line=_line_number(content, start),
+            unclosed=opened,
+        )
+    body_start = _first_content_line(content, match.end())
     return FrontmatterSplit(
-        yaml_block=yaml_block,
+        yaml_block=match.group("yaml"),
         body=content[body_start:],
-        frontmatter_end=frontmatter_end,
+        frontmatter_end=match.end(),
         body_start=body_start,
-        body_line=content.count("\n", 0, body_start) + 1,
+        body_line=_line_number(content, body_start),
+        frontmatter_start=fence,
+        yaml_start=match.start("yaml"),
+        yaml_end=match.end("close"),
+        at_start=fence == bom,
     )
+
+
+def _line_number(text: str, offset: int) -> int:
+    """Return the 1-based line of *offset*, counting every kind of line break."""
+    return len(_LINE_BREAK_RE.findall(text, 0, offset)) + 1
 
 
 def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
