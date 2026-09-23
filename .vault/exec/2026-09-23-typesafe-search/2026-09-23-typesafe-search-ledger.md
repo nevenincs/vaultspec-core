@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:724f0a6d4bf8ac49b20faa25128a2c6f03b6a6d7402b8089ef2c98d77ea7ce79'
+body_hash: 'sha256:0a7150e5e35f0005fcea9042d7de02c107526f20fb6f7354f7035bb26767881b'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -177,3 +177,30 @@ related:
 - `S03` `M` `src/vaultspec_core/search/_credential.py`
 - `S03` `M` `src/vaultspec_core/search/tests/test_credential.py`
 - `S03` `verify:` `pytest search/tests/test_credential.py` -> `pass`
+- `S05` `M` `docs/CLI.md`
+- `S05` `M` `docs/MCP.md`
+- `S05` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S05` `M` `src/vaultspec_core/cli/json_output.py`
+- `S05` `M` `src/vaultspec_core/cli/vault_search_cmd.py`
+- `S05` `M` `src/vaultspec_core/core/windowing.py`
+- `S05` `M` `src/vaultspec_core/graph/api.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/envelope.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/test_context_budget.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S05` `M` `src/vaultspec_core/search/_corpus.py`
+- `S05` `M` `src/vaultspec_core/search/_engine.py`
+- `S05` `M` `src/vaultspec_core/search/_remediation.py`
+- `S05` `M` `src/vaultspec_core/search/_service.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_corpus.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_engine.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_service.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_transport.py`
+- `S05` `M` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S05` `M` `src/vaultspec_core/tests/cli/test_vault_status.py`
+- `S05` `M` `src/vaultspec_core/tests/cli/test_windowing.py`
+- `S05` `A` `src/vaultspec_core/mcp_server/tests/test_tool_description.py`
+- `S05` `A` `src/vaultspec_core/search/tests/reply_budget.py`
+- `S05` `verify:` `pytest tests/cli` -> `pass`
+
