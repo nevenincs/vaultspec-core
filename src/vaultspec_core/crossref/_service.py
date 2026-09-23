@@ -338,7 +338,7 @@ def crossref_sweep(
         raise InvalidSourceError("name an ADR, or sweep by feature, isolation or all")
     records = {record.stem: record for record in load_adrs(root)}
     selection = _selection(records, list(refs), feature, isolated, all_adrs)
-    cursor = _resolve(after, records).stem if after else None
+    cursor = _resolve(after, records).stem if after is not None else None
     if cursor is not None:
         selection = [record for record in selection if record.stem > cursor]
     size = sweep_size(max_sources)
@@ -373,6 +373,7 @@ def crossref_sweep(
     # later source the provider reads settles them; until then the sweep may
     # judge past its size, by at most the refusal limit, to find that read.
     pending: list[str] = []
+    first_open: UnavailableReason | None = None
     stopped: str | None = None
     try:
         for position, record in enumerate(selection):
@@ -392,6 +393,8 @@ def crossref_sweep(
                 cursor = record.stem
                 continue
             if outcome.reason in _PER_SOURCE:
+                if not pending:
+                    first_open = outcome.reason
                 pending.append(record.stem)
                 if len(pending) < MAX_REFUSALS:
                     continue
@@ -401,7 +404,7 @@ def crossref_sweep(
             # No read settled these refusals: the selection or the room to
             # probe ran out. Say so, so the caller settles them itself rather
             # than resuming onto them unaware.
-            stopped = UnavailableReason.CONTENT_REJECTED.value
+            stopped = (first_open or UnavailableReason.CONTENT_REJECTED).value
     finally:
         if owned:
             active.close()

@@ -205,12 +205,14 @@ class SweepOutcome:
     Attributes:
         outcomes: One outcome per source judged, in sweep order.
         remaining: Sources the selection held that this run did not process.
-        next_after: The last source processed - judged, or refused on its own
-            text once the provider had read others - to resume after; ``None``
-            when the selection is exhausted.
+        next_after: The last source processed - judged, or refused and then
+            settled by a later read - to resume after. ``None`` when the
+            selection is exhausted, or when nothing was processed and no
+            cursor was given, so a resume starts from the beginning.
         stopped: Why the sweep stopped early: the failure reason of the
-            source that failed, ``deadline`` for the run deadline, or ``None``
-            when it judged every source it took.
+            source that failed, the reason of the first refusal no read
+            settled, ``deadline`` for the run deadline, or ``None`` when it
+            processed every source it took.
     """
 
     outcomes: tuple[CrossrefOutcome, ...] = ()

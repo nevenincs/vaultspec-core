@@ -164,6 +164,29 @@ def test_a_selection_of_refused_adrs_alone_stops_the_sweep(tmp_path: Path) -> No
     assert sweep.remaining == 1
 
 
+def test_a_sweep_settling_refusals_judges_at_most_two_past_its_size(
+    tmp_path: Path,
+) -> None:
+    _small_vault(tmp_path)
+    for day in (4, 5, 6):
+        write_adr(tmp_path, f"2026-01-0{day}-refused-adr", implementation=BLOCKED)
+
+    sweep = _sweep(tmp_path, all_adrs=True, max_sources=4)
+
+    # Three sources judged OK, the refusal at the size limit, then two more
+    # refusals past it: the run reaches the refusal limit and stops there.
+    assert len(sweep.outcomes) == 4 + MAX_REFUSALS - 1
+    assert sweep.stopped == UnavailableReason.CONTENT_REJECTED.value
+    assert sweep.next_after == "2026-01-03-declared-adr"
+
+
+def test_an_empty_cursor_is_refused(tmp_path: Path) -> None:
+    _small_vault(tmp_path)
+
+    with pytest.raises(InvalidSourceError):
+        crossref_sweep(tmp_path, all_adrs=True, after="", environ=ENV)
+
+
 def test_a_sweep_needs_one_clear_selector(tmp_path: Path) -> None:
     _small_vault(tmp_path)
 
