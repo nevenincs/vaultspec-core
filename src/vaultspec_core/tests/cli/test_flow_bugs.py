@@ -1602,7 +1602,6 @@ _HOOK_SUBCOMMANDS = {
     # corpus-mutating repair from inside a commit is retired, so a stray
     # ``--fix`` here would be a regression, not a formatting detail.
     "vault-fix": "vault check all",
-    "vault-sanitize-annotations": "vault sanitize annotations",
     "check-provider-artifacts": "check-providers",
     "spec-check": "spec doctor --gate-errors",
 }
@@ -1629,7 +1628,7 @@ def _expected_entries(prefix: str) -> dict[str, str]:
 
 @pytest.mark.unit
 class TestHookEntryModeRendering:
-    """The four canonical hook entries render for the resolved install mode.
+    """The canonical hook entries render for the resolved install mode.
 
     Marked ``unit`` (in addition to the module's ``integration`` mark) so the
     unit gate exercises the mode-rendering guarantee directly; each test drives

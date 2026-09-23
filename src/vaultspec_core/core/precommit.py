@@ -33,6 +33,7 @@ __all__ = [
     "CANONICAL_HOOK_ENTRIES",
     "CANONICAL_HOOK_IDS",
     "CANONICAL_PRECOMMIT_HOOKS",
+    "RETIRED_HOOK_IDS",
     "canonical_hook_entries_for_mode",
     "canonical_precommit_hooks_for_mode",
     "entry_prefix_for_mode",
@@ -117,7 +118,6 @@ _HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
     # historical ``vault-fix`` spelling so existing installs are updated in
     # place rather than accumulating a second, near-duplicate entry.
     PrecommitHook.VAULT_FIX: "vault check all",
-    PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: "vault sanitize annotations",
     PrecommitHook.CHECK_PROVIDER_ARTIFACTS: "check-providers",
     # ``--gate-errors`` folds the doctor's warning exit (1) to 0 so the gate
     # blocks only on errors. Warning-level provider-mirror lag is the expected
@@ -129,10 +129,6 @@ _HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
 }
 _HOOK_META: dict[PrecommitHook, dict[str, object]] = {
     PrecommitHook.VAULT_FIX: {"name": "Vault gate", "types": ["markdown"]},
-    PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: {
-        "name": "Vault sanitize annotations",
-        "types": ["markdown"],
-    },
     PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
         "name": "Check provider artifacts",
         "always_run": True,
@@ -199,8 +195,16 @@ CANONICAL_HOOK_ENTRIES: dict[str, str] = canonical_hook_entries_for_mode(
     InstallMode.DEPENDENCY
 )
 
+#: Hook IDs vaultspec-core once scaffolded and no longer renders. Existing
+#: installs still carry them, so the scaffold removes them and uninstall still
+#: strips them. ``vault-sanitize-annotations`` rewrote the whole vault from
+#: inside a commit, contradicting the pure-gate rule above, and the non-fixing
+#: ``vault check all`` behind ``vault-fix`` already reports the same
+#: annotation findings.
+RETIRED_HOOK_IDS: frozenset[str] = frozenset({"vault-sanitize-annotations"})
+
 # All managed hook IDs for uninstall filtering.
-ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
+ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS | RETIRED_HOOK_IDS
 
 
 def _precommit_yaml() -> YAML:
@@ -376,17 +380,24 @@ def _merge_local_repo_hooks(
     """Reconcile *existing_hooks* against *canonical_hooks* in place.
 
     Missing hooks are appended; hooks whose entry drifted from the canonical
-    pattern are updated in place; hooks already canonical are left untouched.
+    pattern are updated in place; hooks already canonical are left untouched;
+    hooks whose ID is in :data:`RETIRED_HOOK_IDS` are removed.
 
     Returns:
         ``True`` when *existing_hooks* was changed.
     """
+    changed = False
+    for i in reversed(range(len(existing_hooks))):
+        hook = _as_mapping(existing_hooks[i])
+        if hook is not None and hook.get("id") in RETIRED_HOOK_IDS:
+            logger.info("Removed retired pre-commit hook '%s'", hook.get("id"))
+            del existing_hooks[i]
+            changed = True
     existing_by_id: dict[Any, dict[str, Any]] = {}
     for raw_hook in existing_hooks:
         hook = _as_mapping(raw_hook)
         if hook is not None:
             existing_by_id[hook.get("id")] = hook
-    changed = False
     for canonical in canonical_hooks:
         hook_id = str(canonical["id"])
         existing = existing_by_id.get(hook_id)

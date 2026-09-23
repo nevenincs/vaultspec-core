@@ -240,6 +240,24 @@ class PrekMigrationResult:
     yaml_removed: bool = False
 
 
+def _block_carries_retired_hook(raw: str) -> bool:
+    """Whether the managed block in *raw* still renders a retired hook ID.
+
+    Only the managed block is inspected: a retired ID the operator wrote
+    outside the markers is theirs, and migration never edits outside them.
+    """
+    from .precommit import RETIRED_HOOK_IDS
+
+    lines = raw.splitlines()
+    begins = [i for i, line in enumerate(lines) if line.strip() == MARKER_BEGIN]
+    ends = [i for i, line in enumerate(lines) if line.strip() == MARKER_END]
+    if not (begins and ends and begins[0] < ends[0]):
+        return False
+    block = lines[begins[0] + 1 : ends[0]]
+    rendered_ids = {f"id = {_toml_string(hook_id)}" for hook_id in RETIRED_HOOK_IDS}
+    return any(line.strip() in rendered_ids for line in block)
+
+
 def _replace_or_append_block(raw: str, block: str) -> str:
     """Substitute the managed block in *raw*, or append it."""
     lines = raw.splitlines()
@@ -271,7 +289,9 @@ def migrate_hooks_to_prek(
 
     Explicitly operator-invoked; never runs as part of install or sync.
     Idempotent: when the full canonical hook set is already present the
-    file is left byte-for-byte untouched. The managed block is replaced in
+    file is left byte-for-byte untouched, unless the managed block still
+    renders a hook vaultspec-core has since retired, in which case the block
+    is re-rendered without it. The managed block is replaced in
     place when its markers exist, appended otherwise; operator-authored
     TOML outside the markers is never parsed for writing, only read for
     the boundary assessment.
@@ -337,13 +357,21 @@ def migrate_hooks_to_prek(
             detail="prek.toml is not valid TOML; fix it before migrating",
         )
 
-    if boundary.hooks_present:
+    raw = config_path.read_text(encoding="utf-8")
+    if boundary.hooks_present and _block_carries_retired_hook(raw):
+        rendered = _replace_or_append_block(raw, render_prek_hook_block(mode))
+        if not dry_run:
+            atomic_write(config_path, rendered)
+        result = PrekMigrationResult(
+            status="migrated",
+            detail="removed retired hooks from the managed block in prek.toml",
+        )
+    elif boundary.hooks_present:
         result = PrekMigrationResult(
             status="unchanged",
             detail="canonical hooks already present in prek.toml",
         )
     else:
-        raw = config_path.read_text(encoding="utf-8")
         has_block = any(line.strip() == MARKER_BEGIN for line in raw.splitlines())
         if boundary.hook_ids_present and not has_block:
             return PrekMigrationResult(
