@@ -12,7 +12,8 @@ decisions that sit above the ranking itself.
   sending.
 - **A decline names the way on.** Every ``not_configured`` and
   ``unavailable`` outcome carries the search to run instead, resolved from
-  the requested record types and the workspace's companion provisioning.
+  the requested record types, feature and date and the workspace's companion
+  provisioning.
 - **Filters first.** The records are filtered in code before any request is
   built; when none survive, the answer is an empty ``ok`` that cost nothing.
 - **One deadline.** Every request of a search shares one monotonic deadline,
@@ -31,6 +32,7 @@ decisions that sit above the ranking itself.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from ..config import VAULTSPEC_CORE_TYPESAFE_API_KEY, resolve_credential
@@ -71,10 +73,27 @@ def _page_size(limit: int) -> int:
     return min(limit, MAX_RESULTS)
 
 
+@dataclass(frozen=True)
+class _Request:
+    """What a search was asked, as a declined outcome's next step needs it.
+
+    Attributes:
+        root: The workspace root.
+        query: The query as submitted.
+        types: The record types the request named; ``None`` for all.
+        feature: The feature filter, if any.
+        date: The date filter, if any.
+    """
+
+    root: Path
+    query: str
+    types: frozenset[DocType] | None
+    feature: str | None
+    date: str | None
+
+
 def _declined(
-    root: Path,
-    query: str,
-    types: frozenset[DocType] | None,
+    request: _Request,
     *,
     reason: UnavailableReason | None = None,
     usage: SearchUsage | None = None,
@@ -82,9 +101,7 @@ def _declined(
     """Build the outcome of a search that did not rank, with its next step.
 
     Args:
-        root: The workspace root.
-        query: The query as submitted.
-        types: The record types the request named; ``None`` for all.
+        request: What the search was asked; its next step keeps the filters.
         reason: Why a configured search failed; ``None`` when no credential
             is configured.
         usage: What the failed search cost, when anything was sent.
@@ -93,12 +110,11 @@ def _declined(
         ``unavailable`` with *reason*, or ``not_configured`` without one.
     """
     status = SearchStatus.NOT_CONFIGURED if reason is None else SearchStatus.UNAVAILABLE
+    step = next_step(
+        request.root, request.types, feature=request.feature, date=request.date
+    )
     return SearchOutcome(
-        status=status,
-        query=query,
-        reason=reason,
-        usage=usage,
-        next_step=next_step(root, types),
+        status=status, query=request.query, reason=reason, usage=usage, next_step=step
     )
 
 
@@ -147,9 +163,10 @@ def search_vault(
             f"the search query must be at most {MAX_QUERY_CHARS} characters"
         )
     types = record_types(doc_types)
+    request = _Request(root, query, types, feature, date)
     credential = resolve_credential(VAULTSPEC_CORE_TYPESAFE_API_KEY, root, environ)
     if credential is None:
-        return _declined(root, query, types)
+        return _declined(request)
     records = load_records(root, doc_types=types, feature=feature, date=date)
     size = _page_size(limit)
     if not records:
@@ -162,9 +179,7 @@ def search_vault(
         except ValueError:
             # A key no HTTP header can carry would be refused by the provider;
             # say so without sending it anywhere.
-            return _declined(
-                root, query, types, reason=UnavailableReason.CREDENTIAL_REJECTED
-            )
+            return _declined(request, reason=UnavailableReason.CREDENTIAL_REJECTED)
     meter = Meter()
     try:
         ranking = run_search(
@@ -179,14 +194,14 @@ def search_vault(
             # Content rejections are absorbed by the engine as unscored
             # records; one reaching here is a defect, not an outcome.
             raise
-        return _declined(root, query, types, reason=failure.reason, usage=meter.usage())
+        return _declined(request, reason=failure.reason, usage=meter.usage())
     finally:
         if owned:
             client.close()
     usage = meter.usage()
     if not ranking.hits and usage.unscored:
         return _declined(
-            root, query, types, reason=UnavailableReason.CONTENT_REJECTED, usage=usage
+            request, reason=UnavailableReason.CONTENT_REJECTED, usage=usage
         )
     hits, window = apply_window(ranking.hits, limit=size, pageable=False)
     return SearchOutcome(

@@ -2,10 +2,8 @@
 
 Two independent facts, each read from local configuration and neither a
 liveness check: whether hosted search has a credential, and whether the
-semantic-search companion is provisioned. ``vaultspec-core status`` reports
-both through :func:`discovery_fields`; the MCP ``status`` tool carries the
-same ``hosted_search`` record, while the companion reaches an agent where it
-decides something, as the next step of a search that declined.
+semantic-search companion is provisioned. ``vaultspec-core status`` and the
+MCP ``status`` tool both report them through :func:`discovery_fields`.
 
 Hosted search is enrolled by one variable,
 :data:`~vaultspec_core.config.VAULTSPEC_CORE_TYPESAFE_API_KEY`, resolved by

@@ -26,7 +26,10 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY, CredentialSource
-from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
+from vaultspec_core.core.diagnosis.collectors_companion import (
+    RAG_DISTRIBUTION_NAME,
+    CompanionSignal,
+)
 from vaultspec_core.core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.mcps_mode import render_launch_for_mode
@@ -55,6 +58,7 @@ from vaultspec_core.search import (
     UnavailableReason,
     hit_fields,
     outcome_fields,
+    unscored_note,
 )
 from vaultspec_core.search.tests.reply_budget import (
     DISCOVERY_BUDGET,
@@ -259,7 +263,7 @@ async def test_an_unanswered_whole_page_says_so() -> None:
     assert payload["answered"] is False
     assert payload["verdict"] == SearchVerdict.NOTHING_ANSWERS.value
     assert payload["truncated"] is False
-    assert _summary(reply) == "1 hit, not answered"
+    assert _summary(reply) == f"1 hit, {SearchVerdict.NOTHING_ANSWERS.sentence}"
 
 
 @pytest.mark.unit
@@ -297,7 +301,9 @@ async def test_the_summary_counts_records_left_unscored() -> None:
     payload = reply.structured_content
     assert payload is not None
     assert payload["usage"]["unscored"] == 2
-    assert _summary(reply) == "1 hit, not answered, 2 unscored"
+    # The page's own verdict, then the note the CLI prints, word for word.
+    verdict = SearchVerdict.NONE_READ_ANSWERS.sentence
+    assert _summary(reply) == f"1 hit, {verdict}, {unscored_note(2)}"
 
 
 @pytest.mark.unit
@@ -345,7 +351,7 @@ async def test_unavailable_reports_its_reason_and_a_next_step(
     assert payload["next_step"]["kind"] == NextStepKind.LISTING.value
     assert f"`{LIST_VAULT}`" in payload["remediation"]
     assert payload["hits"] == []
-    assert _summary(reply) == f"unavailable: {reason.value}"
+    assert _summary(reply) == f"unavailable ({reason.value})"
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +508,14 @@ def _cli_search_data(project: Path, *args: str) -> dict[str, Any]:
     return json.loads(result.stdout)["data"]
 
 
+def _cli_status_data(project: Path) -> dict[str, Any]:
+    """Run ``status --json`` on *project* without a key; return its data."""
+    runner = CliRunner(env={VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: ""})
+    result = runner.invoke(app, ["-t", str(project), "status", "--json"])
+    assert result.exit_code == 0, result.output
+    return json.loads(result.stdout)["data"]
+
+
 def _provision_rag(project: Path) -> None:
     """Add the ``.mcp.json`` entry core renders for a tool-mode rag."""
     mcp_json = project / ".mcp.json"
@@ -548,9 +562,15 @@ async def _drive_without_a_key(project: Path) -> None:
         }
         assert payload == _cli_search_data(project, "--type", "adr")
 
-        # The configuration record itself, as ``status --json`` carries it.
+        # Both status surfaces carry the backend's discovery record, the same
+        # keys ``status --json`` carries, including the rag provisioning.
         status = data_of(await session.call_tool("status", {}))
         assert status["hosted_search"] == {"configured": False, "source": None}
+        assert status["companion"]["package"] == RAG_DISTRIBUTION_NAME
+        assert status["companion"]["signal"] != CompanionSignal.ABSENT.value
+        cli = _cli_status_data(project)
+        for key in ("hosted_search", "companion"):
+            assert status[key] == cli[key], key
 
 
 async def _drive_with_a_key(project: Path) -> None:

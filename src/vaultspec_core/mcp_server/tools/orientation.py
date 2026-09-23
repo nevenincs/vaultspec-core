@@ -24,14 +24,16 @@ from pydantic import Field
 
 from ... import __version__
 from ...config import HostedSearchConfig
+from ...core.diagnosis.collectors_companion import CompanionCapability
 from ...core.types import get_context as _get_ctx
-from ...search import hosted_search_config
+from ...search import discovery_capability, discovery_fields
 from ..envelope import LeanResult, LeanShape, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
 
+    from ...search import DiscoveryCapability
     from ...vaultcore.checks import CheckResult
     from ...vaultcore.orientation import GroundingTrace, Rollup
 
@@ -172,6 +174,8 @@ class StatusResult(LeanResult):
         hosted_search: Whether hosted vault search has a key configured, and
             from which source (rollup mode only). Local configuration, not
             liveness: a configured key may still be rejected.
+        companion: The semantic-search companion's provisioning (rollup mode
+            only); absent when the probe failed. Provisioning, not liveness.
     """
 
     tool_schema_version: str
@@ -184,6 +188,7 @@ class StatusResult(LeanResult):
     trace_kind: str | None = None
     plans: list[PlanTraceLine] = Field(default_factory=list)
     hosted_search: Annotated[HostedSearchConfig, LeanShape()] | None = None
+    companion: Annotated[CompanionCapability, LeanShape()] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -268,13 +273,12 @@ class CheckResultModel(LeanResult):
 # ---------------------------------------------------------------------------
 
 
-def _rollup_to_result(
-    rollup: Rollup, hosted_search: HostedSearchConfig
-) -> StatusResult:
+def _rollup_to_result(rollup: Rollup, discovery: DiscoveryCapability) -> StatusResult:
     """Adapt a :class:`Rollup` into the ``status`` rollup result.
 
-    ``hosted_search`` is the search package's configuration record itself,
-    the one ``vaultspec-core status --json`` carries under the same key.
+    The discovery keys are the search package's one projection of what the
+    workspace is configured for, the keys ``vaultspec-core status --json``
+    carries.
     """
     features = [
         FeatureStatus(
@@ -301,14 +305,16 @@ def _rollup_to_result(
         )
         for p in rollup.plans_in_flight
     ]
-    return StatusResult(
-        tool_schema_version=__version__,
-        kind="rollup",
-        hosted_search=hosted_search,
-        features_total=rollup.active_features_total,
-        features=features,
-        plans_in_flight=plans,
-        totals=dict(rollup.totals),
+    return StatusResult.model_validate(
+        {
+            **discovery_fields(discovery),
+            "tool_schema_version": __version__,
+            "kind": "rollup",
+            "features_total": rollup.active_features_total,
+            "features": features,
+            "plans_in_flight": plans,
+            "totals": dict(rollup.totals),
+        }
     )
 
 
@@ -510,7 +516,7 @@ def register_orientation_tools(
 
         With no ``target``, returns the project rollup: active features with
         their lifecycle status, plans in flight with tier, completion and next
-        open step, vault totals, whether ``search`` has a key configured, and
+        open step, vault totals, which vault discovery is configured, and
         the tool-schema version. With a ``target`` (a feature tag or plan
         stem/path), returns the matching plans' grounding trace: each step's
         execution record, the grounding documents, and completion. Returns no
@@ -539,7 +545,7 @@ def register_orientation_tools(
         if target is None:
             logger.info("status: project rollup")
             return _rollup_to_result(
-                compute_rollup(root_dir), hosted_search_config(root_dir)
+                compute_rollup(root_dir), discovery_capability(root_dir)
             )
 
         logger.info("status: trace target=%r", target)

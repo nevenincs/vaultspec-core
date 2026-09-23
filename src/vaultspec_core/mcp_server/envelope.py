@@ -176,6 +176,12 @@ class LeanResult(LeanModel):
     property default, as :class:`LeanShape` does for a dataclass. An input
     model keeps :class:`LeanModel`, whose defaults tell the caller what it
     may omit.
+
+    For the same reason an optional key's schema drops its ``null`` branch:
+    :func:`compact_result` omits an optional key rather than sending it null,
+    so the branch describes a value the wire never carries. A required key
+    that may be null keeps ``null``, spelled as a type list where the other
+    branch is a plain type.
     """
 
     @override
@@ -194,8 +200,10 @@ class LeanResult(LeanModel):
         """
         produced = super().__get_pydantic_json_schema__(core_schema, handler)
         properties = cast("dict[str, Any]", produced.get("properties", {}))
-        for prop in properties.values():
+        required = cast("list[str]", produced.get("required", []))
+        for name, prop in properties.items():
             prop.pop("default", None)
+            properties[name] = _collapse_nullable(prop, omissible=name not in required)
         return produced
 
 
@@ -264,7 +272,8 @@ class LeanShape:
         properties = cast("dict[str, Any]", definition.get("properties", {}))
         for name, prop in properties.items():
             prop.pop("default", None)
-            properties[name] = _inline_enums(prop, handler)
+            inlined = _inline_enums(prop, handler)
+            properties[name] = _collapse_nullable(inlined, omissible=False)
         definition["required"] = list(properties)
         return reference
 
@@ -306,6 +315,56 @@ def _lean_object(schema: dict[str, Any]) -> None:
             name: _strip_titles(prop)
             for name, prop in cast("dict[str, Any]", properties).items()
         }
+
+
+#: Keywords of a nullable property's one non-null branch that may be hoisted
+#: beside a ``["T", "null"]`` type: each constrains only instances of its own
+#: type, so a null still validates. ``enum`` is handled apart, because it
+#: constrains every instance and must list ``null`` itself.
+_HOISTABLE = frozenset({"type", "enum", "items", "additionalProperties"})
+
+#: The null branch Pydantic pairs with an optional field's own schema.
+_NULL_BRANCH: dict[str, Any] = {"type": "null"}
+
+
+def _collapse_nullable(node: Any, *, omissible: bool) -> Any:
+    """Shorten a result property's ``anyOf`` of one schema and ``null``.
+
+    Pydantic renders ``str | None`` as ``{"anyOf": [{"type": "string"},
+    {"type": "null"}]}``. An omissible key never travels as null, so its
+    fragment becomes the non-null branch alone. A required key keeps null as
+    ``{"type": ["string", "null"]}``, which validates the same instances in
+    about half the characters; a branch that is a reference, or that carries
+    a keyword outside :data:`_HOISTABLE`, keeps its union.
+
+    Args:
+        node: A property's schema fragment.
+        omissible: Whether the key is omitted, rather than sent null, when
+            it has no value.
+
+    Returns:
+        The fragment, shortened when its union is a nullable schema.
+    """
+    if not isinstance(node, dict):
+        return node
+    fragment = cast("dict[str, Any]", node)
+    branches = fragment.get("anyOf")
+    if not isinstance(branches, list) or len(cast("list[Any]", branches)) != 2:
+        return fragment
+    value, null = cast("list[Any]", branches)
+    if null != _NULL_BRANCH or not isinstance(value, dict):
+        return fragment
+    branch = cast("dict[str, Any]", value)
+    collapsed = {key: item for key, item in fragment.items() if key != "anyOf"}
+    if omissible:
+        return {**collapsed, **branch}
+    if not isinstance(branch.get("type"), str) or not branch.keys() <= _HOISTABLE:
+        return fragment
+    collapsed.update(branch)
+    collapsed["type"] = [branch["type"], "null"]
+    if "enum" in branch:
+        collapsed["enum"] = [*branch["enum"], None]
+    return collapsed
 
 
 def _strip_titles(node: Any) -> Any:

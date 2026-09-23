@@ -77,7 +77,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: stopped shipping property defaults, which describe input a result never
 #: takes, and enum fields of dataclass shapes ship as their values alone.
 #: Measured 26,375 before and 26,289 after (-86). Margin of 6.
-MAX_TOOL_DEFINITION_CHARS = 26_295
+#:
+#: Lowered from 26,295 when ``status`` gained the ``companion`` record the
+#: CLI already carried, so both status surfaces carry the same discovery
+#: keys. The record alone measured +439. Result schemas paid for it: an
+#: optional result key, omitted rather than sent null, stopped publishing a
+#: null branch, and a key that is sent null spells it as a type list.
+#: Measured 26,289 before, 25,643 with the schema change alone and 26,107
+#: with the record (-182). Margin of 8.
+MAX_TOOL_DEFINITION_CHARS = 26_115
 
 #: Aggregate ceiling for the read-only surface (five tools), same rules.
 #: Measured at 9,194 chars. Raised from 9,500 by the same three changes, which
@@ -87,7 +95,10 @@ MAX_TOOL_DEFINITION_CHARS = 26_295
 #: before and 14,143 after (+1,001: find, search, discover and status), with
 #: a margin of 8. Lowered from 14,151 by the same change as the full
 #: surface: measured 14,143 before and 14,057 after (-86), margin of 8.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 14_065
+#: Lowered from 14,065 by the same ``companion`` record and schema change:
+#: measured 14,057 before, 13,411 with the schema change alone and 13,875
+#: with the record (-182), margin of 8.
+MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 13_883
 
 # Maximum number of tools: the tiered surface is nine hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.

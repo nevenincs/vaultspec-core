@@ -39,12 +39,17 @@ from ._remediation import remediation as remediation
 from ._wire import SCORE_PLACES as SCORE_PLACES
 from ._wire import hit_fields as hit_fields
 from ._wire import outcome_fields as outcome_fields
+from ._wording import NO_PASSAGE as NO_PASSAGE
+from ._wording import outcome_label as outcome_label
+from ._wording import premise_note as premise_note
+from ._wording import unscored_note as unscored_note
 
 __all__ = [
     "DEFAULT_RESULTS",
     "EXCERPT_BYTES",
     "MAX_QUERY_CHARS",
     "MAX_RESULTS",
+    "NO_PASSAGE",
     "PREMISE_CONFLICT_THRESHOLD",
     "SCORE_PLACES",
     "SEARCHABLE_TYPES",
@@ -67,9 +72,12 @@ __all__ = [
     "hit_fields",
     "hosted_search_config",
     "outcome_fields",
+    "outcome_label",
+    "premise_note",
     "remediation",
     "search_vault",
     "tokenize",
+    "unscored_note",
 ]
 
 if TYPE_CHECKING:

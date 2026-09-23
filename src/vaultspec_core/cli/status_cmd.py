@@ -249,10 +249,7 @@ def _companion_line(cap: CompanionCapability) -> str:
     from vaultspec_core.core.diagnosis.collectors_companion import CompanionSignal
 
     if cap.signal is CompanionSignal.ABSENT:
-        return (
-            f"  [dim]{cap.package} not provisioned - "
-            f"use find and grep for discovery[/dim]"
-        )
+        return f"  [dim]{cap.package} not provisioned[/dim]"
     version = f" {cap.version}" if cap.version else ""
     floor_note = (
         f"  [yellow]below advisory floor {cap.floor}[/yellow]"
@@ -286,8 +283,8 @@ def _rollup_payload(rollup: Rollup, discovery: DiscoveryCapability) -> dict[str,
     """Shape a :class:`Rollup` into the JSON envelope's data mapping.
 
     The discovery fields are the search package's projection of what the
-    workspace is configured for; ``hosted_search`` is the same record the MCP
-    ``status`` tool carries under the same key.
+    workspace is configured for, the same keys the MCP ``status`` tool
+    carries.
     """
     import dataclasses
 

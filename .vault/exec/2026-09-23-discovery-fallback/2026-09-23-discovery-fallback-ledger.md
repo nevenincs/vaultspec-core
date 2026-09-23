@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:81b9166e67a3679cb3e118d776faadca8fa20187dff7a5a4ad62447459b96507'
+body_hash: 'sha256:017becb1b8cfeb7ad9bf2cb4006458789521421c3afaca29d41616bb94827dc8'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -113,6 +113,12 @@ related:
 - `S04` `verify:` `install --upgrade and sync` -> `pass`
 - `S04` `verify:` `pytest test_discovery_guidance test_corpus_contracts test_seed_builtins test_sync test_install, just check-markdown check-python check-type` -> `pass`
 - `S05` `verify:` `pytest dev/guards/test_cli_language_contract.py, spec reference generate --check, just check-markdown` -> `pass`
+- `S01` `A` `src/vaultspec_core/search/_wording.py`
+- `S01` `A` `src/vaultspec_core/search/tests/test_wording.py`
+- `S01` `M` `src/vaultspec_core/search/_capability.py`
+- `S01` `M` `src/vaultspec_core/mcp_server/tests/test_orientation_tools.py`
+- `S01` `verify:` `just check-python check-type check-type-strict check-size check-complexity check-nesting check-markdown` -> `pass`
+- `S01` `verify:` `pytest mcp_server search cli/test_vault_status cli/test_vault_search_cmd cli reference drift dev/guards` -> `pass`
 
 ## Notes
 

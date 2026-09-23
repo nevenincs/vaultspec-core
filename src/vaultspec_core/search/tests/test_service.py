@@ -522,6 +522,21 @@ class TestUnavailable:
         assert outcome.usage is None
         assert outcome.next_step is not None
 
+    def test_a_failed_search_names_a_next_step_with_its_filters(
+        self, tmp_path: Path
+    ) -> None:
+        cache_vault(tmp_path)
+
+        with (
+            ScriptedProvider(Reply.json({"detail": "down"}, 503)) as server,
+            JevClient(KEY, endpoint=server.endpoint, max_attempts=1) as jev,
+        ):
+            outcome = search(tmp_path, jev, feature="cache", date="2026-01-02")
+
+        assert outcome.status is SearchStatus.UNAVAILABLE
+        assert outcome.next_step is not None
+        assert outcome.next_step.command.endswith(" --feature cache --date 2026-01-02")
+
 
 class TestContentRejection:
     def test_refused_full_read_leaves_the_record_unscored(

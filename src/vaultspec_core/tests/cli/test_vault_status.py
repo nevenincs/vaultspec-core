@@ -1036,6 +1036,17 @@ class TestHostedSearchRow:
         name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
         assert f"hosted search not configured - {name} unset" in discovery
 
+    def test_an_absent_companion_states_provisioning_only(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = self._run_with_key(tmp_path, "")
+
+        assert result.exit_code == 0, result.output
+        rows = result.stdout.split("Discovery")[1].strip().splitlines()
+        companion = next(row for row in rows if RAG_DISTRIBUTION_NAME in row)
+        # Where to look instead is the search reply's to name, not status's.
+        assert companion.strip() == f"{RAG_DISTRIBUTION_NAME} not provisioned"
+
     def test_configured_row_names_the_source_not_the_key(self, tmp_path: Path) -> None:
         _build_vault(tmp_path)
 

@@ -10,12 +10,15 @@ clean and with findings (with and without ``fix``).
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from mcp import Client
 
+from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
 from vaultspec_core.mcp_server.app import create_server
+from vaultspec_core.search import discovery_capability, discovery_fields
 from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 
 from .conftest import data_of
@@ -92,6 +95,41 @@ async def test_status_rollup_lists_features_and_version(vault_root: Path) -> Non
         assert "rollupfeat" in names
         # Orientation carries no blob hashes.
         assert "blob_hash" not in payload
+
+
+async def test_status_rollup_carries_the_backend_discovery_record(
+    vault_root: Path,
+) -> None:
+    """The rollup's discovery keys are the search package's one projection."""
+    mcp = create_server()
+    async with Client(mcp) as client:
+        payload = data_of(await client.call_tool("status", {}))
+
+    expected = discovery_fields(discovery_capability(vault_root))
+    discovery = {key: payload.get(key) for key in expected}
+    assert discovery == json.loads(json.dumps(expected))
+    assert payload["companion"]["package"] == RAG_DISTRIBUTION_NAME
+
+
+async def test_status_schema_omits_null_only_where_the_wire_does(
+    vault_root: Path,
+) -> None:
+    """An omitted key publishes no null branch; a key sent as null keeps one."""
+    _ = vault_root
+    tools = {tool.name: tool for tool in await create_server().list_tools()}
+    schema = tools["status"].output_schema
+    assert schema is not None
+
+    # Absent outside rollup mode, never null.
+    assert schema["properties"]["companion"] == {"$ref": "#/$defs/CompanionCapability"}
+    assert "null" not in json.dumps(schema["properties"]["target"])
+    # Always present, null when the plan has no open step.
+    line = schema["$defs"]["PlanProgressLine"]
+    assert "next_open_step" in line["required"]
+    assert line["properties"]["next_open_step"] == {"type": ["string", "null"]}
+    # A dataclass field that may be null keeps null among its values.
+    mode = schema["$defs"]["CompanionCapability"]["properties"]["mode"]
+    assert None in mode["enum"]
 
 
 async def test_status_trace_targets_a_feature(vault_root: Path) -> None:

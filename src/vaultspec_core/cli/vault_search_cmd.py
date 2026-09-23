@@ -47,13 +47,17 @@ from vaultspec_core.core.windowing import elision_line
 from vaultspec_core.search import (
     DEFAULT_RESULTS,
     MAX_RESULTS,
+    NO_PASSAGE,
     SEARCHABLE_TYPE_NAMES,
     InvalidQueryError,
     SearchStatus,
     SearchVerdict,
     UnsearchableTypeError,
     outcome_fields,
+    outcome_label,
+    premise_note,
     remediation,
+    unscored_note,
 )
 
 if TYPE_CHECKING:
@@ -116,18 +120,11 @@ def _hit_lines(rank: int, hit: SearchHit) -> list[TreeLine]:
         fields[-1] += f":{hit.excerpt.line_start}-{hit.excerpt.line_end}"
         fields.append(hit.excerpt.section)
     lines = [TreeLine(" ".join(field for field in fields if field), style="bold")]
-    if hit.contradicts_premise:
-        lines.append(
-            TreeLine(
-                "may contradict an assumption in your question "
-                f"({hit.premise_conflict:.2f})",
-                depth=1,
-                glyph="!",
-                style="yellow",
-            )
-        )
+    premise = premise_note(hit)
+    if premise is not None:
+        lines.append(TreeLine(premise, depth=1, glyph="!", style="yellow"))
     if hit.excerpt is None:
-        lines.append(TreeLine("no answering passage located", depth=1, style="dim"))
+        lines.append(TreeLine(NO_PASSAGE, depth=1, style="dim"))
     else:
         lines += _passage_lines(hit.excerpt, depth=1)
     if hit.supporting is not None:
@@ -142,30 +139,20 @@ def _outcome_lines(outcome: SearchOutcome) -> list[TreeLine]:
     """Render an outcome for the terminal: the verdict first, then the hits."""
     from vaultspec_core.cli.rendering import OUTCOME_STYLE, TreeLine, summary_line
 
+    label = outcome_label(outcome.status, outcome.verdict, outcome.reason)
     if outcome.status is not SearchStatus.OK:
         glyph, style = OUTCOME_STYLE[_envelope_status(outcome.status)]
-        label = outcome.status.value.replace("_", " ")
-        if outcome.reason is not None:
-            label += f" ({outcome.reason.value})"
         lines = [TreeLine(label, glyph=glyph, style=style)]
         note = remediation(outcome)
         if note is not None:
             lines.append(TreeLine(note, depth=1))
         return lines
 
-    lines: list[TreeLine] = []
-    verdict = outcome.verdict
-    if verdict is not None:
-        style = "green" if verdict is SearchVerdict.ANSWERED else "yellow"
-        lines.append(TreeLine(verdict.sentence, style=style))
-    if outcome.unscored:
-        noun = "record" if outcome.unscored == 1 else "records"
-        lines.append(
-            TreeLine(
-                f"{outcome.unscored} {noun} the provider would not read in full",
-                style="yellow",
-            )
-        )
+    style = "green" if outcome.verdict is SearchVerdict.ANSWERED else "yellow"
+    lines = [TreeLine(label, style=style)]
+    unscored = unscored_note(outcome.unscored)
+    if unscored is not None:
+        lines.append(TreeLine(unscored, style="yellow"))
     for rank, hit in enumerate(outcome.hits, start=1):
         lines += _hit_lines(rank, hit)
     if outcome.window is not None:

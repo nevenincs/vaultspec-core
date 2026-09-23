@@ -104,6 +104,29 @@ class TestNextStep:
         assert step.command == f"{RAG_VAULT_SEARCH} --doc-type adr,plan"
         assert step.types == (DocType.ADR, DocType.PLAN)
 
+    def test_with_rag_the_search_keeps_the_feature_and_date(
+        self, tmp_path: Path
+    ) -> None:
+        _provision_rag(tmp_path)
+
+        step = next_step(
+            tmp_path, frozenset({DocType.ADR}), feature="#Search", date="2026-09-23"
+        )
+
+        assert step.command == (
+            f"{RAG_VAULT_SEARCH} --doc-type adr --feature search --date 2026-09-23"
+        )
+
+    def test_the_listing_verb_keeps_the_feature_and_date(self, tmp_path: Path) -> None:
+        step = next_step(tmp_path, None, feature="search", date="2026-09-23")
+
+        assert step.command == f"{LIST_VAULT} --feature search --date 2026-09-23"
+
+    def test_a_malformed_filter_never_reaches_the_command(self, tmp_path: Path) -> None:
+        step = next_step(tmp_path, None, feature="x; rm -rf .", date="soon")
+
+        assert step.command == LIST_VAULT
+
     def test_types_are_held_as_record_types_in_name_order(self) -> None:
         step = NextStep(
             kind=NextStepKind.LISTING, types=(DocType.PLAN, DocType.ADR), command="c"

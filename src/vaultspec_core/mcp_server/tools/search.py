@@ -44,8 +44,12 @@ from ...search import (
     NextStep,
     SearchStatus,
     SearchUsage,
+    SearchVerdict,
+    UnavailableReason,
     outcome_fields,
+    outcome_label,
     search_vault,
+    unscored_note,
 )
 from ..envelope import LeanResult, LeanShape, compact_result
 from ..filters import DateFilter, FeatureFilter, TypeFilter
@@ -170,22 +174,25 @@ def _search_summary(payload: object) -> str:
         payload: The :class:`SearchResult` the tool returned.
 
     Returns:
-        ``"3 hits, answered"``, ``"1 hit, not answered, 2 unscored"``,
-        ``"not configured"`` or ``"unavailable: rate_limited"``, for example.
+        The hit count before the search package's outcome label and unscored
+        note: ``"3 hits, answered"`` or ``"unavailable (rate_limited)"``, for
+        example.
     """
     if not isinstance(payload, SearchResult):
         return type(payload).__name__
-    if payload.status == SearchStatus.NOT_CONFIGURED:
-        return "not configured"
-    if payload.status == SearchStatus.UNAVAILABLE:
-        return f"unavailable: {payload.reason}"
+    status = SearchStatus(payload.status)
+    label = outcome_label(
+        status,
+        None if payload.verdict is None else SearchVerdict(payload.verdict),
+        None if payload.reason is None else UnavailableReason(payload.reason),
+    )
+    if status is not SearchStatus.OK:
+        return label
     count = len(payload.hits)
     shown = f"{count} of {payload.total}" if payload.truncated else str(count)
-    verdict = "answered" if payload.answered else "not answered"
-    summary = f"{shown} hit{'' if count == 1 else 's'}, {verdict}"
-    if payload.usage is not None and payload.usage.unscored:
-        summary += f", {payload.usage.unscored} unscored"
-    return summary
+    summary = f"{shown} hit{'' if count == 1 else 's'}, {label}"
+    unscored = unscored_note(0 if payload.usage is None else payload.usage.unscored)
+    return summary if unscored is None else f"{summary}, {unscored}"
 
 
 def register_search_tools(mcp: MCPServer[None]) -> None:
