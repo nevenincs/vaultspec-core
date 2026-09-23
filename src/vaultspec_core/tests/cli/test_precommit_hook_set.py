@@ -165,3 +165,19 @@ class TestMigrateDropsTheRetiredHookFromPrek:
 
         assert result.status == "unchanged"
         assert prek.read_text(encoding="utf-8") == content
+
+
+@pytest.mark.parametrize("mode", list(InstallMode))
+def test_the_one_hook_is_scoped_to_what_the_commit_stages(mode: InstallMode) -> None:
+    """One process per commit, fed the staged files, never skipped.
+
+    ``pass_filenames`` is what keeps the gate's cost proportional to the commit
+    instead of the vault; ``always_run`` without a ``types`` or ``files`` filter
+    is what lets the per-machine file guard see commits that touch no markdown.
+    """
+    (hook,) = canonical_precommit_hooks_for_mode(mode)
+
+    assert hook["pass_filenames"] is True
+    assert hook["always_run"] is True
+    assert "types" not in hook
+    assert "files" not in hook

@@ -220,6 +220,7 @@ def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:
 def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     """Assess ``.pre-commit-config.yaml`` hook state, ignoring ``prek.toml``."""
     from ..commands import CANONICAL_HOOK_IDS, canonical_hook_entries_for_mode
+    from ..precommit import RETIRED_HOOK_IDS
     from ..prek_boundary import precommit_config_path
     from ..workspace_mode import resolve_render_mode
 
@@ -248,6 +249,11 @@ def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
     )
 
     if not found_ids:
+        # Hooks vaultspec-core retired are still its hooks: the config is an
+        # older install awaiting convergence, not one whose owner removed the
+        # hooks, so it must read as repairable rather than as a stand-down.
+        if any(h.get("id") in RETIRED_HOOK_IDS for h in local_hooks):
+            return PrecommitSignal.INCOMPLETE
         return PrecommitSignal.NO_HOOKS
 
     if found_ids != CANONICAL_HOOK_IDS:

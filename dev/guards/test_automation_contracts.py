@@ -503,18 +503,19 @@ def test_pre_commit_blocks_manual_changelog_edits() -> None:
 
 
 def test_pre_commit_carries_no_retired_vault_hooks() -> None:
-    """The repository's own hook config runs the canonical gates, nothing retired.
+    """The repository's own hook config runs the canonical gate, nothing retired.
 
-    A retired hook left here would keep rewriting the vault from inside a
-    commit in this checkout even though no consumer install renders it.
+    A retired hook left here would keep scanning the whole vault, or worse,
+    rewriting it, from inside a commit in this checkout even though no
+    consumer install renders it.
     """
-    from vaultspec_core.core.precommit import RETIRED_HOOK_IDS
+    from vaultspec_core.core.precommit import CANONICAL_HOOK_IDS, RETIRED_HOOK_IDS
 
     config = _load_pre_commit_config()
     hooks = [hook for repo in config.get("repos", []) for hook in repo.get("hooks", [])]
-    ordered_ids = [hook.get("id") for hook in hooks]
-    assert not RETIRED_HOOK_IDS & set(ordered_ids)
-    assert ordered_ids.index("vault-fix") < ordered_ids.index("spec-check")
+    ids = {hook.get("id") for hook in hooks}
+    assert not RETIRED_HOOK_IDS & ids
+    assert ids >= CANONICAL_HOOK_IDS
 
 
 def _toolchain_targets(verb_name: str) -> set[str]:

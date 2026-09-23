@@ -411,23 +411,13 @@ def render_mode(mode: InstallMode) -> InstallMode:
 class PrecommitHook(StrEnum):
     """Canonical pre-commit hook IDs managed by vaultspec-core.
 
-    ``VAULT_FIX`` runs all vault checkers as a pure gate, reporting naming,
-    frontmatter, annotation, link, dangling, reference, schema, and
-    body-link findings and blocking the commit on them. It does not repair:
-    the hook's ``pass_filenames: false`` scope makes the whole corpus its
-    blast radius regardless of what the commit touches, so a hook-time fix
-    writes changes nobody reviewed into commits that are not about them.
-    Repair is an operator-run ``vault check all --fix``, committed visibly.
-    The member keeps its historical ``vault-fix`` id so existing installs
-    are updated in place rather than growing a second, near-duplicate hook.
-
-    ``SPEC_CHECK`` runs the workspace doctor, diagnosing framework,
-    provider, and tooling health.
-
-    ``CHECK_PROVIDER_ARTIFACTS`` prevents provider artifacts and
-    installation manifests from being committed to git.
+    ``COMMIT_GATE`` is the one hook: it runs ``commit-gate`` over the files a
+    commit stages, in a single read-only process. It checks each staged vault
+    document with the checkers that judge a document on its own, blocks only
+    on errors the commit introduces, and blocks staged per-machine files. The
+    whole-vault checks and the workspace doctor are not commit-time work: they
+    cost time in proportion to the vault and judge state the commit did not
+    create, so they run in CI and on demand.
     """
 
-    VAULT_FIX = "vault-fix"
-    SPEC_CHECK = "spec-check"
-    CHECK_PROVIDER_ARTIFACTS = "check-provider-artifacts"
+    COMMIT_GATE = "vaultspec-commit-gate"

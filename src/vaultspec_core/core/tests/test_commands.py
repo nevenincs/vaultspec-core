@@ -15,7 +15,7 @@ from vaultspec_core.core.commands import (
     install_run,
     sync_provider,
 )
-from vaultspec_core.core.enums import InstallMode, PrecommitHook
+from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 
 
@@ -150,15 +150,16 @@ def test_precommit_collector_detects_states(tmp_path: Path) -> None:
     config_path.write_text(yaml.dump({"repos": []}, sort_keys=False), encoding="utf-8")
     assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_HOOKS
 
-    # Only 1 of 2 canonical hooks -> INCOMPLETE
+    # Only a retired vaultspec hook -> INCOMPLETE (an older install awaiting
+    # convergence, not a stand-down)
     partial_config = {
         "repos": [
             {
                 "repo": "local",
                 "hooks": [
                     {
-                        "id": PrecommitHook.SPEC_CHECK.value,
-                        "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
+                        "id": "spec-check",
+                        "entry": f"{CANONICAL_ENTRY_PREFIX} spec doctor",
                     },
                 ],
             }

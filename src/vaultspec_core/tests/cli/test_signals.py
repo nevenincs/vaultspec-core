@@ -130,9 +130,7 @@ pytestmark = [pytest.mark.unit]
         (
             PrecommitHook,
             {
-                "VAULT_FIX",
-                "CHECK_PROVIDER_ARTIFACTS",
-                "SPEC_CHECK",
+                "COMMIT_GATE",
             },
         ),
         (

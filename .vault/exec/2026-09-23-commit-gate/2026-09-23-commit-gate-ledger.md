@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:44abe4b7d9a0a0562fe964f6b7ca2405bbffb69ae832b7227e4badc788f7663e'
+body_hash: 'sha256:e0c8e163de64280a04a23c97de2256e0d696d5d93f4c5eff8870896cc1733866'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -51,8 +51,20 @@ related:
 - `S07` `M` `src/vaultspec_core/builtins/reference/cli.md`
 - `S07` `A` `src/vaultspec_core/tests/cli/test_commit_gate_cli.py`
 - `S07` `verify:` `ty check` -> `pass`
+- `S08` `M` `src/vaultspec_core/core/enums.py`
+- `S08` `M` `src/vaultspec_core/core/precommit.py`
+- `S08` `M` `src/vaultspec_core/core/diagnosis/collectors_precommit.py`
+- `S08` `M` `.pre-commit-config.yaml`
+- `S08` `M` `dev/guards/test_automation_contracts.py`
+- `S08` `M` `src/vaultspec_core/core/tests/test_commands.py`
+- `S08` `M` `src/vaultspec_core/tests/cli/test_convergence_advisories.py`
+- `S08` `M` `src/vaultspec_core/tests/cli/test_flow_bugs.py`
+- `S08` `M` `src/vaultspec_core/tests/cli/test_precommit_hook_set.py`
+- `S08` `M` `src/vaultspec_core/tests/cli/test_signals.py`
+- `S08` `verify:` `ty check` -> `pass`
 
 ## Notes
 
 - `S03` authorized by the user's direct request to fix just init; not governed by the proposed ADR
 - `S05` full-suite run also hit test_rename_concurrency under -n auto; it passes 3/3 alone and is untouched by this Step
+- `S08` test_rename_concurrency failed intermittently under -n auto in full runs; it passes alone and exercises rename/edit locks this Step does not touch

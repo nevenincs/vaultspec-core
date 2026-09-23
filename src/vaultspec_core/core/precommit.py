@@ -111,34 +111,16 @@ CANONICAL_ENTRY_PREFIX = entry_prefix_for_mode(InstallMode.DEPENDENCY)
 # insertion order here is the order hooks are scaffolded into
 # ``.pre-commit-config.yaml`` and must be preserved.
 _HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
-    # A pure gate, deliberately not ``--fix``. Unattended corpus-mutating
-    # repair from inside a commit is retired by the modified-stamp-provenance
-    # decision: ``pass_filenames: false`` hands the hook the whole corpus as
-    # blast radius no matter what the commit touches, a hook-time fix writes
-    # changes nobody reviewed into commits that are not about them, and the
-    # hook runner's revert-based staging protocol makes hook-time tree
-    # mutation unsafe in shared worktrees. The non-fix run is an exact,
-    # deterministic preview, so a failing gate names precisely what a
-    # deliberate operator-run ``--fix`` will do. The hook id keeps its
-    # historical ``vault-fix`` spelling so existing installs are updated in
-    # place rather than accumulating a second, near-duplicate entry.
-    PrecommitHook.VAULT_FIX: "vault check all",
-    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: "check-providers",
-    # ``--gate-errors`` folds the doctor's warning exit (1) to 0 so the gate
-    # blocks only on errors. Warning-level provider-mirror lag is the expected
-    # steady state after any builtins change - check-provider-artifacts forbids
-    # committing the regenerated mirror - so a warning-strict gate would
-    # deadlock every commit. This is the canonical entry, not a hand-hardened
-    # local override, so sync renders it directly rather than clobbering it.
-    PrecommitHook.SPEC_CHECK: "spec doctor --gate-errors",
+    # A pure gate, never ``--fix``: a hook-time fix writes changes nobody
+    # reviewed into commits that are not about them, and the hook runner's
+    # revert-based staging protocol makes hook-time tree mutation unsafe in
+    # shared worktrees.
+    PrecommitHook.COMMIT_GATE: "commit-gate",
 }
 _HOOK_META: dict[PrecommitHook, dict[str, object]] = {
-    PrecommitHook.VAULT_FIX: {"name": "Vault gate", "types": ["markdown"]},
-    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
-        "name": "Check provider artifacts",
-        "always_run": True,
-    },
-    PrecommitHook.SPEC_CHECK: {"name": "Spec check", "types": ["markdown"]},
+    # ``always_run`` so the per-machine file guard sees every commit, not only
+    # those touching markdown; the gate itself ignores paths it has no rule for.
+    PrecommitHook.COMMIT_GATE: {"name": "Vaultspec commit gate", "always_run": True},
 }
 
 
@@ -172,7 +154,9 @@ def canonical_precommit_hooks_for_mode(mode: InstallMode) -> list[dict[str, obje
             "id": hook.value,
             **meta,
             "language": "system",
-            "pass_filenames": False,
+            # The gate checks exactly the staged files the runner passes, which
+            # is what keeps its cost proportional to the commit.
+            "pass_filenames": True,
         }
         for hook, meta in hook_defs_for_mode(mode).items()
     ]
@@ -202,11 +186,21 @@ CANONICAL_HOOK_ENTRIES: dict[str, str] = canonical_hook_entries_for_mode(
 
 #: Hook IDs vaultspec-core once scaffolded and no longer renders. Existing
 #: installs still carry them, so the scaffold removes them and uninstall still
-#: strips them. ``vault-sanitize-annotations`` rewrote the whole vault from
-#: inside a commit, contradicting the pure-gate rule above, and the non-fixing
-#: ``vault check all`` behind ``vault-fix`` already reports the same
-#: annotation findings.
-RETIRED_HOOK_IDS: frozenset[str] = frozenset({"vault-sanitize-annotations"})
+#: strips them.
+#:
+#: ``vault-sanitize-annotations`` rewrote the whole vault from inside a commit,
+#: contradicting the pure-gate rule above. ``vault-fix``, ``spec-check`` and
+#: ``check-provider-artifacts`` each spent a process, and the first two a
+#: vault-sized scan, on every commit; ``commit-gate`` does their commit-scoped
+#: work in one process, and the whole-vault checks run in CI and on demand.
+RETIRED_HOOK_IDS: frozenset[str] = frozenset(
+    {
+        "vault-sanitize-annotations",
+        "vault-fix",
+        "spec-check",
+        "check-provider-artifacts",
+    }
+)
 
 # All managed hook IDs for uninstall filtering.
 ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS | RETIRED_HOOK_IDS
