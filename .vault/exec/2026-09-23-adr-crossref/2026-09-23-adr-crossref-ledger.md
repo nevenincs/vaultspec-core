@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:021ceaf5961a80420bbd141fa6152b3456508ff5c7208e6372e23a99b82356a5'
+body_hash: 'sha256:563d6867ff5b630b510fb7471b96d903bc5ebb57cada61c387ea235b4ef36823'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -94,6 +94,7 @@ related:
 - `S05` `verify:` `pytest test_crossref_tool test_context_budget test_tool_surface` -> `pass`
 - `S06` `verify:` `pytest test_corpus_contracts test_cli_language_contract test_discovery_guidance test_template_annotations` -> `pass`
 - `S03` `M` `src/vaultspec_core/crossref/tests/test_sweep_safety.py`
+- `S05` `verify:` `pytest test_crossref_tool` -> `pass`
 
 ## Notes
 

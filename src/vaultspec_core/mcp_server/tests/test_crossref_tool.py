@@ -33,7 +33,11 @@ from vaultspec_core.crossref import (
 )
 from vaultspec_core.mcp_server.app import create_server
 from vaultspec_core.mcp_server.envelope import _structured
-from vaultspec_core.mcp_server.tools.crossref import CrossrefResult
+from vaultspec_core.mcp_server.tools.crossref import (
+    CrossrefResult,
+    SourceRow,
+    _summary,
+)
 from vaultspec_core.search import CREDENTIAL_VARIABLE
 
 from .conftest import data_of, run_in_fresh_workspace, stdio_session
@@ -147,6 +151,22 @@ def test_a_reply_with_verdicts_reaches_mcp_exactly_as_the_cli_prints_it() -> Non
     assert _structured(CrossrefResult.model_validate(fields)) == fields
 
 
+@pytest.mark.unit
+def test_a_sweep_summary_counts_its_sources_and_names_why_it_stopped() -> None:
+    result = CrossrefResult(
+        sources=[
+            SourceRow(source="a", status="ok", links=2),
+            SourceRow(source="b", status="unavailable", reason="content_rejected"),
+        ],
+        judged=1,
+        links=2,
+        remaining=3,
+        stopped="rate_limited",
+    )
+
+    assert _summary(result) == "1 judged, 2 links, 3 remaining, stopped: rate_limited"
+
+
 def _cli_data(project: Path) -> dict[str, Any]:
     """Run ``vault adr crossref --json`` on *project* without a key."""
     runner = CliRunner(env={CREDENTIAL_VARIABLE: ""})
@@ -177,6 +197,12 @@ async def _drive_without_a_key(project: Path) -> None:
         await session.initialize()
         judged = data_of(await session.call_tool("crossref", {"ref": _SOURCE}))
     assert judged == payload
+
+    async with stdio_session(project, environ=environ) as session:
+        await session.initialize()
+        swept = data_of(await session.call_tool("crossref", {"all_adrs": True}))
+    # The selector reached the backend: both ADRs were selected, none judged.
+    assert (swept["judged"], swept["remaining"]) == (0, 2)
 
 
 @pytest.mark.integration

@@ -156,6 +156,8 @@ def _summary(payload: object) -> str:
         text += f", {payload.written} written"
     if payload.remaining:
         text += f", {payload.remaining} remaining"
+    if payload.stopped:
+        text += f", stopped: {payload.stopped}"
     return text
 
 

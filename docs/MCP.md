@@ -502,18 +502,21 @@ data flow described under [`search`](#search).
 | `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                  |
 | `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                         |
 
-A call needs `refs`, `feature`, `isolated`, or `all_adrs`; naming `refs` together with
-any of the others is refused. The read-only server takes one parameter, `ref`, the ADR
-to judge.
+A call needs `refs`, `feature`, `isolated`, or `all_adrs`. `feature` and `isolated`
+narrow together; `refs` and `all_adrs` each stand alone, and combining either with
+another selector is refused. The read-only server takes one parameter, `ref`, the ADR to
+judge.
 
 **Bounds.** Every other ADR is ranked by code alone, the best 192 are put to the model
 as Choice questions of at most 32 options, and the best 32, plus up to 8 declared links
 outside them, are judged in pairs. A source costs at most 46 requests and 60 seconds, a
 sweep takes at most 50 sources and 300 seconds, and a vault may hold at most 5,000 ADRs.
-Sweeps run in stem order and store no state. An ADR the provider refuses to read fails
-on its own and the sweep moves past it, once the provider has read something in that
-sweep; a refusal before then, or three in a row, stops the sweep. Any other failure
-stops the sweep too, and resuming retries the source it stopped at.
+Sweeps run in stem order and store no state. An ADR the provider refuses to read is held
+open while the sweep judges on: once a later ADR is read, the refusal counts as that
+ADR's own and the sweep moves past it, and at the end of the selection a sweep in which
+the provider read something moves past it too. Three refusals in a row, or any other
+failure, stop the sweep before the first refusal still open, and resuming retries from
+there.
 
 **Verdicts.** Each row has `stem`, `kind`, `score`, `relation`, `status`, `declared`,
 and `applied` when this call wrote it. `link` means the source should link the ADR;
