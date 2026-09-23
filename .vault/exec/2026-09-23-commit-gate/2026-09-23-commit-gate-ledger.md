@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:35ce92506aa91ab0c5cbf9d7e26cfbe2c16009eeea9b85032a2e20249dace1ac'
+body_hash: 'sha256:0a38a3d88d8c524d7db6817137cfe714dc7de52065817314223397d366487bff'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -37,6 +37,10 @@ related:
 - `S05` `M` `src/vaultspec_core/tests/cli/test_flow_bugs.py`
 - `S05` `A` `src/vaultspec_core/tests/cli/test_provider_guard.py`
 - `S05` `verify:` `ty check` -> `pass`
+- `S06` `A` `src/vaultspec_core/vaultcore/checks/staged.py`
+- `S06` `M` `src/vaultspec_core/vaultcore/checks/encoding.py`
+- `S06` `A` `src/vaultspec_core/vaultcore/checks/tests/test_staged.py`
+- `S06` `verify:` `ty check` -> `pass`
 
 ## Notes
 
