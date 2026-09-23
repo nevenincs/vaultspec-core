@@ -683,10 +683,10 @@ plan completion percent), the plans currently in flight (stem, feature, tier, op
 closed step counts, completion percent, and the next open step), vault-wide totals, and
 `hosted_search`. That field reports whether [`search`](#search) has a key (`configured`)
 and, when it does, where the key was found (`source`: `environment` or `dotenv`). It
-describes configuration, not whether the key works. Unlike the CLI's `status --json`,
-the tool carries no vaultspec-rag companion field: a declined `search` names the
-companion route in its own `next_step`. Every response carries a `tool_schema_version`
-field so a client can detect a server upgrade.
+describes configuration, not whether the key works. Unlike the CLI's
+`vaultspec-core status --json`, the tool carries no vaultspec-rag companion field: a
+declined `search` names the companion route in its own `next_step`. Every response
+carries a `tool_schema_version` field so a client can detect a server upgrade.
 
 Pass a target to trace one plan or feature instead. The response then reports each
 plan's steps in full detail (canonical ID, display path, checked state, the ledger stem

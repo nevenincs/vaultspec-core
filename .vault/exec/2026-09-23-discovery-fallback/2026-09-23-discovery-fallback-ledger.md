@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:08d288de5f0f410e72f78204a7cee669c40a2715695052dfe78a8edc666ddcc5'
+body_hash: 'sha256:40baad0f3b757030896bc535c8857618ab990911b60030a52d44ebbe9677046b'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -106,10 +106,12 @@ related:
 - `S04` `M` `.vaultspec/reference/cli.md`
 - `S04` `verify:` `install --upgrade, sync, just check-python check-type, pytest test_discovery_guidance test_corpus_contracts test_agents_render test_antigravity_agents test_cli_reference_drift test_seed_builtins cli/test_sync cli/test_install, mdformat and pymarkdown on builtins` -> `pass`
 - `S04` `by:` `opus-medium`
+- `S03` `verify:` `just check-type-strict` -> `pass`
+- `S05` `verify:` `pytest dev/guards/test_cli_language_contract.py` -> `pass`
 
 ## Notes
 
 - `S01` MCP status does not carry the companion record: it measured +439 tool-definition chars against a ceiling the envelope ADR forbids raising; the companion reaches agents as the search next step instead
 - `S02` Builtins touched only to swap the routing sentence for the new constant; the S04 rewrite owns their prose. SEARCH_ADR removed: no builtin or backend offers the rag ADR search any more
-- `S03` Whole-tree check-python and check-type fail only in the concurrent env-var centralisation lane (search tests, CredentialSource import in search/_models.py, deleted search/_credential.py); none in S03 files
+- `S03` Whole-tree check-python and check-type fail only in the concurrent env-var centralisation lane (search tests, CredentialSource import in search/\_models.py, deleted search/\_credential.py); none in S03 files
 - `S04` S04 dev/guards test_cli_language_contract fails on README.md and docs/ from the concurrent user-docs lane; check-markdown flags this ledger's S03 note (unescaped underscores), machine-owned and left as written

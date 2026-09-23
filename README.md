@@ -94,7 +94,7 @@ passage that answers them. Every search sends vault text to the TypeSafe API. Wi
 key, everything else works. A vault search then names what to run instead: a
 vaultspec-rag vault search when the workspace provisions vaultspec-rag, otherwise
 `vaultspec-core vault list` and grep. Code search is always vaultspec-rag's job. See
-[`vault search`](docs/CLI.md#vaultspec-core-vault-search).
+[`vaultspec-core vault search`](docs/CLI.md#vaultspec-core-vault-search).
 
 ## Support and license
 

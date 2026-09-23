@@ -169,7 +169,7 @@ def test_no_reference_table_is_wrapped_into_prose() -> None:
     A table the formatter read as prose comes back as one paragraph whose
     rows run together across wrapped lines.
     """
-    offenders = []
+    offenders: list[tuple[str, str]] = []
     for managed in MANAGED_FILES:
         path = managed.path_factory()
         if managed.optional and not path.is_file():

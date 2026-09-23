@@ -94,10 +94,10 @@ vaultspec-core vault list --feature search-api
 See the [list reference](CLI.md#vaultspec-core-vault-list) for type filters and
 pagination.
 
-To ask the vault a question, use `vault search` (MCP: `search`). It returns the passage
-that answers, with its line range, and says when nothing in the vault answers. It needs
-a TypeSafe key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` and sends vault text to the TypeSafe
-API:
+To ask the vault a question, use `vaultspec-core vault search` (MCP: `search`). It
+returns the passage that answers, with its line range, and says when nothing in the
+vault answers. It needs a TypeSafe key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` and sends
+vault text to the TypeSafe API:
 
 ```bash
 vaultspec-core vault search "why do pages use opaque cursors" --feature search-api
@@ -105,10 +105,11 @@ vaultspec-core vault search "why do pages use opaque cursors" --feature search-a
 
 When no key is set, or the hosted service fails, the reply returns no partial results
 and names the next step instead: a vaultspec-rag vault search over the requested record
-types when the workspace provisions RAG, otherwise `vault list` (MCP: `find`) and grep
-over `.vault/`. Listing, the feature [graph](CLI.md#vaultspec-core-vault-graph), and
-grep always work. See the [`vault search` reference](CLI.md#vaultspec-core-vault-search)
-and the [`search` tool](MCP.md#search) for the reply fields.
+types when the workspace provisions RAG, otherwise `vaultspec-core vault list` (MCP:
+`find`) and grep over `.vault/`. Listing, the feature
+[graph](CLI.md#vaultspec-core-vault-graph), and grep always work. See the
+[`vaultspec-core vault search` reference](CLI.md#vaultspec-core-vault-search) and the
+[`search` tool](MCP.md#search) for the reply fields.
 
 To search code by meaning,
 [install RAG](https://github.com/nevenincs/vaultspec-rag#install) and
