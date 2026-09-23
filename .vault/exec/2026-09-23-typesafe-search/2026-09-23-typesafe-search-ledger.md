@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:82a6d4ffc53ad92debe4dc81211d2a0479458ede7ec299442c756b2afc7c9a4a'
+body_hash: 'sha256:a586d8fb27816df65f9c9f47a48842517736527c6dc16c9fca003af73f37e34f'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -47,3 +47,42 @@ related:
 - `S04` `A` `src/vaultspec_core/search/tests/scripted_provider.py`
 - `S04` `A` `src/vaultspec_core/search/tests/test_transport.py`
 - `S03` `M` `src/vaultspec_core/search/__init__.py`
+- `S10` `M` `src/vaultspec_core/core/adr.py`
+- `S10` `M` `src/vaultspec_core/graph/cache.py`
+- `S10` `M` `src/vaultspec_core/graph/cache_io.py`
+- `S10` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S10` `M` `src/vaultspec_core/plan/checks/heading_level_check.py`
+- `S10` `M` `src/vaultspec_core/plan/checks/vocabulary_check.py`
+- `S10` `M` `src/vaultspec_core/plan/parser.py`
+- `S10` `M` `src/vaultspec_core/plan/row_contract.py`
+- `S10` `M` `src/vaultspec_core/tests/plan/test_checks.py`
+- `S10` `M` `src/vaultspec_core/tests/plan/test_parser.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/checks/annotations.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/checks/body_sections.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/checks/placeholders.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/edit_engine.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/exec_fold.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/exec_ledger.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/hydration.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/links.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/markdown.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/parser.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_core.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_exec_fold.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_exec_ledger.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_links.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_markdown.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/catalog.py`
+- `S05` `M` `src/vaultspec_core/search/__init__.py`
+- `S05` `M` `src/vaultspec_core/search/_models.py`
+- `S05` `M` `src/vaultspec_core/search/_questions.py`
+- `S05` `M` `src/vaultspec_core/search/_transport.py`
+- `S05` `M` `src/vaultspec_core/search/tests/scripted_provider.py`
+- `S05` `A` `src/vaultspec_core/search/_corpus.py`
+- `S05` `A` `src/vaultspec_core/search/_engine.py`
+- `S05` `A` `src/vaultspec_core/search/_lexical.py`
+- `S05` `A` `src/vaultspec_core/search/_service.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_corpus.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_engine.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_lexical.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_service.py`
