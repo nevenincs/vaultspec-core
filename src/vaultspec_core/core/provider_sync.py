@@ -37,6 +37,7 @@ from .manifest import (
     write_manifest_data,
 )
 from .precommit import scaffold_precommit
+from .prek_boundary import PREK_CONFIG_NAME, repair_managed_prek_block
 from .provider_registry import SYNC_PROVIDERS, rel, validate_skip
 
 logger = logging.getLogger(__name__)
@@ -201,6 +202,15 @@ def _reconcile_precommit_management(target_dir: Path) -> None:
         mdata.precommit_managed = False
         write_manifest_data(target_dir, mdata)
         logger.info("Pre-commit hooks removed by user, disabling management")
+        return
+    if (
+        signal is PrecommitSignal.DUPLICATED
+        and (target_dir / PREK_CONFIG_NAME).exists()
+    ):
+        # Sync otherwise leaves prek.toml to `spec precommit migrate`, but a
+        # duplicated managed block runs the gate repeatedly on every commit,
+        # and the block is vaultspec's own to repair.
+        repair_managed_prek_block(target_dir)
         return
     scaffold_precommit(target_dir)
 

@@ -72,9 +72,13 @@ NODE = Phase(
     skip_reason="this repository has no Node dependency graph",
 )
 
+# Deliberately no git-hook step. The hook runner stashes a worktree's unstaged
+# changes for the length of every commit and restores them afterwards, and in a
+# worktree several writers share, an edit landing inside that window is lost on
+# restore. The gates run in CI and on demand instead.
 TOOLS = Phase(
     name="tools",
-    summary="Enroll the Vaultspec framework and diagnose the git hook runner.",
+    summary="Enroll the Vaultspec framework and provision actionlint.",
     steps=(
         Step(
             name="framework-install",
@@ -87,12 +91,6 @@ TOOLS = Phase(
                 "--force",
             ),
             summary="Rebuild .vaultspec/providers.json from the tracked config.",
-        ),
-        Step(
-            name="hook-runner",
-            argv=(PY, "-m", "dev.init.hooks", ".pre-commit-config.yaml"),
-            summary="Install the committed hooks, or report that none can be.",
-            advisory=True,
         ),
         Step(
             name="actionlint-install",
@@ -108,7 +106,7 @@ TOOLS = Phase(
             summary="Provision the pinned actionlint the workflow check uses.",
         ),
     ),
-    inputs=("uv.lock", ".pre-commit-config.yaml"),
+    inputs=("uv.lock",),
     artifacts=(".vaultspec/providers.json",),
 )
 

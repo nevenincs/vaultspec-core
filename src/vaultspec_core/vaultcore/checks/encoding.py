@@ -26,9 +26,11 @@ from ..exclusions import is_excluded_vault_path
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
     from ...graph.api import VaultGraph
+    from ...graph.models import EncodingIssue
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,47 @@ _DECODE_MESSAGE = (
     "excluded from feature scans, indexes, and renames. "
     "Convert it to UTF-8 (a UTF-8-BOM file is also accepted)."
 )
+
+
+def encoding_issue_result(
+    root_dir: Path, issues: Iterable[EncodingIssue]
+) -> CheckResult:
+    """Build the ``encoding`` result from read and decode failures already seen.
+
+    Shared by the combined pass, which gets its issues from the graph's ingress
+    read, and by any caller that read a set of documents itself.
+
+    Args:
+        root_dir: Project root directory.
+        issues: The observed read and decode failures.
+
+    Returns:
+        :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with check
+        name ``"encoding"``.
+    """
+    result = CheckResult(check_name="encoding", supports_fix=False)
+    for issue in sorted(issues, key=lambda i: i.path):
+        path = issue.path
+        rel_path = path.relative_to(root_dir) if path.is_absolute() else path
+        if issue.kind == "read":
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel_path,
+                    message=f"Could not read document bytes: {issue.detail}",
+                    severity=Severity.WARNING,
+                )
+            )
+        else:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel_path,
+                    message=_DECODE_MESSAGE.format(
+                        start=issue.start, reason=issue.detail
+                    ),
+                    severity=Severity.ERROR,
+                )
+            )
+    return result
 
 
 def check_encoding(root_dir: Path, *, graph: VaultGraph | None = None) -> CheckResult:
@@ -71,35 +114,14 @@ def check_encoding(root_dir: Path, *, graph: VaultGraph | None = None) -> CheckR
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with check
         name ``"encoding"``.
     """
-    result = CheckResult(check_name="encoding", supports_fix=False)
-
     if graph is not None:
         # No per-file stat parity probes here: the graph path must stay
         # disk-free. The only divergence from the standalone walk is that a
         # symlinked document observed by the scan is reported rather than
         # skipped.
-        for issue in sorted(graph.encoding_issues, key=lambda i: i.path):
-            path = issue.path
-            rel_path = path.relative_to(root_dir) if path.is_absolute() else path
-            if issue.kind == "read":
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=rel_path,
-                        message=f"Could not read document bytes: {issue.detail}",
-                        severity=Severity.WARNING,
-                    )
-                )
-            else:
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=rel_path,
-                        message=_DECODE_MESSAGE.format(
-                            start=issue.start, reason=issue.detail
-                        ),
-                        severity=Severity.ERROR,
-                    )
-                )
-        return result
+        return encoding_issue_result(root_dir, graph.encoding_issues)
+
+    result = CheckResult(check_name="encoding", supports_fix=False)
 
     from ...config import get_config
 

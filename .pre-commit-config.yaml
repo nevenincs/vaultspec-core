@@ -55,27 +55,6 @@ repos:
     types:
     - markdown
     exclude: '^CHANGELOG\.md$'
-  - id: vault-fix
-    name: Vault gate
-    entry: uv run --no-sync vaultspec-core vault check all
-    language: system
-    types:
-    - markdown
-    pass_filenames: false
-  - id: vault-sanitize-annotations
-    name: Vault sanitize annotations
-    entry: uv run --no-sync vaultspec-core vault sanitize annotations
-    language: system
-    types:
-    - markdown
-    pass_filenames: false
-  - id: spec-check
-    name: Vault Doctor (Check)
-    entry: uv run --no-sync vaultspec-core spec doctor --gate-errors
-    language: system
-    types:
-    - markdown
-    pass_filenames: false
   - id: cli-reference-check
     name: CLI reference up to date (generator --check)
     entry: uv run --no-sync vaultspec-core spec reference generate --check
@@ -102,15 +81,15 @@ repos:
     types:
     - markdown
 
-  - id: check-provider-artifacts
-    name: Check provider artifacts
-    entry: uv run --no-sync vaultspec-core check-providers
-    always_run: true
-    language: system
-    pass_filenames: false
   - id: block-manual-changelog
     name: Block manual CHANGELOG.md edits (release-please-managed)
     entry: python -c "import subprocess, sys; changed = subprocess.run(['git', 'diff', '--cached', '--name-only', '--', 'CHANGELOG.md'], capture_output=True, text=True, check=False).stdout.strip(); sys.exit('CHANGELOG.md is auto-managed by release-please. Do not edit manually - land your change as a conventional commit (feat:/fix:/perf:/...) and release-please will regenerate CHANGELOG.md on the next release PR.' if changed else 0)"
     language: system
     files: '^CHANGELOG\.md$'
     pass_filenames: false
+  - id: vaultspec-commit-gate
+    name: Vaultspec commit gate
+    entry: uv run --no-sync vaultspec-core commit-gate
+    always_run: true
+    language: system
+    pass_filenames: true

@@ -74,10 +74,10 @@ class TestPrekUnrefreshableAdvisory:
     def test_stale_hooks_without_prek_toml_keep_existing_signal(
         self, tmp_path: Path
     ) -> None:
-        """Without prek.toml the YAML state reports as before (refreshable)."""
+        """Without prek.toml a stale canonical entry is refreshable drift."""
         _write_yaml_hooks(tmp_path, "uv run vaultspec-core legacy-entry")
 
-        assert collect_precommit_state(tmp_path) is PrecommitSignal.INCOMPLETE
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.NON_CANONICAL
 
     def test_unrefreshable_warns_the_doctor(self, tmp_path: Path) -> None:
         """Content-verified genuine stranding is a warning: prek.toml owns
@@ -108,25 +108,37 @@ class TestPrekUnrefreshableAdvisory:
 class TestPrekContentAwareSignal:
     """The precommit signal reflects prek.toml contents, not existence."""
 
-    def test_healthy_prek_with_stale_yaml_reports_orphaned(
+    def test_healthy_prek_with_vaultspec_yaml_reports_shadowed(
         self, tmp_path: Path
     ) -> None:
+        """vaultspec hooks in a YAML prek never reads look live and are not."""
         _write_prek_hooks(tmp_path)
         _write_yaml_hooks(tmp_path, "uv run vaultspec-core legacy-entry")
 
-        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.SHADOWED
 
-    def test_healthy_prek_with_complete_yaml_reports_orphaned(
+    def test_healthy_prek_with_hook_free_yaml_reports_orphaned(
         self, tmp_path: Path
     ) -> None:
-        """Even a fully canonical YAML is superseded: prek never reads it."""
+        """A leftover YAML carrying no vaultspec hooks is only superseded."""
+        _write_prek_hooks(tmp_path)
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos: []\n", encoding="utf-8"
+        )
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+
+    def test_healthy_prek_with_complete_yaml_reports_shadowed(
+        self, tmp_path: Path
+    ) -> None:
+        """Even a fully canonical YAML is shadowed: prek never reads it."""
         from vaultspec_core.core.commands import scaffold_precommit
 
         scaffold_precommit(tmp_path)
         assert collect_precommit_state(tmp_path) is PrecommitSignal.COMPLETE
 
         _write_prek_hooks(tmp_path)
-        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.SHADOWED
 
     def test_healthy_prek_without_yaml_reports_complete(self, tmp_path: Path) -> None:
         _write_prek_hooks(tmp_path)
@@ -140,10 +152,11 @@ class TestPrekContentAwareSignal:
 
         assert collect_precommit_state(tmp_path) is PrecommitSignal.UNREFRESHABLE
 
-    def test_partial_prek_hooks_report_unrefreshable(self, tmp_path: Path) -> None:
-        from vaultspec_core.core.commands import CANONICAL_HOOK_IDS
+    def test_retired_prek_hooks_report_unrefreshable(self, tmp_path: Path) -> None:
+        """Only retired vaultspec hooks in prek.toml: the gate is stranded."""
+        from vaultspec_core.core.precommit import RETIRED_HOOK_IDS
 
-        hook_id = sorted(CANONICAL_HOOK_IDS)[0]
+        hook_id = sorted(RETIRED_HOOK_IDS)[0]
         (tmp_path / "prek.toml").write_text(
             "[[repos]]\n"
             'repo = "local"\n\n'
@@ -179,7 +192,7 @@ class TestDoctorPrekAdvisoryText:
 
         assert "spec precommit migrate" in result.output
 
-    def test_orphaned_advisory_names_superseded_yaml(
+    def test_shadowed_advisory_names_the_unread_config(
         self, runner: CliRunner, factory: WorkspaceFactory
     ) -> None:
         from vaultspec_core.tests.cli.conftest import run_spec
@@ -189,15 +202,20 @@ class TestDoctorPrekAdvisoryText:
 
         result = run_spec(runner, "spec", "doctor", target=factory.path)
 
-        assert "superseded .pre-commit-config.yaml" in result.output
+        assert "config file prek does not" in result.output
 
 
 class TestGatedOrphanCleanup:
     """YAML removal is operator-gated and verified, never automatic."""
 
-    def test_remove_refused_on_conflicting_prek(self, tmp_path: Path) -> None:
-        """Canonical IDs outside the managed block refuse the whole run,
-        including removal: the YAML must survive."""
+    def test_remove_proceeds_beside_operator_authored_gate(
+        self, tmp_path: Path
+    ) -> None:
+        """An operator-authored canonical hook in prek.toml supersedes the YAML.
+
+        The hook lives outside the managed block and is left as written, but
+        it is present, so the superseded YAML may go.
+        """
         from vaultspec_core.core.commands import CANONICAL_HOOK_IDS
         from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
 
@@ -213,11 +231,14 @@ class TestGatedOrphanCleanup:
         )
         _write_yaml_hooks(tmp_path, "uv run vaultspec-core legacy-entry")
 
+        before = (tmp_path / "prek.toml").read_bytes()
+
         result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)
 
-        assert result.status == "conflicting"
-        assert result.yaml_removed is False
-        assert (tmp_path / ".pre-commit-config.yaml").exists()
+        assert result.status == "unchanged"
+        assert result.yaml_removed is True
+        assert not (tmp_path / ".pre-commit-config.yaml").exists()
+        assert (tmp_path / "prek.toml").read_bytes() == before
 
     def test_remove_after_migration_clears_orphan(self, tmp_path: Path) -> None:
         """migrate --remove-yaml transplants, verifies, deletes, and the
@@ -239,7 +260,7 @@ class TestGatedOrphanCleanup:
 
         _write_prek_hooks(tmp_path)
         _write_yaml_hooks(tmp_path, "uv run vaultspec-core legacy-entry")
-        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.SHADOWED
 
         result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)
 

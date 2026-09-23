@@ -12,7 +12,7 @@ The recipes:
 | `just init`        | Everything, in dependency order.                              |
 | `just init-python` | The Python environment and its locked dependencies.           |
 | `just init-node`   | The pinned Node dependency graph.                             |
-| `just init-tools`  | Framework enrollment, git hooks, and host-tool diagnosis.     |
+| `just init-tools`  | Framework enrollment and host-tool diagnosis.                 |
 | `just init-check`  | Reports whether the worktree is initialized. Mutates nothing. |
 
 ## The contract

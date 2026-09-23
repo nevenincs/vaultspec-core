@@ -105,6 +105,10 @@ pytestmark = [pytest.mark.unit]
                 "ORPHANED",
                 "NOT_INSTALLED",
                 "UNREADABLE",
+                "DECLINED",
+                "DECLINED_LEFTOVER",
+                "DUPLICATED",
+                "SHADOWED",
                 "COMPLETE",
             },
         ),
@@ -128,10 +132,7 @@ pytestmark = [pytest.mark.unit]
         (
             PrecommitHook,
             {
-                "VAULT_FIX",
-                "VAULT_SANITIZE_ANNOTATIONS",
-                "CHECK_PROVIDER_ARTIFACTS",
-                "SPEC_CHECK",
+                "COMMIT_GATE",
             },
         ),
         (

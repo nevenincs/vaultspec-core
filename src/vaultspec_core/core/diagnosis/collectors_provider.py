@@ -40,10 +40,9 @@ _SHARED_DIR_OWNERS: dict[str, set[str]] = {
 # Host-tool-native files that legitimately live inside a provider directory but
 # are owned by the host tool, not by vaultspec. Their presence must not classify
 # a provider directory as MIXED (issue #122): a real Claude Code / Codex
-# workspace always carries these, and the bundled spec-check hook runs
-# ``spec doctor`` on every markdown commit, so treating them as foreign content
-# blocked all markdown commits with no in-workspace remedy. ``"*"`` entries
-# apply to every provider.
+# workspace always carries these, so treating them as foreign content would
+# flag every such workspace with no in-workspace remedy. ``"*"`` entries apply
+# to every provider.
 _HOST_NATIVE_FILES: dict[str, set[str]] = {
     "*": {".gitignore"},
     "claude": {"settings.json", "settings.local.json"},

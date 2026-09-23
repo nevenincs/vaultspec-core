@@ -117,8 +117,13 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.4`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.2.4`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core commit-gate`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -134,6 +139,8 @@ full options.
 - `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
+- `vaultspec-core commit-gate` - Check the files a commit stages, in one read-only
+  process.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
 - `vaultspec-core status` - Orient in a vaultspec vault: rollup, or a grounding trace
   for a target.
@@ -555,6 +562,48 @@ edits.
 
   ```bash
   vaultspec-core sync all
+  ```
+
+______________________________________________________________________
+
+### commit-gate
+
+```bash
+vaultspec-core commit-gate [OPTIONS] [PATHS]...
+```
+
+The read-only check the generated pre-commit hook runs. It checks each staged vault
+document with the checkers that judge a document on its own, and blocks only on errors
+the commit introduces: an error the document's committed version already carries is
+printed as advisory and does not block. It also blocks staged per-machine files, such as
+the install manifest, snapshots, lock sentinels, and local vault caches. It never
+writes, and it never runs the whole-vault checks; `vaultspec-core vault check all`
+remains the corpus-wide gate for CI and explicit runs.
+
+#### Arguments
+
+- `PATHS` (optional) - Files to check, relative to the workspace root. The hook passes
+  the staged files; with none given, the staged files are read from git.
+
+#### Options
+
+- `--target DIR` (`-t`, default cwd) - Check a directory other than the current one.
+- `--json` (default off) - Output as JSON.
+
+Exit codes: `0` = nothing blocks, `1` = something blocks.
+
+#### Examples
+
+- **Check what is staged right now, the way the commit hook will**:
+
+  ```bash
+  vaultspec-core commit-gate
+  ```
+
+- **Check two documents explicitly and capture the result for a script**:
+
+  ```bash
+  vaultspec-core commit-gate .vault/adr/2026-02-04-auth-adr.md .vault/plan/2026-02-04-auth-plan.md --json
   ```
 
 ______________________________________________________________________
@@ -2165,8 +2214,8 @@ reported as warnings and are not modified.
 - `--target DIR` (`-t`, default cwd) - Diagnose a directory other than the current one.
 - `--json` (default off) - Emit the diagnosis as JSON.
 - `--gate-errors` (default off) - Exit `0` on warnings and fail (exit `2`) only on
-  errors. Intended for the pre-commit gate, where warning-level provider-mirror lag is
-  an expected steady state that must not block a commit.
+  errors. Intended for CI and other automation gates, where warning-level
+  provider-mirror lag is an expected steady state that must not fail the run.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 

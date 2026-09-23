@@ -15,7 +15,7 @@ from vaultspec_core.core.commands import (
     install_run,
     sync_provider,
 )
-from vaultspec_core.core.enums import InstallMode, PrecommitHook
+from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 
 
@@ -150,15 +150,16 @@ def test_precommit_collector_detects_states(tmp_path: Path) -> None:
     config_path.write_text(yaml.dump({"repos": []}, sort_keys=False), encoding="utf-8")
     assert collect_precommit_state(tmp_path) == PrecommitSignal.NO_HOOKS
 
-    # Only 1 of 2 canonical hooks -> INCOMPLETE
+    # Only a retired vaultspec hook -> INCOMPLETE (an older install awaiting
+    # convergence, not a stand-down)
     partial_config = {
         "repos": [
             {
                 "repo": "local",
                 "hooks": [
                     {
-                        "id": PrecommitHook.SPEC_CHECK.value,
-                        "entry": f"{CANONICAL_ENTRY_PREFIX} doctor",
+                        "id": "spec-check",
+                        "entry": f"{CANONICAL_ENTRY_PREFIX} spec doctor",
                     },
                 ],
             }
@@ -191,62 +192,6 @@ def test_precommit_collector_detects_states(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert collect_precommit_state(tmp_path) == PrecommitSignal.COMPLETE
-
-
-@pytest.mark.unit
-def test_provider_artifact_patterns_catch_known_files() -> None:
-    """PROVIDER_ARTIFACT_PATTERNS must match known provider artifact paths."""
-    from vaultspec_core.core.commands import PROVIDER_ARTIFACT_PATTERNS
-
-    # Paths that MUST be caught
-    must_catch = [
-        ".mcp.json",
-        "providers.lock",
-        "CLAUDE.md",
-        "GEMINI.md",
-        "AGENTS.md",
-        ".claude/rules/foo.md",
-        ".gemini/rules/bar.md",
-        ".codex/config.toml",
-        ".agents/workflows/test.md",
-        ".vaultspec/_snapshots/foo.json",
-    ]
-    # Paths that must NOT be caught
-    must_pass = [
-        "src/commands.py",
-        "tests/test_foo.py",
-        ".vault/adr/my-adr.md",
-        ".vaultspec/my-rule.md",
-        "pyproject.toml",
-    ]
-
-    for path in must_catch:
-        normalized = path.replace("\\", "/")
-        matched = False
-        for pattern in PROVIDER_ARTIFACT_PATTERNS:
-            if pattern.endswith("/"):
-                if normalized.startswith(pattern):
-                    matched = True
-                    break
-            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
-                matched = True
-                break
-        assert matched, f"Expected {path!r} to match a provider artifact pattern"
-
-    for path in must_pass:
-        normalized = path.replace("\\", "/")
-        matched = False
-        for pattern in PROVIDER_ARTIFACT_PATTERNS:
-            if pattern.endswith("/"):
-                if normalized.startswith(pattern):
-                    matched = True
-                    break
-            elif normalized == pattern or normalized.endswith(f"/{pattern}"):
-                matched = True
-                break
-        assert not matched, (
-            f"Expected {path!r} to NOT match any provider artifact pattern"
-        )
 
 
 @pytest.mark.unit
