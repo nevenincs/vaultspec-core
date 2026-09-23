@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -17,6 +17,7 @@ from vaultspec_core.config import reset_config
 from vaultspec_core.crossref import (
     CrossrefStatus,
     InvalidSourceError,
+    SweepOutcome,
     crossref_sweep,
 )
 from vaultspec_core.crossref._engine import _run, order_choice
@@ -84,8 +85,8 @@ def test_a_block_before_the_provider_reads_anything_stops_the_sweep(
             tmp_path, all_adrs=True, max_sources=50, environ=ENV, client=client
         )
 
-    assert len(sweep.outcomes) == 1
-    assert sweep.outcomes[0].reason is UnavailableReason.CONTENT_REJECTED
+    assert len(sweep.outcomes) == MAX_REFUSALS
+    assert {o.reason for o in sweep.outcomes} == {UnavailableReason.CONTENT_REJECTED}
     assert sweep.stopped == UnavailableReason.CONTENT_REJECTED.value
     assert sweep.next_after is None
     assert sweep.remaining == 7
@@ -109,9 +110,45 @@ def test_a_run_of_refused_adrs_stops_the_sweep(tmp_path: Path) -> None:
     assert statuses[:3] == [CrossrefStatus.OK] * 3
     assert statuses[3:] == [CrossrefStatus.UNAVAILABLE] * MAX_REFUSALS
     assert sweep.stopped == UnavailableReason.CONTENT_REJECTED.value
-    # The last refusal in the run was not counted as the ADR's own, so the
-    # next run starts at it.
-    assert sweep.next_after == f"2026-01-0{MAX_REFUSALS + 2}-refused-adr"
+    # No refusal in the run was confirmed as its ADR's own, so the cursor
+    # stays before the first of them and the next run retries them all.
+    assert sweep.next_after == "2026-01-03-declared-adr"
+
+
+def _sweep(tmp_path: Path, **selection: Any) -> SweepOutcome:
+    with ScriptedProvider(responder=(judge := Judge())) as provider:
+        client = JevClient(KEY, endpoint=provider.endpoint, max_concurrency=4)
+        sweep = crossref_sweep(tmp_path, environ=ENV, client=client, **selection)
+    judge.check()
+    return sweep
+
+
+def test_a_resume_that_lands_on_a_refused_adr_moves_past_it(tmp_path: Path) -> None:
+    _small_vault(tmp_path)
+    write_adr(tmp_path, "2026-01-04-refused-adr", implementation=BLOCKED)
+
+    first = _sweep(tmp_path, all_adrs=True, max_sources=4)
+    # The batch ended on the refusal, with no later source to confirm it.
+    assert first.next_after == "2026-01-03-declared-adr"
+    assert first.remaining == 5
+
+    second = _sweep(tmp_path, all_adrs=True, after=first.next_after, max_sources=50)
+
+    assert second.outcomes[0].reason is UnavailableReason.CONTENT_REJECTED
+    assert second.stopped is None
+    assert second.remaining == 0
+    assert second.next_after is None
+
+
+def test_a_refusal_at_the_end_of_the_selection_is_vouched_for(tmp_path: Path) -> None:
+    _small_vault(tmp_path)
+    write_adr(tmp_path, "2026-01-99-refused-adr", implementation=BLOCKED)
+
+    sweep = _sweep(tmp_path, all_adrs=True, max_sources=50)
+
+    assert sweep.outcomes[-1].reason is UnavailableReason.CONTENT_REJECTED
+    assert sweep.stopped is None
+    assert sweep.remaining == 0
 
 
 def test_a_sweep_needs_one_clear_selector(tmp_path: Path) -> None:
@@ -121,3 +158,7 @@ def test_a_sweep_needs_one_clear_selector(tmp_path: Path) -> None:
         crossref_sweep(tmp_path, environ=ENV)
     with pytest.raises(InvalidSourceError):
         crossref_sweep(tmp_path, [SOURCE], all_adrs=True, environ=ENV)
+    with pytest.raises(InvalidSourceError):
+        crossref_sweep(tmp_path, all_adrs=True, isolated=True, environ=ENV)
+    with pytest.raises(InvalidSourceError):
+        crossref_sweep(tmp_path, feature="#", environ=ENV)

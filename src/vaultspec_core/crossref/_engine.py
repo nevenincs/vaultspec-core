@@ -179,7 +179,12 @@ def _run[T](
         return []
     pool = ThreadPoolExecutor(max_workers=min(WORKERS, len(jobs)))
     futures = [pool.submit(job) for job in jobs]
-    done, _ = wait(futures, return_when=FIRST_EXCEPTION)
+    try:
+        done, _ = wait(futures, return_when=FIRST_EXCEPTION)
+    except BaseException:
+        # An interrupt while waiting: nothing queued may still be sent.
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
     failed = next((f for f in futures if f in done and f.exception()), None)
     if failed is not None:
         pool.shutdown(wait=True, cancel_futures=True)

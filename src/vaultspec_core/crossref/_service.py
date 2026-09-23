@@ -10,17 +10,19 @@ The service owns the decisions above the engine:
   hosted search resolves for ADRs.
 - **One deadline per source, one per sweep.** Every request for a source
   shares the source's deadline, which never runs past the sweep's.
-- **All or nothing per source.** A provider failure other than a content
-  rejection fails that source with its reason and no partial verdicts, and
-  stops a sweep there; sources already judged keep their outcomes and any
-  links already written.
+- **All or nothing per source.** A provider failure fails that source with
+  its reason and no partial verdicts. Any failure but a refusal stops a sweep
+  there; sources already judged keep their outcomes and any links already
+  written.
 - **Writes are narrow.** Applying writes a source's ``link`` verdicts that it
   does not already declare into its own ``related:``, once that source is
   judged, through the writer ``vault link add`` uses. Nothing is removed and
   no candidate is written to.
 - **Sweeps resume.** A sweep takes its sources in stem order, after an
-  optional cursor, up to its size; its outcome names the last source judged,
-  so the next run starts after it. No sweep state is stored.
+  optional cursor, up to its size; its outcome names the last source
+  processed, so the next run starts after it. A source the provider refuses
+  counts as processed only once a later source shows the provider reads; a
+  run of refusals stops the sweep before them. No sweep state is stored.
 """
 
 from __future__ import annotations
@@ -72,10 +74,9 @@ logger = logging.getLogger(__name__)
 _RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED})
 
 #: Failures that can belong to one ADR's text rather than to the provider or
-#: the key: a sweep records them and moves on, since retrying cannot change
-#: them. A content refusal counts as the ADR's own only once the provider has
-#: read something in this run; before that it may be an edge blocking every
-#: request, and the sweep stops instead.
+#: the key. A sweep holds such a refusal open and judges on: a later source the
+#: provider reads shows the refusal was the ADR's own, while a run of refusals
+#: looks like an edge blocking every request and stops the sweep before it.
 _PER_SOURCE = frozenset(
     {UnavailableReason.CONTENT_REJECTED, UnavailableReason.REQUEST_TOO_LARGE}
 )
@@ -256,6 +257,10 @@ def _selection(
         InvalidSourceError: If a named source is no ADR of this vault, or
             sources are named together with a filter.
     """
+    if feature is not None and not feature.strip("# "):
+        raise InvalidSourceError("a feature filter needs a feature name")
+    if every and (feature is not None or isolated):
+        raise InvalidSourceError("sweep all ADRs, or narrow by feature or isolation")
     if refs:
         if feature is not None or isolated or every:
             raise InvalidSourceError(
@@ -292,14 +297,17 @@ def crossref_sweep(
 
     With *refs* the sweep takes exactly those ADRs; otherwise every ADR that
     still governs (not superseded or rejected), narrowed to *feature* and, with
-    *isolated*, to ADRs that declare no ADR link. *all_adrs* takes every such
-    ADR unnarrowed; one of the selectors is required.
+    *isolated*, to ADRs that declare no ADR link; the two narrow together.
+    *all_adrs* takes every such ADR unnarrowed. Named ADRs and *all_adrs* each
+    stand alone, and one selector is required.
 
-    A source the provider refuses to read, or cannot fit in a request, fails
-    on its own and the sweep moves past it; any other failure stops the sweep
-    at the source that met it, so a resumed run retries that source. The
-    cursor always names the last source processed, so resuming never repeats
-    one that was judged or refused on its own text.
+    A source the provider refuses to read, or that cannot fit in a request, is
+    held open while the sweep judges on. When a later source is read, the
+    refusal was the ADR's own and the cursor moves past it; at the end of the
+    selection a provider that read something earlier vouches for it. Refusals
+    that reach the run limit, and any other failure, stop the sweep with the
+    cursor before the first refusal still open, so a resumed run retries them.
+    The cursor names the last source processed.
 
     Args:
         root: The workspace root.
@@ -359,7 +367,9 @@ def crossref_sweep(
     run_deadline = time.monotonic() + RUN_DEADLINE
     outcomes: list[CrossrefOutcome] = []
     processed = 0
-    refusals = 0
+    # Refused sources whose refusal is not yet known to be their own: a later
+    # source the provider reads confirms them, a run of them stops the sweep.
+    pending: list[str] = []
     provider_read = False
     stopped: str | None = None
     try:
@@ -372,22 +382,29 @@ def crossref_sweep(
                 root, active, record, index, deadline=deadline, apply=apply
             )
             outcomes.append(outcome)
-            usage = outcome.usage
-            provider_read = provider_read or (
-                usage is not None and usage.requests > usage.unscored
-            )
-            refusals = 0 if outcome.status is CrossrefStatus.OK else refusals + 1
-            own = (
-                outcome.reason in _PER_SOURCE
-                and provider_read
-                and refusals < MAX_REFUSALS
-            )
-            if outcome.status is CrossrefStatus.OK or own:
-                processed += 1
+            if outcome.status is CrossrefStatus.OK:
+                usage = outcome.usage
+                provider_read = provider_read or (
+                    usage is not None and usage.input_tokens > 0
+                )
+                processed += len(pending) + 1
+                pending = []
                 cursor = record.stem
                 continue
+            if outcome.reason in _PER_SOURCE:
+                pending.append(record.stem)
+                if len(pending) < MAX_REFUSALS:
+                    continue
             stopped = outcome.reason.value if outcome.reason else "unavailable"
             break
+        else:
+            # The batch ended on refusals. At the end of the selection no later
+            # source can confirm them, so a provider that read this sweep
+            # vouches for them; otherwise the next run retries them first.
+            if pending and len(taken) == len(selection) and provider_read:
+                processed += len(pending)
+                cursor = pending[-1]
+                pending = []
     finally:
         if owned:
             active.close()
