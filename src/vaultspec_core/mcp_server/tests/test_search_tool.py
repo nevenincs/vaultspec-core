@@ -15,14 +15,20 @@ tests and its deselected live test cover that path.
 
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from mcp import Client
 from mcp.types import CallToolResult
+from typer.testing import CliRunner
 
-from vaultspec_core.core.discovery_guidance import SEARCH_ADR
+from vaultspec_core.cli import app
+from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
+from vaultspec_core.core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
+from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.mcps_mode import render_launch_for_mode
 from vaultspec_core.core.windowing import apply_window
 from vaultspec_core.mcp_server.app import create_server
 from vaultspec_core.mcp_server.envelope import compact_result
@@ -40,12 +46,16 @@ from vaultspec_core.search import (
     SEARCHABLE_TYPES,
     CredentialSource,
     Excerpt,
+    NextStep,
+    NextStepKind,
     SearchHit,
     SearchOutcome,
     SearchStatus,
     SearchUsage,
+    SearchVerdict,
     UnavailableReason,
     hit_fields,
+    outcome_fields,
 )
 from vaultspec_core.search.tests.reply_budget import (
     DISCOVERY_BUDGET,
@@ -62,6 +72,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mcp.types import Tool
+
+#: The next step a workspace without rag resolves to for an unfiltered search.
+_LISTING = NextStep(
+    kind=NextStepKind.LISTING, types=tuple(SEARCHABLE_TYPES), command=LIST_VAULT
+)
 
 #: A stand-in credential. It never reaches the network: the only call made
 #: with it set is ``status``, which reads configuration and sends nothing.
@@ -243,8 +258,37 @@ async def test_an_unanswered_whole_page_says_so() -> None:
     payload = reply.structured_content
     assert payload is not None
     assert payload["answered"] is False
+    assert payload["verdict"] == SearchVerdict.NOTHING_ANSWERS.value
     assert payload["truncated"] is False
     assert _summary(reply) == "1 hit, not answered"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        _ranked([_hit(excerpt=_excerpt("The answer."))], unscored=1),
+        SearchOutcome(
+            status=SearchStatus.NOT_CONFIGURED, query="q", next_step=_LISTING
+        ),
+        SearchOutcome(
+            status=SearchStatus.UNAVAILABLE,
+            query="q",
+            reason=UnavailableReason.DEADLINE,
+            usage=SearchUsage("jev-1.13.0", 3, 900, 25_000, 0),
+            next_step=_LISTING,
+        ),
+    ],
+    ids=["ok", "not-configured", "unavailable"],
+)
+async def test_the_wire_is_the_search_packages_one_projection(
+    outcome: SearchOutcome,
+) -> None:
+    # The CLI's --json data is this same projection, so the two surfaces carry
+    # the same keys and values for every outcome.
+    reply = await _reply(outcome)
+
+    assert reply.structured_content == json.loads(json.dumps(outcome_fields(outcome)))
 
 
 @pytest.mark.unit
@@ -258,20 +302,28 @@ async def test_the_summary_counts_records_left_unscored() -> None:
 
 
 @pytest.mark.unit
-async def test_not_configured_names_the_variable_and_the_rag_fallback() -> None:
-    outcome = SearchOutcome(status=SearchStatus.NOT_CONFIGURED, query="q")
+async def test_not_configured_names_the_variable_and_the_next_step() -> None:
+    outcome = SearchOutcome(
+        status=SearchStatus.NOT_CONFIGURED, query="q", next_step=_LISTING
+    )
 
     reply = await _reply(outcome)
 
     payload = reply.structured_content
     assert payload is not None
     assert payload["status"] == SearchStatus.NOT_CONFIGURED.value
+    assert payload["answered"] is False
     assert payload["hits"] == []
+    assert payload["next_step"] == {
+        "kind": NextStepKind.LISTING.value,
+        "types": sorted(SEARCHABLE_TYPES),
+        "command": LIST_VAULT,
+    }
     remediation = payload["remediation"]
     assert CREDENTIAL_VARIABLE in remediation
-    assert SEARCH_ADR in remediation
-    # Nothing ranked and nothing sent: no window and no usage to report.
-    for absent in ("returned", "total", "truncated", "usage", "reason"):
+    assert f"`{LIST_VAULT}`" in remediation
+    # Nothing ranked and nothing sent: no window, verdict or usage to report.
+    for absent in ("returned", "total", "truncated", "usage", "reason", "verdict"):
         assert absent not in payload, absent
     assert _summary(reply) == "not configured"
 
@@ -281,7 +333,9 @@ async def test_not_configured_names_the_variable_and_the_rag_fallback() -> None:
 async def test_unavailable_reports_its_reason_and_a_next_step(
     reason: UnavailableReason,
 ) -> None:
-    outcome = SearchOutcome(status=SearchStatus.UNAVAILABLE, query="q", reason=reason)
+    outcome = SearchOutcome(
+        status=SearchStatus.UNAVAILABLE, query="q", reason=reason, next_step=_LISTING
+    )
 
     reply = await _reply(outcome)
 
@@ -289,7 +343,8 @@ async def test_unavailable_reports_its_reason_and_a_next_step(
     assert payload is not None
     assert payload["status"] == SearchStatus.UNAVAILABLE.value
     assert payload["reason"] == reason.value
-    assert SEARCH_ADR in payload["remediation"]
+    assert payload["next_step"]["kind"] == NextStepKind.LISTING.value
+    assert f"`{LIST_VAULT}`" in payload["remediation"]
     assert payload["hits"] == []
     assert _summary(reply) == f"unavailable: {reason.value}"
 
@@ -387,7 +442,7 @@ async def test_the_output_schema_describes_the_domain_shapes_leanly(
     assert schema is not None
 
     definitions = schema["$defs"]
-    for shape in (Excerpt, SearchUsage):
+    for shape in (Excerpt, SearchUsage, NextStep):
         definition = definitions[shape.__name__]
         fields = list(shape.__dataclass_fields__)
         # Every field is always serialised, so every field is required, and
@@ -399,6 +454,14 @@ async def test_the_output_schema_describes_the_domain_shapes_leanly(
             assert "title" not in prop
             assert "default" not in prop
     assert definitions["SearchUsage"]["properties"]["elapsed_ms"]["type"] == "integer"
+    # An enum field of a shape ships as its values, with no definition of its own.
+    assert definitions["NextStep"]["properties"]["kind"] == {
+        "enum": [kind.value for kind in NextStepKind],
+        "type": "string",
+    }
+    assert NextStepKind.__name__ not in definitions
+    # A result is never input, so none of its properties carries a default.
+    assert all("default" not in prop for prop in schema["properties"].values())
 
 
 @pytest.mark.unit
@@ -427,26 +490,64 @@ async def test_find_and_search_share_one_declaration_of_each_filter(
 # ---------------------------------------------------------------------------
 
 
+_QUESTION = "Why does discovery stop at 4,000 tokens?"
+
+
+def _cli_search_data(project: Path, *args: str) -> dict[str, Any]:
+    """Run ``vault search --json`` on *project* without a key; return its data."""
+    runner = CliRunner(env={CREDENTIAL_VARIABLE: ""})
+    result = runner.invoke(
+        app, ["-t", str(project), "vault", "search", _QUESTION, *args, "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    return json.loads(result.stdout)["data"]
+
+
+def _provision_rag(project: Path) -> None:
+    """Add the ``.mcp.json`` entry core renders for a tool-mode rag."""
+    mcp_json = project / ".mcp.json"
+    config = json.loads(mcp_json.read_text(encoding="utf-8"))
+    command, args = render_launch_for_mode(
+        InstallMode.TOOL,
+        RAG_DISTRIBUTION_NAME,
+        "vaultspec_rag.server",
+        tool_spec=f"{RAG_DISTRIBUTION_NAME}[mcp]",
+    )
+    config["mcpServers"][RAG_DISTRIBUTION_NAME] = {"command": command, "args": args}
+    mcp_json.write_text(json.dumps(config), encoding="utf-8")
+
+
 async def _drive_without_a_key(project: Path) -> None:
     environ = {k: v for k, v in os.environ.items() if k != CREDENTIAL_VARIABLE}
     async with stdio_session(project, environ=environ) as session:
         await session.initialize()
 
-        payload = data_of(
-            await session.call_tool(
-                "search", {"query": "Why does discovery stop at 4,000 tokens?"}
-            )
-        )
+        payload = data_of(await session.call_tool("search", {"query": _QUESTION}))
         assert payload["status"] == SearchStatus.NOT_CONFIGURED.value
+        assert payload["answered"] is False
         assert payload["hits"] == []
         # Usage is reported whenever a request was made; its absence is the
         # service's statement that nothing was sent.
         assert "usage" not in payload
         assert CREDENTIAL_VARIABLE in payload["remediation"]
-        assert SEARCH_ADR in payload["remediation"]
+        assert payload["next_step"]["kind"] == NextStepKind.LISTING.value
+        # The CLI renders the same backend result under the same keys.
+        assert payload == _cli_search_data(project)
 
+        _provision_rag(project)
+        payload = data_of(
+            await session.call_tool("search", {"query": _QUESTION, "type": ["adr"]})
+        )
+        assert payload["next_step"] == {
+            "kind": NextStepKind.RAG_SEARCH.value,
+            "types": ["adr"],
+            "command": f"{RAG_VAULT_SEARCH} --doc-type adr",
+        }
+        assert payload == _cli_search_data(project, "--type", "adr")
+
+        # The configuration record itself, as ``status --json`` carries it.
         status = data_of(await session.call_tool("status", {}))
-        assert status["hosted_search"] == {"configured": False}
+        assert status["hosted_search"] == {"configured": False, "source": None}
 
 
 async def _drive_with_a_key(project: Path) -> None:

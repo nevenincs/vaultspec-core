@@ -2,9 +2,11 @@
 
 A thin wrapper over :func:`vaultspec_core.search.search_vault`, the same
 service the ``vault search`` CLI verb calls, so both surfaces rank the same
-records and quote the same passages. No ranking, credential or remediation
-logic is authored here: this layer only projects a
-:class:`~vaultspec_core.search.SearchOutcome` onto the wire.
+records and quote the same passages. No ranking, credential, validation,
+verdict or next-step logic is authored here: the result is the search
+package's one projection of a :class:`~vaultspec_core.search.SearchOutcome`,
+the same fields ``vault search --json`` carries, declared as a model so the
+tool publishes its output schema.
 
 The search package bounds every excerpt, title and section in encoded bytes
 before this layer sees them, marks each excerpt it cut, and projects each hit
@@ -36,16 +38,16 @@ from ...search import (
     DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
-    SEARCHABLE_TYPES,
+    SEARCHABLE_TYPE_NAMES,
     Excerpt,
     InvalidQueryError,
+    NextStep,
     SearchStatus,
     SearchUsage,
-    hit_fields,
-    remediation,
+    outcome_fields,
     search_vault,
 )
-from ..envelope import LeanModel, LeanShape, compact_result
+from ..envelope import LeanResult, LeanShape, compact_result
 from ..filters import DateFilter, FeatureFilter, TypeFilter
 from ..isolation import isolated_context as _isolated_context
 
@@ -53,7 +55,6 @@ if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
 
     from ...search import SearchOutcome
-    from ...vaultcore.models import DocType
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +75,11 @@ _Limit = Annotated[int, Field(ge=1, le=MAX_RESULTS)]
 #: search covers by default stated from the search package's own set.
 _SearchTypes = Annotated[
     TypeFilter,
-    Field(description=f"Default: {', '.join(sorted(SEARCHABLE_TYPES))}."),
+    Field(description=f"Default: {SEARCHABLE_TYPE_NAMES}."),
 ]
 
 
-class SearchHitRow(LeanModel):
+class SearchHitRow(LeanResult):
     """One ranked record, as :func:`~vaultspec_core.search.hit_fields` projects it.
 
     The record's name is its path's stem, so it is not carried twice. No
@@ -114,7 +115,7 @@ class SearchHitRow(LeanModel):
     supporting: Annotated[Excerpt, LeanShape()] | None = None
 
 
-class SearchResult(LeanModel):
+class SearchResult(LeanResult):
     """The whole-call result of a ``search`` invocation.
 
     The query is not echoed: the caller sent it, and an echo of up to the
@@ -122,25 +123,28 @@ class SearchResult(LeanModel):
 
     Attributes:
         status: ``ok``, ``not_configured`` or ``unavailable``.
-        answered: Whether any record was judged to answer the query; a
-            verdict on the whole vault only when ``usage.unscored`` is zero.
+        answered: Whether any record was judged to answer the query.
+        verdict: What a ranked page says about the vault (``ok`` only).
         hits: The ranked page, best first.
         returned: Hits on this page (``ok`` only).
         total: Hits the ranking held before the page cap (``ok`` only).
         truncated: Whether the ranking held more than this page (``ok``
             only); raising ``limit`` reaches them.
         reason: Why a configured search failed (``unavailable`` only).
-        remediation: The next step when no ranking was produced.
+        next_step: The search to run instead when no ranking was produced.
+        remediation: The reason and the next step, as one sentence.
         usage: Cost and diagnostics; absent when nothing was sent.
     """
 
     status: str
     answered: bool
+    verdict: str | None = None
     hits: list[SearchHitRow] = Field(default_factory=list)
     returned: int | None = None
     total: int | None = None
     truncated: bool | None = None
     reason: str | None = None
+    next_step: Annotated[NextStep, LeanShape()] | None = None
     remediation: str | None = None
     usage: Annotated[SearchUsage, LeanShape()] | None = None
 
@@ -153,22 +157,10 @@ def search_result(outcome: SearchOutcome) -> SearchResult:
             returned.
 
     Returns:
-        The tool result: the hits with their bounded excerpts, the window
-        fields for a ranked page, and the next step for an outcome without
-        one.
+        The tool result, validated from
+        :func:`~vaultspec_core.search.outcome_fields`.
     """
-    window = outcome.window.as_fields() if outcome.window is not None else {}
-    return SearchResult.model_validate(
-        {
-            "status": outcome.status.value,
-            "answered": outcome.answered,
-            "hits": [hit_fields(hit) for hit in outcome.hits],
-            **window,
-            "reason": outcome.reason.value if outcome.reason is not None else None,
-            "remediation": remediation(outcome),
-            "usage": outcome.usage,
-        }
-    )
+    return SearchResult.model_validate(outcome_fields(outcome))
 
 
 def _search_summary(payload: object) -> str:
@@ -194,28 +186,6 @@ def _search_summary(payload: object) -> str:
     if payload.usage is not None and payload.usage.unscored:
         summary += f", {payload.usage.unscored} unscored"
     return summary
-
-
-def _refuse_unsearchable(types: list[DocType] | None) -> None:
-    """Refuse record types search never ranks, rather than answer from none.
-
-    An unsearchable type would otherwise filter every record out and come
-    back as an ``ok`` page that reads as "nothing in the vault answers this".
-
-    Args:
-        types: The requested record types, or ``None`` for all of them.
-
-    Raises:
-        ToolError: When a requested type is not searchable.
-    """
-    refused = sorted(t.value for t in types or () if t not in SEARCHABLE_TYPES)
-    if refused:
-        searchable = ", ".join(sorted(SEARCHABLE_TYPES))
-        msg = (
-            f"search does not rank {', '.join(refused)} records; "
-            f"choose from {searchable}"
-        )
-        raise ToolError(msg)
 
 
 def register_search_tools(mcp: MCPServer[None]) -> None:
@@ -251,22 +221,18 @@ def register_search_tools(mcp: MCPServer[None]) -> None:
         Ranks records against a natural-language ``query``, best first. Each
         hit quotes its answering block verbatim with its file lines and
         ``blob_hash``; ``truncated`` marks a block cut at ``line_end``.
-        ``answered``: whether a record read states the answer;
-        ``usage.unscored``: records not read in full.
-        ``premise_conflict`` is the probability a record contradicts the
-        question's premise. ``not_configured`` (no TypeSafe key, nothing
-        sent) and ``unavailable`` carry a ``remediation`` naming the fallback.
-        With a key set, vault text is sent to the TypeSafe API.
+        ``verdict`` says whether the records read answer; ``premise_conflict``
+        is the probability a record contradicts the question. When search
+        declines (``not_configured``: no TypeSafe key, nothing sent) or fails
+        (``unavailable``), run ``next_step.command`` instead. With a key set,
+        vault text is sent to the TypeSafe API.
 
         Args:
             ctx: The MCP request context (unused).
             query: The question, in plain language.
-            type: Every searchable type when omitted; ``index`` is never
-                searched.
             limit: Hits to return.
         """
         _ = ctx
-        _refuse_unsearchable(type)
         root_dir = _get_ctx().target_dir
         logger.info(
             "search: %d chars type=%r feature=%r date=%r limit=%s",

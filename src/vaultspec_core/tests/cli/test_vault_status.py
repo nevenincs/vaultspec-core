@@ -26,6 +26,10 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.core.diagnosis.collectors_companion import (
+    RAG_DISTRIBUTION_NAME,
+    CompanionSignal,
+)
 from vaultspec_core.search import CREDENTIAL_VARIABLE
 
 if TYPE_CHECKING:
@@ -1056,3 +1060,19 @@ class TestHostedSearchRow:
             "source": "environment",
         }
         assert self._KEY not in result.output
+
+    def test_json_reports_the_companion_as_the_workspace_provisions_it(
+        self, tmp_path: Path
+    ) -> None:
+        _build_vault(tmp_path)
+
+        absent = json.loads(self._run_with_key(tmp_path, "", "--json").stdout)
+        servers = {RAG_DISTRIBUTION_NAME: {"command": "uvx", "args": []}}
+        (tmp_path / ".mcp.json").write_text(
+            json.dumps({"mcpServers": servers}), encoding="utf-8"
+        )
+        provisioned = json.loads(self._run_with_key(tmp_path, "", "--json").stdout)
+
+        assert absent["data"]["companion"]["signal"] == CompanionSignal.ABSENT
+        assert provisioned["data"]["companion"]["package"] == RAG_DISTRIBUTION_NAME
+        assert provisioned["data"]["companion"]["signal"] != CompanionSignal.ABSENT

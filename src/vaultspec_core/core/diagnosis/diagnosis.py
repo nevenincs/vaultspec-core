@@ -392,24 +392,6 @@ def _safe_mode_mismatch_state(
         return ModeMismatchSignal.CLEAN
 
 
-def _safe_companion_capability(target: Path) -> CompanionCapability | None:
-    """Probe the semantic-search companion's provisioning state.
-
-    Returns ``None`` only when the probe itself fails, which is distinct from
-    the companion being absent - absence is a reported state, not a missing
-    answer. The probe is a total local function over two file reads, so this
-    guard should never fire; it exists so a diagnosis surface can never be
-    taken down by the newest collector on it.
-    """
-    from .collectors_companion import collect_companion_capability
-
-    try:
-        return collect_companion_capability(target)
-    except Exception:
-        logger.warning("Companion capability probe failed", exc_info=True)
-        return None
-
-
 def _safe_version_floor_state(
     target: Path, *, package: str | None = None
 ) -> tuple[VersionFloorSignal, str, str]:
@@ -571,9 +553,10 @@ def _collect_layer1_diagnosis(
     )
 
     from ..home import diagnose_process_registry
+    from .collectors_companion import probe_companion
 
     process_registry = diagnose_process_registry(core_home)
-    companion = _safe_companion_capability(target) if scope == "full" else None
+    companion = probe_companion(target) if scope == "full" else None
     return WorkspaceDiagnosis(
         framework=_safe_framework_presence(target),
         gitignore=_safe_gitignore_state(target),

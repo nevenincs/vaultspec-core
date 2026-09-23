@@ -57,6 +57,7 @@ if TYPE_CHECKING:
 __all__ = [
     "LeanEnum",
     "LeanModel",
+    "LeanResult",
     "LeanShape",
     "compact_result",
     "describe",
@@ -166,6 +167,38 @@ class LeanModel(BaseModel):
         return produced
 
 
+class LeanResult(LeanModel):
+    """Base for a model that is only ever a tool's result, never its input.
+
+    A property default describes what a caller may leave out of a request,
+    and a result is never a request: the wire either carries the key or, for
+    an optional key, omits it. So a result model's schema drops every
+    property default, as :class:`LeanShape` does for a dataclass. An input
+    model keeps :class:`LeanModel`, whose defaults tell the caller what it
+    may omit.
+    """
+
+    @override
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: Any, handler: GetJsonSchemaHandler
+    ) -> dict[str, Any]:
+        """Render this model's schema lean and without property defaults.
+
+        Args:
+            core_schema: The pydantic-core schema for this model.
+            handler: The next handler in the generation chain.
+
+        Returns:
+            The pruned schema fragment.
+        """
+        produced = super().__get_pydantic_json_schema__(core_schema, handler)
+        properties = cast("dict[str, Any]", produced.get("properties", {}))
+        for prop in properties.values():
+            prop.pop("default", None)
+        return produced
+
+
 class LeanEnum:
     """``Annotated`` marker that ships an enum as its values alone.
 
@@ -209,6 +242,8 @@ class LeanShape:
 
     Every property is also marked required and loses its default: a dataclass
     serialises every field, so a default describes input the wire never takes.
+    An enum-typed field is inlined as its values, as :class:`LeanEnum` would
+    ship it: the dataclass's own annotation cannot carry that marker.
     """
 
     def __get_pydantic_json_schema__(
@@ -227,10 +262,34 @@ class LeanShape:
         definition = handler.resolve_ref_schema(reference)
         _lean_object(definition)
         properties = cast("dict[str, Any]", definition.get("properties", {}))
-        for prop in properties.values():
+        for name, prop in properties.items():
             prop.pop("default", None)
+            properties[name] = _inline_enums(prop, handler)
         definition["required"] = list(properties)
         return reference
+
+
+def _inline_enums(node: Any, handler: GetJsonSchemaHandler) -> Any:
+    """Replace each reference to an enum definition with the enum's values.
+
+    Args:
+        node: A property's schema fragment.
+        handler: The handler that resolves the fragment's references.
+
+    Returns:
+        The fragment with every enum inlined as ``enum`` and ``type`` alone.
+    """
+    if isinstance(node, list):
+        return [_inline_enums(item, handler) for item in cast("list[Any]", node)]
+    if not isinstance(node, dict):
+        return node
+    fragment = cast("dict[str, Any]", node)
+    if "$ref" in fragment:
+        target = handler.resolve_ref_schema(fragment)
+        if "enum" in target:
+            return {key: target[key] for key in ("enum", "type") if key in target}
+        return fragment
+    return {key: _inline_enums(value, handler) for key, value in fragment.items()}
 
 
 def _lean_object(schema: dict[str, Any]) -> None:

@@ -13,7 +13,7 @@ related:
   - '[[2026-09-23-typesafe-search-audit]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:d91e1d849c8dbb0b539f68ccb87e3f2a1c1217cc14f4962fbb6fcaa1f574e0e7'
+body_hash: 'sha256:9b04804278e121480f9a5992686a29fc66ee4e0884f6757d108a10fe89d0e9e2'
 ---
 
 # `discovery-fallback` plan
@@ -48,7 +48,7 @@ No new costly decision is involved beyond the amendment.
 
 ## Steps
 
-- [ ] `S01` - Resolve the search degradation next step in the backend from companion detection and the requested record types, render the CLI and MCP search and status surfaces from one backend result with identical fields (fixing the answered drift), move search and status decision logic out of cli/ and mcp_server/, and test it; `src/vaultspec_core/search/, src/vaultspec_core/core/diagnosis/, src/vaultspec_core/cli/vault_search_cmd.py, src/vaultspec_core/cli/status_cmd.py, src/vaultspec_core/mcp_server/tools/search.py, src/vaultspec_core/mcp_server/tools/orientation.py`.
+- [x] `S01` - Resolve the search degradation next step in the backend from companion detection and the requested record types, render the CLI and MCP search and status surfaces from one backend result with identical fields (fixing the answered drift), move search and status decision logic out of cli/ and mcp_server/, and test it; `src/vaultspec_core/search/, src/vaultspec_core/core/diagnosis/, src/vaultspec_core/cli/vault_search_cmd.py, src/vaultspec_core/cli/status_cmd.py, src/vaultspec_core/mcp_server/tools/search.py, src/vaultspec_core/mcp_server/tools/orientation.py`.
 - [ ] `S02` - Replace the status-gated routing constant with state-free wording and update the builtins-sync guard tests; `src/vaultspec_core/core/discovery_guidance.py, src/vaultspec_core/tests/test_discovery_guidance.py`.
 - [ ] `S03` - Fix the reference generator inputs so the bundled CLI reference and docs/CLI.md list the real hit fields and render the vault search options table, then regenerate; `src/vaultspec_core/cli/reference_gen.py, src/vaultspec_core/builtins/reference/cli.md, docs/CLI.md`.
 - [ ] `S04` - Rewrite the bundled discovery guidance with single-home routing, search output handling, the unavailable branch and a degraded-mode grep carve-out, add a coverage-check method to the ADR skill and code-reviewer, then sync; `src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md, src/vaultspec_core/builtins/skills/vaultspec-code-research/, src/vaultspec_core/builtins/skills/vaultspec-curate/, src/vaultspec_core/builtins/skills/vaultspec-adr/, src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md, src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.

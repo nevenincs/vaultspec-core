@@ -28,12 +28,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, cast
 
+from ..enums import InstallMode
 from .collectors_mode import observed_mcp_mode
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from ..enums import InstallMode
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +228,6 @@ def _entry_shape_mode(target: Path, package: str) -> InstallMode | None:
         The inferred mode, or ``None`` when there is no entry or its command
         token is neither launcher.
     """
-    from ..enums import InstallMode
     from .collectors_config import read_mcp_servers
 
     servers = read_mcp_servers(target / ".mcp.json")
@@ -303,3 +301,26 @@ def collect_companion_capability(
         floor=floor,
         health_authority=health_authority,
     )
+
+
+def probe_companion(target: Path) -> CompanionCapability | None:
+    """Probe the semantic-search companion for a surface that must not fail.
+
+    Returns ``None`` only when the probe itself fails, which is distinct from
+    the companion being absent - absence is a reported state, not a missing
+    answer. The probe is a total local function over two file reads, so this
+    guard should never fire; it exists so no surface that reports the
+    companion - diagnosis, orientation, a declined search - can be taken down
+    by it.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The observed capability, or ``None`` when the probe failed.
+    """
+    try:
+        return collect_companion_capability(target)
+    except Exception:
+        logger.warning("Companion capability probe failed", exc_info=True)
+        return None

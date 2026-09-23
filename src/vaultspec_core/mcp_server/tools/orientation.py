@@ -15,7 +15,7 @@ output through typed Pydantic return models.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
@@ -24,14 +24,13 @@ from pydantic import Field
 
 from ... import __version__
 from ...core.types import get_context as _get_ctx
-from ...search import hosted_search_config
-from ..envelope import LeanModel, compact_result
+from ...search import HostedSearchConfig, hosted_search_config
+from ..envelope import LeanResult, LeanShape, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
 
-    from ...search import HostedSearchConfig
     from ...vaultcore.checks import CheckResult
     from ...vaultcore.orientation import GroundingTrace, Rollup
 
@@ -45,7 +44,7 @@ __all__ = ["register_orientation_tools"]
 # ---------------------------------------------------------------------------
 
 
-class FeatureStatus(LeanModel):
+class FeatureStatus(LeanResult):
     """One active feature in the project-wide orientation view.
 
     Attributes:
@@ -70,7 +69,7 @@ class FeatureStatus(LeanModel):
     plan_completion_percent: float = 0.0
 
 
-class PlanProgressLine(LeanModel):
+class PlanProgressLine(LeanResult):
     """A plan in flight, pre-shaped for the orientation view.
 
     Attributes:
@@ -94,7 +93,7 @@ class PlanProgressLine(LeanModel):
     next_open_step: str | None
 
 
-class StepTraceLine(LeanModel):
+class StepTraceLine(LeanResult):
     """One plan step mapped to its execution record in a trace.
 
     Attributes:
@@ -115,7 +114,7 @@ class StepTraceLine(LeanModel):
     verify: str | None = None
 
 
-class PlanTraceLine(LeanModel):
+class PlanTraceLine(LeanResult):
     """The grounding trace for a single plan.
 
     Attributes:
@@ -148,22 +147,7 @@ class PlanTraceLine(LeanModel):
     error: str | None = None
 
 
-class HostedSearchStatus(LeanModel):
-    """Whether hosted vault search can run, as the rollup reports it.
-
-    The wire projection of :class:`~vaultspec_core.search.HostedSearchConfig`,
-    which never carries the key either.
-
-    Attributes:
-        configured: Whether a hosted-search key is configured.
-        source: Where the key was found, when configured.
-    """
-
-    configured: bool
-    source: str | None = None
-
-
-class StatusResult(LeanModel):
+class StatusResult(LeanResult):
     """The whole-call result of a ``status`` invocation.
 
     Carries no blob hashes: orientation is hash-free, and the read-then-edit
@@ -198,7 +182,7 @@ class StatusResult(LeanModel):
     target: str | None = None
     trace_kind: str | None = None
     plans: list[PlanTraceLine] = Field(default_factory=list)
-    hosted_search: HostedSearchStatus | None = None
+    hosted_search: Annotated[HostedSearchConfig, LeanShape()] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +190,7 @@ class StatusResult(LeanModel):
 # ---------------------------------------------------------------------------
 
 
-class CheckFinding(LeanModel):
+class CheckFinding(LeanResult):
     """One finding from a vault health check.
 
     Attributes:
@@ -225,7 +209,7 @@ class CheckFinding(LeanModel):
     fixable: bool
 
 
-class CheckReportLine(LeanModel):
+class CheckReportLine(LeanResult):
     """The per-checker summary line.
 
     Attributes:
@@ -245,7 +229,7 @@ class CheckReportLine(LeanModel):
     clean: bool
 
 
-class CheckResultModel(LeanModel):
+class CheckResultModel(LeanResult):
     """The whole-call result of a ``check`` invocation.
 
     Attributes:
@@ -286,40 +270,43 @@ class CheckResultModel(LeanModel):
 def _rollup_to_result(
     rollup: Rollup, hosted_search: HostedSearchConfig
 ) -> StatusResult:
-    """Adapt a :class:`Rollup` into the ``status`` rollup result."""
+    """Adapt a :class:`Rollup` into the ``status`` rollup result.
+
+    ``hosted_search`` is the search package's configuration record itself,
+    the one ``vaultspec-core status --json`` carries under the same key.
+    """
+    features = [
+        FeatureStatus(
+            name=f.name,
+            doc_count=f.doc_count,
+            latest_activity=f.latest_activity,
+            has_plan=f.has_plan,
+            status=_lifecycle_status(f),
+            plan_tier=f.plan_tier,
+            plan_completion_percent=f.plan_completion_percent,
+        )
+        for f in rollup.active_features
+    ]
+    plans = [
+        PlanProgressLine(
+            stem=p.stem,
+            feature=p.feature,
+            tier=p.tier,
+            open_steps=p.open_steps,
+            closed_steps=p.closed_steps,
+            total_steps=p.total_steps,
+            completion_percent=p.completion_percent,
+            next_open_step=p.next_open_step,
+        )
+        for p in rollup.plans_in_flight
+    ]
     return StatusResult(
         tool_schema_version=__version__,
         kind="rollup",
-        hosted_search=HostedSearchStatus(
-            configured=hosted_search.configured,
-            source=hosted_search.source.value if hosted_search.source else None,
-        ),
+        hosted_search=hosted_search,
         features_total=rollup.active_features_total,
-        features=[
-            FeatureStatus(
-                name=f.name,
-                doc_count=f.doc_count,
-                latest_activity=f.latest_activity,
-                has_plan=f.has_plan,
-                status=_lifecycle_status(f),
-                plan_tier=f.plan_tier,
-                plan_completion_percent=f.plan_completion_percent,
-            )
-            for f in rollup.active_features
-        ],
-        plans_in_flight=[
-            PlanProgressLine(
-                stem=p.stem,
-                feature=p.feature,
-                tier=p.tier,
-                open_steps=p.open_steps,
-                closed_steps=p.closed_steps,
-                total_steps=p.total_steps,
-                completion_percent=p.completion_percent,
-                next_open_step=p.next_open_step,
-            )
-            for p in rollup.plans_in_flight
-        ],
+        features=features,
+        plans_in_flight=plans,
         totals=dict(rollup.totals),
     )
 
@@ -521,12 +508,12 @@ def register_orientation_tools(
         """Orient in a vaultspec project, project-wide or targeted.
 
         With no ``target``, returns the project rollup: active features with
-        their lifecycle status, plans in flight with tier and completion and
-        the next open step, the vault totals, whether ``search`` has a key
-        configured, and the tool-schema version. With a ``target`` (a feature
-        tag or a plan stem/path), returns the grounding trace for the
-        matching plan(s): each step mapped to its execution record, the
-        grounding documents, and the completion facts. Returns no blob hashes.
+        their lifecycle status, plans in flight with tier, completion and next
+        open step, vault totals, whether ``search`` has a key configured, and
+        the tool-schema version. With a ``target`` (a feature tag or plan
+        stem/path), returns the matching plans' grounding trace: each step's
+        execution record, the grounding documents, and completion. Returns no
+        blob hashes.
 
         Args:
             ctx: The MCP request context (unused; logging routes through the

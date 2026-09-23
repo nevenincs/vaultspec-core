@@ -376,7 +376,11 @@ target-version = "py313"
     # Pydantic resolves a model's annotations when the class is created, so a
     # type used only in a field annotation is still needed at RUNTIME. Without
     # this, TC001 tells you to defer an import the model then cannot resolve.
-    runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+    runtime-evaluated-base-classes = [
+        "pydantic.BaseModel",
+        "vaultspec_core.mcp_server.envelope.LeanModel",
+        "vaultspec_core.mcp_server.envelope.LeanResult",
+    ]
 
 [tool.ty.environment]
 python-version = "3.13"

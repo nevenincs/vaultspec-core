@@ -71,7 +71,13 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: to keep. Measured 23,895 before the fix and 26,375 after (+2,480): invoke
 #: +711, find +572, log +392, search +167, discover +139, plan_edit +130,
 #: status +123, plan_progress +118, create +66, edit +62. Margin of 5.
-MAX_TOOL_DEFINITION_CHARS = 26_380
+#:
+#: Lowered from 26,380 when ``search`` gained its typed ``next_step`` and
+#: ``verdict``: the result models of ``search``, ``status`` and ``check``
+#: stopped shipping property defaults, which describe input a result never
+#: takes, and enum fields of dataclass shapes ship as their values alone.
+#: Measured 26,375 before and 26,289 after (-86). Margin of 6.
+MAX_TOOL_DEFINITION_CHARS = 26_295
 
 #: Aggregate ceiling for the read-only surface (five tools), same rules.
 #: Measured at 9,194 chars. Raised from 9,500 by the same three changes, which
@@ -79,8 +85,9 @@ MAX_TOOL_DEFINITION_CHARS = 26_380
 #: before and 13,100 after (+3,654), with a margin of 50. Raised again from
 #: 13,150 by the restored parameter documentation above: measured 13,142
 #: before and 14,143 after (+1,001: find, search, discover and status), with
-#: a margin of 8.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 14_151
+#: a margin of 8. Lowered from 14,151 by the same change as the full
+#: surface: measured 14,143 before and 14,057 after (-86), margin of 8.
+MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 14_065
 
 # Maximum number of tools: the tiered surface is nine hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.

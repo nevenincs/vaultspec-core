@@ -19,8 +19,10 @@ from vaultspec_core.search import (
     MAX_QUERY_CHARS,
     MAX_RESULTS,
     InvalidQueryError,
+    NextStepKind,
     SearchStatus,
     UnavailableReason,
+    UnsearchableTypeError,
 )
 from vaultspec_core.search._corpus import SECTION_BYTES, TITLE_BYTES
 from vaultspec_core.search._credential import CREDENTIAL_VARIABLE
@@ -443,6 +445,17 @@ class TestNotConfigured:
         assert outcome.usage is None
         assert provider.received == []
 
+    def test_the_next_step_covers_the_requested_types(self, tmp_path: Path) -> None:
+        cache_vault(tmp_path)
+
+        outcome = search_vault(
+            tmp_path, QUERY, doc_types=["research", DocType.ADR], environ={}
+        )
+
+        assert outcome.next_step is not None
+        assert outcome.next_step.kind is NextStepKind.LISTING
+        assert outcome.next_step.types == (DocType.ADR, DocType.RESEARCH)
+
 
 class TestUnavailable:
     @pytest.mark.parametrize(
@@ -505,6 +518,7 @@ class TestUnavailable:
         assert outcome.status is SearchStatus.UNAVAILABLE
         assert outcome.reason is UnavailableReason.CREDENTIAL_REJECTED
         assert outcome.usage is None
+        assert outcome.next_step is not None
 
 
 class TestContentRejection:
@@ -790,3 +804,12 @@ class TestQuery:
     ) -> None:
         with pytest.raises(InvalidQueryError, match=str(MAX_QUERY_CHARS)):
             search_vault(tmp_path, "q" * (MAX_QUERY_CHARS + 1), environ=ENV)
+
+    @pytest.mark.parametrize("environ", [ENV, {}], ids=["configured", "no-key"])
+    def test_an_unsearchable_type_is_refused_whether_or_not_a_key_is_set(
+        self, tmp_path: Path, environ: dict[str, str]
+    ) -> None:
+        # Refused, not filtered: dropping every index record would come back
+        # as a page that reads "nothing answers".
+        with pytest.raises(UnsearchableTypeError, match="index"):
+            search_vault(tmp_path, QUERY, doc_types=[DocType.INDEX], environ=environ)

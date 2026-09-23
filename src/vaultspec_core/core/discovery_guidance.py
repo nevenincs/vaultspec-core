@@ -50,11 +50,19 @@ DISCOVERY_FALLBACK = (
 #: Canonical spelling for locating code by meaning.
 SEARCH_CODE = '`vaultspec-rag search "<concept and domain nouns>" --type code`'
 
+#: rag's vault search before its record-type filter. ``--doc-type`` narrows it
+#: to one type or, comma-separated, a union of types.
+RAG_VAULT_SEARCH = 'vaultspec-rag search "<intent>" --type vault'
+
 #: Canonical spelling for locating governing decisions.
 #:
 #: The directed ``--doc-type adr`` filter, not catch-all ``--type vault``,
 #: which is materially noisier for decision recall.
-SEARCH_ADR = '`vaultspec-rag search "<intent>" --type vault --doc-type adr`'
+SEARCH_ADR = f"`{RAG_VAULT_SEARCH} --doc-type adr`"
+
+#: Core's listing verb, the orientation half of the no-semantic route; an
+#: optional record type narrows it. Its MCP counterpart is ``find``.
+LIST_VAULT = "vaultspec-core vault list"
 
 #: Canonical spelling for asking the vault a question through core's hosted
 #: search, which answers with the passage and its line range and abstains when

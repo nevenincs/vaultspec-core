@@ -25,12 +25,8 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.cli.rendering import TRUNCATE_MARKER
-from vaultspec_core.cli.vault_search_cmd import (
-    _json_text,
-    _outcome_lines,
-    _outcome_payload,
-)
-from vaultspec_core.core.discovery_guidance import SEARCH_ADR
+from vaultspec_core.cli.vault_search_cmd import _json_text, _outcome_lines
+from vaultspec_core.core.discovery_guidance import LIST_VAULT
 from vaultspec_core.core.windowing import apply_window
 from vaultspec_core.search import (
     CREDENTIAL_VARIABLE,
@@ -38,11 +34,15 @@ from vaultspec_core.search import (
     MAX_QUERY_CHARS,
     MAX_RESULTS,
     PREMISE_CONFLICT_THRESHOLD,
+    SEARCHABLE_TYPES,
     Excerpt,
+    NextStepKind,
     SearchHit,
     SearchOutcome,
     SearchStatus,
     SearchUsage,
+    SearchVerdict,
+    outcome_fields,
 )
 from vaultspec_core.search.tests.reply_budget import (
     DISCOVERY_BUDGET,
@@ -106,7 +106,7 @@ def _search(root: Path, *args: str, key: str = "") -> Result:
 
 
 class TestNotConfigured:
-    def test_human_output_names_the_variable_and_the_rag_search(
+    def test_human_output_names_the_variable_and_the_next_step(
         self, tmp_path: Path
     ) -> None:
         result = _search(_workspace(tmp_path), "why are widgets stored?")
@@ -114,9 +114,9 @@ class TestNotConfigured:
         assert result.exit_code == 0, result.output
         assert "not configured" in result.stdout
         assert CREDENTIAL_VARIABLE in result.stdout
-        assert SEARCH_ADR in result.stdout
+        assert f"`{LIST_VAULT}`" in result.stdout
 
-    def test_json_envelope_is_skipped_with_remediation(self, tmp_path: Path) -> None:
+    def test_json_envelope_is_skipped_with_the_next_step(self, tmp_path: Path) -> None:
         result = _search(_workspace(tmp_path), "why are widgets stored?", "--json")
 
         assert result.exit_code == 0, result.output
@@ -125,11 +125,17 @@ class TestNotConfigured:
         assert envelope["status"] == "skipped"
         data = envelope["data"]
         assert data["status"] == SearchStatus.NOT_CONFIGURED
+        assert data["answered"] is False
+        assert data["hits"] == []
+        assert data["next_step"] == {
+            "kind": NextStepKind.LISTING.value,
+            "types": sorted(SEARCHABLE_TYPES),
+            "command": LIST_VAULT,
+        }
         assert CREDENTIAL_VARIABLE in data["remediation"]
-        assert SEARCH_ADR in data["remediation"]
-        # Nothing was ranked, so there is no page to describe.
-        assert "hits" not in data
+        # Nothing was ranked, so there is no page or verdict to describe.
         assert "total" not in data
+        assert "verdict" not in data
 
 
 class TestInputValidation:
@@ -210,6 +216,7 @@ class TestConfiguredWithoutSending:
         assert envelope["data"] == {
             "status": "ok",
             "answered": False,
+            "verdict": SearchVerdict.NOTHING_ANSWERS.value,
             "hits": [],
             "returned": 0,
             "total": 0,
@@ -243,6 +250,7 @@ class TestConfiguredWithoutSending:
         assert envelope["status"] == "failed"
         assert envelope["data"]["status"] == SearchStatus.UNAVAILABLE
         assert envelope["data"]["reason"] == "credential_rejected"
+        assert envelope["data"]["next_step"]["kind"] == NextStepKind.LISTING.value
         assert CREDENTIAL_VARIABLE in envelope["data"]["remediation"]
         assert _UNSENDABLE_KEY not in result.output
 
@@ -317,7 +325,7 @@ def _page(*, answered: bool = True, unscored: int | None = None) -> SearchOutcom
 
 def _page_json() -> dict[str, Any]:
     """The page's ``data`` as a JSON consumer receives it."""
-    return json.loads(json.dumps(_outcome_payload(_page())))
+    return json.loads(json.dumps(outcome_fields(_page())))
 
 
 class TestJsonPage:
@@ -344,7 +352,7 @@ class TestJsonPage:
             _hit(1), score=0.912345, answers=0.876543, premise_conflict=0.012345
         )
         outcome = dataclasses.replace(_page(), hits=(precise,))
-        hit = json.loads(json.dumps(_outcome_payload(outcome)))["hits"][0]
+        hit = json.loads(json.dumps(outcome_fields(outcome)))["hits"][0]
 
         assert hit["type"] == DocType.ADR.value
         assert "doc_type" not in hit

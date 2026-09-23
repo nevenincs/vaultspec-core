@@ -1,19 +1,17 @@
 """``vaultspec-core vault search``: ask the vault a question, read the passage.
 
 The verb presents hosted vault search and adds no search logic of its own. The
-filters, the page ceiling, the three outcomes and the next step after an outcome
-that did not rank all come from :mod:`vaultspec_core.search`, so this verb and
-the MCP ``search`` tool give the same answer to the same question, and each hit
-in the ``--json`` envelope is the search package's one projection of it. This
-module owns only the shape of the answer around the hits: on a terminal and in
-the envelope.
+filters and their validation, the page ceiling, the three outcomes, the verdict,
+the premise note and the next step after an outcome that did not rank all come
+from :mod:`vaultspec_core.search`, so this verb and the MCP ``search`` tool give
+the same answer to the same question. The ``--json`` envelope's ``data`` is the
+search package's one projection of the outcome, the one the MCP tool returns.
+This module owns only the terminal rendering and the envelope around the data.
 
 Both shapes carry the window the search applied (``returned``, ``total``,
 ``truncated``) and the excerpts exactly as the search package bounded them,
-each marked when it was cut; nothing is clipped here. The terminal verdict
-says nothing in the vault answers only when the search read every record. The
-key never reaches this module; the search package reports only whether one is
-configured.
+each marked when it was cut; nothing is clipped here. The key never reaches
+this module; the search package reports only whether one is configured.
 
 Exit codes:
 
@@ -33,8 +31,7 @@ Exit codes:
 
 from __future__ import annotations
 
-import dataclasses
-from typing import TYPE_CHECKING, Annotated, Final
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -50,23 +47,20 @@ from vaultspec_core.core.windowing import elision_line
 from vaultspec_core.search import (
     DEFAULT_RESULTS,
     MAX_RESULTS,
-    PREMISE_CONFLICT_THRESHOLD,
-    SEARCHABLE_TYPES,
+    SEARCHABLE_TYPE_NAMES,
     InvalidQueryError,
     SearchStatus,
-    hit_fields,
+    SearchVerdict,
+    UnsearchableTypeError,
+    outcome_fields,
     remediation,
 )
 
 if TYPE_CHECKING:
     from vaultspec_core.cli.rendering import Outcome, TreeLine
     from vaultspec_core.search import Excerpt, SearchHit, SearchOutcome
-    from vaultspec_core.vaultcore.models import DocType
 
 __all__ = ["cmd_search"]
-
-#: The record types ``--type`` accepts, in the order help and errors list them.
-_TYPE_NAMES: Final = ", ".join(sorted(doc_type.value for doc_type in SEARCHABLE_TYPES))
 
 
 def _envelope_status(status: SearchStatus) -> Outcome:
@@ -84,53 +78,6 @@ def _envelope_status(status: SearchStatus) -> Outcome:
     return Outcome.UNCHANGED
 
 
-def _record_types(values: list[str] | None) -> frozenset[DocType] | None:
-    """Resolve the ``--type`` values to the record types search ranks.
-
-    Args:
-        values: The raw option values, or ``None`` when none were given.
-
-    Returns:
-        The selected record types, or ``None`` to search every searchable type.
-
-    Raises:
-        typer.BadParameter: If a value names no searchable record type.
-    """
-    if not values:
-        return None
-    searchable = {doc_type.value: doc_type for doc_type in SEARCHABLE_TYPES}
-    unknown = [value for value in values if value not in searchable]
-    if unknown:
-        raise typer.BadParameter(
-            f"not a searchable record type: {', '.join(unknown)} "
-            f"(choose from {_TYPE_NAMES})",
-            param_hint="'--type'",
-        )
-    return frozenset(searchable[value] for value in values)
-
-
-def _outcome_payload(outcome: SearchOutcome) -> dict[str, object]:
-    """Render an outcome as the envelope's ``data``.
-
-    The query is not echoed back: the caller supplied it. Keys that do not
-    apply to the outcome are absent rather than ``null``.
-    """
-    payload: dict[str, object] = {"status": outcome.status.value}
-    if outcome.status is SearchStatus.OK:
-        payload["answered"] = outcome.answered
-        payload["hits"] = [hit_fields(hit) for hit in outcome.hits]
-    if outcome.window is not None:
-        payload.update(outcome.window.as_fields())
-    if outcome.reason is not None:
-        payload["reason"] = outcome.reason.value
-    note = remediation(outcome)
-    if note is not None:
-        payload["remediation"] = note
-    if outcome.usage is not None:
-        payload["usage"] = dataclasses.asdict(outcome.usage)
-    return payload
-
-
 def _json_text(outcome: SearchOutcome) -> str:
     """Render *outcome* as the ``--json`` envelope text the command prints."""
     import json
@@ -138,7 +85,7 @@ def _json_text(outcome: SearchOutcome) -> str:
     from vaultspec_core.cli.rendering import json_envelope
 
     status = _envelope_status(outcome.status)
-    envelope = json_envelope("vault.search", status, _outcome_payload(outcome))
+    envelope = json_envelope("vault.search", status, outcome_fields(outcome))
     # The excerpt caps bound UTF-8 bytes. ASCII escaping would carry each CJK
     # character in six bytes and each emoji in twelve, so the reply budget the
     # caps guarantee holds only when the text travels as the UTF-8 it is.
@@ -169,7 +116,7 @@ def _hit_lines(rank: int, hit: SearchHit) -> list[TreeLine]:
         fields[-1] += f":{hit.excerpt.line_start}-{hit.excerpt.line_end}"
         fields.append(hit.excerpt.section)
     lines = [TreeLine(" ".join(field for field in fields if field), style="bold")]
-    if hit.premise_conflict >= PREMISE_CONFLICT_THRESHOLD:
+    if hit.contradicts_premise:
         lines.append(
             TreeLine(
                 "may contradict an assumption in your question "
@@ -191,21 +138,6 @@ def _hit_lines(rank: int, hit: SearchHit) -> list[TreeLine]:
     return lines
 
 
-def _verdict_line(outcome: SearchOutcome) -> TreeLine:
-    """Render the verdict of a ranked outcome.
-
-    "Nothing answers" is claimed only when every record was read; with records
-    unscored, the verdict covers the records that were.
-    """
-    from vaultspec_core.cli.rendering import TreeLine
-
-    if outcome.answered:
-        return TreeLine("answered", style="green")
-    if outcome.abstained:
-        return TreeLine("nothing in the vault answers this", style="yellow")
-    return TreeLine("no record that was read answers this", style="yellow")
-
-
 def _outcome_lines(outcome: SearchOutcome) -> list[TreeLine]:
     """Render an outcome for the terminal: the verdict first, then the hits."""
     from vaultspec_core.cli.rendering import OUTCOME_STYLE, TreeLine, summary_line
@@ -221,7 +153,11 @@ def _outcome_lines(outcome: SearchOutcome) -> list[TreeLine]:
             lines.append(TreeLine(note, depth=1))
         return lines
 
-    lines = [_verdict_line(outcome)]
+    lines: list[TreeLine] = []
+    verdict = outcome.verdict
+    if verdict is not None:
+        style = "green" if verdict is SearchVerdict.ANSWERED else "yellow"
+        lines.append(TreeLine(verdict.sentence, style=style))
     if outcome.unscored:
         noun = "record" if outcome.unscored == 1 else "records"
         lines.append(
@@ -250,7 +186,7 @@ def cmd_search(
         list[str] | None,
         typer.Option(
             "--type",
-            help=f"Search only this record type ({_TYPE_NAMES}); repeatable",
+            help=f"Search only this record type ({SEARCHABLE_TYPE_NAMES}); repeatable",
         ),
     ] = None,
     feature: FeatureFilterOption = None,
@@ -271,7 +207,6 @@ def cmd_search(
     vault answers. Without a hosted-search key it runs nothing and names the
     search to use instead.
     """
-    types = _record_types(record_types)
     apply_target(target, json_output=json_output)
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.search import search_vault
@@ -280,11 +215,13 @@ def cmd_search(
         outcome = search_vault(
             _get_ctx().target_dir,
             query,
-            doc_types=types,
+            doc_types=record_types,
             feature=feature,
             date=date,
             limit=limit,
         )
+    except UnsearchableTypeError as exc:
+        raise typer.BadParameter(str(exc), param_hint="'--type'") from exc
     except InvalidQueryError as exc:
         raise typer.BadParameter(str(exc), param_hint="'QUERY'") from exc
     except OSError as exc:

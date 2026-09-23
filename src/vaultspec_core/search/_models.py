@@ -12,12 +12,15 @@ rather than leaving a caller to infer it from an empty list:
     record was read: a search whose refusals leave nothing ranked is
     ``unavailable`` instead.
 ``not_configured``
-    No hosted-search credential is available. Nothing was sent anywhere; the
-    caller routes to the agent-level fallback.
+    No hosted-search credential is available. Nothing was sent anywhere.
 ``unavailable``
     Hosted search was configured but failed. ``reason`` names the failure
     class, and no partial ranking is returned: mixing judged and unjudged
     records would present a guess as a result.
+
+Both outcomes that did not rank carry a :class:`NextStep`: the search the
+caller should run instead, resolved from what this workspace provides. Core
+names that search; it never runs it.
 
 Every excerpt is the record's own text at a reported line range, never text a
 model wrote, so a caller can quote it or open the file at that span. The
@@ -36,11 +39,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Final
 
-from ._questions import SHORTLIST_LEXICAL, SHORTLIST_SIZE
+from ..vaultcore.models import DocType
+from ._questions import PREMISE_CONFLICT_THRESHOLD, SHORTLIST_LEXICAL, SHORTLIST_SIZE
 
 if TYPE_CHECKING:
     from ..core.windowing import Window
-    from ..vaultcore.models import DocType
 
 __all__ = [
     "DEFAULT_RESULTS",
@@ -52,11 +55,15 @@ __all__ = [
     "Excerpt",
     "HostedSearchConfig",
     "InvalidQueryError",
+    "NextStep",
+    "NextStepKind",
     "SearchHit",
     "SearchOutcome",
     "SearchStatus",
     "SearchUsage",
+    "SearchVerdict",
     "UnavailableReason",
+    "UnsearchableTypeError",
 ]
 
 #: Hits returned when a caller names no limit. Four hits with their excerpts
@@ -95,10 +102,20 @@ MAX_QUERY_CHARS: Final = 2_000
 
 
 class InvalidQueryError(ValueError):
-    """The query is blank or longer than :data:`MAX_QUERY_CHARS`.
+    """The search request is invalid, before anything is read or sent.
 
-    Its own type, so a surface reports exactly this as invalid input and lets
-    any other failure surface as the defect it is.
+    The query is blank or longer than :data:`MAX_QUERY_CHARS`, or a filter
+    names what search cannot rank. Its own type, so a surface reports exactly
+    this as invalid input and lets any other failure surface as the defect it
+    is.
+    """
+
+
+class UnsearchableTypeError(InvalidQueryError):
+    """A record-type filter names a type search does not rank.
+
+    Refused rather than applied: the filter would drop every record of that
+    type and come back as a page that reads as "nothing answers".
     """
 
 
@@ -108,6 +125,70 @@ class SearchStatus(StrEnum):
     OK = "ok"
     NOT_CONFIGURED = "not_configured"
     UNAVAILABLE = "unavailable"
+
+
+class SearchVerdict(StrEnum):
+    """What a ranked page says about the vault.
+
+    The verdict is only as wide as what was read: "nothing answers" is a
+    statement about the whole vault, so it needs every record read.
+    """
+
+    ANSWERED = "answered"
+    NOTHING_ANSWERS = "nothing_answers"
+    NONE_READ_ANSWERS = "none_read_answers"
+
+    @property
+    def sentence(self) -> str:
+        """The verdict as every surface words it."""
+        return _VERDICT_SENTENCES[self]
+
+
+_VERDICT_SENTENCES: Final[dict[SearchVerdict, str]] = {
+    SearchVerdict.ANSWERED: "answered",
+    SearchVerdict.NOTHING_ANSWERS: "nothing in the vault answers this",
+    SearchVerdict.NONE_READ_ANSWERS: "no record that was read answers this",
+}
+
+
+class NextStepKind(StrEnum):
+    """Which search to run when hosted search did not rank.
+
+    Members:
+        RAG_SEARCH: A vaultspec-rag vault search. Chosen when the workspace
+            provisions the rag companion; provisioning is configuration, not
+            liveness, so the rag search can itself be unavailable.
+        LISTING: Core's listing verbs, with grep over the listed records for
+            the passage. Always available, and the one route when rag is not
+            provisioned.
+    """
+
+    RAG_SEARCH = "rag_search"
+    LISTING = "listing"
+
+
+@dataclass(frozen=True)
+class NextStep:
+    """The search a caller runs when hosted search did not rank.
+
+    Attributes:
+        kind: Which search it is.
+        types: The record types it covers: the ones the request named, or
+            every searchable type. Held as record types in name order, however
+            they were given, so the step reads the same on every surface.
+        command: The command line that runs it, with ``<intent>`` standing
+            for the caller's question.
+    """
+
+    kind: NextStepKind
+    types: tuple[DocType, ...]
+    command: str
+
+    def __post_init__(self) -> None:
+        """Hold ``types`` as record types in name order."""
+        object.__setattr__(
+            self, "types", tuple(sorted(DocType(name) for name in self.types))
+        )
 
 
 class UnavailableReason(StrEnum):
@@ -205,6 +286,15 @@ class SearchHit:
     supporting: Excerpt | None
     blob_hash: str
 
+    @property
+    def contradicts_premise(self) -> bool:
+        """Whether the record likely contradicts an assumption in the query.
+
+        Advisory: the threshold separated the false-premise queries it was
+        measured on, but not by a wide margin.
+        """
+        return self.premise_conflict >= PREMISE_CONFLICT_THRESHOLD
+
 
 @dataclass(frozen=True)
 class SearchUsage:
@@ -242,6 +332,12 @@ class SearchOutcome:
         window: The bound applied to ``hits``; ``None`` unless ``ok``.
         reason: Why hosted search failed; set only when ``unavailable``.
         usage: Cost and diagnostics; ``None`` when nothing was sent.
+        next_step: The search to run instead; set exactly when the outcome
+            is not ``ok``.
+
+    Raises:
+        ValueError: If ``next_step`` is missing from an outcome that did not
+            rank, or present on one that did.
     """
 
     status: SearchStatus
@@ -251,6 +347,18 @@ class SearchOutcome:
     window: Window | None = None
     reason: UnavailableReason | None = None
     usage: SearchUsage | None = None
+    next_step: NextStep | None = None
+
+    def __post_init__(self) -> None:
+        """Hold the one invariant every surface relies on: a decline names a step."""
+        ranked = self.status is SearchStatus.OK
+        if ranked == (self.next_step is not None):
+            msg = (
+                "a ranked outcome carries no next step"
+                if ranked
+                else f"a {self.status.value} outcome must name its next step"
+            )
+            raise ValueError(msg)
 
     @property
     def unscored(self) -> int:
@@ -268,3 +376,14 @@ class SearchOutcome:
         return (
             self.status is SearchStatus.OK and not self.answered and not self.unscored
         )
+
+    @property
+    def verdict(self) -> SearchVerdict | None:
+        """What the ranked page says about the vault; ``None`` unless ``ok``."""
+        if self.status is not SearchStatus.OK:
+            return None
+        if self.answered:
+            return SearchVerdict.ANSWERED
+        if self.abstained:
+            return SearchVerdict.NOTHING_ANSWERS
+        return SearchVerdict.NONE_READ_ANSWERS
