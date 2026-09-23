@@ -47,4 +47,3 @@ related:
 - `S04` `A` `src/vaultspec_core/search/tests/scripted_provider.py`
 - `S04` `A` `src/vaultspec_core/search/tests/test_transport.py`
 - `S03` `M` `src/vaultspec_core/search/__init__.py`
-
