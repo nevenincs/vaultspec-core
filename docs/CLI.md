@@ -1607,13 +1607,15 @@ anything.
 - `--feature TAG` (`-f`) - Sweep this feature's ADRs.
 - `--all` (default off) - Sweep every ADR that still governs. Superseded and rejected
   ADRs are skipped unless named.
-- `--isolated` (default off) - Sweep only ADRs that link no other ADR.
+- `--isolated` (default off) - Sweep only ADRs that link no other ADR. Combines with
+  `--feature` to narrow further; `--all` stands alone.
 - `--after STEM` - Resume a sweep after this ADR: the `next_after` a previous sweep
   reported, with the same selector. Sweeps run in stem order and store no state. An ADR
-  the provider refuses to read fails on its own and the sweep moves past it, once the
-  provider has read something in that sweep; a refusal before then, or three in a row,
-  stops the sweep. Any other failure stops the sweep too, and resuming retries the
-  source it stopped at.
+  the provider refuses to read is held open while the sweep judges on: once a later ADR
+  is read, the refusal counts as that ADR's own and the sweep moves past it, and at the
+  end of the selection a sweep in which the provider read something moves past it too.
+  Three refusals in a row, or any other failure, stop the sweep before the first refusal
+  still open, and resuming retries from there.
 - `--max-sources N` (default `10`) - Most ADRs one sweep judges, from `1` to `50`.
 - `--apply` (default off) - Write each new `link` verdict into the source's `related:`,
   as each source finishes, without reading them first. Nothing is removed, and no
@@ -1644,7 +1646,8 @@ Exit codes:
   resume.
 - `2` - Invalid input: no source or sweep option, a `REFS` entry or `--after` value that
   is not an ADR of this vault, `REFS` combined with `--feature`, `--isolated`, or
-  `--all`, a vault with more than 5,000 ADRs, or `--max-sources` outside `1..50`.
+  `--all`, `--all` combined with `--feature` or `--isolated`, an empty `--feature`, a
+  vault with more than 5,000 ADRs, or `--max-sources` outside `1..50`.
 
 #### Examples
 

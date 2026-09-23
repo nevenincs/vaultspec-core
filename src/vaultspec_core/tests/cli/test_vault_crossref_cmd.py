@@ -208,7 +208,7 @@ def test_a_stopped_sweep_says_where_to_resume() -> None:
     text = "\n".join(line.text for line in _sweep_lines(sweep))
 
     assert "stopped early: rate_limited" in text
-    assert f"resume with --after {_SOURCE}" in text
+    assert f"repeat the selector with --after {_SOURCE}" in text
 
 
 def test_the_worst_case_sweep_reply_stays_under_the_ceiling() -> None:

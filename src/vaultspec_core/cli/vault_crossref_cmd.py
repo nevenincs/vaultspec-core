@@ -7,10 +7,10 @@ so this verb and the MCP ``crossref`` tool give the same answer. The ``--json``
 envelope's ``data`` is the package's one projection of the outcome. This module
 owns only the terminal rendering and the envelope around the data.
 
-One named ADR is judged on its own. Several named ADRs, a ``--feature``, or
-``--all`` make a sweep: sources in stem order, at most ``--max-sources`` of
-them, resumable with ``--after`` from the ``next_after`` a previous sweep
-reported.
+One named ADR is judged on its own. Several named ADRs, ``--feature``,
+``--isolated`` or ``--all`` make a sweep: sources in stem order, at most
+``--max-sources`` of them, resumable by repeating the selector with
+``--after`` and the ``next_after`` a previous sweep reported.
 
 Exit codes:
 
@@ -118,7 +118,11 @@ def _sweep_lines(sweep: SweepOutcome) -> list[TreeLine]:
     if sweep.stopped is not None:
         lines.append(TreeLine(f"stopped early: {sweep.stopped}", style="yellow"))
     if sweep.remaining:
-        resume = f"; resume with --after {sweep.next_after}" if sweep.next_after else ""
+        resume = (
+            f"; repeat the selector with --after {sweep.next_after}"
+            if sweep.next_after
+            else ""
+        )
         lines.append(
             TreeLine(f"{sweep.remaining} source(s) remaining{resume}", style="dim")
         )
