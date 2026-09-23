@@ -101,6 +101,11 @@ class VaultSpecConfig:
             :func:`~vaultspec_core.core.helpers.advisory_lock` acquisition may
             spend waiting before it reports a timeout instead of blocking on.
         editor: Default editor command for creating rules/skills.
+        typesafe_api_key: The hosted vault search credential, or ``None``.
+            A secret: it is excluded from ``repr`` and redacted from every
+            configuration log line. Hosted search resolves it through its own
+            credential resolver, which also consults the workspace ``.env``
+            in dependency and dev install modes.
     """
 
     # -- Root ------------------------------------------------------------------
@@ -125,6 +130,9 @@ class VaultSpecConfig:
 
     # -- Editor ----------------------------------------------------------------
     editor: str = "zed -w"
+
+    # -- Vault search ----------------------------------------------------------
+    typesafe_api_key: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_environment(
@@ -246,6 +254,19 @@ def _convert_raw_value(var: ConfigVariable, raw: str) -> tuple[Any, bool]:
     return converter(raw), skip_validation
 
 
+#: What a log line shows in place of a secret variable's value.
+_REDACTED = "<redacted>"
+
+
+def _shown(var: ConfigVariable, value: object) -> str:
+    """Render *value* for a log line, withholding it when *var* is secret.
+
+    A rejected secret is still a secret: the line that says a credential was
+    malformed must not be the line that leaks it.
+    """
+    return _REDACTED if var.secret else repr(value)
+
+
 def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool:
     """Validate an already-converted *value* against *var*'s constraints.
 
@@ -261,9 +282,9 @@ def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool
     """
     if var.options is not None and value not in var.options:
         logger.error(
-            "%s=%r is not one of %s (source: %s); using default",
+            "%s=%s is not one of %s (source: %s); using default",
             var.attr_name,
-            value,
+            _shown(var, value),
             var.options,
             source,
         )
@@ -275,9 +296,9 @@ def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool
         and value < var.min_value
     ):
         logger.error(
-            "%s=%r is below minimum %s (source: %s); using default",
+            "%s=%s is below minimum %s (source: %s); using default",
             var.attr_name,
-            value,
+            _shown(var, value),
             var.min_value,
             source,
         )
@@ -289,9 +310,9 @@ def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool
         and value > var.max_value
     ):
         logger.error(
-            "%s=%r exceeds maximum %s (source: %s); using default",
+            "%s=%s exceeds maximum %s (source: %s); using default",
             var.attr_name,
-            value,
+            _shown(var, value),
             var.max_value,
             source,
         )
@@ -317,21 +338,23 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
     try:
         value, skip_validation = _convert_raw_value(var, raw)
     except (ValueError, TypeError) as exc:
+        # A converter's own message and traceback quote the input verbatim,
+        # so a secret's failure is reported without either.
         logger.error(
-            "Failed to parse %s=%r (source: %s): %s; using default",
+            "Failed to parse %s=%s (source: %s): %s; using default",
             var.attr_name,
-            raw,
+            _shown(var, raw),
             source,
-            exc,
-            exc_info=True,
+            _REDACTED if var.secret else exc,
+            exc_info=not var.secret,
         )
         return _SENTINEL
 
     if var.var_type in (_OptionalInt, _OptionalFloat) and value is None:
         logger.error(
-            "Could not parse %s=%r as %s (source: %s); using default",
+            "Could not parse %s=%s as %s (source: %s); using default",
             var.attr_name,
-            raw,
+            _shown(var, raw),
             "int" if var.var_type is _OptionalInt else "float",
             source,
         )
@@ -359,6 +382,9 @@ class ConfigVariable:
         options: Allowed string values; ``None`` means no restriction.
         min_value: Minimum numeric value (inclusive); ``None`` means no minimum.
         max_value: Maximum numeric value (inclusive); ``None`` means no maximum.
+        secret: If ``True``, the value is a credential: every log line that
+            would quote it shows a redaction marker instead, and surfaces
+            report only whether it is set.
     """
 
     env_name: str
@@ -370,6 +396,7 @@ class ConfigVariable:
     options: list[str] | None = None
     min_value: float | None = None
     max_value: float | None = None
+    secret: bool = False
 
 
 CONFIG_REGISTRY: list[ConfigVariable] = [
@@ -469,6 +496,20 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         # respected without a vaultspec-specific variable.
         default=os.environ.get("VISUAL") or os.environ.get("EDITOR") or "zed -w",
         description="Default editor command for creating rules/skills.",
+    ),
+    # -- Vault search ----------------------------------------------------------
+    ConfigVariable(
+        env_name="VAULTSPEC_CORE_TYPESAFE_API_KEY",
+        attr_name="typesafe_api_key",
+        var_type=str,
+        default=None,
+        description=(
+            "TypeSafe API key that enables hosted vault search. Read from the "
+            "process environment, then from the workspace .env only when the "
+            "workspace installs vaultspec-core in dependency or dev mode. "
+            "Unset or blank means hosted search is not configured."
+        ),
+        secret=True,
     ),
 ]
 
