@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:efbb3aa3e99a98b8e1b190860f45c8f20367c5f4637183dc8eaf548738ab8c85'
+body_hash: 'sha256:e2d93e8cb29317aba35db1bd403ba9869c3bc32c2ab39714d3a8116e4ac846c8'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -95,6 +95,20 @@ related:
 - `S10` `M` `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py`
 - `S10` `M` `src/vaultspec_core/migrations/tests/test_commit_gate.py`
 - `S10` `verify:` `ty check` -> `pass`
+- `S11` `A` `src/vaultspec_core/tests/cli/test_precommit_duplicates.py`
+- `S11` `M` `src/vaultspec_core/core/diagnosis/signals.py`
+- `S11` `M` `src/vaultspec_core/core/diagnosis/collectors_precommit.py`
+- `S11` `M` `src/vaultspec_core/core/prek_boundary.py`
+- `S11` `M` `src/vaultspec_core/core/precommit.py`
+- `S11` `M` `src/vaultspec_core/core/provider_sync.py`
+- `S11` `M` `src/vaultspec_core/cli/spec_cmd_doctor.py`
+- `S11` `M` `src/vaultspec_core/core/resolver_repo.py`
+- `S11` `M` `src/vaultspec_core/core/executor.py`
+- `S11` `M` `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py`
+- `S11` `M` `src/vaultspec_core/tests/cli/test_convergence_advisories.py`
+- `S11` `M` `src/vaultspec_core/tests/cli/test_signals.py`
+- `S11` `M` `.vault/adr/2026-09-23-commit-gate-adr.md`
+- `S11` `verify:` `ty check` -> `pass`
 
 ## Notes
 

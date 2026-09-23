@@ -156,6 +156,12 @@ class PrecommitSignal(StrEnum):
     canonical hooks is the requested state. ``DECLINED_LEFTOVER`` adds that a
     ``.pre-commit-config.yaml`` is still on disk, which the operator may want
     to delete by hand.
+
+    ``DUPLICATED`` is an error: the config prek reads lists a canonical hook
+    more than once (or carries more than one managed block), so prek would run
+    it repeatedly on every commit. ``SHADOWED`` is a warning: vaultspec hooks
+    sit in a config file prek does not read, because another config takes
+    precedence, so they look configured and never run.
     """
 
     NO_FILE = "no_file"
@@ -168,6 +174,8 @@ class PrecommitSignal(StrEnum):
     UNREADABLE = "unreadable"
     DECLINED = "declined"
     DECLINED_LEFTOVER = "declined_leftover"
+    DUPLICATED = "duplicated"
+    SHADOWED = "shadowed"
     COMPLETE = "complete"
 
 

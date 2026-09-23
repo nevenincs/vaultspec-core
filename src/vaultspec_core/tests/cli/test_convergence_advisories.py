@@ -108,25 +108,37 @@ class TestPrekUnrefreshableAdvisory:
 class TestPrekContentAwareSignal:
     """The precommit signal reflects prek.toml contents, not existence."""
 
-    def test_healthy_prek_with_stale_yaml_reports_orphaned(
+    def test_healthy_prek_with_vaultspec_yaml_reports_shadowed(
         self, tmp_path: Path
     ) -> None:
+        """vaultspec hooks in a YAML prek never reads look live and are not."""
         _write_prek_hooks(tmp_path)
         _write_yaml_hooks(tmp_path, "uv run vaultspec-core legacy-entry")
 
-        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.SHADOWED
 
-    def test_healthy_prek_with_complete_yaml_reports_orphaned(
+    def test_healthy_prek_with_hook_free_yaml_reports_orphaned(
         self, tmp_path: Path
     ) -> None:
-        """Even a fully canonical YAML is superseded: prek never reads it."""
+        """A leftover YAML carrying no vaultspec hooks is only superseded."""
+        _write_prek_hooks(tmp_path)
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            "repos: []\n", encoding="utf-8"
+        )
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+
+    def test_healthy_prek_with_complete_yaml_reports_shadowed(
+        self, tmp_path: Path
+    ) -> None:
+        """Even a fully canonical YAML is shadowed: prek never reads it."""
         from vaultspec_core.core.commands import scaffold_precommit
 
         scaffold_precommit(tmp_path)
         assert collect_precommit_state(tmp_path) is PrecommitSignal.COMPLETE
 
         _write_prek_hooks(tmp_path)
-        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.SHADOWED
 
     def test_healthy_prek_without_yaml_reports_complete(self, tmp_path: Path) -> None:
         _write_prek_hooks(tmp_path)
@@ -180,7 +192,7 @@ class TestDoctorPrekAdvisoryText:
 
         assert "spec precommit migrate" in result.output
 
-    def test_orphaned_advisory_names_superseded_yaml(
+    def test_shadowed_advisory_names_the_unread_config(
         self, runner: CliRunner, factory: WorkspaceFactory
     ) -> None:
         from vaultspec_core.tests.cli.conftest import run_spec
@@ -190,7 +202,7 @@ class TestDoctorPrekAdvisoryText:
 
         result = run_spec(runner, "spec", "doctor", target=factory.path)
 
-        assert "superseded .pre-commit-config.yaml" in result.output
+        assert "config file prek does not" in result.output
 
 
 class TestGatedOrphanCleanup:
@@ -248,7 +260,7 @@ class TestGatedOrphanCleanup:
 
         _write_prek_hooks(tmp_path)
         _write_yaml_hooks(tmp_path, "uv run vaultspec-core legacy-entry")
-        assert collect_precommit_state(tmp_path) is PrecommitSignal.ORPHANED
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.SHADOWED
 
         result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)
 

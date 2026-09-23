@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:796169b9423c3adda459d42df2d683a7a9547893caa9309f40534381ed9bd2d2'
+body_hash: 'sha256:d1812e2dcc3f930420ff88d044636c28ff6438402815f09752b95e064b7e258b'
 ---
 
 # `commit-gate` plan
@@ -19,7 +19,7 @@ Replace the three whole-vault commit hooks with one staged-document gate, and st
 
 Approved 2026-09-23
 
-Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too. After the plan closed, the user asked on 2026-09-23 that the hook changes be enrolled in the per-release schema migrations; S10 does that under the amended convergence clause of the ADR.
+Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too. After the plan closed, the user asked on 2026-09-23 that the hook changes be enrolled in the per-release schema migrations; S10 does that under the amended convergence clause of the ADR. The user then asked that duplicate hook listings be surfaced, as a warning for copies prek does not read and as a repaired error for live duplicates. S11 implements the recommended design, since the user's answer to the design question did not arrive; it awaits their confirmation.
 
 Decision coverage:
 
@@ -47,6 +47,7 @@ Issues addressed:
 - [x] `S08` - make vaultspec-commit-gate the one canonical hook, retire vault-fix, spec-check and check-provider-artifacts, and extend the read-only guard to the new entry and its output; `src/vaultspec_core/core/enums.py, src/vaultspec_core/core/precommit.py, .pre-commit-config.yaml, dev/guards/test_automation_contracts.py`.
 - [x] `S09` - document the gate and the CI home of corpus checks, regenerate the CLI reference, and record before and after commit timings on the core vault and the 30k corpus; `docs/, src/vaultspec_core/builtins/reference/`.
 - [x] `S10` - enroll the hook retirement as the 0.2.5 schema migration, converging YAML configs that carry vaultspec hooks and existing managed prek.toml blocks, never touching declined or hook-free configs; `src/vaultspec_core/migrations/m_0_2_5_commit_gate.py (new), src/vaultspec_core/migrations/__init__.py, src/vaultspec_core/core/prek_boundary.py`.
+- [x] `S11` - surface duplicate vaultspec hook listings: warn on copies in configs prek does not read, and report as an error and repair the gate listed more than once in the config prek reads; `src/vaultspec_core/core/diagnosis/collectors_precommit.py, core/prek_boundary.py, core/precommit.py, core/provider_sync.py, cli/spec_cmd_doctor.py`.
 
 ## Parallelization
 

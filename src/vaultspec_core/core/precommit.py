@@ -403,34 +403,56 @@ def _load_existing_precommit_config(
 
 
 def _merge_local_repo_hooks(
-    existing_hooks: list[Any], canonical_hooks: list[dict[str, object]]
+    local_hook_lists: list[list[Any]], canonical_hooks: list[dict[str, object]]
 ) -> bool:
-    """Reconcile *existing_hooks* against *canonical_hooks* in place.
+    """Reconcile every local repo's hooks against *canonical_hooks* in place.
 
-    Missing hooks are appended; hooks whose entry drifted from the canonical
-    pattern are updated in place; hooks already canonical are left untouched;
-    hooks whose ID is in :data:`RETIRED_HOOK_IDS` are removed.
+    All ``repo: local`` entries are considered together, because prek runs
+    each of them: hooks whose ID is in :data:`RETIRED_HOOK_IDS` are removed
+    wherever they sit; a canonical hook listed more than once keeps only its
+    first entry, since every copy would run again on each commit; a canonical
+    hook present anywhere has a drifted entry updated in place; and one present
+    nowhere is appended to the first local repo.
+
+    Args:
+        local_hook_lists: The ``hooks`` list of each local repo, in file order.
+        canonical_hooks: The canonical hook mappings to reconcile against.
 
     Returns:
-        ``True`` when *existing_hooks* was changed.
+        ``True`` when any list was changed.
     """
     changed = False
-    for i in reversed(range(len(existing_hooks))):
-        hook = _as_mapping(existing_hooks[i])
-        if hook is not None and hook.get("id") in RETIRED_HOOK_IDS:
-            logger.info("Removed retired pre-commit hook '%s'", hook.get("id"))
-            del existing_hooks[i]
-            changed = True
-    existing_by_id: dict[Any, dict[str, Any]] = {}
-    for raw_hook in existing_hooks:
-        hook = _as_mapping(raw_hook)
-        if hook is not None:
-            existing_by_id[hook.get("id")] = hook
+    canonical_ids = {str(hook["id"]) for hook in canonical_hooks}
+    first_by_id: dict[str, dict[str, Any]] = {}
+    for hooks in local_hook_lists:
+        for i in reversed(range(len(hooks))):
+            hook = _as_mapping(hooks[i])
+            if hook is not None and hook.get("id") in RETIRED_HOOK_IDS:
+                logger.info("Removed retired pre-commit hook '%s'", hook.get("id"))
+                del hooks[i]
+                changed = True
+    for hooks in local_hook_lists:
+        kept: list[Any] = []
+        for raw_hook in hooks:
+            hook = _as_mapping(raw_hook)
+            hook_id = str(hook.get("id")) if hook is not None else None
+            if hook is not None and hook_id in canonical_ids:
+                if hook_id in first_by_id:
+                    logger.warning(
+                        "Removed duplicate pre-commit hook '%s'; it was listed "
+                        "more than once and would have run on every commit twice",
+                        hook_id,
+                    )
+                    changed = True
+                    continue
+                first_by_id[hook_id] = hook
+            kept.append(raw_hook)
+        hooks[:] = kept
     for canonical in canonical_hooks:
         hook_id = str(canonical["id"])
-        existing = existing_by_id.get(hook_id)
+        existing = first_by_id.get(hook_id)
         if existing is None:
-            existing_hooks.append(dict(canonical))
+            local_hook_lists[0].append(dict(canonical))
             logger.info("Added pre-commit hook '%s'", hook_id)
             changed = True
             continue
@@ -445,10 +467,11 @@ def _merge_local_repo_hooks(
 def _reconcile_precommit_repos(
     data: dict[str, Any], canonical_hooks: list[dict[str, object]]
 ) -> bool:
-    """Reconcile the local repo's hooks in *data* against *canonical_hooks*.
+    """Reconcile the local repos' hooks in *data* against *canonical_hooks*.
 
-    Creates the local repo when none exists; otherwise merges via
-    :func:`_merge_local_repo_hooks`.
+    Creates a local repo when none exists; otherwise merges via
+    :func:`_merge_local_repo_hooks` and drops any local repo the merge left
+    without hooks.
 
     Returns:
         ``True`` when *data* should be written back to disk.
@@ -463,11 +486,18 @@ def _reconcile_precommit_repos(
         repos.append({"repo": "local", "hooks": [dict(h) for h in canonical_hooks]})
         return True
 
-    local_repo = local_repos[0]
-    existing_hooks = _as_list(local_repo.setdefault("hooks", []))
-    if existing_hooks is None:
+    hook_lists: list[list[Any]] = []
+    for local_repo in local_repos:
+        hooks = _as_list(local_repo.setdefault("hooks", []))
+        if hooks is None:
+            return False
+        hook_lists.append(hooks)
+    if not _merge_local_repo_hooks(hook_lists, canonical_hooks):
         return False
-    return _merge_local_repo_hooks(existing_hooks, canonical_hooks)
+    for local_repo, hooks in zip(local_repos[1:], hook_lists[1:], strict=True):
+        if not hooks:
+            repos.remove(local_repo)
+    return True
 
 
 def scaffold_precommit(

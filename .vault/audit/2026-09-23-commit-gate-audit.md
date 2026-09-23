@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:a5a423213ecd9fc894af34ac5af30ab1629d694bacbacec619c55c1dc1dee55e'
+body_hash: 'sha256:559728692da7af4338788be188a488b797b06d31fb8a3ad929235d8c2fce252f'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
   - "[[2026-09-23-commit-gate-adr]]"
@@ -120,6 +120,29 @@ that nothing is gated outside a workspace, but only the context setup is skipped
 was reworded, and a mid-sentence docstring wrap in `dev/init/__main__.py` was reflowed.
 
 Result: PASS. The plan is complete.
+
+### s10-crlf-normalisation | medium | the unattended migration rewrote a CRLF `prek.toml` to LF and added a trailing newline
+
+The review of S10 found that `src/vaultspec_core/core/prek_boundary.py`, via
+`_replace_or_append_block`, re-emitted every line outside the markers with LF, so the
+release migration produced a whole-file diff on a CRLF checkout. Fixed in `8f98ded1`:
+`prek.toml` is read as bytes and rewritten with its own terminator and final-newline state.
+The regression test is in `src/vaultspec_core/migrations/tests/test_commit_gate.py`.
+
+### s10-unreadable-yaml-called-clean | low | an unparseable YAML config was reported as carrying no vaultspec hooks
+
+`managed_strip_outcome` returned `"unchanged"` for a parse failure. Fixed in `8f98ded1` by
+adding a separate `"unreadable"` outcome, which the migration and the declined remove path
+report.
+
+### s10-refresh-on-invalid-toml | low | the block refresh wrote into a `prek.toml` that the migrate verb refuses as invalid
+
+Fixed in `8f98ded1`: `refresh_managed_prek_block` refuses invalid TOML, and the migration
+reports it as unreadable.
+
+Result of the S10 review: PASS. All three findings are fixed and each has a failing-first
+test. The reviewer also noted that any later migration shipping in 0.2.5 must target
+`0.2.6`, because a workspace converged from this branch already records `0.2.5`.
 
 ## Recommendations
 

@@ -17,6 +17,7 @@ from .signals import PrecommitSignal
 
 if TYPE_CHECKING:
     from ..enums import InstallMode
+    from ..prek_boundary import PrekBoundaryState
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,13 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
     when a YAML hook config (``.yaml`` or ``.yml``) is still on disk. Nothing is
     deleted.
 
+    Two cross-config readings sit on top: ``DUPLICATED`` when the config prek
+    reads lists a canonical hook more than once (an error, since prek would run
+    it repeatedly), and ``SHADOWED`` when vaultspec hooks sit in a config prek
+    does not read while the live one is sound (a warning, since they look
+    configured and never run). A leftover YAML beside a healthy ``prek.toml``
+    that carries no vaultspec hooks stays ``ORPHANED``.
+
     The YAML config read is the one prek would read, per
     :func:`~vaultspec_core.core.prek_boundary.precommit_config_path`.
 
@@ -82,14 +90,62 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
 
     boundary = collect_prek_boundary(target)
     if not boundary.owns_boundary:
-        return _reassess_against_installation(
-            target, _collect_precommit_yaml_state(target)
-        )
-    if boundary.hooks_present:
-        if existing_precommit_configs(target):
-            return PrecommitSignal.ORPHANED
-        return _reassess_against_installation(target, PrecommitSignal.COMPLETE)
-    return PrecommitSignal.UNREFRESHABLE
+        return _yaml_side_state(target)
+    return _prek_side_state(target, boundary)
+
+
+def _yaml_side_state(target: Path) -> PrecommitSignal:
+    """Assess a workspace whose hooks live in a YAML config."""
+    from ..prek_boundary import existing_precommit_configs, precommit_config_path
+
+    effective = precommit_config_path(target)
+    if _yaml_lists_a_canonical_hook_twice(effective):
+        return PrecommitSignal.DUPLICATED
+    signal = _reassess_against_installation(
+        target, _collect_precommit_yaml_state(target)
+    )
+    unread = [c for c in existing_precommit_configs(target) if c != effective]
+    if signal in _HEALTHY and any(_carries_vaultspec_hooks(c) for c in unread):
+        return PrecommitSignal.SHADOWED
+    return signal
+
+
+def _prek_side_state(target: Path, boundary: PrekBoundaryState) -> PrecommitSignal:
+    """Assess a workspace whose hook boundary ``prek.toml`` owns."""
+    from ..prek_boundary import existing_precommit_configs
+
+    if boundary.duplicated:
+        return PrecommitSignal.DUPLICATED
+    if not boundary.hooks_present:
+        return PrecommitSignal.UNREFRESHABLE
+    leftovers = existing_precommit_configs(target)
+    if any(_carries_vaultspec_hooks(c) for c in leftovers):
+        return PrecommitSignal.SHADOWED
+    if leftovers:
+        return PrecommitSignal.ORPHANED
+    return _reassess_against_installation(target, PrecommitSignal.COMPLETE)
+
+
+#: Signals a shadowed copy may displace: the live config is otherwise sound,
+#: so the copy prek ignores is the one thing left to report. A signal naming
+#: a fault in the live config stays, as the more urgent finding.
+_HEALTHY = (PrecommitSignal.COMPLETE, PrecommitSignal.NOT_INSTALLED)
+
+
+def _carries_vaultspec_hooks(config: Path) -> bool:
+    """Whether *config* lists any vaultspec hook, current or retired."""
+    from ..precommit import managed_strip_outcome
+
+    return managed_strip_outcome(config) in ("delete", "rewrite")
+
+
+def _yaml_lists_a_canonical_hook_twice(config: Path) -> bool:
+    """Whether prek would run a canonical hook in *config* more than once."""
+    from ..commands import CANONICAL_HOOK_IDS
+
+    hooks = _local_precommit_hooks(config) or []
+    ids = [str(h.get("id")) for h in hooks if h.get("id") in CANONICAL_HOOK_IDS]
+    return len(ids) > len(set(ids))
 
 
 def _hooks_directory(target: Path) -> Path | None:

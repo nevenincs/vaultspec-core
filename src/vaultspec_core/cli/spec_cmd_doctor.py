@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from vaultspec_core.core.diagnosis import (
         GitattributesSignal,
         GitignoreSignal,
+        PrecommitSignal,
         ProviderDiagnosis,
         ProviderHookSignal,
         WorkspaceDiagnosis,
@@ -515,6 +516,8 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             PrecommitSignal.UNREADABLE: ("warn", "yellow"),
             PrecommitSignal.DECLINED: ("info", "dim"),
             PrecommitSignal.DECLINED_LEFTOVER: ("info", "dim"),
+            PrecommitSignal.DUPLICATED: ("error", "red"),
+            PrecommitSignal.SHADOWED: ("warn", "yellow"),
         },
     )
     pc_detail = {
@@ -548,6 +551,18 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "but a pre-commit YAML config is still on disk - 'vaultspec-core "
             "spec precommit migrate --remove-yaml' removes vaultspec's hooks "
             "from it and keeps any of your own"
+        ),
+        PrecommitSignal.DUPLICATED: (
+            "the hook config prek reads lists a vaultspec hook more than once, "
+            "so it runs repeatedly on every commit - 'vaultspec-core sync' "
+            "removes the extra copies (with prek.toml: 'vaultspec-core spec "
+            "precommit migrate')"
+        ),
+        PrecommitSignal.SHADOWED: (
+            "vaultspec hooks are also listed in a config file prek does not "
+            "read, so they look configured and never run - delete that file "
+            "or its vaultspec entries (with prek.toml: 'vaultspec-core spec "
+            "precommit migrate --remove-yaml')"
         ),
     }.get(diag.precommit, str(diag.precommit))
     rows.append(
@@ -815,6 +830,33 @@ def _provider_hooks_weigh_warn(reports: "list[ProviderHookReport]") -> bool:
     return any(report.signal not in benign for report in reports)
 
 
+def _precommit_weight(signal: "PrecommitSignal") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for the pre-commit row."""
+    from vaultspec_core.core.diagnosis import PrecommitSignal
+
+    return (
+        # The live config runs a vaultspec hook more than once per commit.
+        signal == PrecommitSignal.DUPLICATED,
+        signal
+        in (
+            PrecommitSignal.INCOMPLETE,
+            PrecommitSignal.NON_CANONICAL,
+            PrecommitSignal.NO_HOOKS,
+            # A perfect config that nothing executes is the failure this whole
+            # row exists to report, so it warns exactly as a broken config does.
+            PrecommitSignal.NOT_INSTALLED,
+            # Content-verified genuine stranding: prek.toml owns the boundary
+            # and lacks the canonical hooks, so nothing runs them anywhere.
+            PrecommitSignal.UNREFRESHABLE,
+            # The collector could not run, so this row vouches for nothing.
+            PrecommitSignal.UNREADABLE,
+            # A copy of vaultspec's hooks prek never reads: harmless to run,
+            # but it misleads anyone reading that file.
+            PrecommitSignal.SHADOWED,
+        ),
+    )
+
+
 def _gitignore_weight(signal: "GitignoreSignal") -> tuple[bool, bool]:
     """Return ``(error, warn)`` for the gitignore row.
 
@@ -852,7 +894,6 @@ def doctor_exit_code(
         FrameworkSignal,
         ManifestEntrySignal,
         ModeMismatchSignal,
-        PrecommitSignal,
         ProviderDirSignal,
         RenameIntegritySignal,
         VaultContentSignal,
@@ -877,20 +918,9 @@ def doctor_exit_code(
     gitattributes_error, gitattributes_warn = _gitattributes_weight(diag.gitattributes)
     has_error = has_error or gitattributes_error
     has_warn = has_warn or gitattributes_warn
-    if diag.precommit in (
-        PrecommitSignal.INCOMPLETE,
-        PrecommitSignal.NON_CANONICAL,
-        PrecommitSignal.NO_HOOKS,
-        # A perfect config that nothing executes is the failure this whole
-        # row exists to report, so it warns exactly as a broken config does.
-        PrecommitSignal.NOT_INSTALLED,
-        # Content-verified genuine stranding: prek.toml owns the boundary
-        # and lacks the canonical hooks, so nothing runs them anywhere.
-        PrecommitSignal.UNREFRESHABLE,
-        # The collector could not run, so this row vouches for nothing.
-        PrecommitSignal.UNREADABLE,
-    ):
-        has_warn = True
+    precommit_error, precommit_warn = _precommit_weight(diag.precommit)
+    has_error = has_error or precommit_error
+    has_warn = has_warn or precommit_warn
     has_warn = has_warn or _provider_hooks_weigh_warn(diag.provider_hooks)
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True

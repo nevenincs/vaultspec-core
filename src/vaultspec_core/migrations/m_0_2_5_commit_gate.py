@@ -80,10 +80,9 @@ def _converge_prek(workspace: Path) -> MigrationResult:
 
     if collect_prek_boundary(workspace).parse_error:
         return _result("prek.toml could not be read; left for spec doctor")
-    if refresh_managed_prek_block(workspace):
-        return _result(
-            "re-rendered the managed prek.toml block with the commit gate", prek=1
-        )
+    change = refresh_managed_prek_block(workspace)
+    if change:
+        return _result(f"{change} in prek.toml", prek=1)
     return _result("no stale vaultspec block in prek.toml; nothing converged")
 
 

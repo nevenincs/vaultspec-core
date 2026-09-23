@@ -179,6 +179,9 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
     PrecommitSignal.NON_CANONICAL: (
         "Hook entries use non-canonical pattern; should use '{entry_prefix}'"
     ),
+    PrecommitSignal.DUPLICATED: (
+        "A vaultspec hook is listed more than once and would run repeatedly"
+    ),
 }
 
 #: Signals that describe a coherent boundary no resolution step acts on.
@@ -193,11 +196,14 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
 #: on a state nobody has seen (issue #407).
 #: DECLINED and DECLINED_LEFTOVER mean the committed declaration refused the
 #: hooks; the scaffold declines too, so a repair would be a permanent no-op.
+#: SHADOWED means a copy of vaultspec's hooks sits in a config prek does not
+#: read. That file is the operator's; its removal is theirs to make.
 #: NOT_INSTALLED means the config is complete but no git hook runs it.
 #: Installing a hook is the operator's call, never sync's; `doctor` reports it.
 _PRECOMMIT_INERT_SIGNALS = (
     PrecommitSignal.COMPLETE,
     PrecommitSignal.NOT_INSTALLED,
+    PrecommitSignal.SHADOWED,
     PrecommitSignal.UNREFRESHABLE,
     PrecommitSignal.ORPHANED,
     PrecommitSignal.UNREADABLE,

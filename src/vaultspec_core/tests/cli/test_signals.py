@@ -107,6 +107,8 @@ pytestmark = [pytest.mark.unit]
                 "UNREADABLE",
                 "DECLINED",
                 "DECLINED_LEFTOVER",
+                "DUPLICATED",
+                "SHADOWED",
                 "COMPLETE",
             },
         ),

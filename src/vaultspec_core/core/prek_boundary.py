@@ -95,12 +95,17 @@ class PrekBoundaryState:
             treats ID presence as "hooks live here" because ``prek.toml``
             is operator-owned and a customised entry is not a stranded
             hook.
+        managed_blocks: How many vaultspec-managed blocks the file carries.
+        canonical_listings: How many hook entries in the local repos carry a
+            canonical id, inside or outside the managed blocks.
     """
 
     config_exists: bool
     parse_error: bool = False
     hook_ids_present: frozenset[str] = field(default_factory=frozenset)
     entries_canonical: bool = False
+    managed_blocks: int = 0
+    canonical_listings: int = 0
 
     @property
     def owns_boundary(self) -> bool:
@@ -113,6 +118,13 @@ class PrekBoundaryState:
         from .commands import CANONICAL_HOOK_IDS
 
         return self.hook_ids_present == CANONICAL_HOOK_IDS
+
+    @property
+    def duplicated(self) -> bool:
+        """Whether prek would run a canonical hook more than once per commit."""
+        return self.managed_blocks > 1 or self.canonical_listings > len(
+            self.hook_ids_present
+        )
 
 
 def _local_hooks(data: dict[str, object]) -> list[dict[str, object]]:
@@ -166,7 +178,8 @@ def collect_prek_boundary(
         return PrekBoundaryState(config_exists=False)
 
     try:
-        data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        raw = config_path.read_text(encoding="utf-8")
+        data = tomllib.loads(raw)
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:
         logger.warning("Cannot read %s: %s", config_path, exc)
         return PrekBoundaryState(config_exists=True, parse_error=True)
@@ -189,6 +202,8 @@ def collect_prek_boundary(
         config_exists=True,
         hook_ids_present=found,
         entries_canonical=entries_canonical,
+        managed_blocks=len(_managed_spans(raw.splitlines())),
+        canonical_listings=sum(1 for h in hooks if h.get("id") in CANONICAL_HOOK_IDS),
     )
 
 
@@ -282,24 +297,6 @@ class PrekMigrationResult:
     yaml_removed: bool = False
 
 
-def _block_carries_retired_hook(raw: str) -> bool:
-    """Whether the managed block in *raw* still renders a retired hook ID.
-
-    Only the managed block is inspected: a retired ID the operator wrote
-    outside the markers is theirs, and migration never edits outside them.
-    """
-    from .precommit import RETIRED_HOOK_IDS
-
-    lines = raw.splitlines()
-    begins = [i for i, line in enumerate(lines) if line.strip() == MARKER_BEGIN]
-    ends = [i for i, line in enumerate(lines) if line.strip() == MARKER_END]
-    if not (begins and ends and begins[0] < ends[0]):
-        return False
-    block = lines[begins[0] + 1 : ends[0]]
-    rendered_ids = {f"id = {_toml_string(hook_id)}" for hook_id in RETIRED_HOOK_IDS}
-    return any(line.strip() in rendered_ids for line in block)
-
-
 def _replace_or_append_block(raw: str, block: str) -> str:
     """Substitute the managed block in *raw*, or append it.
 
@@ -325,26 +322,60 @@ def _replace_or_append_block(raw: str, block: str) -> str:
     return raw + separator + block.replace("\n", newline)
 
 
+def _managed_spans(lines: list[str]) -> list[tuple[int, int]]:
+    """Return the ``(begin, end)`` line indices of every managed block, in order."""
+    spans: list[tuple[int, int]] = []
+    begin: int | None = None
+    for index, line in enumerate(lines):
+        if line.strip() == MARKER_BEGIN and begin is None:
+            begin = index
+        elif line.strip() == MARKER_END and begin is not None:
+            spans.append((begin, index))
+            begin = None
+    return spans
+
+
+def _without_spans(lines: list[str], spans: list[tuple[int, int]]) -> list[str]:
+    """Return *lines* minus each span and the blank line that introduced it."""
+    dropped: set[int] = set()
+    for begin, end in spans:
+        dropped.update(range(begin, end + 1))
+        if begin > 0 and not lines[begin - 1].strip():
+            dropped.add(begin - 1)
+    return [line for index, line in enumerate(lines) if index not in dropped]
+
+
 def refresh_managed_prek_block(
     target: Path, *, mode: InstallMode | None = None, dry_run: bool = False
-) -> bool:
-    """Re-render an existing managed hook block in ``prek.toml``, adding none.
+) -> str | None:
+    """Bring vaultspec's managed hook block in ``prek.toml`` to one canonical copy.
 
-    Only the lines between the vaultspec markers are compared and replaced, so
-    operator-authored TOML is never touched and a ``prek.toml`` without a
-    managed block is left exactly as it is: transplanting hooks into one is
-    the operator's call through ``spec precommit migrate``.
+    Only vaultspec's own lines between the markers are ever changed, and a
+    ``prek.toml`` with no managed block is left exactly as it is:
+    transplanting hooks into one is the operator's call through
+    ``spec precommit migrate``. Within that bound:
+
+    - a stale managed block is re-rendered to the canonical set;
+    - extra managed blocks are removed, keeping the first, because each copy
+      of the gate would run again on every commit;
+    - when the operator already lists a canonical hook outside the markers,
+      every managed block is removed, because the operator's own entry is the
+      one to keep and vaultspec never edits outside its markers.
+
+    A file that is not valid TOML is refused, as ``migrate_hooks_to_prek``
+    refuses it: markers inside a multi-line string are not a managed block.
 
     Args:
         target: Workspace root directory.
         mode: Provisioning mode to render entries for; resolved from the
             workspace declaration when ``None``.
-        dry_run: Report whether a refresh is due without writing.
+        dry_run: Report the change without writing.
 
     Returns:
-        ``True`` when the managed block differed from the canonical render
-        (and, unless *dry_run*, was rewritten).
+        A short description of the change made (or, under *dry_run*, due),
+        or ``None`` when the managed block is already the one canonical copy.
     """
+    from .commands import CANONICAL_HOOK_IDS
     from .helpers import atomic_write
     from .workspace_mode import resolve_render_mode
 
@@ -353,24 +384,47 @@ def refresh_managed_prek_block(
         # Bytes, not ``read_text``: universal newlines would erase the CRLF
         # convention the rewrite must preserve.
         raw = config_path.read_bytes().decode("utf-8")
-        # Refuse a file that is not valid TOML, as ``migrate_hooks_to_prek``
-        # does: markers inside a multi-line string are not a managed block.
         tomllib.loads(raw)
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
-        return False
+        return None
     lines = raw.splitlines()
-    begins = [i for i, line in enumerate(lines) if line.strip() == MARKER_BEGIN]
-    ends = [i for i, line in enumerate(lines) if line.strip() == MARKER_END]
-    if not (begins and ends and begins[0] < ends[0]):
-        return False
-    if mode is None:
-        mode = resolve_render_mode(target)
-    block = render_prek_hook_block(mode)
-    if lines[begins[0] : ends[0] + 1] == block.splitlines():
-        return False
+    spans = _managed_spans(lines)
+    if not spans:
+        return None
+
+    outside = "\n".join(_without_spans(lines, spans))
+    try:
+        operator_hooks = _local_hooks(tomllib.loads(outside))
+    except tomllib.TOMLDecodeError:
+        operator_hooks = []
+    if any(h.get("id") in CANONICAL_HOOK_IDS for h in operator_hooks):
+        kept = _without_spans(lines, spans)
+        change = (
+            "removed vaultspec's managed block; the canonical hook written "
+            "outside it stands"
+        )
+    else:
+        if mode is None:
+            mode = resolve_render_mode(target)
+        block = render_prek_hook_block(mode).splitlines()
+        first_begin, first_end = spans[0]
+        if len(spans) == 1 and lines[first_begin : first_end + 1] == block:
+            return None
+        rest = _without_spans(lines, spans[1:])
+        # Indices of the first span are unchanged: every removed span follows it.
+        kept = [*rest[:first_begin], *block, *rest[first_end + 1 :]]
+        change = (
+            f"collapsed {len(spans)} managed blocks into one"
+            if len(spans) > 1
+            else "re-rendered the managed block"
+        )
     if not dry_run:
-        atomic_write(config_path, _replace_or_append_block(raw, block))
-    return True
+        newline = "\r\n" if "\r\n" in raw else "\n"
+        rendered = newline.join(kept)
+        if raw.endswith(("\n", "\r")):
+            rendered += newline
+        atomic_write(config_path, rendered)
+    return change
 
 
 def _strip_declined_leftovers(
@@ -426,9 +480,9 @@ def migrate_hooks_to_prek(
 
     Explicitly operator-invoked; never runs as part of install or sync.
     Idempotent: when the full canonical hook set is already present the
-    file is left byte-for-byte untouched, unless the managed block still
-    renders a hook vaultspec-core has since retired, in which case the block
-    is re-rendered without it. The managed block is replaced in
+    file is left byte-for-byte untouched, unless vaultspec's managed block is
+    stale or duplicated, in which case :func:`refresh_managed_prek_block`
+    brings it to one canonical copy. The managed block is replaced in
     place when its markers exist, appended otherwise; operator-authored
     TOML outside the markers is never parsed for writing, only read for
     the boundary assessment.
@@ -490,14 +544,13 @@ def migrate_hooks_to_prek(
         )
 
     raw = config_path.read_bytes().decode("utf-8")
-    if boundary.hooks_present and _block_carries_retired_hook(raw):
-        rendered = _replace_or_append_block(raw, render_prek_hook_block(mode))
-        if not dry_run:
-            atomic_write(config_path, rendered)
-        result = PrekMigrationResult(
-            status="migrated",
-            detail="removed retired hooks from the managed block in prek.toml",
-        )
+    change = (
+        refresh_managed_prek_block(target, mode=mode, dry_run=dry_run)
+        if boundary.hooks_present
+        else None
+    )
+    if change:
+        result = PrekMigrationResult(status="migrated", detail=f"{change} in prek.toml")
     elif boundary.hooks_present:
         result = PrekMigrationResult(
             status="unchanged",

@@ -277,9 +277,18 @@ def _execute_repair_gitattributes(target: Path, _step: ResolutionStep) -> None:
 
 
 def _execute_repair_precommit(target: Path, _step: ResolutionStep) -> None:
-    """Scaffold or repair canonical pre-commit hooks."""
-    from .commands import scaffold_precommit
+    """Scaffold or repair canonical pre-commit hooks.
 
+    Under ``prek.toml`` the scaffold declines, so a repair there is confined to
+    vaultspec's own managed block: it is re-rendered or de-duplicated, never
+    added.
+    """
+    from .commands import scaffold_precommit
+    from .prek_boundary import PREK_CONFIG_NAME, refresh_managed_prek_block
+
+    if (target / PREK_CONFIG_NAME).exists():
+        refresh_managed_prek_block(target)
+        return
     scaffold_precommit(target)
 
 
