@@ -144,11 +144,13 @@ class PrecommitSignal(StrEnum):
     :attr:`NOT_INSTALLED` reports: git has no ``pre-commit`` hook, so the
     declared hooks never execute on a commit.
 
-    ``UNREADABLE`` is not a state of the subject at all: it says the check
-    could not run. A collector that fails must not report the value it would
-    have reported had it run and found nothing wrong - that is how a broken
-    workspace came to read as a healthy one (issue #407). Weighed as a
-    warning, because a check that did not run cannot vouch for anything.
+    ``UNREADABLE`` says the config vouches for nothing: either the check could
+    not run, or the config lists vaultspec hooks in a shape the scaffold will
+    not rewrite, so no writer maintains them. A collector that fails must not
+    report the value it would have reported had it run and found nothing
+    wrong - that is how a broken workspace came to read as a healthy one
+    (issue #407). Weighed as a warning, because such a config cannot vouch for
+    anything.
 
     ``DECLINED`` and ``DECLINED_LEFTOVER`` report a workspace whose committed
     declaration sets ``hooks.pre_commit`` to ``false``. Neither is a fault:

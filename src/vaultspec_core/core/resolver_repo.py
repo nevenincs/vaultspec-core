@@ -191,9 +191,10 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
 #: hooks live safely in ``prek.toml`` and the leftover
 #: ``.pre-commit-config.yaml`` is superseded and operator-owned; removal is
 #: operator-gated, never a sync-time repair.
-#: UNREADABLE means the collector failed, so nothing about the config was
-#: observed. `doctor` weighs that as a warning; a repair here would be acting
-#: on a state nobody has seen (issue #407).
+#: UNREADABLE means the collector failed, or the config lists vaultspec hooks
+#: in a shape the scaffold will not rewrite. `doctor` weighs that as a
+#: warning; a repair here would act on a state nobody has seen (issue #407) or
+#: that no writer can change.
 #: DECLINED and DECLINED_LEFTOVER mean the committed declaration refused the
 #: hooks; the scaffold declines too, so a repair would be a permanent no-op.
 #: SHADOWED means a copy of vaultspec's hooks sits in a config prek does not

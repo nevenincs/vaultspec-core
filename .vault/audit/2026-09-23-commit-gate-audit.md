@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:96f62aced58a712ee3859c3362874326da21db26fa84cfcc38b5503976d41417'
+body_hash: 'sha256:e63b7e9ab58bb3b1612c4096b60d5ab608b8779414e873302378fe6da87f9f2f'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
   - "[[2026-09-23-commit-gate-adr]]"
@@ -243,15 +243,48 @@ S14 set. The other collectors' reads of the files they own are outside that scop
 Result of the S13/S14 review: REVISION REQUIRED, then fixed. The high and both mediums are
 resolved in reopened S14, and the S13 low is fixed. The two remaining lows are recorded.
 
+### s14-unreadable-contract-text | medium | the UNREADABLE contract still said only that the check did not run
+
+The re-review of b4348759 found that `PrecommitSignal`'s docstring in
+`src/vaultspec_core/core/diagnosis/signals.py`, the inert-signal comment in
+`src/vaultspec_core/core/resolver_repo.py` and the weighting comment in
+`src/vaultspec_core/cli/spec_cmd_doctor.py` described one cause where there are now two.
+Fixed under reopened S14: all three name both causes, a failed check and vaultspec hooks in a
+shape the scaffold will not rewrite.
+
+### s14-unrecognised-shape-without-hooks-stands-down | medium | a hook config nobody could interpret still reads as the operator's removal
+
+This predates S14 and is outside it. A config whose `repos` is not a list, or that is not a
+mapping, has no vaultspec hooks the reconcile can see, so it reads `NO_HOOKS`, and
+`src/vaultspec_core/core/provider_sync.py:201` then records a durable stand-down. The same
+module refuses that inference for an unreadable `.gitignore`. Recorded, not changed:
+changing it is new scope, and it would reverse the collector tests that pin `NO_HOOKS`.
+
+### s14-redundant-ingress-call | low | the content row called `ensure_raw_texts` after a build that already fills them
+
+Fixed: the call is removed. That the row pays a cold graph parse per doctor run, because it
+may not write the cache, stays recorded under s14-vault-content-row-cost.
+
+Result of the b4348759 re-review: PASS. The contract text medium and the low are fixed, and
+the stand-down medium is recorded as follow-on scope.
+
 ## Recommendations
+
+- s14-unrecognised-shape-without-hooks-stands-down: a follow-on ADR should decide whether sync
+  may infer a durable pre-commit stand-down from a hook config whose shape it never
+  recognised, or must hold management as it does for an unreadable `.gitignore`.
 
 - declined-migrate-deletes-operator-config: in the declined branch, delete a config only when
   it carries nothing but managed hooks; otherwise strip the managed ids and keep the file.
+
 - provider-guard-blocks-declined-config: give the guard its own subset of the managed
   entries, excluding the declined hook-config lines. Whether "ignored by the managed block"
   and "must never be staged" should be one set or two is a decision for a follow-on ADR.
+
 - head-attribution-desync: skip every object's payload by its size, and treat a malformed
   header as "no baseline" for the remaining paths.
+
 - Add a test that the baseline pass writes nothing to disk.
+
 - `_LinkIndex` is rebuilt per process. A commit large enough for the runner to split into
   several invocations walks the vault once per invocation; measure before it matters.

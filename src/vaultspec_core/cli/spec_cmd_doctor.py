@@ -859,7 +859,8 @@ def _precommit_weight(signal: "PrecommitSignal") -> tuple[bool, bool]:
             # Content-verified genuine stranding: prek.toml owns the boundary
             # and lacks the canonical hooks, so nothing runs them anywhere.
             PrecommitSignal.UNREFRESHABLE,
-            # The collector could not run, so this row vouches for nothing.
+            # The collector could not run, or no writer maintains the hooks
+            # in the shape found, so this row vouches for nothing.
             PrecommitSignal.UNREADABLE,
             # A copy of vaultspec's hooks prek never reads: harmless to run,
             # but it misleads anyone reading that file.

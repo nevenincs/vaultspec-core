@@ -203,7 +203,6 @@ def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, 
     # run; standalone, each walks and reads every document again. The graph
     # cache stays untouched because a diagnosis writes nothing.
     graph = VaultGraph(target, use_cache=False)
-    graph.ensure_raw_texts()
     annotated = len(
         check_annotations(target, fix=False, raw_texts=graph.raw_texts).diagnostics
     )

@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:fdb39bfb2c8b8e75a0e50c1a5c457419fdf941320b6e89813ec38f1b6e5db7aa'
+body_hash: 'sha256:dbad211e67ddd10c9bca70e19856cae3a142953cc65b30b07a4c96351fce0a2f'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -131,6 +131,9 @@ related:
 - `S14` `M` `src/vaultspec_core/tests/cli/test_doctor_aggregates_canonical_checks.py`
 - `S14` `M` `src/vaultspec_core/tests/cli/test_precommit_hook_set.py`
 - `S14` `verify:` `pytest unrecognised hooks list without the recognised check` -> `fail`
+- `S14` `M` `src/vaultspec_core/core/diagnosis/signals.py`
+- `S14` `M` `src/vaultspec_core/core/resolver_repo.py`
+- `S14` `verify:` `pytest tests/cli core/tests` -> `pass`
 
 ## Notes
 
