@@ -1036,12 +1036,13 @@ last line `text` holds, and `truncated` marks a passage that goes on past it. A
 `supporting` excerpt is present only when the answer spans two passages. The
 `not_configured` and `unavailable` replies carry a `next_step` (`kind` `rag_search` or
 `listing`, the `types` it covers, and the `command` to run, where `<intent>` stands for
-your question) and a `remediation` sentence that words it, and `unavailable` also
-carries its `reason`: `credential_rejected`, `content_rejected`, `rate_limited`,
-`transport`, `deadline`, `invalid_response`, or `request_too_large`. `usage` reports the
-requests, tokens, and time a search spent, and `unscored`, the number of records the
-provider would not read in full. `answered` is `false` for the whole vault only when
-`unscored` is `0`. The JSON carries non-ASCII text as UTF-8 rather than `\u` escapes.
+your question and the `--feature` and `--date` filters are kept when the search had
+them) and a `remediation` sentence that words it, and `unavailable` also carries its
+`reason`: `credential_rejected`, `content_rejected`, `rate_limited`, `transport`,
+`deadline`, `invalid_response`, or `request_too_large`. `usage` reports the requests,
+tokens, and time a search spent, and `unscored`, the number of records the provider
+would not read in full. `answered` is `false` for the whole vault only when `unscored`
+is `0`. The JSON carries non-ASCII text as UTF-8 rather than `\u` escapes.
 
 Exit codes:
 
@@ -1479,8 +1480,8 @@ branches appending different Steps merge without a conflict.
 - `--step STEP` - Required canonical Step identifier or display path being logged.
 - `--row SPEC` - Row to append, repeatable. `A:path` added, `M:path` modified, `D:path`
   deleted, `R:old->new` renamed. The verb never infers an operation from disk state.
-- `--verify SPEC` - A check that ran, as `<command>=pass` or `<command>=fail`; written
-  as a `verify:` row.
+- `--verify SPEC` - A check that ran, as `<command>=pass` or `<command>=fail`,
+  repeatable; each is written as its own `verify:` row.
 - `--by PERSONA` - The persona that closed the Step; written as a `by:` row.
 - `--note TEXT` - Exception note, repeatable; written as a `## Notes` line under the
   Step id, the section created on first use.

@@ -476,17 +476,17 @@ ledger on first use. Append-only and idempotent; concurrent appends serialise on
 docs-domain lock and the managed `.gitattributes` block declares `merge=union` on
 ledgers.
 
-| Option           | Default | Description                                                                         |
-| ---------------- | ------- | ----------------------------------------------------------------------------------- |
-| `--feature TAG`  | None    | Feature tag, with or without `#`. Required.                                         |
-| `--related STEM` | None    | Parent plan stem. Required.                                                         |
-| `--step ID`      | None    | Canonical Step id or display path. Required.                                        |
-| `--row SPEC`     | None    | `A:path`, `M:path`, `D:path`, or `R:old->new`; repeatable.                          |
-| `--verify SPEC`  | None    | A check that ran, `<command>=pass` or `<command>=fail`; written as a `verify:` row. |
-| `--by PERSONA`   | None    | The persona that closed the Step; written as a `by:` row.                           |
-| `--note TEXT`    | None    | Exception note under the Step id in `## Notes`; repeatable.                         |
-| `--dry-run`      | off     | Resolve the ledger without writing.                                                 |
-| `--json`         | off     | Emit machine-readable output.                                                       |
+| Option           | Default | Description                                                                                                   |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `--feature TAG`  | None    | Feature tag, with or without `#`. Required.                                                                   |
+| `--related STEM` | None    | Parent plan stem. Required.                                                                                   |
+| `--step ID`      | None    | Canonical Step id or display path. Required.                                                                  |
+| `--row SPEC`     | None    | `A:path`, `M:path`, `D:path`, or `R:old->new`; repeatable.                                                    |
+| `--verify SPEC`  | None    | A check that ran, `<command>=pass` or `<command>=fail`, repeatable; each is written as its own `verify:` row. |
+| `--by PERSONA`   | None    | The persona that closed the Step; written as a `by:` row.                                                     |
+| `--note TEXT`    | None    | Exception note under the Step id in `## Notes`; repeatable.                                                   |
+| `--dry-run`      | off     | Resolve the ledger without writing.                                                                           |
+| `--json`         | off     | Emit machine-readable output.                                                                                 |
 
 ### vaultspec-core vault edit
 

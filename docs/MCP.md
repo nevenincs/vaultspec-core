@@ -400,9 +400,10 @@ to run instead, and `remediation`, one sentence giving the reason and that step.
 `kind` is `listing`, and `command` is `vaultspec-core vault list`, with the type when
 one was requested; run it or `find`, then grep `.vault/` for the passage. `types` lists
 the record types the step covers, and `<intent>` in `command` stands for your question.
-Provisioning is read from the workspace configuration, not checked for liveness. The
-server never calls vaultspec-rag itself; you or your agent run the step. `search` covers
-the vault only: use vaultspec-rag for code.
+When the request carried `feature` or `date`, `command` keeps them as `--feature` and
+`--date`. Provisioning is read from the workspace configuration, not checked for
+liveness. The server never calls vaultspec-rag itself; you or your agent run the step.
+`search` covers the vault only: use vaultspec-rag for code.
 
 **Hits.** Each hit reports `path`, `type`, `feature`, `date`, `title`, `score` (the
 ranking score), `answers` (the probability that the record states the answer),
@@ -683,10 +684,13 @@ plan completion percent), the plans currently in flight (stem, feature, tier, op
 closed step counts, completion percent, and the next open step), vault-wide totals, and
 `hosted_search`. That field reports whether [`search`](#search) has a key (`configured`)
 and, when it does, where the key was found (`source`: `environment` or `dotenv`). It
-describes configuration, not whether the key works. Unlike the CLI's
-`vaultspec-core status --json`, the tool carries no vaultspec-rag companion field: a
-declined `search` names the companion route in its own `next_step`. Every response
-carries a `tool_schema_version` field so a client can detect a server upgrade.
+describes configuration, not whether the key works. Next to it, `companion` reports
+whether the `vaultspec-rag` companion is provisioned, which decides the next step a
+declined `search` names (`package`, `signal`, `mode`, `version`, `floor`,
+`health_authority`, or `null` when the probe failed). It reports configuration, not
+liveness: a provisioned companion can still be down. Both fields come from the same
+backend call as `vaultspec-core status --json`. Every response carries a
+`tool_schema_version` field so a client can detect a server upgrade.
 
 Pass a target to trace one plan or feature instead. The response then reports each
 plan's steps in full detail (canonical ID, display path, checked state, the ledger stem

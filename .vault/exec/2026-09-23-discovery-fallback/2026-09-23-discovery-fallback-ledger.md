@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:1b063c8285bf630d7012600720c0fbdb53567949a479c1e80fe6c150f66f85ba'
+body_hash: 'sha256:6fc4b4d67543a96b165bc98841f0b118ce1883a73f767585ea4d672ca74a601c'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -130,6 +130,10 @@ related:
 - `S07` `verify:` `vault check all` -> `pass`
 - `S07` `verify:` `pytest test_exec_ledger test_exec_fold test_exec_recovery cli/test_exec_ledger_cli cli/test_ledger_merge cli/test_step_aware_exec mcp test_log_tool test_context_budget` -> `pass`
 - `S07` `by:` `opus-high`
+- `S05` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S05` `M` `.vaultspec/reference/cli.md`
+- `S05` `verify:` `just check-markdown` -> `pass`
+- `S05` `by:` `opus-low`
 
 ## Notes
 
