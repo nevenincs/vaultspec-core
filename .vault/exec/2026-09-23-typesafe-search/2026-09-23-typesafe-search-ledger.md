@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:3c9da9ac01f369ddfe349e6fd82725cf74182660d7dff214efbe87cc200f1333'
+body_hash: 'sha256:f2631f87ff91fb6deba99fd03da8abc43aa26a8169e0e13115452e771ddb7245'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -163,3 +163,14 @@ related:
 - `S08` `M` `.vaultspec/skills/vaultspec-code-research/SKILL.md`
 - `S08` `M` `.vaultspec/skills/vaultspec-curate/SKILL.md`
 - `S08` `M` `.vaultspec/skills/vaultspec-curate/references/reconciliation-playbook.md`
+- `S12` `M` `src/vaultspec_core/core/adr.py`
+- `S12` `M` `src/vaultspec_core/core/rules.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/checks/frontmatter.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/parser.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/query_rename.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/related_surgery.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/rename_ops.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_core.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`
+- `S12` `A` `src/vaultspec_core/vaultcore/tests/test_frontmatter_render.py`
+- `S12` `verify:` `pytest targeted vaultcore/core` -> `pass`
