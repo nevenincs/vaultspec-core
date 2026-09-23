@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Literal
 
 from .gitattributes import has_valid_block as _ga_has_valid_block
 from .gitignore import get_recommended_entries, managed_lock_candidates
+from .prek_boundary import PRECOMMIT_CONFIG_NAMES
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -363,6 +364,11 @@ def per_machine_paths(root: Path, paths: Iterable[str]) -> list[str]:
     drifting. Team-shared projections such as ``CLAUDE.md``, ``.mcp.json`` and
     the provider rule directories are not in the block, so they pass.
 
+    The one exception is the YAML hook config a workspace that declined the
+    hooks has the block ignore. That entry keeps vaultspec's refused config out
+    of a sweeping ``git add -A``; a config the operator authors there is theirs
+    and neither per-machine nor vaultspec's, so it is not blocked.
+
     Args:
         root: Workspace root the paths are relative to.
         paths: Root-relative candidate paths.
@@ -370,7 +376,8 @@ def per_machine_paths(root: Path, paths: Iterable[str]) -> list[str]:
     Returns:
         The per-machine paths among *paths*, in their given spelling.
     """
-    entries = get_recommended_entries(root)
+    declined_configs = {f"/{name}" for name in PRECOMMIT_CONFIG_NAMES}
+    entries = [e for e in get_recommended_entries(root) if e not in declined_configs]
     return [
         path
         for path in paths

@@ -119,3 +119,25 @@ def test_failure_advises_unstaging_never_untracking(
     assert result.returncode == 1
     assert "git restore --staged" in result.stderr
     assert "rm --cached" not in result.stderr
+
+
+def test_a_declined_workspaces_own_hook_config_is_not_per_machine(
+    committed: WorkspaceFactory,
+) -> None:
+    """Declining vaultspec's hooks makes the block ignore the config name.
+
+    That keeps vaultspec's refused config out of a sweeping commit. A config
+    the operator deliberately authors and stages there is theirs, not a
+    per-machine artifact, so the guard must let it through.
+    """
+    from vaultspec_core.core.workspace_mode import (
+        HooksDeclaration,
+        write_hooks_declaration,
+    )
+
+    root = committed.root
+    write_hooks_declaration(root, HooksDeclaration(pre_commit=False))
+    (root / ".pre-commit-config.yaml").write_text("repos: []\n", encoding="utf-8")
+    _git(root, "add", "-f", "--", ".pre-commit-config.yaml")
+
+    assert check_staged_provider_artifacts(cwd=root) == []
