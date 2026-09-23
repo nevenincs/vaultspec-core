@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:ac535e60e3b4aa3ceb230fad3638e87bcbaf63fd1f12bc6406492ef85f9eae34'
+body_hash: 'sha256:e4c2771147ee80d638691951251beae8eaf5fbffd9b70907733606d58a138765'
 ---
 
 # `commit-gate` plan
@@ -17,7 +17,9 @@ Replace the three whole-vault commit hooks with one staged-document gate, and st
 
 ## Description
 
-Draft, awaiting approval. The user directed this work on 2026-09-23 ("absolutely do that") after reviewing the production analysis. That covers filing the issues and drafting this plan with its ADR. It does not accept the ADR, so no Step governed by it executes until the ADR is accepted and this plan is approved. The user separately asked on 2026-09-23 that `just init` be fixed too.
+Approved 2026-09-23
+
+Basis: on 2026-09-23 the user accepted `2026-09-23-commit-gate-adr`, including the amendment to the sanitize-hook clause of `2026-05-15-template-annotation-sanitization-adr`, and approved this plan. The same instruction directed testing `just init` in an isolated scratch worktree and managing the prek hook install on the live core repository. The work was first directed on 2026-09-23 ("absolutely do that") after the user reviewed the production analysis. The user separately asked on 2026-09-23 that `just init` be fixed too.
 
 Decision coverage:
 

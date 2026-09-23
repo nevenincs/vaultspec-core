@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:22b1b10f85c1f119a746a95f8c0dc217aa6c2f3db6818c41da991a7e2763f207'
+body_hash: 'sha256:b29996b6726321bba638a058f30424a6d30a526d3e597d1ae6ceac9bbdafdd23'
 related:
   - "[[2026-09-23-commit-gate-research]]"
   - "[[2026-02-24-vault-doctor-suite-adr]]"
@@ -15,7 +15,7 @@ related:
   - "[[2026-07-23-prek-boundary-hardening-adr]]"
 ---
 
-# `commit-gate` adr: `the commit gate checks what the commit stages, in one process` | (**status:** `proposed`)
+# `commit-gate` adr: `the commit gate checks what the commit stages, in one process` | (**status:** `accepted`)
 
 ## Problem Statement
 
