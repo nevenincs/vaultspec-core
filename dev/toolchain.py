@@ -703,6 +703,16 @@ TEST = Verb(
             (lane("benchmark", PACKAGE, "-q", "-m", "benchmark"),),
         ),
         Target(
+            "typesafe",
+            "The hosted-search tests against the live TypeSafe API.",
+            # Outside `all` and `ci` like every credential-gated marker: it
+            # needs VAULTSPEC_CORE_TYPESAFE_API_KEY and fails without it, so
+            # it runs where the key is guaranteed - the merge gate, from a
+            # repository secret - and by name wherever a contributor exports
+            # the key.
+            (lane("typesafe", PACKAGE, "-q", "-m", "typesafe"),),
+        ),
+        Target(
             "harness",
             "The dev/ and docs/ development-instrument guards.",
             # Every instrument guard runs in ONE lane rather than one lane per

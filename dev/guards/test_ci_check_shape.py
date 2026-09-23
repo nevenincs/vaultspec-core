@@ -87,6 +87,7 @@ LINUX_RECIPES = (
     "test-harness",
     "test-repo",
     "test-broad",
+    "test-typesafe",
     "framework-install",
     "vault-check",
     "audit-deps",
@@ -118,6 +119,12 @@ RECIPE_VERB = {"check": "lint"}
 #: so these are expected in all of them and are not repeated work in the sense
 #: this file polices - re-running them is how a second machine gets a venv.
 PROVISIONING = frozenset({"just init", "just framework-install"})
+
+#: Recipes the merge gate runs with a repository secret that `just ci` cannot
+#: assume a contributor holds. Each fails rather than passes without its key,
+#: so keeping it out of the local gate never turns a keyless run green; a
+#: contributor runs it by name with the key exported.
+CREDENTIAL_GATED = frozenset({"just test-typesafe"})
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -704,7 +711,7 @@ def test_the_local_gate_runs_every_gate_the_pull_request_runs() -> None:
             run = str(step.get("run", "")).strip()
             # Provisioning is how a fresh runner gets an environment a
             # contributor already has; it is not a gate that can go unrun.
-            if not run.startswith("just ") or run in PROVISIONING:
+            if not run.startswith("just ") or run in PROVISIONING | CREDENTIAL_GATED:
                 continue
             recipe = run.removeprefix("just ").split()[0]
             for argv in sorted(_leaf_commands(recipe) - covered):
@@ -714,3 +721,53 @@ def test_the_local_gate_runs_every_gate_the_pull_request_runs() -> None:
         "contributor's green is not the merge gate's green:\n  "
         + "\n  ".join(sorted(set(uncovered)))
     )
+
+
+def test_every_credential_gated_gate_holds_its_key_on_every_path() -> None:
+    """A credential-gated recipe gets its key from a secret wherever it runs.
+
+    Keeping one out of `just ci` is safe only because the merge gate holds the
+    key. The gate also runs as a called workflow - a release, main's daily
+    health - where it sees only the secrets its caller passes, so a key wired
+    into the pull-request path alone would first fail on a release tag.
+    """
+    gated = [
+        step
+        for job in _jobs().values()
+        for step in job.get("steps", [])
+        if str(step.get("run", "")).strip() in CREDENTIAL_GATED
+    ]
+    assert {str(step["run"]).strip() for step in gated} == CREDENTIAL_GATED, (
+        "a recipe exempt from the local mirror as credential-gated must run "
+        "in the merge gate"
+    )
+    needed: set[str] = set()
+    for step in gated:
+        bound = {
+            name
+            for name, value in (step.get("env") or {}).items()
+            if str(value).strip() == f"${{{{ secrets.{name} }}}}"
+        }
+        assert bound, (
+            f"`{step['run']}` must take its key from the repository secret of "
+            "the same name"
+        )
+        needed |= bound
+
+    declared = set(_events(_gate())["workflow_call"].get("secrets") or {})
+    assert needed <= declared, (
+        f"merge-gate.yml must declare {sorted(needed - declared)} under "
+        "workflow_call.secrets, or a release runs the gate without them"
+    )
+    callers = {
+        f"{path.name} `{job_id}`": job
+        for path in _workflow_paths()
+        for job_id, job in _workflow_jobs(_load(path)).items()
+        if str(job.get("uses", "")).endswith("/merge-gate.yml")
+    }
+    assert callers, "no workflow calls the merge gate; the walk found nothing"
+    for caller, job in callers.items():
+        passed = set(job.get("secrets") or {})
+        assert needed <= passed, (
+            f"{caller} calls the merge gate without {sorted(needed - passed)}"
+        )

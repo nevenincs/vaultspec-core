@@ -41,3 +41,5 @@ jobs:
       pull-requests: write
     with:
       ref: main
+    secrets:
+      VAULTSPEC_CORE_TYPESAFE_API_KEY: ${{ secrets.VAULTSPEC_CORE_TYPESAFE_API_KEY }}
