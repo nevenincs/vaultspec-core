@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:8125351eb231543e17a9767d2d3e7d0e9510f9a7a8a9b12e073ab2c224c15f35'
+body_hash: 'sha256:08d288de5f0f410e72f78204a7cee669c40a2715695052dfe78a8edc666ddcc5'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---
@@ -85,9 +85,31 @@ related:
 - `S05` `M` `docs/MCP.md`
 - `S05` `verify:` `just framework-reference-check` -> `pass`
 - `S05` `by:` `opus-medium`
+- `S04` `M` `src/vaultspec_core/core/discovery_guidance.py`
+- `S04` `M` `src/vaultspec_core/tests/test_discovery_guidance.py`
+- `S04` `M` `src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md`
+- `S04` `M` `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`
+- `S04` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S04` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/references/reconciliation-playbook.md`
+- `S04` `M` `src/vaultspec_core/builtins/skills/vaultspec-adr/SKILL.md`
+- `S04` `M` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
+- `S04` `M` `src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`
+- `S04` `M` `src/vaultspec_core/builtins/agents/vaultspec-reference-auditor.md`
+- `S04` `M` `.vaultspec/rules/vaultspec-discovery.builtin.md`
+- `S04` `M` `.vaultspec/skills/vaultspec-code-research/SKILL.md`
+- `S04` `M` `.vaultspec/skills/vaultspec-curate/SKILL.md`
+- `S04` `M` `.vaultspec/skills/vaultspec-curate/references/reconciliation-playbook.md`
+- `S04` `M` `.vaultspec/skills/vaultspec-adr/SKILL.md`
+- `S04` `M` `.vaultspec/agents/vaultspec-docs-curator.md`
+- `S04` `M` `.vaultspec/agents/vaultspec-code-reviewer.md`
+- `S04` `M` `.vaultspec/agents/vaultspec-reference-auditor.md`
+- `S04` `M` `.vaultspec/reference/cli.md`
+- `S04` `verify:` `install --upgrade, sync, just check-python check-type, pytest test_discovery_guidance test_corpus_contracts test_agents_render test_antigravity_agents test_cli_reference_drift test_seed_builtins cli/test_sync cli/test_install, mdformat and pymarkdown on builtins` -> `pass`
+- `S04` `by:` `opus-medium`
 
 ## Notes
 
 - `S01` MCP status does not carry the companion record: it measured +439 tool-definition chars against a ceiling the envelope ADR forbids raising; the companion reaches agents as the search next step instead
 - `S02` Builtins touched only to swap the routing sentence for the new constant; the S04 rewrite owns their prose. SEARCH_ADR removed: no builtin or backend offers the rag ADR search any more
 - `S03` Whole-tree check-python and check-type fail only in the concurrent env-var centralisation lane (search tests, CredentialSource import in search/_models.py, deleted search/_credential.py); none in S03 files
+- `S04` S04 dev/guards test_cli_language_contract fails on README.md and docs/ from the concurrent user-docs lane; check-markdown flags this ledger's S03 note (unescaped underscores), machine-owned and left as written

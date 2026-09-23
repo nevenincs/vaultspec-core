@@ -24,17 +24,15 @@ the code.
 
 ## Preconditions (cede the mechanical layer first)
 
-Reconciliation reasons over a structurally-correct corpus and a populated semantic
-index. Before any semantic work:
+Reconciliation reasons over a structurally-correct corpus. Before any semantic work:
 
 - **Structural hygiene to the CLI.** Run `vaultspec-core vault check all --fix`. This
   repairs frontmatter, links, names, stamps, and template drift. Never hand-fix these.
-- **Ensure the semantic index is live.** `vaultspec-rag` powers decision and code
-  recall, but a freshly checked-out worktree is often unindexed. Confirm with
-  `vaultspec-rag server doctor`; if the vault or code index is empty, populate it with
-  `vaultspec-rag index --type vault` and `vaultspec-rag index --type code` before
-  relying on search. Where `vaultspec-rag` is unavailable, the `vaultspec-core`
-  discovery verbs and grep carry the same sequence.
+- **Check the code index.** `vaultspec-rag` powers code recall, and a fresh worktree is
+  often unindexed. Confirm with `vaultspec-rag server doctor`; if the code index is
+  empty, run `vaultspec-rag index --type code`. Where `vaultspec-rag` is unavailable,
+  locate code with a targeted grep, and say in your report that discovery ran without
+  semantic search. Decision recall does not depend on it.
 
 ## Workflow
 
@@ -50,13 +48,10 @@ The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
 - **Ground.** Build the decision inventory: `vaultspec-core vault list adr --json` for
   the set, the body H1 (and any legacy status section) for each declared status, and
   `vaultspec-core vault graph --json` for the supersession and relatedness edges.
-- **Reconcile decision-vs-decision.** When `status` reports hosted search configured,
-  search decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
-  `search`); otherwise use
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Surface the ADRs
-  covering the same concept, read them whole, and judge agreement, duplication,
-  contradiction, or fragmentation (a refinement chain or sibling accepted records on one
-  scope).
+- **Reconcile decision-vs-decision.** Surface the ADRs covering the same concept with
+  the `vaultspec-discovery` rule's decision search and ADR listing, read them whole, and
+  judge agreement, duplication, contradiction, or fragmentation (a refinement chain or
+  sibling accepted records on one scope).
 - **Reconcile decision-vs-code.** For each live decision,
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
   file whole, and confirm the decision is implemented; grep to confirm exact symbols.

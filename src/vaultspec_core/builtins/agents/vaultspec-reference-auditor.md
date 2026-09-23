@@ -20,7 +20,8 @@ run.
 - Locate by meaning: `vaultspec-rag search "<concept and domain nouns>" --type code`,
   narrowed with `--language` or `--path`. Read the epicenter file, or the nearest
   analogue, whole. Confirm exact symbols with grep. Where `vaultspec-rag` is
-  unavailable, the `vaultspec-core` discovery verbs and grep carry the same sequence.
+  unavailable, locate code with a targeted grep, and say in your report that discovery
+  ran without semantic search.
 - Map the modules, key abstractions, and boundaries the feature crosses.
 - Translate each pattern onto this codebase. Name where it will not fit, and why.
 

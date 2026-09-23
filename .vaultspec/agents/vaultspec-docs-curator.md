@@ -21,10 +21,10 @@ record yourself. You return a summary and the audit stem. You terminate within o
 - Read the ADR and research templates. Their DOCUMENT BOUNDARY hints define the boundary
   you enforce: research grounds, the ADR decides, the audit finds.
 - Run `vaultspec-core vault check all --fix`; the CLI owns mechanical hygiene.
-- Confirm the index with `vaultspec-rag server doctor`. When the vault or code index is
-  empty, run `vaultspec-rag index --type vault` and `vaultspec-rag index --type code`.
-  Where `vaultspec-rag` is unavailable, the `vaultspec-core` discovery verbs and grep
-  carry the same sequence.
+- Check the code index with `vaultspec-rag server doctor`. When it is empty, run
+  `vaultspec-rag index --type code`. Where `vaultspec-rag` is unavailable, locate code
+  with a targeted grep, and say in your report that discovery ran without semantic
+  search.
 
 ## Ground
 
@@ -34,13 +34,11 @@ body heading. Record `supersedes` and `superseded_by` edges from
 
 ## Reconcile
 
-- Decision against decision: When `status` reports hosted search configured, search
-  decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
-  `search`); otherwise use
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Read the candidates
-  whole, judge agreement, duplication, contradiction, or fragmentation. Walk each
-  supersession chain end to end. Refinements chained as supersessions, or sibling
-  `accepted` records on one scope, are one fragmented decision.
+- Decision against decision: find candidates with the `vaultspec-discovery` rule's
+  decision search and ADR listing. Read the candidates whole, judge agreement,
+  duplication, contradiction, or fragmentation. Walk each supersession chain end to end.
+  Refinements chained as supersessions, or sibling `accepted` records on one scope, are
+  one fragmented decision.
 - Decision against code:
   `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
   whole, confirm with grep that the decision is implemented. For a retired decision,

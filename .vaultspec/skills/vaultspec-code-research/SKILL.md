@@ -12,13 +12,12 @@ skill terminates within one run.
 
 ## Steps
 
-- Locate code by meaning:
-  `vaultspec-rag search "<concept and domain nouns>" --type code`. When `status` reports
-  hosted search configured, search decisions and vault facts with
-  `vaultspec-core vault search "<question>"` (MCP: `search`); otherwise use
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Read the epicenter or
+- Discover per the `vaultspec-discovery` rule, including its decision search and ADR
+  listing. Locate code by meaning:
+  `vaultspec-rag search "<concept and domain nouns>" --type code`. Read the epicenter or
   nearest analogue whole, then confirm exact symbols with grep. Where `vaultspec-rag` is
-  unavailable, the `vaultspec-core` discovery verbs and grep carry the same sequence.
+  unavailable, locate code with a targeted grep, and say in your report that discovery
+  ran without semantic search.
 - Scaffold: `vaultspec-core vault add reference --feature {feature}` (or the `create`
   tool). Read `.vaultspec/templates/reference.md`; its hint blocks fix the body shape.
 - Audit in this run, or dispatch the `vaultspec-reference-auditor` persona to locate and

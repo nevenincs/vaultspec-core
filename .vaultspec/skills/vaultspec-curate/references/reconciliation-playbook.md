@@ -8,8 +8,8 @@ first; this playbook assumes the canonical status set.
 
 1. Run the preconditions: `vaultspec-core vault check all --fix` for structural hygiene
    (this includes `adr-status`, which surfaces the status divergences in the taxonomy
-   reference), and confirm the semantic index is live (`vaultspec-rag server doctor`;
-   index with `vaultspec-rag index --type vault` and `--type code` if empty).
+   reference), and check the code index (`vaultspec-rag server doctor`; index with
+   `vaultspec-rag index --type code` if empty).
 1. Enumerate the corpus: `vaultspec-core vault list adr --json`. This gives path, name,
    feature, date, and tags - but not status, which lives in the body.
 1. Parse each declared status from the body H1 (and any legacy `## Status` section) per
@@ -23,11 +23,9 @@ first; this playbook assumes the canonical status set.
 
 For each cluster of decisions on a shared concept:
 
-- Surface the cluster by meaning. When `status` reports hosted search configured, search
-  decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
-  `search`); otherwise use
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Semantic recall finds
-  same-topic ADRs that share no obvious filename or feature tag.
+- Surface the cluster with the `vaultspec-discovery` rule's decision search and ADR
+  listing. Search finds same-topic ADRs that share no obvious filename or feature tag;
+  the listing catches what search misses.
 - Read the candidate ADRs whole. Judge them against each other for the conflict classes
   below. Do not rely on titles; two ADRs can agree in title and contradict in Rationale.
 - Walk each feature's supersession chain end to end. A chain whose links are refinements

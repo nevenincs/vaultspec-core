@@ -8,8 +8,9 @@ search itself are registered restaters and carry the invocation verbatim.
 
 Decision and vault-fact questions are routed by one state-free sentence:
 core's ``search``, and when it declines or fails, the next step its reply
-names. No builtin offers rag's vault search itself; the reply does, when the
-workspace provisions rag.
+names. That sentence and every hosted-search invocation live in the rule
+alone; other builtins cite the rule. No builtin offers rag's vault search
+itself; the reply does, when the workspace provisions rag.
 
 No test here counts anything. Each asserts a relation between the registry in
 ``core.discovery_guidance`` and the tree:
@@ -179,6 +180,22 @@ class TestRoutingIsStateFree:
         assert not offenders, f"discovery routed on status: {offenders}"
 
 
+class TestVaultSearchHasOneHome:
+    def test_hosted_search_is_invoked_only_in_the_home(self):
+        """Outside the rule, vault search is cited through the rule, never invoked.
+
+        A second copy of the routing sentence drifts from the first the next
+        time the degradation chain changes, and a reader holding the stale copy
+        cannot tell.
+        """
+        offenders = [
+            _rel(p)
+            for p in _builtin_docs()
+            if _rel(p) != DISCOVERY_HOME and _VAULT_SEARCH.search(_read(p))
+        ]
+        assert not offenders, f"hosted search invoked outside the rule: {offenders}"
+
+
 class TestInvocationsAreCanonical:
     def test_every_rag_search_invocation_is_the_code_search(self):
         """Any ``vaultspec-rag search`` span, anywhere, is SEARCH_CODE.
@@ -209,14 +226,19 @@ class TestInvocationsAreCanonical:
         assert not offenders, f"non-canonical hosted-search invocations: {offenders}"
 
     def test_no_builtin_spells_an_mcp_only_capability_as_a_cli_flag(self):
-        """Intent ranking, feedback, and domain filters have no CLI flag."""
+        """Intent ranking, feedback, and domain filters have no CLI flag.
+
+        Scoped to paragraphs that name rag: an invocation wraps across lines,
+        and a reference documenting core's own ``--intent`` elsewhere in the
+        same file is not describing rag.
+        """
         offenders = [
             (_rel(p), flag)
             for p in _builtin_docs()
-            for body in [p.read_text(encoding="utf-8")]
-            if _RAG in body
+            for paragraph in re.split(r"\n\s*\n", p.read_text(encoding="utf-8"))
+            if _RAG in paragraph
             for flag in MCP_ONLY_CAPABILITIES
-            if re.search(rf"{re.escape(flag)}\b", body)
+            if re.search(rf"{re.escape(flag)}\b", paragraph)
         ]
         assert not offenders, f"MCP-only capability spelled as a CLI flag: {offenders}"
 

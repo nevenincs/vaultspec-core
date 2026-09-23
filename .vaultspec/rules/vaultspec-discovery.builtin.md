@@ -5,27 +5,40 @@ name: vaultspec-discovery
 # Discovery
 
 Discover before changing: at each phase start, and before a session's first edit to
-source or vault, at any horizon. The sequence is locate by meaning, read the epicenter
-whole, confirm with grep.
+source or vault, at any horizon. Run the steps in order: locate by meaning, read the
+epicenter whole, confirm with grep, list the decisions.
 
-1. **Locate by meaning.** Code:
-   `vaultspec-rag search "<concept and domain nouns>" --type code` (narrow with
-   `--language` or `--path`). When `status` reports hosted search configured, search
-   decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
-   `search`); otherwise use
-   `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Orientation: the
-   discovery verbs `vaultspec-core status [target]`, `vaultspec-core vault list`, and
-   `vaultspec-core vault graph` (MCP: `status`, `find`). A small, well-named module is
-   listed directly.
+1. **Locate by meaning.**
+   - Code: `vaultspec-rag search "<concept and domain nouns>" --type code` (narrow with
+     `--language` or `--path`).
+   - Search decisions and vault facts with `vaultspec-core vault search "<question>"`
+     (MCP: `search`); when it declines or fails, run the next step its reply names.
+   - Orientation: `vaultspec-core status [target]` and
+     `vaultspec-core vault list [type]` (MCP: `status`, `find`), and
+     `vaultspec-core vault graph` (CLI only).
+   - A small, well-named module is listed directly.
 1. **Read** the epicenter file, or the nearest existing analogue when extending a
    feature, in full.
 1. **Confirm** exact symbols and insertion points with a targeted grep.
-1. For decisions, also list `.vault/adr/` filtered by feature; search alone misses
-   lower-ranked or opaquely named records. Search across features before narrowing:
-   shared decisions can govern work under another tag. Read accepted decisions that
-   cover the scope and follow their evidence links. This discovery does not itself
-   require a persisted Research or Reference record.
+1. **List decisions.** Run `vaultspec-core vault list adr` (MCP: `find`), across all
+   features first, then with `--feature`. Search can miss a record, so this step always
+   runs. Read each accepted decision that covers the scope in full, and follow its
+   evidence links. This discovery does not itself require a persisted Research or
+   Reference record.
+
+## Reading a search reply
+
+- An excerpt is triage. Read the record whole before you rely on it.
+- A premise conflict means the record contradicts something the question assumed.
+  Re-check that assumption before you act on it.
+- "nothing in the vault answers this" is evidence that no record covers the question.
+  Still list the decisions.
+- "no record that was read answers this" means some records were not read. It is not
+  evidence of absence. List the decisions and grep `.vault/`.
+- A reply that declines or fails names a next step. Run it.
+
+## Without semantic search
 
 Do not lead with broad glob or grep sweeps on a large tree; grep is the confirmation
-step. Where `vaultspec-rag` is unavailable, the `vaultspec-core` discovery verbs and
-grep carry the same sequence.
+step. Where `vaultspec-rag` is unavailable, locate code with a targeted grep, and say in
+your report that discovery ran without semantic search.
