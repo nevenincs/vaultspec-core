@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:7bcec3aec17f3bf772fe3488de950d6bef907f2d37b6ad52b816e30df9d62fe1'
+body_hash: 'sha256:a024925f046860f5add1c30ceed5bd28d58771a2433c26335535851b1750ab1e'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -15,7 +15,7 @@ related:
   - '[[2026-02-16-environment-variable-adr]]'
 ---
 
-# `typesafe-search` adr: `hosted vault search on TypeSafe Jev, with rag as the agent-level fallback` | (**status:** `proposed`)
+# `typesafe-search` adr: `hosted vault search on TypeSafe Jev, with rag as the agent-level fallback` | (**status:** `accepted`)
 
 ## Problem Statement
 
@@ -34,6 +34,10 @@ that governing decisions keep local, fixed and root-bound. The terms need decidi
 before any code lands.
 
 ## Considerations
+
+Accepted 2026-09-23. The user reviewed the proposal ("the adr is looking great") and
+then gave full authority to implement and deliver the TypeSafe ranking, filtering and
+search feature as drafted.
 
 - **Retrieval quality.** On held-out queries a two-stage Jev engine ranked the right
   record first in 0.83 of cases, against rag's 0.72, and located the answering excerpt
