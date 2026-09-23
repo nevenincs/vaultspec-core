@@ -23,7 +23,9 @@ first; this playbook assumes the canonical status set.
 
 For each cluster of decisions on a shared concept:
 
-- Surface the cluster by meaning:
+- Surface the cluster by meaning. When `status` reports hosted search configured, search
+  decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
+  `search`); otherwise use
   `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Semantic recall finds
   same-topic ADRs that share no obvious filename or feature tag.
 - Read the candidate ADRs whole. Judge them against each other for the conflict classes

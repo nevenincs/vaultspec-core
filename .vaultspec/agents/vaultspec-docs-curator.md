@@ -34,8 +34,10 @@ body heading. Record `supersedes` and `superseded_by` edges from
 
 ## Reconcile
 
-- Decision against decision:
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr`, read the candidates
+- Decision against decision: When `status` reports hosted search configured, search
+  decisions and vault facts with `vaultspec-core vault search "<question>"` (MCP:
+  `search`); otherwise use
+  `vaultspec-rag search "<intent>" --type vault --doc-type adr`. Read the candidates
   whole, judge agreement, duplication, contradiction, or fragmentation. Walk each
   supersession chain end to end. Refinements chained as supersessions, or sibling
   `accepted` records on one scope, are one fragmented decision.
