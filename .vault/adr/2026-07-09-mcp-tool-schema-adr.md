@@ -10,7 +10,7 @@ related:
 supersedes:
   - '2026-02-22-mcp-consolidation-adr'
 modified: '2026-09-23'
-body_hash: 'sha256:b6996e76b65089990fb329f4f266bea61d9d6f8c665f95cfde695964f09669a4'
+body_hash: 'sha256:c665390d613e45b5717d5563537491fb66a2df6aeecea7ed8122bc5e12524aaa'
 ---
 
 # `mcp-tool-schema` adr: tiered hot-tool surface with a stateless discover/invoke gateway | (**status:** `accepted`)
@@ -75,7 +75,7 @@ The catalog module parses the generated command-inventory markers at server star
 
 **Amendment note, 2026-09-23**: `2026-09-23-typesafe-search-adr` adds a first-class, read-only `search` tool: ranked vault records with verbatim excerpts, always registered, returning a typed `not_configured` outcome when no hosted-search credential is set. The single-digits-plus-gateway rule of this record still holds.
 
-**Amendment note, 2026-09-23, ADR cross-referencing**: `2026-09-23-adr-crossref-adr` adds `crossref` as the tenth hot tool: the ADRs one decision should link, judged within fixed request, time and reply ceilings, always registered, returning a typed `not_configured` outcome when no hosted-search credential is set. The hot-tool ceiling of this record becomes ten tools plus the two gateway tools. `crossref` is non-read-only, non-destructive, idempotent and open-world on the full surface, since it can write `related:` links.
+**Amendment note, 2026-09-23, ADR cross-referencing**: `2026-09-23-adr-crossref-adr` adds `crossref` as the tenth hot tool: the ADRs one decision should link, judged within fixed request, time and reply ceilings, always registered, returning a typed `not_configured` outcome when no hosted-search credential is set. The hot-tool ceiling of this record becomes ten tools plus the two gateway tools. This replaces the Constraint that the advertised first-class tool count stays in single digits plus gateway, and the first amendment note's statement that that rule still holds. `crossref` is non-read-only, non-destructive, idempotent and open-world on the full surface, since it can write `related:` links.
 
 ## Rationale
 
