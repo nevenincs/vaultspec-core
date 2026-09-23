@@ -26,10 +26,10 @@ from typer.testing import CliRunner
 from vaultspec_core.cli import app
 from vaultspec_core.cli.rendering import TRUNCATE_MARKER
 from vaultspec_core.cli.vault_search_cmd import _json_text, _outcome_lines
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.core.discovery_guidance import LIST_VAULT
 from vaultspec_core.core.windowing import apply_window
 from vaultspec_core.search import (
-    CREDENTIAL_VARIABLE,
     DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
@@ -99,7 +99,7 @@ def _search(root: Path, *args: str, key: str = "") -> Result:
             "NO_COLOR": "1",
             "TERM": "dumb",
             "COLUMNS": "200",
-            CREDENTIAL_VARIABLE: key,
+            VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: key,
         }
     )
     return runner.invoke(app, ["-t", str(root), "vault", "search", *args])
@@ -113,7 +113,7 @@ class TestNotConfigured:
 
         assert result.exit_code == 0, result.output
         assert "not configured" in result.stdout
-        assert CREDENTIAL_VARIABLE in result.stdout
+        assert VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in result.stdout
         assert f"`{LIST_VAULT}`" in result.stdout
 
     def test_json_envelope_is_skipped_with_the_next_step(self, tmp_path: Path) -> None:
@@ -132,7 +132,7 @@ class TestNotConfigured:
             "types": sorted(SEARCHABLE_TYPES),
             "command": LIST_VAULT,
         }
-        assert CREDENTIAL_VARIABLE in data["remediation"]
+        assert VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in data["remediation"]
         # Nothing was ranked, so there is no page or verdict to describe.
         assert "total" not in data
         assert "verdict" not in data
@@ -251,7 +251,9 @@ class TestConfiguredWithoutSending:
         assert envelope["data"]["status"] == SearchStatus.UNAVAILABLE
         assert envelope["data"]["reason"] == "credential_rejected"
         assert envelope["data"]["next_step"]["kind"] == NextStepKind.LISTING.value
-        assert CREDENTIAL_VARIABLE in envelope["data"]["remediation"]
+        assert (
+            VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in envelope["data"]["remediation"]
+        )
         assert _UNSENDABLE_KEY not in result.output
 
     def test_unusable_key_human_output_names_the_reason(self, tmp_path: Path) -> None:

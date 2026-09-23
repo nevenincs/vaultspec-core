@@ -35,9 +35,9 @@ if TYPE_CHECKING:
     from pathlib import Path
     from typing import IO
 
+from vaultspec_core.config import VAULTSPEC_STDIO_WATCHDOG
 from vaultspec_core.mcp_server.watchdog import (
     _POSIX_POLL_SECONDS,
-    STDIO_WATCHDOG_ENV,
     arm_client_watchdog,
     resolve_stdin_client_pid,
     watchdog_disabled,
@@ -225,39 +225,42 @@ def test_non_pipe_stdin_arms_ancestor_fallback(tmp_path: Path) -> None:
     assert proc.stdout.strip() == "None True"
 
 
-def test_kill_switch_disables_arming_in_process() -> None:
-    """The env kill switch declines arming before any anchor is touched.
+@pytest.mark.parametrize("value", ["0", "false", " OFF ", "no"])
+def test_kill_switch_disables_arming_in_process(value: str) -> None:
+    """An off value declines arming before any anchor is touched.
 
-    Exercised in-process with a real environment mutation (restored in
-    ``finally``) so no watchdog thread is ever spawned inside the test
-    runner.
+    Exercised in-process with the value injected, so no watchdog thread is
+    ever spawned inside the test runner.
     """
-    previous = os.environ.get(STDIO_WATCHDOG_ENV)
-    os.environ[STDIO_WATCHDOG_ENV] = "off"
-    try:
-        assert watchdog_disabled() is True
-        assert arm_client_watchdog() is False
-    finally:
-        if previous is None:
-            del os.environ[STDIO_WATCHDOG_ENV]
-        else:
-            os.environ[STDIO_WATCHDOG_ENV] = previous
+    assert watchdog_disabled(value) is True
+    assert arm_client_watchdog(kill_switch=value) is False
+
+
+@pytest.mark.parametrize("value", [None, "", "1", "on"])
+def test_kill_switch_is_off_unless_set_to_an_off_value(value: str | None) -> None:
+    assert watchdog_disabled(value) is False
 
 
 def test_kill_switch_disables_arming_in_worker() -> None:
-    """A worker launched with the kill switch set stays alive and unarmed."""
+    """A worker launched with the kill switch set stays alive and unarmed.
+
+    The worker reads the switch the way the server entry point does, through
+    the configuration layer, so the environment variable is what disarms it.
+    """
     worker_code = textwrap.dedent(
         """
         import time
+        from vaultspec_core.config import VAULTSPEC_STDIO_WATCHDOG, env_value
         from vaultspec_core.mcp_server.watchdog import arm_client_watchdog
-        print(f"armed={arm_client_watchdog()}", flush=True)
+        armed = arm_client_watchdog(kill_switch=env_value(VAULTSPEC_STDIO_WATCHDOG))
+        print(f"armed={armed}", flush=True)
         time.sleep(2)
         print("still-alive", flush=True)
         """
     )
     proc = subprocess.run(
         [sys.executable, "-c", worker_code],
-        env={**os.environ, STDIO_WATCHDOG_ENV: "0"},
+        env={**os.environ, VAULTSPEC_STDIO_WATCHDOG.env_name: "0"},
         capture_output=True,
         text=True,
         timeout=60,

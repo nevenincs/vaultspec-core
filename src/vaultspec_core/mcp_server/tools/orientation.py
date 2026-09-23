@@ -23,8 +23,9 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ... import __version__
+from ...config import HostedSearchConfig
 from ...core.types import get_context as _get_ctx
-from ...search import HostedSearchConfig, hosted_search_config
+from ...search import hosted_search_config
 from ..envelope import LeanResult, LeanShape, compact_result
 from ..isolation import isolated_context as _isolated_context
 

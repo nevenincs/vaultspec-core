@@ -26,10 +26,11 @@ if TYPE_CHECKING:
     import typer as _typer
     from rich.console import Console
 
+    from vaultspec_core.config import HostedSearchConfig
     from vaultspec_core.core.diagnosis.collectors_companion import (
         CompanionCapability,
     )
-    from vaultspec_core.search import DiscoveryCapability, HostedSearchConfig
+    from vaultspec_core.search import DiscoveryCapability
     from vaultspec_core.vaultcore.orientation import (
         GroundingTrace,
         PlanInFlight,
@@ -270,14 +271,15 @@ def _hosted_search_line(config: HostedSearchConfig) -> str:
     States configuration only: a configured key can still be rejected, and
     that surfaces on the search itself, not here.
     """
-    from vaultspec_core.search import CREDENTIAL_VARIABLE
+    from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 
     if config.configured and config.source is not None:
         return (
             f"  [green]hosted search configured[/green]  "
             f"[dim]source: {config.source.value}[/dim]"
         )
-    return f"  [dim]hosted search not configured - {CREDENTIAL_VARIABLE} unset[/dim]"
+    name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+    return f"  [dim]hosted search not configured - {name} unset[/dim]"
 
 
 def _rollup_payload(rollup: Rollup, discovery: DiscoveryCapability) -> dict[str, Any]:

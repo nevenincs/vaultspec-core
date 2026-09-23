@@ -33,9 +33,9 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Final
 
+from ..config import VAULTSPEC_CORE_TYPESAFE_API_KEY, resolve_credential
 from ..core.windowing import apply_window
 from ._corpus import load_records
-from ._credential import resolve_credential
 from ._engine import WORKERS, Meter, run_search
 from ._filters import record_types
 from ._models import (
@@ -126,7 +126,7 @@ def search_vault(
         limit: Hits to return; clamped to ``1..MAX_RESULTS``, with a
             non-positive limit meaning the default.
         environ: The environment the credential is read from; ``None`` reads
-            :data:`os.environ`.
+            the process's own.
         client: A client to use instead of building one from the credential;
             it is not closed here. A credential is still required.
 
@@ -147,7 +147,7 @@ def search_vault(
             f"the search query must be at most {MAX_QUERY_CHARS} characters"
         )
     types = record_types(doc_types)
-    credential = resolve_credential(root, environ)
+    credential = resolve_credential(VAULTSPEC_CORE_TYPESAFE_API_KEY, root, environ)
     if credential is None:
         return _declined(root, query, types)
     records = load_records(root, doc_types=types, feature=feature, date=date)

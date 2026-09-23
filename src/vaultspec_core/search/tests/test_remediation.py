@@ -12,12 +12,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
 from vaultspec_core.core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.mcps_mode import render_launch_for_mode
 from vaultspec_core.search import (
-    CREDENTIAL_VARIABLE,
     SEARCHABLE_TYPES,
     NextStep,
     NextStepKind,
@@ -126,7 +126,7 @@ class TestRemediation:
         text = remediation(_declined(step))
 
         assert text is not None
-        assert CREDENTIAL_VARIABLE in text
+        assert VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in text
         assert f"`{step.command}`" in text
 
     def test_without_rag_it_names_the_listing_find_and_grep(

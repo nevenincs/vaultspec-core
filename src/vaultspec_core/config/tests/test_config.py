@@ -178,7 +178,9 @@ def test_registry_coverage():
     """Ensure all fields in the dataclass are represented in the registry."""
     from dataclasses import fields
 
-    registry_attrs = {var.attr_name for var in CONFIG_REGISTRY}
+    registry_attrs = {
+        var.attr_name for var in CONFIG_REGISTRY if var.attr_name is not None
+    }
     config_attrs = {f.name for f in fields(VaultSpecConfig)}
 
     assert registry_attrs == config_attrs

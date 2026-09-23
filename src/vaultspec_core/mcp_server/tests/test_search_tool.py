@@ -25,6 +25,7 @@ from mcp.types import CallToolResult
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY, CredentialSource
 from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
 from vaultspec_core.core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
 from vaultspec_core.core.enums import InstallMode
@@ -38,13 +39,11 @@ from vaultspec_core.mcp_server.tools.search import (
     search_result,
 )
 from vaultspec_core.search import (
-    CREDENTIAL_VARIABLE,
     DEFAULT_RESULTS,
     EXCERPT_BYTES,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
     SEARCHABLE_TYPES,
-    CredentialSource,
     Excerpt,
     NextStep,
     NextStepKind,
@@ -320,7 +319,7 @@ async def test_not_configured_names_the_variable_and_the_next_step() -> None:
         "command": LIST_VAULT,
     }
     remediation = payload["remediation"]
-    assert CREDENTIAL_VARIABLE in remediation
+    assert VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in remediation
     assert f"`{LIST_VAULT}`" in remediation
     # Nothing ranked and nothing sent: no window, verdict or usage to report.
     for absent in ("returned", "total", "truncated", "usage", "reason", "verdict"):
@@ -495,7 +494,7 @@ _QUESTION = "Why does discovery stop at 4,000 tokens?"
 
 def _cli_search_data(project: Path, *args: str) -> dict[str, Any]:
     """Run ``vault search --json`` on *project* without a key; return its data."""
-    runner = CliRunner(env={CREDENTIAL_VARIABLE: ""})
+    runner = CliRunner(env={VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: ""})
     result = runner.invoke(
         app, ["-t", str(project), "vault", "search", _QUESTION, *args, "--json"]
     )
@@ -518,7 +517,11 @@ def _provision_rag(project: Path) -> None:
 
 
 async def _drive_without_a_key(project: Path) -> None:
-    environ = {k: v for k, v in os.environ.items() if k != CREDENTIAL_VARIABLE}
+    environ = {
+        k: v
+        for k, v in os.environ.items()
+        if k != VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+    }
     async with stdio_session(project, environ=environ) as session:
         await session.initialize()
 
@@ -529,7 +532,7 @@ async def _drive_without_a_key(project: Path) -> None:
         # Usage is reported whenever a request was made; its absence is the
         # service's statement that nothing was sent.
         assert "usage" not in payload
-        assert CREDENTIAL_VARIABLE in payload["remediation"]
+        assert VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in payload["remediation"]
         assert payload["next_step"]["kind"] == NextStepKind.LISTING.value
         # The CLI renders the same backend result under the same keys.
         assert payload == _cli_search_data(project)
@@ -551,7 +554,7 @@ async def _drive_without_a_key(project: Path) -> None:
 
 
 async def _drive_with_a_key(project: Path) -> None:
-    environ = {**os.environ, CREDENTIAL_VARIABLE: _SENTINEL_KEY}
+    environ = {**os.environ, VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: _SENTINEL_KEY}
     async with stdio_session(project, environ=environ) as session:
         await session.initialize()
 

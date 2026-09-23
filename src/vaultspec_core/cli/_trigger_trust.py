@@ -19,11 +19,12 @@ Key exports: :func:`consent_gate`, :func:`describe_trigger`,
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import TYPE_CHECKING
 
 import typer
+
+from vaultspec_core.config import CI, VAULTSPEC_NON_INTERACTIVE, env_value
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,7 +36,7 @@ __all__ = ["consent_gate", "describe_trigger", "operator_present"]
 #: Environment variables whose mere presence means no operator is watching.
 #: ``CI`` is the near-universal convention; the VaultSpec-specific name lets an
 #: operator assert the same thing for a wrapper script that CI does not set.
-_NON_INTERACTIVE_ENV = ("CI", "VAULTSPEC_NON_INTERACTIVE")
+_NON_INTERACTIVE_ENV = (CI, VAULTSPEC_NON_INTERACTIVE)
 
 #: Why a trigger needs approval, in the terms that make the decision answerable:
 #: what runs, as whom, and why the repository itself cannot vouch for it. A
@@ -167,7 +168,7 @@ def operator_present() -> bool:
     unattended run. Any one of them dissenting means the answer is no, because
     a prompt nobody sees is a prompt nobody consented to.
     """
-    if any(name in os.environ for name in _NON_INTERACTIVE_ENV):
+    if any(env_value(var) is not None for var in _NON_INTERACTIVE_ENV):
         return False
     try:
         return sys.stdin.isatty() and sys.stdout.isatty()

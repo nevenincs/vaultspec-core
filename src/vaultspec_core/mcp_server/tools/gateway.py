@@ -26,7 +26,7 @@ either way. Two further measures cover them. The flags in
 :data:`~vaultspec_core.mcp_server.catalog.BLOCKED_FLAGS` are refused whichever
 verb declares them and are withheld from the schemas ``discover`` returns; and
 every spawned child is marked through
-:data:`~vaultspec_core.core.editor.GATEWAY_ENV_MARKER`, so the CLI itself knows
+:data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`, so the CLI itself knows
 it has no terminal and declines to open an editor no matter which source the
 editor command came from.
 
@@ -44,7 +44,6 @@ from __future__ import annotations
 import functools
 import json
 import logging
-import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING, Any, cast
@@ -55,7 +54,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from ...core.editor import GATEWAY_ENV_MARKER
+from ...config import VAULTSPEC_MCP_GATEWAY_INVOCATION, child_environment
 from ...core.types import get_context as _get_ctx
 from ..catalog import (
     BLOCKED_FLAGS,
@@ -438,7 +437,7 @@ def _child_environment() -> dict[str, str]:
     """Build the environment for an ``invoke`` subprocess.
 
     The server's own environment plus one marker,
-    :data:`~vaultspec_core.core.editor.GATEWAY_ENV_MARKER`, telling the child
+    :data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`, telling the child
     that it was started by a tool call rather than by a person at a terminal.
     The child refuses to launch an interactive editor when it sees the marker.
 
@@ -452,9 +451,7 @@ def _child_environment() -> dict[str, str]:
     Returns:
         The environment mapping to hand to the child process.
     """
-    env = dict(os.environ)
-    env[GATEWAY_ENV_MARKER] = "1"
-    return env
+    return child_environment((VAULTSPEC_MCP_GATEWAY_INVOCATION, "1"))
 
 
 # ---------------------------------------------------------------------------

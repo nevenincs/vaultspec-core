@@ -6,6 +6,11 @@ semantic-search companion is provisioned. ``vaultspec-core status`` reports
 both through :func:`discovery_fields`; the MCP ``status`` tool carries the
 same ``hosted_search`` record, while the companion reaches an agent where it
 decides something, as the next step of a search that declined.
+
+Hosted search is enrolled by one variable,
+:data:`~vaultspec_core.config.VAULTSPEC_CORE_TYPESAFE_API_KEY`, resolved by
+the configuration layer's credential resolver. Status surfaces report only
+whether a key is configured and from which source, never the key.
 """
 
 from __future__ import annotations
@@ -14,15 +19,56 @@ import dataclasses
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ._credential import hosted_search_config
+from ..config import (
+    VAULTSPEC_CORE_TYPESAFE_API_KEY,
+    HostedSearchConfig,
+    resolve_credential,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from ..core.diagnosis.collectors_companion import CompanionCapability
-    from ._models import HostedSearchConfig
 
-__all__ = ["DiscoveryCapability", "discovery_capability", "discovery_fields"]
+__all__ = [
+    "DiscoveryCapability",
+    "discovery_capability",
+    "discovery_fields",
+    "hosted_search_config",
+]
+
+
+def hosted_search_config(
+    root: Path,
+    environ: Mapping[str, str] | None = None,
+    *,
+    interpreter_prefix: Path | None = None,
+) -> HostedSearchConfig:
+    """Report whether hosted search is configured for *root*, never the key.
+
+    This is local configuration, not liveness: a configured key may still be
+    rejected by the provider.
+
+    Args:
+        root: The workspace root.
+        environ: The process environment to read; ``None`` reads the
+            process's own.
+        interpreter_prefix: The running interpreter's prefix; ``None`` reads
+            :data:`sys.prefix`.
+
+    Returns:
+        Whether a key is configured, and from which source.
+    """
+    credential = resolve_credential(
+        VAULTSPEC_CORE_TYPESAFE_API_KEY,
+        root,
+        environ,
+        interpreter_prefix=interpreter_prefix,
+    )
+    if credential is None:
+        return HostedSearchConfig(configured=False)
+    return HostedSearchConfig(configured=True, source=credential.source)
 
 
 @dataclass(frozen=True)

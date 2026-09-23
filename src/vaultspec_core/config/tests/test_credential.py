@@ -1,4 +1,4 @@
-"""Hosted-search credential resolution over real workspaces on disk."""
+"""Credential resolution over real workspaces on disk."""
 
 from __future__ import annotations
 
@@ -6,23 +6,26 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from vaultspec_core.config import CONFIG_REGISTRY
+from vaultspec_core.config import (
+    CONFIG_REGISTRY,
+    VAULTSPEC_CORE_TYPESAFE_API_KEY,
+    VAULTSPEC_EDITOR,
+    ConfigVariable,
+    Credential,
+    CredentialSource,
+    resolve_credential,
+)
 from vaultspec_core.core.enums import DirName, InstallMode
 from vaultspec_core.core.install_mode import write_mode_declaration
 from vaultspec_core.core.workspace_mode import WORKSPACE_FILENAME
-from vaultspec_core.search import CredentialSource, HostedSearchConfig
-from vaultspec_core.search._credential import (
-    CREDENTIAL_VARIABLE,
-    Credential,
-    hosted_search_config,
-    resolve_credential,
-)
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
+KEY_VAR = VAULTSPEC_CORE_TYPESAFE_API_KEY
+NAME = KEY_VAR.env_name
 ENV_KEY = "ts-env-7a1d93c0b5e2"
 DOTENV_KEY = "ts-dotenv-2c8e41f6a9d0"
 
@@ -45,14 +48,48 @@ def _own_env(root: Path) -> Path:
 
 
 def _dotenv_line(value: str) -> str:
-    return f"# local credentials\n{CREDENTIAL_VARIABLE}={value}\n"
+    return f"# local credentials\n{NAME}={value}\n"
 
 
-def test_variable_name_comes_from_the_secret_registry_entry() -> None:
-    (entry,) = [var for var in CONFIG_REGISTRY if var.env_name == CREDENTIAL_VARIABLE]
+class TestTheRegistryOwnsTheCredential:
+    def test_the_hosted_search_key_is_the_only_workspace_dotenv_entry(self) -> None:
+        eligible = [var for var in CONFIG_REGISTRY if var.workspace_dotenv]
 
-    assert CREDENTIAL_VARIABLE == "VAULTSPEC_CORE_TYPESAFE_API_KEY"
-    assert entry.secret is True
+        assert eligible == [KEY_VAR]
+        assert NAME == "VAULTSPEC_CORE_TYPESAFE_API_KEY"
+        assert KEY_VAR.secret is True
+
+    def test_a_setting_cannot_be_resolved_as_a_credential(self, tmp_path: Path) -> None:
+        root = _workspace(tmp_path, mode=InstallMode.DEV)
+
+        with pytest.raises(ValueError, match="is not a credential"):
+            resolve_credential(
+                VAULTSPEC_EDITOR, root, {VAULTSPEC_EDITOR.env_name: "vi"}
+            )
+
+    def test_an_unregistered_secret_is_refused(self, tmp_path: Path) -> None:
+        stray = ConfigVariable(
+            env_name="VAULTSPEC_UNDECLARED_SECRET",
+            attr_name=None,
+            var_type=str,
+            default=None,
+            description="Declared outside the registry.",
+            secret=True,
+        )
+
+        with pytest.raises(ValueError, match="not declared in CONFIG_REGISTRY"):
+            resolve_credential(stray, tmp_path, {stray.env_name: ENV_KEY})
+
+    def test_only_a_secret_may_be_read_from_a_workspace_dotenv(self) -> None:
+        with pytest.raises(ValueError, match="only a secret"):
+            ConfigVariable(
+                env_name="VAULTSPEC_UNDECLARED_SETTING",
+                attr_name=None,
+                var_type=str,
+                default=None,
+                description="A setting a repository must not supply.",
+                workspace_dotenv=True,
+            )
 
 
 class TestPrecedence:
@@ -62,9 +99,18 @@ class TestPrecedence:
         )
 
         credential = resolve_credential(
-            root,
-            {CREDENTIAL_VARIABLE: f" {ENV_KEY} "},
-            interpreter_prefix=_own_env(root),
+            KEY_VAR, root, {NAME: f" {ENV_KEY} "}, interpreter_prefix=_own_env(root)
+        )
+
+        assert credential == Credential(ENV_KEY, CredentialSource.ENVIRONMENT)
+
+    def test_environment_is_read_whatever_the_workspace(self, tmp_path: Path) -> None:
+        # Neither gate applies to the process environment: a global tool in an
+        # undeclared workspace still takes the key from where the operator set it.
+        root = _workspace(tmp_path)
+
+        credential = resolve_credential(
+            KEY_VAR, root, {NAME: ENV_KEY}, interpreter_prefix=tmp_path.parent
         )
 
         assert credential == Credential(ENV_KEY, CredentialSource.ENVIRONMENT)
@@ -75,7 +121,9 @@ class TestPrecedence:
     ) -> None:
         root = _workspace(tmp_path, mode=mode, dotenv=_dotenv_line(DOTENV_KEY))
 
-        credential = resolve_credential(root, {}, interpreter_prefix=_own_env(root))
+        credential = resolve_credential(
+            KEY_VAR, root, {}, interpreter_prefix=_own_env(root)
+        )
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
@@ -87,7 +135,7 @@ class TestPrecedence:
         )
 
         credential = resolve_credential(
-            root, {CREDENTIAL_VARIABLE: "   "}, interpreter_prefix=_own_env(root)
+            KEY_VAR, root, {NAME: "   "}, interpreter_prefix=_own_env(root)
         )
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
@@ -99,7 +147,7 @@ class TestPrecedence:
 
         assert (
             resolve_credential(
-                root, {CREDENTIAL_VARIABLE: ""}, interpreter_prefix=_own_env(root)
+                KEY_VAR, root, {NAME: ""}, interpreter_prefix=_own_env(root)
             )
             is None
         )
@@ -114,7 +162,9 @@ class TestPrecedence:
             encoding="utf-8",
         )
 
-        credential = resolve_credential(root, {}, interpreter_prefix=_own_env(root))
+        credential = resolve_credential(
+            KEY_VAR, root, {}, interpreter_prefix=_own_env(root)
+        )
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
@@ -125,12 +175,18 @@ class TestClosedDotenv:
             tmp_path, mode=InstallMode.TOOL, dotenv=_dotenv_line(DOTENV_KEY)
         )
 
-        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
+        assert (
+            resolve_credential(KEY_VAR, root, {}, interpreter_prefix=_own_env(root))
+            is None
+        )
 
     def test_undeclared_workspace_ignores_the_dotenv(self, tmp_path: Path) -> None:
         root = _workspace(tmp_path, dotenv=_dotenv_line(DOTENV_KEY))
 
-        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
+        assert (
+            resolve_credential(KEY_VAR, root, {}, interpreter_prefix=_own_env(root))
+            is None
+        )
 
     def test_corrupt_declaration_ignores_the_dotenv(self, tmp_path: Path) -> None:
         root = _workspace(
@@ -139,7 +195,10 @@ class TestClosedDotenv:
         declaration = root / DirName.VAULTSPEC.value / WORKSPACE_FILENAME
         declaration.write_text("{not valid json", encoding="utf-8")
 
-        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
+        assert (
+            resolve_credential(KEY_VAR, root, {}, interpreter_prefix=_own_env(root))
+            is None
+        )
 
     def test_a_declared_mode_does_not_open_the_dotenv_to_a_foreign_interpreter(
         self, tmp_path: Path
@@ -151,7 +210,10 @@ class TestClosedDotenv:
         )
         global_tool = tmp_path / "tools" / "vaultspec-core"
 
-        assert resolve_credential(root, {}, interpreter_prefix=global_tool) is None
+        assert (
+            resolve_credential(KEY_VAR, root, {}, interpreter_prefix=global_tool)
+            is None
+        )
 
     def test_the_running_interpreter_is_used_when_no_prefix_is_given(
         self, tmp_path: Path
@@ -161,7 +223,7 @@ class TestClosedDotenv:
         )
 
         # This test process runs outside tmp_path, so the dotenv stays closed.
-        assert resolve_credential(root, {}) is None
+        assert resolve_credential(KEY_VAR, root, {}) is None
 
     def test_generic_typesafe_variables_never_enrol(self, tmp_path: Path) -> None:
         root = _workspace(
@@ -175,7 +237,10 @@ class TestClosedDotenv:
         }
 
         assert (
-            resolve_credential(root, environ, interpreter_prefix=_own_env(root)) is None
+            resolve_credential(
+                KEY_VAR, root, environ, interpreter_prefix=_own_env(root)
+            )
+            is None
         )
 
 
@@ -183,9 +248,9 @@ class TestDotenvShapes:
     @pytest.mark.parametrize(
         "text",
         [
-            f'export {CREDENTIAL_VARIABLE}="{DOTENV_KEY}"\n',
-            f"{CREDENTIAL_VARIABLE} = '{DOTENV_KEY}'\n",
-            f"{CREDENTIAL_VARIABLE}={DOTENV_KEY}  # personal key\n",
+            f'export {NAME}="{DOTENV_KEY}"\n',
+            f"{NAME} = '{DOTENV_KEY}'\n",
+            f"{NAME}={DOTENV_KEY}  # personal key\n",
         ],
         ids=["export double-quoted", "spaced single-quoted", "trailing comment"],
     )
@@ -194,40 +259,23 @@ class TestDotenvShapes:
     ) -> None:
         root = _workspace(tmp_path, mode=InstallMode.DEPENDENCY, dotenv=text)
 
-        credential = resolve_credential(root, {}, interpreter_prefix=_own_env(root))
+        credential = resolve_credential(
+            KEY_VAR, root, {}, interpreter_prefix=_own_env(root)
+        )
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
     def test_blank_dotenv_value_is_absent(self, tmp_path: Path) -> None:
-        root = _workspace(
-            tmp_path, mode=InstallMode.DEPENDENCY, dotenv=f'{CREDENTIAL_VARIABLE}=""\n'
+        root = _workspace(tmp_path, mode=InstallMode.DEPENDENCY, dotenv=f'{NAME}=""\n')
+
+        assert (
+            resolve_credential(KEY_VAR, root, {}, interpreter_prefix=_own_env(root))
+            is None
         )
 
-        assert resolve_credential(root, {}, interpreter_prefix=_own_env(root)) is None
 
+def test_repr_never_shows_the_key() -> None:
+    credential = Credential(ENV_KEY, CredentialSource.ENVIRONMENT)
 
-class TestReporting:
-    def test_repr_never_shows_the_key(self) -> None:
-        credential = Credential(ENV_KEY, CredentialSource.ENVIRONMENT)
-
-        assert ENV_KEY not in repr(credential)
-        assert "environment" in repr(credential)
-
-    def test_config_reports_source_without_the_key(self, tmp_path: Path) -> None:
-        root = _workspace(
-            tmp_path, mode=InstallMode.DEV, dotenv=_dotenv_line(DOTENV_KEY)
-        )
-
-        from_dotenv = hosted_search_config(root, {}, interpreter_prefix=_own_env(root))
-        from_environment = hosted_search_config(
-            root, {CREDENTIAL_VARIABLE: ENV_KEY}, interpreter_prefix=_own_env(root)
-        )
-        unconfigured = hosted_search_config(_workspace(tmp_path / "bare"), {})
-
-        assert from_dotenv == HostedSearchConfig(True, CredentialSource.DOTENV)
-        assert from_environment == HostedSearchConfig(
-            True, CredentialSource.ENVIRONMENT
-        )
-        assert unconfigured == HostedSearchConfig(False)
-        assert DOTENV_KEY not in repr(from_dotenv)
-        assert ENV_KEY not in repr(from_environment)
+    assert ENV_KEY not in repr(credential)
+    assert "environment" in repr(credential)

@@ -18,10 +18,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
+from ..config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from ..core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
 from ..core.enums import DirName
 from ._corpus import SEARCHABLE_TYPES
-from ._credential import CREDENTIAL_VARIABLE
 from ._models import NextStep, NextStepKind, SearchStatus, UnavailableReason
 
 if TYPE_CHECKING:
@@ -34,7 +34,8 @@ __all__ = ["next_step", "remediation"]
 
 _UNAVAILABLE: Final[dict[UnavailableReason, str]] = {
     UnavailableReason.CREDENTIAL_REJECTED: (
-        f"The TypeSafe API rejected the key in {CREDENTIAL_VARIABLE} or denied "
+        "The TypeSafe API rejected the key in "
+        f"{VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name} or denied "
         "it this request; check or rotate it"
     ),
     UnavailableReason.CONTENT_REJECTED: (
@@ -58,7 +59,8 @@ _UNAVAILABLE: Final[dict[UnavailableReason, str]] = {
 }
 
 _NOT_CONFIGURED: Final = (
-    f"Hosted vault search is not configured: set {CREDENTIAL_VARIABLE} to enable it"
+    "Hosted vault search is not configured: set "
+    f"{VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name} to enable it"
 )
 
 

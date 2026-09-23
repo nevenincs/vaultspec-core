@@ -398,12 +398,12 @@ def _execute_shell(
         with code 0.  Captures stdout as ``output`` and stderr as ``error``.
     """
     cmd = _interpolate(action.command, ctx)
+    from ..config import VAULTSPEC_TARGET_DIR, child_environment
     from ..core.types import get_context
 
-    env = os.environ.copy()
     try:
         target_dir = get_context().target_dir
-        env["VAULTSPEC_TARGET_DIR"] = str(target_dir)
+        env = child_environment((VAULTSPEC_TARGET_DIR, str(target_dir)))
         if target_dir.is_dir():
             cwd: str | None = str(target_dir)
         else:
@@ -412,6 +412,7 @@ def _execute_shell(
             )
             cwd = None
     except LookupError:
+        env = child_environment()
         cwd = None
 
     try:

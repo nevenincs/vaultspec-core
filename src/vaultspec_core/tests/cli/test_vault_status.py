@@ -26,11 +26,11 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.core.diagnosis.collectors_companion import (
     RAG_DISTRIBUTION_NAME,
     CompanionSignal,
 )
-from vaultspec_core.search import CREDENTIAL_VARIABLE
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -1021,7 +1021,7 @@ class TestHostedSearchRow:
                 "NO_COLOR": "1",
                 "TERM": "dumb",
                 "COLUMNS": "200",
-                CREDENTIAL_VARIABLE: key,
+                VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: key,
             }
         )
         return runner.invoke(app, ["-t", str(root), "status", *args])
@@ -1033,9 +1033,8 @@ class TestHostedSearchRow:
 
         assert result.exit_code == 0, result.output
         discovery = result.stdout.split("Discovery")[1]
-        assert f"hosted search not configured - {CREDENTIAL_VARIABLE} unset" in (
-            discovery
-        )
+        name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+        assert f"hosted search not configured - {name} unset" in discovery
 
     def test_configured_row_names_the_source_not_the_key(self, tmp_path: Path) -> None:
         _build_vault(tmp_path)
@@ -1067,7 +1066,9 @@ class TestHostedSearchRow:
         _build_vault(tmp_path)
 
         absent = json.loads(self._run_with_key(tmp_path, "", "--json").stdout)
-        servers = {RAG_DISTRIBUTION_NAME: {"command": "uvx", "args": []}}
+        servers: dict[str, dict[str, object]] = {
+            RAG_DISTRIBUTION_NAME: {"command": "uvx", "args": []}
+        }
         (tmp_path / ".mcp.json").write_text(
             json.dumps({"mcpServers": servers}), encoding="utf-8"
         )

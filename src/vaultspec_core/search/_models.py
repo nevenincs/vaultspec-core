@@ -51,9 +51,7 @@ __all__ = [
     "MAX_QUERY_CHARS",
     "MAX_RESULTS",
     "SUPPORTING_BYTES",
-    "CredentialSource",
     "Excerpt",
-    "HostedSearchConfig",
     "InvalidQueryError",
     "NextStep",
     "NextStepKind",
@@ -207,21 +205,6 @@ class UnavailableReason(StrEnum):
     DEADLINE = "deadline"
     INVALID_RESPONSE = "invalid_response"
     REQUEST_TOO_LARGE = "request_too_large"
-
-
-class CredentialSource(StrEnum):
-    """Where the hosted-search credential was found."""
-
-    ENVIRONMENT = "environment"
-    DOTENV = "dotenv"
-
-
-@dataclass(frozen=True)
-class HostedSearchConfig:
-    """Whether hosted search is configured, and from where. Never the key."""
-
-    configured: bool
-    source: CredentialSource | None = None
 
 
 @dataclass(frozen=True)

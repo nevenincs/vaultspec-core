@@ -14,9 +14,8 @@ from typing import TYPE_CHECKING
 from ._capability import DiscoveryCapability as DiscoveryCapability
 from ._capability import discovery_capability as discovery_capability
 from ._capability import discovery_fields as discovery_fields
+from ._capability import hosted_search_config as hosted_search_config
 from ._corpus import SEARCHABLE_TYPES as SEARCHABLE_TYPES
-from ._credential import CREDENTIAL_VARIABLE as CREDENTIAL_VARIABLE
-from ._credential import hosted_search_config as hosted_search_config
 from ._filters import SEARCHABLE_TYPE_NAMES as SEARCHABLE_TYPE_NAMES
 from ._lexical import tokenize as tokenize
 from ._models import DEFAULT_RESULTS as DEFAULT_RESULTS
@@ -24,9 +23,7 @@ from ._models import EXCERPT_BYTES as EXCERPT_BYTES
 from ._models import MAX_QUERY_CHARS as MAX_QUERY_CHARS
 from ._models import MAX_RESULTS as MAX_RESULTS
 from ._models import SUPPORTING_BYTES as SUPPORTING_BYTES
-from ._models import CredentialSource as CredentialSource
 from ._models import Excerpt as Excerpt
-from ._models import HostedSearchConfig as HostedSearchConfig
 from ._models import InvalidQueryError as InvalidQueryError
 from ._models import NextStep as NextStep
 from ._models import NextStepKind as NextStepKind
@@ -44,7 +41,6 @@ from ._wire import hit_fields as hit_fields
 from ._wire import outcome_fields as outcome_fields
 
 __all__ = [
-    "CREDENTIAL_VARIABLE",
     "DEFAULT_RESULTS",
     "EXCERPT_BYTES",
     "MAX_QUERY_CHARS",
@@ -54,10 +50,8 @@ __all__ = [
     "SEARCHABLE_TYPES",
     "SEARCHABLE_TYPE_NAMES",
     "SUPPORTING_BYTES",
-    "CredentialSource",
     "DiscoveryCapability",
     "Excerpt",
-    "HostedSearchConfig",
     "InvalidQueryError",
     "NextStep",
     "NextStepKind",

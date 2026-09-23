@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.search import (
     DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
@@ -25,7 +26,6 @@ from vaultspec_core.search import (
     UnsearchableTypeError,
 )
 from vaultspec_core.search._corpus import SECTION_BYTES, TITLE_BYTES
-from vaultspec_core.search._credential import CREDENTIAL_VARIABLE
 from vaultspec_core.search._engine import KIND_QID
 from vaultspec_core.search._questions import (
     ANSWERED_THRESHOLD,
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.unit]
 
 KEY = "ts-test-5b0e93d1c7a2"
-ENV = {CREDENTIAL_VARIABLE: KEY}
+ENV = {VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: KEY}
 QUERY = "how is the graph cache kept fresh"
 
 #: Card text the provider recalls in stage one.
@@ -512,7 +512,9 @@ class TestUnavailable:
         cache_vault(tmp_path)
 
         outcome = search_vault(
-            tmp_path, QUERY, environ={CREDENTIAL_VARIABLE: "two words"}
+            tmp_path,
+            QUERY,
+            environ={VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: "two words"},
         )
 
         assert outcome.status is SearchStatus.UNAVAILABLE

@@ -83,9 +83,9 @@ def hints_suppressed(no_hints: bool = False) -> bool:
     set. This is the one predicate every hint surface consults so the
     suppression contract cannot drift per command.
     """
-    import os
+    from ..config import VAULTSPEC_NO_HINTS, env_value
 
-    return no_hints or os.environ.get("VAULTSPEC_NO_HINTS") == "1"
+    return no_hints or env_value(VAULTSPEC_NO_HINTS) == "1"
 
 
 def render_next_actions(pairs: Sequence[tuple[str, str]]) -> None:

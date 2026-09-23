@@ -6,7 +6,6 @@ the ownership-fingerprint convergence story this package implements.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -74,14 +73,18 @@ def _selected_mcp_tools(
 
 def _claude_user_config_path() -> Path:
     """Return Claude Code's user/local MCP store, honoring ``CLAUDE_CONFIG_DIR``."""
-    configured = os.environ.get("CLAUDE_CONFIG_DIR")
+    from ..config import CLAUDE_CONFIG_DIR, env_value
+
+    configured = env_value(CLAUDE_CONFIG_DIR)
     home = Path(configured).expanduser() if configured else Path.home()
     return home / ".claude.json"
 
 
 def _codex_user_config_path() -> Path:
     """Return Codex's user MCP store, honoring ``CODEX_HOME``."""
-    configured = os.environ.get("CODEX_HOME")
+    from ..config import CODEX_HOME, env_value
+
+    configured = env_value(CODEX_HOME)
     home = Path(configured).expanduser() if configured else Path.home() / ".codex"
     return home / "config.toml"
 

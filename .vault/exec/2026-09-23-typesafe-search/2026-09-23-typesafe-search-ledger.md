@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:45221341655aafa305532677182185e0fa29f4f36e336e4080992cf107caea75'
+body_hash: 'sha256:bfd7001a4bd10f97cf8ca89f157dfdf69f048c879c098c5276d1eec989afc192'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -249,3 +249,40 @@ related:
 - `S09` `verify:` `basedpyright guard` -> `pass`
 - `S09` `M` `src/vaultspec_core/search/tests/test_live.py`
 - `S09` `verify:` `pytest -m typesafe test_live.py with the key only in the workspace .env` -> `pass`
+- `S13` `M` `src/vaultspec_core/cli/_trigger_trust.py`
+- `S13` `M` `src/vaultspec_core/cli/json_output.py`
+- `S13` `M` `src/vaultspec_core/cli/rendering_hints.py`
+- `S13` `M` `src/vaultspec_core/cli/status_cmd.py`
+- `S13` `M` `src/vaultspec_core/config/__init__.py`
+- `S13` `M` `src/vaultspec_core/config/config.py`
+- `S13` `M` `src/vaultspec_core/config/tests/test_config.py`
+- `S13` `M` `src/vaultspec_core/console.py`
+- `S13` `M` `src/vaultspec_core/core/editor.py`
+- `S13` `M` `src/vaultspec_core/core/local_config.py`
+- `S13` `M` `src/vaultspec_core/core/mcps_targets.py`
+- `S13` `M` `src/vaultspec_core/logging_config.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tests/test_watchdog.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tools/gateway.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tools/orientation.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/watchdog.py`
+- `S13` `M` `src/vaultspec_core/search/__init__.py`
+- `S13` `M` `src/vaultspec_core/search/_capability.py`
+- `S13` `D` `src/vaultspec_core/search/_credential.py`
+- `S13` `M` `src/vaultspec_core/search/_models.py`
+- `S13` `M` `src/vaultspec_core/search/_remediation.py`
+- `S13` `M` `src/vaultspec_core/search/_service.py`
+- `S13` `D` `src/vaultspec_core/search/tests/test_credential.py`
+- `S13` `M` `src/vaultspec_core/search/tests/test_live.py`
+- `S13` `M` `src/vaultspec_core/search/tests/test_remediation.py`
+- `S13` `M` `src/vaultspec_core/search/tests/test_service.py`
+- `S13` `M` `src/vaultspec_core/tests/cli/test_editor_command_validation.py`
+- `S13` `M` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S13` `M` `src/vaultspec_core/tests/cli/test_vault_status.py`
+- `S13` `M` `src/vaultspec_core/triggers/engine.py`
+- `S13` `A` `src/vaultspec_core/config/credential.py`
+- `S13` `A` `src/vaultspec_core/config/tests/test_credential.py`
+- `S13` `A` `src/vaultspec_core/config/tests/test_environment.py`
+- `S13` `A` `src/vaultspec_core/search/tests/test_capability.py`
+- `S13` `verify:` `pytest config, search, cli status/search/editor, mcp orientation/search/watchdog` -> `pass`

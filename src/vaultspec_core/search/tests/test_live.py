@@ -22,8 +22,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY, resolve_credential
 from vaultspec_core.search import SearchStatus, search_vault
-from vaultspec_core.search._credential import CREDENTIAL_VARIABLE, resolve_credential
 from vaultspec_core.vaultcore.models import DocType
 
 from .test_corpus import file_lines, write_record
@@ -98,13 +98,14 @@ def environ() -> dict[str, str]:
     # Resolved for this checkout exactly as the product resolves it - the
     # process environment first, then the workspace .env - so the live run
     # also proves the key loads from where a contributor keeps it.
-    credential = resolve_credential(WORKSPACE_ROOT)
+    name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+    credential = resolve_credential(VAULTSPEC_CORE_TYPESAFE_API_KEY, WORKSPACE_ROOT)
     if credential is None:
         pytest.fail(
-            f"the typesafe marker needs {CREDENTIAL_VARIABLE} in the environment "
+            f"the typesafe marker needs {name} in the environment "
             f"or in {WORKSPACE_ROOT / '.env'}"
         )
-    return {CREDENTIAL_VARIABLE: credential.key}
+    return {name: credential.key}
 
 
 @pytest.fixture
@@ -187,4 +188,4 @@ def test_the_key_never_appears_in_the_outcome(
 ) -> None:
     outcome = _search(tmp_path, "which option was chosen to reap servers?", environ)
 
-    assert environ[CREDENTIAL_VARIABLE] not in repr(outcome)
+    assert environ[VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name] not in repr(outcome)
