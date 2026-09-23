@@ -84,7 +84,7 @@ class VerdictRow(LeanResult):
     relation: str
     status: str | None = None
     declared: bool
-    applied: bool = False
+    applied: bool | None = None
 
 
 class SourceRow(LeanResult):
@@ -99,6 +99,7 @@ class SourceRow(LeanResult):
         links: Link verdicts.
         written: Links written.
         unjudged_declared: Declared links beyond the judged ceiling.
+        write_failed: Link verdicts ``apply`` could not write.
         reason: Why a configured run failed.
         next_step: What to run instead when the source was not judged.
         remediation: The reason and the next step, as one sentence.
@@ -112,6 +113,7 @@ class SourceRow(LeanResult):
     links: int = 0
     written: int = 0
     unjudged_declared: int | None = None
+    write_failed: list[str] | None = None
     reason: str | None = None
     next_step: dict[str, Any] | None = None
     remediation: str | None = None

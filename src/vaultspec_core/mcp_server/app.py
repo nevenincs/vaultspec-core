@@ -39,7 +39,7 @@ from .tools import (
 logger = logging.getLogger(__name__)
 
 
-class _ReadOnlyCheckGuard(Extension):
+class _ReadOnlyArgumentGuard(Extension):
     """Reject write arguments that the SDK would otherwise ignore.
 
     The read-only ``check`` takes no ``fix`` and the read-only ``crossref``
@@ -47,7 +47,7 @@ class _ReadOnlyCheckGuard(Extension):
     would let a caller believe a repair or a link write ran.
     """
 
-    identifier = "io.vaultspec/read-only-check"
+    identifier = "io.vaultspec/read-only-arguments"
 
     @override
     async def intercept_tool_call(
@@ -148,7 +148,7 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
         name="vaultspec-core-mcp",
         instructions=_build_instructions(read_only=read_only),
         lifespan=_lifespan,
-        extensions=[_ReadOnlyCheckGuard()] if read_only else None,
+        extensions=[_ReadOnlyArgumentGuard()] if read_only else None,
     )
 
     # The restricted mode is a positive allowlist: only non-mutating handlers

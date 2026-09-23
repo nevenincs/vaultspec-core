@@ -492,23 +492,26 @@ it should link, plus the links it already declares that were judged weak. It is 
 backend as `vaultspec-core vault adr crossref`, and it uses the hosted-search key and
 data flow described under [`search`](#search).
 
-| Parameter     | Type                   | Default | Description                                                                                |
-| ------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------ |
-| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`. One ref is judged alone.           |
-| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                 |
-| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                    |
-| `all_adrs`    | boolean                | `false` | Sweep every ADR that still governs; superseded and rejected ones are skipped unless named. |
-| `after`       | string or null         | `null`  | Resume a sweep after this stem, the `next_after` of the previous reply.                    |
-| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                |
-| `apply`       | boolean                | `false` | Write each new `link` verdict into the source's `related:`.                                |
+| Parameter     | Type                   | Default | Description                                                                                  |
+| ------------- | ---------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`, at most 50. One ref is judged alone. |
+| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                   |
+| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                      |
+| `all_adrs`    | boolean                | `false` | Sweep every ADR that still governs; superseded and rejected ones are skipped unless named.   |
+| `after`       | string or null         | `null`  | Resume a sweep after this ADR, the `next_after` of the previous reply.                       |
+| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                  |
+| `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                         |
 
-The read-only server takes one parameter, `ref`, the ADR to judge.
+Naming `refs` together with `feature` or `isolated` is refused. The read-only server
+takes one parameter, `ref`, the ADR to judge.
 
 **Bounds.** Every other ADR is ranked by code alone, the best 192 are put to the model
 as Choice questions of at most 32 options, and the best 32, plus up to 8 declared links
 outside them, are judged in pairs. A source costs at most 46 requests and 60 seconds, a
 sweep takes at most 50 sources and 300 seconds, and a vault may hold at most 5,000 ADRs.
-Sweeps run in stem order and store no state.
+Sweeps run in stem order and store no state. An ADR the provider refuses to read fails
+on its own and the sweep moves past it; any other failure stops the sweep, and resuming
+retries the source it stopped at.
 
 **Verdicts.** Each row has `stem`, `kind`, `score`, `relation`, `status`, `declared`,
 and `applied` when this call wrote it. `link` means the source should link the ADR;
@@ -520,7 +523,11 @@ in full, not what to decide.
 **Reply.** `sources` holds one entry per source, with its `status` (`ok`,
 `not_configured`, or `unavailable` with its `reason`), its `verdicts`, and the counts
 `links`, `written`, and `verdicts_total`; `truncated` marks a source whose rows were
-cut, since a reply carries at most 80 verdict rows. The totals `judged`, `links`, and
+cut, since a reply carries at most 80 verdict rows. A source also carries
+`unjudged_declared` when declared links were beyond the judged ceiling, `write_failed`
+for links `apply` could not write, and, when it was not judged, `next_step` and
+`remediation`: the search to run instead, which is the `vaultspec-rag` search when rag
+is provisioned and the ADR listing otherwise. The totals `judged`, `links`, and
 `written` follow, then `remaining`, `next_after` when sources remain, `stopped` when a
 sweep ended early, and `usage` (requests, input tokens, and `unscored`, the requests the
 provider refused to read) when anything was sent. A source whose every pair was refused
@@ -983,7 +990,7 @@ ______________________________________________________________________
 
 ### `discover` and `invoke`
 
-`discover` and `invoke` are the gateway pair for everything else. The eight hot tools
+`discover` and `invoke` are the gateway pair for everything else. The ten hot tools
 cover the verbs a client reaches for constantly; `discover` and `invoke` reach the rest
 of the CLI - the long tail of verbs that don't earn a dedicated tool but still need to
 run. `discover` searches that catalog and returns ranked schemas. `invoke` runs one of
