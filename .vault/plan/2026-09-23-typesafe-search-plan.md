@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-typesafe-search-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:7eaf8386e96671ac50800988f4661edcd5e0e8c33ead655cd23d61dd1ca69f7c'
+body_hash: 'sha256:d115ade0ad90e00b20c74be0429837b5324742a24daa91398f6662fe75445ed9'
 ---
 
 # `typesafe-search` plan
@@ -44,7 +44,7 @@ fence regexes and two section scanners, before the search corpus builds on them.
 - [ ] `S06` - Add the MCP search tool to the normal and read-only surfaces and the hosted-search field to status; `src/vaultspec_core/mcp_server/tools/search.py, src/vaultspec_core/mcp_server/app.py, src/vaultspec_core/mcp_server/tools/orientation.py, docs/MCP.md`.
 - [ ] `S07` - Add the vault search CLI verb and the CLI status row, and regenerate the CLI and MCP references; `src/vaultspec_core/cli/vault_search_cmd.py, src/vaultspec_core/cli/status_cmd.py, docs/CLI.md, src/vaultspec_core/builtins/reference/cli.md`.
 - [ ] `S08` - Route discovery guidance to core search when configured and to vaultspec-rag otherwise; `src/vaultspec_core/core/discovery_guidance.py, src/vaultspec_core/builtins/`.
-- [ ] `S09` - Add the deselected typesafe marker and a live test over a synthetic vault, then verify against this vault; `pyproject.toml, dev/toolchain.py, src/vaultspec_core/search/tests/test_live.py`.
+- [x] `S09` - Add the deselected typesafe marker and a live test over a synthetic vault, then verify against this vault; `pyproject.toml, dev/toolchain.py, src/vaultspec_core/search/tests/test_live.py`.
 - [x] `S10` - Rehome the remaining fence, heading and frontmatter duplicates onto the canonical scanner and parser, and bump the graph cache schema for the changed title reading; `src/vaultspec_core/vaultcore/links.py, src/vaultspec_core/plan/parser.py, src/vaultspec_core/plan/checks/heading_level_check.py, src/vaultspec_core/vaultcore/exec_fold.py, src/vaultspec_core/mcp_server/tools/documents.py, src/vaultspec_core/graph/cache.py`.
 - [ ] `S11` - Move the byte-preserving write-path frontmatter splitters onto the canonical splitter, with YAML-block offsets and lone-CR support, keeping body_hash digests byte-identical; `src/vaultspec_core/vaultcore/parser.py, src/vaultspec_core/vaultcore/body_hash.py, src/vaultspec_core/vaultcore/models.py, src/vaultspec_core/vaultcore/hydration.py, src/vaultspec_core/vaultcore/exec_recovery.py, src/vaultspec_core/vaultcore/rename_ops.py, src/vaultspec_core/vaultcore/query_rename.py, src/vaultspec_core/vaultcore/related_surgery.py`.
 
