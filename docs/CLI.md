@@ -2338,7 +2338,7 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
   scaffold from a named template instead of an empty body.
 - `show NAME` - Print resource content to stdout.
 - `edit NAME [--editor EDITOR]` - Open in configured editor. Resolution order: --editor
-  flag, local config, VISUAL, EDITOR, vi. See
+  flag, local config, VAULTSPEC_EDITOR, VISUAL, EDITOR, vi. See
   [which editors are accepted](#which-editors-are-accepted).
 - `remove NAME [--yes|--force]` (`-y`) - Delete a resource. Prompts unless confirmed.
 - `rename OLD_NAME NEW_NAME` - Rename a resource.
@@ -3246,7 +3246,8 @@ ______________________________________________________________________
 
 ## Environment variables
 
-All variables are prefixed `VAULTSPEC_`. Environment variables override defaults but are
+vaultspec-core owns the `VAULTSPEC_` variables below and honours a few external
+conventions, listed after them. Environment variables override defaults but are
 overridden by the `--target` flag.
 
 - `VAULTSPEC_TARGET_DIR` (path, default cwd) - Root workspace directory (where `.vault/`
@@ -3268,18 +3269,14 @@ overridden by the `--target` flag.
   of blocking indefinitely. Covers the in-process and cross-process layers combined.
   Raise it if a large corpus or a slow network volume makes legitimate contention exceed
   the budget.
-- `VAULTSPEC_LOCK_TIMEOUT_SECONDS` (float, default `120.0`) - Total seconds a single
-  advisory-lock acquisition may wait before failing with a diagnosable timeout instead
-  of blocking indefinitely. Covers the in-process and cross-process layers combined.
-  Raise it if a large corpus or a slow network volume makes legitimate contention exceed
-  the budget.
 - `VAULTSPEC_LOG_LEVEL` (str, default `INFO`) - Root log level for the CLI, for example
   `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.
-- `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command for
-  `vaultspec-core spec {rules|skills|agents} edit`. Overridden by the project-local
-  config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag,
-  project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`. Unlike the flag and the
-  config key, an editor named here is not restricted to the recognised set; see
+- `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command. The edit verbs
+  (`vaultspec-core spec {rules|skills|agents} edit`) resolve in order: `--editor` flag,
+  project config `editor`, `VAULTSPEC_EDITOR`, `VISUAL`, `EDITOR`, `vi`. Interactive
+  creation of a rule, skill, agent, or trigger opens `VAULTSPEC_EDITOR`, or `zed -w`
+  when it is unset. Unlike the flag and the config key, an editor named in the
+  environment is not restricted to the recognised set; see
   [which editors are accepted](#which-editors-are-accepted).
 - `VAULTSPEC_JSON_PRETTY` (str, unset by default) - Indents `--json` output. Any value
   other than `0`, `false`, `no`, `off`, or the empty string turns it on; without it the
@@ -3297,10 +3294,27 @@ overridden by the `--target` flag.
   pipx install, or a release binary) never reads the workspace `.env`. The generic
   `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
   `vaultspec-core status` reports only whether one is configured and from which source.
+- `VAULTSPEC_NON_INTERACTIVE` (presence, unset by default) - Set to any value, even
+  blank, to declare that no operator is watching, as CI does. Repository triggers that
+  await approval are then skipped instead of prompted for.
 - `VAULTSPEC_STDIO_WATCHDOG` (str, default on) - Lifetime watchdog for the MCP server.
   Set it to `0`, `false`, `off`, or `no` to disable it, which leaves the server to exit
   on stdin EOF alone. Read by `vaultspec-core-mcp` rather than by the CLI; see the
   [MCP reference](./MCP.md).
+
+vaultspec-core also honours these external variables. It does not own them.
+
+- `CI` (presence) - Set by CI systems. Same effect as `VAULTSPEC_NON_INTERACTIVE`.
+- `NO_COLOR` (presence) - Set to any value, even blank, to disable colour in console
+  output.
+- `COLUMNS` (int) - Console width. When unset, the width is read from the terminal once
+  at startup.
+- `VISUAL`, `EDITOR` (str) - Editor commands the edit verbs consult after
+  `VAULTSPEC_EDITOR`, in that order.
+- `CLAUDE_CONFIG_DIR` (path, default home directory) - Claude Code's configuration home,
+  whose `.claude.json` holds user-scope MCP servers.
+- `CODEX_HOME` (path, default `~/.codex`) - Codex's home, whose `config.toml` holds
+  user-scope MCP servers.
 
 ## See also
 

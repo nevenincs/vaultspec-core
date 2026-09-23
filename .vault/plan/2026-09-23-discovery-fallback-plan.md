@@ -13,7 +13,7 @@ related:
   - '[[2026-09-23-typesafe-search-audit]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:2dca56efdf9fd15cbb0d20f149867e40530ece8a4cec651094998bc8e600c044'
+body_hash: 'sha256:f32fc8ec32e969f17bbdb202b3e846bb6a15e8b3db35a4d9afb4b68ed13ca542'
 ---
 
 # `discovery-fallback` plan
@@ -52,7 +52,7 @@ No new costly decision is involved beyond the amendment.
 - [x] `S02` - Replace the status-gated routing constant with state-free wording and update the builtins-sync guard tests; `src/vaultspec_core/core/discovery_guidance.py, src/vaultspec_core/tests/test_discovery_guidance.py`.
 - [x] `S03` - Fix the reference generator inputs so the bundled CLI reference and docs/CLI.md list the real hit fields and render the vault search options table, then regenerate; `src/vaultspec_core/cli/reference_gen.py, src/vaultspec_core/builtins/reference/cli.md, docs/CLI.md`.
 - [x] `S04` - Rewrite the bundled discovery guidance with single-home routing, search output handling, the unavailable branch and a degraded-mode grep carve-out, add a coverage-check method to the ADR skill and code-reviewer, then sync; `src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md, src/vaultspec_core/builtins/skills/vaultspec-code-research/, src/vaultspec_core/builtins/skills/vaultspec-curate/, src/vaultspec_core/builtins/skills/vaultspec-adr/, src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md, src/vaultspec_core/builtins/agents/vaultspec-code-reviewer.md`.
-- [ ] `S05` - Add hosted search and the degradation chain to the user discovery narrative and align the CLI and MCP remediation wording; `README.md, docs/framework.md, docs/CLI.md, docs/MCP.md`.
+- [x] `S05` - Add hosted search and the degradation chain to the user discovery narrative and align the CLI and MCP remediation wording; `README.md, docs/framework.md, docs/CLI.md, docs/MCP.md`.
 - [ ] `S07` - Emit ledger notes and verify lines that pass the markdown check, and repair existing rows through the writer; `src/vaultspec_core/vaultcore/exec_ledger.py`.
 - [ ] `S06` - Review the plan's changes against the amended ADR and append the findings to the rolling audit; `.vault/audit/2026-09-23-typesafe-search-audit.md`.
 
