@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:8e0bdf2b388f069ba4c3540c78cd93a956a0df5099bb39721f8b449c1a25627a'
+body_hash: 'sha256:9111110a0e182abd5b2110a104f6dde214502ab7d7801c3ba12aa267755f8f57'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -69,6 +69,7 @@ related:
 - `S09` `verify:` `vaultspec-core commit-gate (30k corpus, 5 docs, 0.81s)` -> `pass`
 - `S04` `M` `src/vaultspec_core/tests/cli/test_precommit_opt_out.py`
 - `S04` `M` `src/vaultspec_core/tests/cli/test_precommit_yml_config.py`
+- `S02` `M` `src/vaultspec_core/vaultcore/checks/tests/test_staged_gate.py`
 
 ## Notes
 

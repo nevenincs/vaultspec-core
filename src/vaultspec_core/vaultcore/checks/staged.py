@@ -157,13 +157,24 @@ def _read_committed(
     committed: dict[Path, bytes | OSError] = {}
     cursor = 0
     for path in documents:
-        header_end = out.index(b"\n", cursor)
+        header_end = out.find(b"\n", cursor)
+        if header_end < 0:
+            break
         header = out[cursor:header_end].split()
         cursor = header_end + 1
-        if len(header) != 3 or header[1] != b"blob":
+        if header and header[-1] == b"missing":
             continue
+        if len(header) != 3 or not header[2].isdigit():
+            # An answer this parser does not understand leaves no way to find
+            # where the next one starts, so the remaining documents simply
+            # have no baseline - every error in them counts - rather than
+            # being matched against bytes from someone else's object.
+            break
         size = int(header[2])
-        committed[path] = out[cursor : cursor + size]
+        if header[1] == b"blob":
+            committed[path] = out[cursor : cursor + size]
+        # Every object's payload is skipped, not only a blob's: a path that is
+        # a tree at the baseline still prints its contents.
         cursor += size + 1
     return committed
 

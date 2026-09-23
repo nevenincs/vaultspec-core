@@ -137,3 +137,50 @@ def test_a_warning_never_blocks(repo: Path) -> None:
 
     assert outcome.blocking == []
     assert any(r.check_name == "annotations" and r.diagnostics for r in outcome.results)
+
+
+def test_a_path_that_was_a_directory_does_not_cost_its_neighbours_their_baseline(
+    repo: Path,
+) -> None:
+    """A staged path that is a tree at HEAD must not desynchronise the others.
+
+    The object database answers every requested path in order; a tree's
+    listing sits in the same stream as the blobs after it, and misreading its
+    length would match later documents against the wrong bytes.
+    """
+    inherited = _CLEAN + "\nSee [[nowhere-doc]] here.\n"
+    folder = repo / ".vault" / "research" / "0-folder.md"
+    folder.mkdir(parents=True)
+    (folder / "inner.txt").write_text("inside a directory\n", encoding="utf-8")
+    _commit(repo, inherited)
+
+    for child in folder.iterdir():
+        child.unlink()
+    folder.rmdir()
+    folder.write_text(_CLEAN.replace("alpha", "zero"), encoding="utf-8")
+    _write(repo, inherited + "\nMore prose.\n")
+
+    import pathlib
+
+    outcome = gate_staged_documents(repo, [".vault/research/0-folder.md", _DOC])
+
+    assert [d for _n, d in outcome.blocking if d.path == pathlib.Path(_DOC)] == []
+
+
+def test_the_baseline_pass_never_writes(repo: Path) -> None:
+    _commit(repo, _CLEAN + "\nSee [[nowhere-doc]] here.\n")
+    _write(repo, _CLEAN + "\nSee [[nowhere-doc]] here.\n\nMore prose.\n")
+    before = {
+        p: p.read_bytes()
+        for p in repo.rglob("*")
+        if p.is_file() and ".git" not in p.parts
+    }
+
+    gate_staged_documents(repo, [_DOC])
+
+    after = {
+        p: p.read_bytes()
+        for p in repo.rglob("*")
+        if p.is_file() and ".git" not in p.parts
+    }
+    assert after == before
