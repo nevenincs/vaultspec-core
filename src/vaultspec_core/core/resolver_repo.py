@@ -193,8 +193,11 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
 #: on a state nobody has seen (issue #407).
 #: DECLINED and DECLINED_LEFTOVER mean the committed declaration refused the
 #: hooks; the scaffold declines too, so a repair would be a permanent no-op.
+#: NOT_INSTALLED means the config is complete but no git hook runs it.
+#: Installing a hook is the operator's call, never sync's; `doctor` reports it.
 _PRECOMMIT_INERT_SIGNALS = (
     PrecommitSignal.COMPLETE,
+    PrecommitSignal.NOT_INSTALLED,
     PrecommitSignal.UNREFRESHABLE,
     PrecommitSignal.ORPHANED,
     PrecommitSignal.UNREADABLE,

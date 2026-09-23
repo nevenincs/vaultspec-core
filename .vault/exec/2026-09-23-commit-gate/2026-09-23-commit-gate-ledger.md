@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:dadea4a98c9ec07b0eb2717539605191fed7aaedd164e327dad867e469dc3b4d'
+body_hash: 'sha256:1caa65310801ef123a4151d1b7edd048ed5a7aa08ca8ddae6d4f257d6a42a477'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -80,9 +80,13 @@ related:
 - `S08` `M` `src/vaultspec_core/core/diagnosis/collectors_provider.py`
 - `S08` `M` `src/vaultspec_core/cli/spec_cmd_doctor.py`
 - `S08` `verify:` `pytest doctor and checks` -> `pass`
+- `S09` `M` `src/vaultspec_core/core/resolver_repo.py`
+- `S09` `M` `src/vaultspec_core/tests/cli/test_precommit_hook_set.py`
+- `S09` `verify:` `ty check` -> `pass`
 
 ## Notes
 
 - `S03` authorized by the user's direct request to fix just init; not governed by the proposed ADR
 - `S05` full-suite run also hit test_rename_concurrency under -n auto; it passes 3/3 alone and is untouched by this Step
 - `S08` test_rename_concurrency failed intermittently under -n auto in full runs; it passes alone and exercises rename/edit locks this Step does not touch
+- `S09` the deployed .vaultspec/reference mirror is left for the next release carry-forward, matching how it has been refreshed from the packaged builtins after each release

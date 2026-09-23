@@ -181,3 +181,21 @@ def test_the_one_hook_is_scoped_to_what_the_commit_stages(mode: InstallMode) -> 
     assert hook["always_run"] is True
     assert "types" not in hook
     assert "files" not in hook
+
+
+def test_an_uninstalled_hook_is_not_a_sync_repair(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Installing a git hook is the operator's decision; sync plans nothing."""
+    from vaultspec_core.core.diagnosis.signals import PrecommitSignal
+    from vaultspec_core.core.enums import CliAction
+    from vaultspec_core.core.resolver_repo import resolve_precommit
+    from vaultspec_core.core.resolver_types import ResolutionPlan
+
+    plan = ResolutionPlan()
+    caplog.set_level("WARNING", logger="vaultspec_core.core.resolver_repo")
+
+    resolve_precommit(plan, PrecommitSignal.NOT_INSTALLED, CliAction.SYNC, force=False)
+
+    assert plan.steps == []
+    assert not caplog.records

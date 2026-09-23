@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:64c330711fe689874ef19a50b2fa9da9481728fb2116926fb704ea26b555a2d3'
+body_hash: 'sha256:b618795e4864464569449aa6716b7514789584bcad9a5bbeeef6f1aee75ffeac'
 ---
 
 # `commit-gate` plan
@@ -45,7 +45,7 @@ Issues addressed:
 - [x] `S02` - attribute blocking findings against each staged document's HEAD version, so only introduced errors block; `src/vaultspec_core/vaultcore/checks/staged.py`.
 - [x] `S07` - add the read-only commit-gate verb running the staged runner and the provider guard in one process, with file-scoped output and no mutating hints; `src/vaultspec_core/cli/root.py and a new cli verb module`.
 - [x] `S08` - make vaultspec-commit-gate the one canonical hook, retire vault-fix, spec-check and check-provider-artifacts, and extend the read-only guard to the new entry and its output; `src/vaultspec_core/core/enums.py, src/vaultspec_core/core/precommit.py, .pre-commit-config.yaml, dev/guards/test_automation_contracts.py`.
-- [ ] `S09` - document the gate and the CI home of corpus checks, regenerate the CLI reference, and record before and after commit timings on the core vault and the 30k corpus; `docs/, src/vaultspec_core/builtins/reference/`.
+- [x] `S09` - document the gate and the CI home of corpus checks, regenerate the CLI reference, and record before and after commit timings on the core vault and the 30k corpus; `docs/, src/vaultspec_core/builtins/reference/`.
 
 ## Parallelization
 
