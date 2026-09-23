@@ -3,10 +3,11 @@ tags:
   - '#adr'
   - '#template-annotation-sanitization'
 date: '2026-05-15'
-modified: '2026-06-28'
-body_hash: 'sha256:8912f70dbc88b0090544ce0c8b5231fbb2a6346340100d28938963373e03fd1f'
+modified: '2026-09-23'
+body_hash: 'sha256:89b07b40d693f04f150d5bcf235d27de83e3ffb9f1dc7c7670d01947cc9fa206'
 related:
   - '[[2026-05-15-template-annotation-sanitization-research]]'
+  - '[[2026-09-23-commit-gate-adr]]'
 ---
 
 # template-annotation-sanitization adr: explicit generated annotation sanitation | (**status:** `accepted`)
@@ -62,8 +63,9 @@ explicit command.
 
 Run the same checker inside `vault repair` through the shared check suite.
 
-Add a canonical pre-commit hook and dev fix recipe entry for
-`vault sanitize annotations`.
+Add a dev fix recipe entry for `vault sanitize annotations`. No canonical commit
+hook runs the sanitizer; commit-time checks report annotations and never rewrite
+documents (amended 2026-09-23 under `2026-09-23-commit-gate-adr`).
 
 Move template frontmatter guidance out of YAML `# ...` comments and into
 Markdown comment directives after frontmatter.
@@ -89,8 +91,8 @@ operator runs the sanitizer or a fix pipeline.
 
 Historical vault documents can be cleaned by running the explicit sanitizer.
 
-Pre-commit can now remove generated annotations before commit, so operators
-should expect staged vault documents to change when annotation guidance remains.
+Commit-time checks report remaining annotations as warnings; removing them is an
+explicit operator action.
 
 Doctor warnings for annotations are advisory. They point operators to the
 explicit sanitizer instead of mutating documents during diagnosis.

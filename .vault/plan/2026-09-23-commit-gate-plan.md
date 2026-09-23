@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-commit-gate-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:e4c2771147ee80d638691951251beae8eaf5fbffd9b70907733606d58a138765'
+body_hash: 'sha256:2c718c14fb17790236295f6b63df134b2182605892746f1cedfd6d0059895c64'
 ---
 
 # `commit-gate` plan
@@ -38,7 +38,7 @@ Issues addressed:
 ## Steps
 
 - [x] `S03` - stop dev init from installing a commit hook, and correct the contributor docs that describe the retired whole-vault and annotation-cleanup hooks; `dev/init/hooks.py, dev/init/plan.py, dev/init/README.md, justfile, docs/framework.md, docs/syntax.md`.
-- [ ] `S01` - apply the authorized amendment retiring the canonical sanitize-hook clause; `.vault/adr/2026-05-15-template-annotation-sanitization-adr.md`.
+- [x] `S01` - apply the authorized amendment retiring the canonical sanitize-hook clause; `.vault/adr/2026-05-15-template-annotation-sanitization-adr.md`.
 - [ ] `S04` - resolve the hook config in prek order, adding .pre-commit-config.yml, across scaffold, boundary, migrate, collector, gitignore lock subjects and uninstall; `src/vaultspec_core/core/precommit.py, prek_boundary.py, diagnosis/collectors_precommit.py, gitignore.py, uninstall.py`.
 - [ ] `S05` - narrow the provider guard to per-machine artifacts derived from the managed-ignore source, with unstage-only remediation; `src/vaultspec_core/core/git_artifacts.py, src/vaultspec_core/cli/root_doctor.py`.
 - [ ] `S06` - build the staged-document check runner: per-document checkers over passed paths, related-link resolution against a name listing, and a subset-safety test per admitted checker; `src/vaultspec_core/vaultcore/checks/staged.py (new)`.

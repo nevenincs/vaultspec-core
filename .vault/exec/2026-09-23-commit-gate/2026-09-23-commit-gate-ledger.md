@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:62a6588a7cbcbc2d958775f714e099e30ede407287e0d9f7ca1509958f373c47'
+body_hash: 'sha256:6d91898c51e2aea4a7199ae9a51ef78720f6b04246e5720387187d2361de43de'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -20,6 +20,8 @@ related:
 - `S03` `M` `dev/init/README.md`
 - `S03` `M` `docs/framework.md`
 - `S03` `verify:` `ty check` -> `pass`
+- `S01` `M` `.vault/adr/2026-05-15-template-annotation-sanitization-adr.md`
+- `S01` `verify:` `vaultspec-core vault check all` -> `pass`
 
 ## Notes
 
