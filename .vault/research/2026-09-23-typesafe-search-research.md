@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:afbac15f47de3839a9ecf04187fdba8750e7c8b79861b3dadb6d9ecc55ca0b6a'
+body_hash: 'sha256:2fbd61d5cb060d2329eb6b4c54c39f65ec91503870ca3231c02f90f3b4b6aa4f'
 related:
   - '[[2026-08-26-rag-search-exposure-adr]]'
   - '[[2026-08-23-envelope-optimization-adr]]'
@@ -83,7 +83,8 @@ retriever, with no index at all.
 ### A two-stage Jev engine matches rag on finding the record and far exceeds it on the excerpt
 
 **Corpus.** 672 records: adr, research, reference, audit, plan and exec. `index/` and
-`_archive/` are excluded.
+`_archive/` are excluded. Together they hold about 4.9 MB, roughly 1.2M tokens, so
+reading every record in full per query is out of reach of the request and rate bounds.
 
 **Stage 1 (summary pass).** The query is the state. There is one Choice per record
 type, and each option is a record summary: title, a 240-character lead, and the
@@ -270,9 +271,11 @@ transport would not.
 
 ### Surface: tool budget, read-only mode and the envelope budget
 
-- **Tool budget.** `2026-07-09-mcp-tool-schema-adr` fixes nine first-class tools. A
-  search reached only through `invoke` would need host confirmation on every call, so a
-  first-class tool amends that set.
+- **Tool budget.** `2026-07-09-mcp-tool-schema-adr` caps first-class tools at single
+  digits plus the gateway. Normal mode registers eight today, plus `discover` and
+  `invoke`; read-only mode registers four (`src/vaultspec_core/mcp_server/app.py:142`).
+  A search reached only through `invoke` would need host confirmation on every call, so
+  a first-class tool amends that set.
 - **Tool-list invariance.** The rag-exposure invariance principle implies registering
   the tool regardless of whether a key is present, and returning a typed unavailable
   outcome.
@@ -314,6 +317,7 @@ transport would not.
 - `src/vaultspec_core/core/discovery_guidance.py:48`
 - `src/vaultspec_core/core/diagnosis/collectors_companion.py:56`
 - `src/vaultspec_core/config/config.py:375`
+- `src/vaultspec_core/mcp_server/app.py:142`
 - `src/vaultspec_core/core/enums.py:328`
 - `dev/binaries/build_pyapp.py:817`
 - `uv.lock` (`mcp@2.2.0`, `httpx2@2.13.0`, `pydantic@2.13.5`)
