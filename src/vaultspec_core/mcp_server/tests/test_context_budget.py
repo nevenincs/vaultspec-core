@@ -5,7 +5,7 @@ An MCPServer's tool definitions are serialized into every LLM
 request  - keeping them compact is a hard requirement.
 
 The budget is the concern here; the ``test_tool_surface`` module covers what
-the same eleven tools do end-to-end and the annotation matrix they declare.
+the same twelve tools do end-to-end and the annotation matrix they declare.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
-#: Aggregate ceiling for the full eleven-tool wire surface, in characters.
+#: Aggregate ceiling for the full twelve-tool wire surface, in characters.
 #:
 #: This is a **ratchet, not a target**. The measured surface is 43,919 chars
 #: (~5.4K tokens at ``ENVELOPE_BYTES_PER_TOKEN``, measured for this JSON),
@@ -77,7 +77,14 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: stopped shipping property defaults, which describe input a result never
 #: takes, and enum fields of dataclass shapes ship as their values alone.
 #: Measured 26,375 before and 26,289 after (-86). Margin of 6.
-MAX_TOOL_DEFINITION_CHARS = 26_295
+#:
+#: Raised a fourth time, from 26,295, when ADR cross-referencing joined the
+#: surface as its tenth hot tool: a record-in, verdicts-out contract that the
+#: ADR workflow's orchestrator calls once per ADR, and that ``invoke`` would
+#: confirm on every call and read-only launches would not reach at all.
+#: Measured 26,289 before and 29,401 after (+3,112): ``crossref`` itself,
+#: description 889, input 713, output 1,341. Margin of 6.
+MAX_TOOL_DEFINITION_CHARS = 29_407
 
 #: Aggregate ceiling for the read-only surface (five tools), same rules.
 #: Measured at 9,194 chars. Raised from 9,500 by the same three changes, which
@@ -87,12 +94,16 @@ MAX_TOOL_DEFINITION_CHARS = 26_295
 #: before and 14,143 after (+1,001: find, search, discover and status), with
 #: a margin of 8. Lowered from 14,151 by the same change as the full
 #: surface: measured 14,143 before and 14,057 after (-86), margin of 8.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 14_065
+#: Raised from 14,065 by ``crossref``'s one-ADR, judge-only signature, which
+#: read-only launches carry: measured 14,057 before and 16,153 after (+2,096),
+#: margin of 8.
+MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 16_161
 
-# Maximum number of tools: the tiered surface is nine hot tools plus the
+# Maximum number of tools: the tiered surface is ten hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.
-# Raised from 10 by exactly one, for ``search``, the ninth hot tool.
-MAX_TOOL_COUNT = 11
+# Raised from 10 by exactly one, for ``search``, the ninth hot tool, and from
+# 11 by exactly one, for ``crossref``, the tenth.
+MAX_TOOL_COUNT = 12
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +250,7 @@ async def test_read_only_tool_definitions_within_context_budget(
 ) -> None:
     """The read-only surface has its own ceiling and its own regressions.
 
-    Read-only registers five of the eleven tools, so a change that bloats a
+    Read-only registers six of the twelve tools, so a change that bloats a
     shared result model surfaces here at a different ratio than on the full
     surface. Guarding only the full surface let this one drift furthest -
     it was the least covered of the two.

@@ -1,8 +1,8 @@
-"""Full eleven-tool surface integration test over the real ``create_server``.
+"""Full twelve-tool surface integration test over the real ``create_server``.
 
 Builds the production server through ``create_server`` on a
 :class:`WorkspaceFactory`-installed vault and drives it over the in-memory
-MCPServer client - no mocks, stubs, or skips. Asserts that exactly the eleven
+MCPServer client - no mocks, stubs, or skips. Asserts that exactly the twelve
 expected tools are registered with the ADR Q6 annotation matrix and an
 ``outputSchema`` each, exercises a representative call on every tool end-to-end
 (including a gateway ``invoke`` of the real ``vault list`` verb), confirms a
@@ -49,6 +49,16 @@ _SEARCH_ANNOTATIONS = {
     "open_world_hint": True,
 }
 
+#: ``crossref`` is open-world like ``search``. On the full surface it can write
+#: links, so it is not read-only, yet repeating a call writes nothing new; the
+#: read-only surface registers a judge-only signature.
+_CROSSREF_ANNOTATIONS = {
+    "read_only_hint": False,
+    "destructive_hint": False,
+    "idempotent_hint": True,
+    "open_world_hint": True,
+}
+
 #: The ADR Q6 annotation matrix: each tool mapped to the hints it must declare.
 #: Read-only tools (status/find/discover) leave ``destructive_hint`` unset
 #: (``None``), matching how their :class:`ToolAnnotations` are constructed.
@@ -60,6 +70,7 @@ _ANNOTATIONS = {
     },
     "find": {"read_only_hint": True, "idempotent_hint": True, "open_world_hint": False},
     "search": _SEARCH_ANNOTATIONS,
+    "crossref": _CROSSREF_ANNOTATIONS,
     "discover": {
         "read_only_hint": True,
         "idempotent_hint": True,
@@ -117,6 +128,7 @@ _READ_ONLY_ANNOTATIONS = {
     },
     "find": {"read_only_hint": True, "idempotent_hint": True, "open_world_hint": False},
     "search": _SEARCH_ANNOTATIONS,
+    "crossref": _SEARCH_ANNOTATIONS,
     "check": {
         "read_only_hint": True,
         "idempotent_hint": True,
@@ -130,10 +142,10 @@ _READ_ONLY_ANNOTATIONS = {
 }
 
 
-async def test_surface_registers_exactly_eleven_tools_with_schemas(
+async def test_surface_registers_exactly_twelve_tools_with_schemas(
     vault_root: Path,
 ) -> None:
-    """``create_server`` advertises exactly the eleven tools, schema'd and annotated."""
+    """``create_server`` advertises exactly the twelve tools, schema'd and annotated."""
     mcp = create_server()
     tools = await mcp.list_tools()
     names = {t.name for t in tools}
@@ -179,6 +191,7 @@ async def test_read_only_surface_omits_mutation_tools_and_repair(
         rejected_repair = await client.call_tool("check", {"fix": True})
     assert checked["fixed"] is False
     assert rejected_repair.is_error
+    assert set(by_name["crossref"].input_schema.get("properties", {})) == {"ref"}
 
 
 async def test_surface_instructions_name_the_tools_and_version(
@@ -343,7 +356,7 @@ def test_registry_entry_launches_this_server_unchanged(vault_root: Path) -> None
     The builtin registry definition (ADR Q8: installation is a no-op for
     existing projects) must keep resolving to the module whose
     ``create_server`` this test drives, so a synced project picks up the
-    eleven-tool surface with no registry migration. Since the install-mode
+    twelve-tool surface with no registry migration. Since the install-mode
     model, the seeded registry carries the mode-neutral launch tokens and
     the concrete launch is rendered per install mode; every mode must still
     target this server module.
@@ -360,7 +373,7 @@ def test_registry_entry_launches_this_server_unchanged(vault_root: Path) -> None
         assert rendered["args"][-1] == "vaultspec_core.mcp_server.app", mode
 
     # The module the registry launches exposes the exact bootstrap this test
-    # exercised, so the launched process serves the same eleven-tool surface.
+    # exercised, so the launched process serves the same twelve-tool surface.
     from vaultspec_core.mcp_server import app as launched
 
     assert callable(launched.create_server)

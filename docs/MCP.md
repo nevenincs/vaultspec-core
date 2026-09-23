@@ -75,10 +75,12 @@ Use `--read-only` to limit the tools the server advertises:
 vaultspec-core-mcp --read-only
 ```
 
-This exposes only `status`, `find`, `search`, `check`, and `discover` to connected
-clients. In this mode, `check` has no `fix` parameter. `search` changes nothing on disk,
-but when a hosted-search key is configured it sends vault text to the TypeSafe API, so
-read-only mode still carries that data flow. See [`search`](#search).
+This exposes only `status`, `find`, `search`, `crossref`, `check`, and `discover` to
+connected clients. In this mode, `check` has no `fix` parameter, and `crossref` judges
+one ADR and cannot write links; any other argument to either is refused rather than
+ignored. `search` and `crossref` change nothing on disk, but when a hosted-search key is
+configured they send vault text to the TypeSafe API, so read-only mode still carries
+that data flow. See [`search`](#search) and [`crossref`](#crossref).
 
 ### Install modes
 
@@ -212,7 +214,7 @@ markers.
 
 <!-- vaultspec:generated:begin mcp-tool-inventory -->
 
-The server exposes 11 tools.
+The server exposes 12 tools.
 
 | Tool            | Purpose                                                                                                                                  | Annotations                     |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
@@ -222,6 +224,7 @@ The server exposes 11 tools.
 | `status`        | Orient in a vaultspec project, project-wide or targeted.                                                                                 | read-only, idempotent           |
 | `check`         | Run the vault health-check suite, optionally repairing.                                                                                  | non-destructive, idempotent     |
 | `search`        | Answer a question from the vault, quoting the passage that answers.                                                                      | read-only, idempotent           |
+| `crossref`      | Find the ADRs a decision should cross-reference, within fixed bounds.                                                                    | non-destructive, idempotent     |
 | `plan_progress` | Mark plan steps closed or open by canonical identifier.                                                                                  | non-destructive, idempotent     |
 | `plan_edit`     | Author plan steps: add, insert, edit, or remove.                                                                                         | destructive, not idempotent     |
 | `log`           | Append one Step's rows to its plan's execution ledger.                                                                                   | non-destructive, idempotent     |
@@ -240,6 +243,7 @@ from the recorded surface of that release, so it empties itself when the next on
 The latest published release is `0.2.4`. These tools are on this branch and not in that
 release, so a host installing the published server will not see them:
 
+- `crossref`
 - `search`
 
 <!-- vaultspec:generated:end unreleased-mcp-surface -->
@@ -474,6 +478,53 @@ Example response with no key configured:
   "remediation": "Hosted vault search is not configured: set VAULTSPEC_CORE_TYPESAFE_API_KEY to enable it, or search with `vaultspec-rag search \"<intent>\" --type vault --doc-type adr`."
 }
 ```
+
+______________________________________________________________________
+
+### `crossref`
+
+Find the ADRs a decision should cross-reference, within fixed bounds. Not read-only (it
+can write links), non-destructive, idempotent, open-world. On a read-only server it is
+read-only and judges one ADR.
+
+`crossref` judges a source ADR against every other ADR in the vault and returns the ones
+it should link, plus the links it already declares that were judged weak. It is the same
+backend as `vaultspec-core vault adr crossref`, and it uses the hosted-search key and
+data flow described under [`search`](#search).
+
+| Parameter     | Type                   | Default | Description                                                                                |
+| ------------- | ---------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`. One ref is judged alone.           |
+| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                 |
+| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                    |
+| `all_adrs`    | boolean                | `false` | Sweep every ADR that still governs; superseded and rejected ones are skipped unless named. |
+| `after`       | string or null         | `null`  | Resume a sweep after this stem, the `next_after` of the previous reply.                    |
+| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                |
+| `apply`       | boolean                | `false` | Write each new `link` verdict into the source's `related:`.                                |
+
+The read-only server takes one parameter, `ref`, the ADR to judge.
+
+**Bounds.** Every other ADR is ranked by code alone, the best 192 are put to the model
+as Choice questions of at most 32 options, and the best 32, plus up to 8 declared links
+outside them, are judged in pairs. A source costs at most 46 requests and 60 seconds, a
+sweep takes at most 50 sources and 300 seconds, and a vault may hold at most 5,000 ADRs.
+Sweeps run in stem order and store no state.
+
+**Verdicts.** Each row has `stem`, `kind`, `score`, `relation`, `status`, `declared`,
+and `applied` when this call wrote it. `link` means the source should link the ADR;
+`weak` is a declared link judged below the threshold, listed for a reader and never
+removed. `relation` (`supersedes`, `refines`, `depends_on`, `conflicts`,
+`shared_artifact`, `topic_only`, `unrelated`) is advisory: it says which pairs to read
+in full, not what to decide.
+
+**Reply.** `sources` holds one entry per source, with its `status` (`ok`,
+`not_configured`, or `unavailable` with its `reason`), its `verdicts`, and the counts
+`links`, `written`, and `verdicts_total`; `truncated` marks a source whose rows were
+cut, since a reply carries at most 80 verdict rows. The totals `judged`, `links`, and
+`written` follow, then `remaining`, `next_after` when sources remain, `stopped` when a
+sweep ended early, and `usage` (requests, input tokens, and `unscored`, the requests the
+provider refused to read) when anything was sent. A source whose every pair was refused
+is `unavailable` with `content_rejected`, never a source with no links.
 
 ______________________________________________________________________
 

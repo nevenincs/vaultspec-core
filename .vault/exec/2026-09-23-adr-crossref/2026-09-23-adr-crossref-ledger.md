@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:b5314dc814925a6a7a9f88527bc2340c947426efc273f3563df9f82382a1fc48'
+body_hash: 'sha256:8186733ae2f5d6205c7259d454648d61666714d7770178e845b09b882308a9a8'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -47,3 +47,15 @@ related:
 - `S04` `M` `src/vaultspec_core/crossref/_wire.py`
 - `S04` `M` `src/vaultspec_core/crossref/tests/test_service.py`
 - `S04` `verify:` `worst-case 50-source sweep reply under the 10,000-token envelope ceiling` -> `pass`
+- `S05` `A` `src/vaultspec_core/mcp_server/tools/crossref.py`
+- `S05` `A` `src/vaultspec_core/mcp_server/tests/test_crossref_tool.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tools/__init__.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/conftest.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/test_context_budget.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/test_tool_surface.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/test_stdio_e2e.py`
+- `S05` `M` `docs/MCP.md`
+- `S05` `M` `docs/CLI.md`
+- `S05` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S05` `verify:` `pytest src/vaultspec_core/mcp_server` -> `pass`

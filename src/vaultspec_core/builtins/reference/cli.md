@@ -56,6 +56,7 @@ Commands:
 
 MCP tools:
 
+- `crossref`
 - `search`
 
 <!-- vaultspec:generated:end unreleased-surface -->
