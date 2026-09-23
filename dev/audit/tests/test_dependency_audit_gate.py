@@ -119,9 +119,8 @@ def test_every_ecosystem_with_a_lockfile_is_scanned() -> None:
 def test_no_artifact_without_a_destination() -> None:
     """cadrumo's zero-artifact posture: no destination, nothing written.
 
-    The destination is passed as a value rather than patched into the
-    environment, so this asserts the behaviour itself and not the plumbing
-    that reads ``VAULTSPEC_CI_REPORTS``.
+    The destination is passed as a value, as the harness passes
+    ``VAULTSPEC_CI_REPORTS`` through ``--reports-dir``.
     """
     assert da.write_artifact(_report([]), "") is None
 

@@ -76,7 +76,6 @@ import argparse
 import gzip
 import hashlib
 import importlib.util
-import os
 import shutil
 import struct
 import subprocess
@@ -88,6 +87,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+from dev import environment
 from dev.binaries.windows_icon import VersionInfo, stamp_resources
 from dev.packaging import products
 
@@ -572,8 +572,6 @@ def build_one(
 ) -> Path:
     """Build a single PyApp binary and return the path to the raw executable."""
     root = workdir / binary.name
-    env = os.environ.copy()
-    env.update(pyapp_env(binary, version, target, distribution))
     # CLEARED, not merely unset. Every PYAPP_* option is read from the
     # environment by the crate's build script, so one left over in a shell or
     # exported by a workflow would silently reconfigure a release binary.
@@ -585,12 +583,14 @@ def build_one(
     # re-exposes `self update`, which would install from an index into an
     # artifact whose premise is that it does not, and would put bytes on disk
     # that the published digest and the attestation no longer describe.
-    for inherited in (
-        "PYAPP_UV_ENABLED",
-        "PYAPP_DISTRIBUTION_SOURCE",
-        "PYAPP_ALLOW_UPDATES",
-    ):
-        env.pop(inherited, None)
+    env = environment.child_environment(
+        pyapp_env(binary, version, target, distribution),
+        without=(
+            "PYAPP_UV_ENABLED",
+            "PYAPP_DISTRIBUTION_SOURCE",
+            "PYAPP_ALLOW_UPDATES",
+        ),
+    )
 
     cmd = install_command(target, root)
     if cmd[0] == "cargo-zigbuild":

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dev import testing
+from dev import environment, testing
 from dev.exit_codes import FINDINGS_CODES
 from dev.runner import Cmd, Echo, Ref, Step, ToolOrDocker, uv_run
 
@@ -141,7 +141,7 @@ WRAPPED_MARKDOWN = (
 
 #: complexipy emits status glyphs; Windows consoles default to a codepage that
 #: cannot encode them, which aborts the run before any finding is reported.
-UTF8 = {"PYTHONIOENCODING": "utf-8"}
+UTF8 = {environment.PYTHONIOENCODING.name: "utf-8"}
 
 #: Repairing the corpus is reachable as both `fix vault` and `vault fix`, which
 #: are the same action approached from the two verbs a reader might try. The
@@ -211,6 +211,16 @@ class Verb:
     def find(self, name: str) -> Target | None:
         """Return the named target, or ``None`` when it is not defined."""
         return next((t for t in self.targets if t.name == name), None)
+
+
+def _reports_dir_args() -> tuple[str, ...]:
+    """Hand ``VAULTSPEC_CI_REPORTS`` to the dependency audit as a flag.
+
+    The audit is a standalone, stdlib-only file in every repository, so it
+    cannot reach :mod:`dev.environment`; the harness reads the variable for it.
+    """
+    reports = environment.value(environment.VAULTSPEC_CI_REPORTS)
+    return ("--reports-dir", reports) if reports else ()
 
 
 def _ruff_paths(*prefix: str) -> Cmd:
@@ -535,7 +545,17 @@ AUDIT = Verb(
         Target(
             "deps",
             "Dependency vulnerability audit (GATES).",
-            (Cmd(("uv", "run", "python", "dev/audit/dependency_audit.py")),),
+            (
+                Cmd(
+                    (
+                        "uv",
+                        "run",
+                        "python",
+                        "dev/audit/dependency_audit.py",
+                        *_reports_dir_args(),
+                    )
+                ),
+            ),
         ),
         Target(
             "security",

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from dev import reporting
+from dev import environment, reporting
 from dev.exit_codes import (
     DRIFT,
     FAILED,
@@ -139,5 +139,5 @@ def test_the_verdict_of_a_clean_run_says_so() -> None:
 def test_verbose_is_off_unless_the_environment_asks() -> None:
     """The escape hatch is opt-in, and blank does not mean set."""
     assert not reporting.verbose({})
-    assert not reporting.verbose({reporting.VERBOSE_ENV: "  "})
-    assert reporting.verbose({reporting.VERBOSE_ENV: "1"})
+    assert not reporting.verbose({environment.VAULTSPEC_VERBOSE.name: "  "})
+    assert reporting.verbose({environment.VAULTSPEC_VERBOSE.name: "1"})

@@ -7,9 +7,9 @@ run, and never overrides a format the caller chose.
 
 from __future__ import annotations
 
-from dev import ci_formats
+from dev import ci_formats, environment
 
-ON = {ci_formats.ANNOTATIONS_ENV: "true"}
+ON = {environment.GITHUB_ACTIONS.name: "true"}
 RUFF_CHECK = ("uv", "run", "--no-sync", "ruff", "check", "src")
 RUFF_FORMAT = ("uv", "run", "--no-sync", "ruff", "format", "--check", "src")
 TY = ("uv", "run", "--no-sync", "python", "-m", "ty", "check", "src")

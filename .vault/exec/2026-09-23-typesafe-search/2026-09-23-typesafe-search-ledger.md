@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:bfd7001a4bd10f97cf8ca89f157dfdf69f048c879c098c5276d1eec989afc192'
+body_hash: 'sha256:d6d312e398da1a13a054ba21bfc1cb5e4bba1d9622c82b77bd634240e38b9d3a'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -286,3 +286,25 @@ related:
 - `S13` `A` `src/vaultspec_core/config/tests/test_environment.py`
 - `S13` `A` `src/vaultspec_core/search/tests/test_capability.py`
 - `S13` `verify:` `pytest config, search, cli status/search/editor, mcp orientation/search/watchdog` -> `pass`
+- `S14` `M` `.env.example`
+- `S14` `M` `dev/__init__.py`
+- `S14` `M` `dev/actionlint.py`
+- `S14` `M` `dev/audit/dependency_audit.py`
+- `S14` `M` `dev/audit/tests/test_dependency_audit_gate.py`
+- `S14` `M` `dev/binaries/build_pyapp.py`
+- `S14` `M` `dev/ci_formats.py`
+- `S14` `M` `dev/exit_codes.py`
+- `S14` `M` `dev/guards/test_ci_formats.py`
+- `S14` `M` `dev/guards/test_exit_code_contract.py`
+- `S14` `M` `dev/init/__init__.py`
+- `S14` `M` `dev/init/__main__.py`
+- `S14` `M` `dev/init/contract.py`
+- `S14` `M` `dev/reporting.py`
+- `S14` `M` `dev/runner.py`
+- `S14` `M` `dev/statistics/parsers/codex.py`
+- `S14` `M` `dev/tests/test_reporting.py`
+- `S14` `M` `dev/tests/test_runner.py`
+- `S14` `M` `dev/toolchain.py`
+- `S14` `A` `dev/environment.py`
+- `S14` `A` `dev/guards/test_environment_registry.py`
+- `S14` `verify:` `pytest dev -m not repo` -> `pass`

@@ -25,8 +25,9 @@ Modules:
 
 from __future__ import annotations
 
-import os
 import sys
+
+from dev import environment
 
 # Windows starts a Python process with its streams bound to the ANSI codepage
 # (cp1252 on a stock installation), so ONE box-drawing character or accented
@@ -40,7 +41,7 @@ import sys
 # everything the harness itself prints; exporting PYTHONIOENCODING covers every
 # Python child it spawns, which is most of the toolchain. An explicit value from
 # the operator or a caller wins, so a deliberate override still works.
-os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+environment.set_default(environment.PYTHONIOENCODING, "utf-8")
 for _stream in (sys.stdout, sys.stderr):
     _reconfigure = getattr(_stream, "reconfigure", None)
     if _reconfigure is not None:

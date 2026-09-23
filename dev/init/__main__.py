@@ -44,19 +44,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import cast
 
+from dev import environment
 from dev.exit_codes import INIT_HOST_TOOL_MISSING, INIT_STALE, OK
 from dev.init import plan
 from dev.init.contract import (
     DONE,
     FAILED,
-    FORCE_ENV,
     FRESH,
-    JSON_ENV,
     PHASES,
     SKIPPED,
     STALE,
@@ -101,16 +99,17 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _truthy(name: str) -> bool:
+def _truthy(var: environment.HarnessVariable) -> bool:
     """Return whether an environment variable is set to something affirmative.
 
     Args:
-        name: The variable's name.
+        var: The variable, as :mod:`dev.environment` declares it.
 
     Returns:
         True for ``1``, ``true``, ``yes`` and ``on``, case-insensitively.
     """
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+    raw = environment.value(var) or ""
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _preflight(
@@ -296,8 +295,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     repo_root = _repo_root()
-    emitter = Emitter(json_mode=args.json or _truthy(JSON_ENV))
-    force = args.force or _truthy(FORCE_ENV)
+    emitter = Emitter(json_mode=args.json or _truthy(environment.VAULTSPEC_INIT_JSON))
+    force = args.force or _truthy(environment.VAULTSPEC_INIT_FORCE)
 
     emitter.event("run-start", repo=repo_root.name, selection=args.selection)
 

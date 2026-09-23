@@ -27,12 +27,12 @@ the surrounding context.
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dev import environment
 from dev.statistics.normalize.exit_status import ExitStatus
 from dev.statistics.normalize.extract import CommandContext, extract_records
 from dev.statistics.normalize.tokenize import EXECUTABLE
@@ -42,9 +42,6 @@ if TYPE_CHECKING:
 
     from dev.statistics.metrics.capability import CapabilityInventory
     from dev.statistics.normalize.models import CallRecord
-
-#: The environment variable that overrides the Codex home directory.
-_CODEX_HOME_ENV = "CODEX_HOME"
 
 #: The tool name a ``function_call`` payload must carry to be a shell call in
 #: current Codex builds.
@@ -72,7 +69,7 @@ def _default_root() -> Path:
     Returns:
         The ``CODEX_HOME`` directory when set, else ``~/.codex``.
     """
-    override = os.environ.get(_CODEX_HOME_ENV)
+    override = environment.value(environment.CODEX_HOME)
     if override:
         return Path(override)
     return Path.home() / ".codex"

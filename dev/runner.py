@@ -9,7 +9,6 @@ re-expressed in each recipe.
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -18,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dev import ci_formats, reporting
+from dev import ci_formats, environment, reporting
 from dev.exit_codes import TOOL_MISSING as _TOOL_MISSING
 
 if TYPE_CHECKING:
@@ -132,7 +131,7 @@ def run(
         A :class:`Completed` carrying the child exit code, or
         :data:`TOOL_MISSING` when the executable does not exist.
     """
-    merged = {**os.environ, **(env or {})}
+    merged = environment.child_environment(env)
     # What a tool PRINTS is decided in one place, from the environment; unset,
     # this returns the command untouched. It never changes the exit status.
     argv = tuple(ci_formats.augment(argv, merged))
