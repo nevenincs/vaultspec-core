@@ -513,6 +513,8 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             PrecommitSignal.NOT_INSTALLED: ("warn", "yellow"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
             PrecommitSignal.UNREADABLE: ("warn", "yellow"),
+            PrecommitSignal.DECLINED: ("info", "dim"),
+            PrecommitSignal.DECLINED_LEFTOVER: ("info", "dim"),
         },
     )
     pc_detail = {
@@ -537,6 +539,15 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         ),
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
         PrecommitSignal.UNREADABLE: ("could not be read; this check did not run"),
+        PrecommitSignal.DECLINED: (
+            "declined by the workspace declaration (hooks.pre_commit = false); "
+            "run 'vaultspec-core spec precommit enable' to restore the hooks"
+        ),
+        PrecommitSignal.DECLINED_LEFTOVER: (
+            "declined by the workspace declaration (hooks.pre_commit = false), "
+            "but a .pre-commit-config.yaml is still on disk - delete it by "
+            "hand if nothing else uses it"
+        ),
     }.get(diag.precommit, str(diag.precommit))
     rows.append(
         {

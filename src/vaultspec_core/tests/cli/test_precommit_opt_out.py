@@ -269,3 +269,72 @@ class TestCliVerbs:
         payload = json.loads(result.output)
         assert payload["status"] == "updated"
         assert payload["data"]["pre_commit"] is False
+
+
+def _hookless_prek(root: Path) -> None:
+    """Give *root* a ``prek.toml`` that owns the boundary and carries no hooks."""
+    (root / "prek.toml").write_text('[[repos]]\nrepo = "local"\n', encoding="utf-8")
+
+
+class TestDoctorHonoursTheDecline:
+    """A declined workspace is in its requested state, not a stranded one.
+
+    Before the doctor read the declaration, a hook-less ``prek.toml`` reported
+    the hooks as stranded and advised ``spec precommit migrate`` - the verb
+    that writes the declined hooks back in.
+    """
+
+    def test_hookless_prek_is_declined_not_stranded(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+        from vaultspec_core.core.diagnosis.signals import PrecommitSignal
+
+        _decline(tmp_path)
+        _hookless_prek(tmp_path)
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.DECLINED
+
+    def test_leftover_config_is_reported_and_kept(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+        from vaultspec_core.core.diagnosis.signals import PrecommitSignal
+
+        (tmp_path / _CONFIG).write_text("repos: []\n", encoding="utf-8")
+        _decline(tmp_path)
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.DECLINED_LEFTOVER
+        assert (tmp_path / _CONFIG).read_text(encoding="utf-8") == "repos: []\n"
+
+    def test_doctor_exits_zero_on_hookless_prek(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        import json
+
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        factory.install()
+        _decline(factory.root)
+        (factory.root / _CONFIG).unlink()
+        _hookless_prek(factory.root)
+        factory.sync()
+
+        result = run_vaultspec(runner, "spec", "doctor", "--json", target=factory.root)
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["data"]["precommit"] == "declined"
+
+    def test_doctor_reports_leftover_config_as_info(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        factory.install()
+        _decline(factory.root)
+        _hookless_prek(factory.root)
+        factory.sync()
+
+        result = run_vaultspec(runner, "spec", "doctor", target=factory.root)
+
+        assert result.exit_code == 0, result.output
+        row = next(line for line in result.output.splitlines() if "precommit" in line)
+        assert "info" in row
+        assert "warn" not in row
+        assert (factory.root / _CONFIG).exists()

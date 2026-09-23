@@ -191,11 +191,15 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
 #: UNREADABLE means the collector failed, so nothing about the config was
 #: observed. `doctor` weighs that as a warning; a repair here would be acting
 #: on a state nobody has seen (issue #407).
+#: DECLINED and DECLINED_LEFTOVER mean the committed declaration refused the
+#: hooks; the scaffold declines too, so a repair would be a permanent no-op.
 _PRECOMMIT_INERT_SIGNALS = (
     PrecommitSignal.COMPLETE,
     PrecommitSignal.UNREFRESHABLE,
     PrecommitSignal.ORPHANED,
     PrecommitSignal.UNREADABLE,
+    PrecommitSignal.DECLINED,
+    PrecommitSignal.DECLINED_LEFTOVER,
 )
 
 

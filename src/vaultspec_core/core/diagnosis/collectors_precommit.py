@@ -49,14 +49,32 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
       prek never reads it and sync will not refresh it. The remediation is
       ``spec precommit migrate``.
 
+    A committed opt-out (``hooks.pre_commit`` set to ``false``) is read first
+    and outranks every configuration reading above: the workspace declined the
+    hooks, so their absence from either file is the requested state, not
+    stranding. The signal is
+    :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.DECLINED`,
+    or
+    :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.DECLINED_LEFTOVER`
+    when a ``.pre-commit-config.yaml`` is still on disk. Nothing is deleted.
+
     Args:
         target: Workspace root directory.
 
     Returns:
         :class:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal`
         reflecting the observed state.
+
+    Raises:
+        VaultSpecError: If the workspace declaration is malformed.
     """
     from ..prek_boundary import collect_prek_boundary
+    from ..workspace_mode import read_hooks_declaration
+
+    if not read_hooks_declaration(target).pre_commit:
+        if (target / ".pre-commit-config.yaml").exists():
+            return PrecommitSignal.DECLINED_LEFTOVER
+        return PrecommitSignal.DECLINED
 
     boundary = collect_prek_boundary(target)
     if not boundary.owns_boundary:

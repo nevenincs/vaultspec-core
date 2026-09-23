@@ -105,6 +105,8 @@ pytestmark = [pytest.mark.unit]
                 "ORPHANED",
                 "NOT_INSTALLED",
                 "UNREADABLE",
+                "DECLINED",
+                "DECLINED_LEFTOVER",
                 "COMPLETE",
             },
         ),

@@ -149,6 +149,13 @@ class PrecommitSignal(StrEnum):
     have reported had it run and found nothing wrong - that is how a broken
     workspace came to read as a healthy one (issue #407). Weighed as a
     warning, because a check that did not run cannot vouch for anything.
+
+    ``DECLINED`` and ``DECLINED_LEFTOVER`` report a workspace whose committed
+    declaration sets ``hooks.pre_commit`` to ``false``. Neither is a fault:
+    the workspace chose to run its gates explicitly, so the absence of the
+    canonical hooks is the requested state. ``DECLINED_LEFTOVER`` adds that a
+    ``.pre-commit-config.yaml`` is still on disk, which the operator may want
+    to delete by hand.
     """
 
     NO_FILE = "no_file"
@@ -159,6 +166,8 @@ class PrecommitSignal(StrEnum):
     ORPHANED = "orphaned"
     NOT_INSTALLED = "not_installed"
     UNREADABLE = "unreadable"
+    DECLINED = "declined"
+    DECLINED_LEFTOVER = "declined_leftover"
     COMPLETE = "complete"
 
 
