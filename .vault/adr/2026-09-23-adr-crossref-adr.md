@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:7edc63b24794098fc9c8195dd183957d40dd7ae427671e38cfb8e26f13fb38dd'
+body_hash: 'sha256:a7a7ae7b266b2c600b69d4a60848743f2767cb8102fe61739625939bdd99287a'
 related:
   - "[[2026-09-23-adr-crossref-research]]"
   - "[[2026-09-23-typesafe-search-adr]]"
@@ -14,6 +14,7 @@ related:
   - "[[2026-06-28-curator-reframe-adr]]"
   - "[[2026-07-09-firmware-mcp-primacy-adr]]"
   - '[[2026-08-23-envelope-optimization-adr]]'
+  - '[[2026-09-23-adr-crossref-audit]]'
 ---
 
 # `adr-crossref` adr: `bounded ADR cross-referencing on TypeSafe Jev, as a core backend with one CLI and MCP surface` | (**status:** `accepted`)
@@ -174,6 +175,13 @@ On acceptance this decision amends `2026-07-09-mcp-tool-schema-adr`, whose hot-t
 ceiling becomes ten tools plus the two gateway tools, and `2026-08-01-mcp-read-only-adr`,
 whose restricted allowlist gains `crossref` in its one-ADR, judge-only form.
 `2026-09-23-typesafe-search-adr` and `2026-06-28-curator-reframe-adr` are unchanged.
+
+**Amendment note, 2026-09-23, sweep resume**: authorised under the user's advance approval of this feature in session on 2026-09-23 ("it's all yours to build and ship ... the adr, plans all preapproved"). Evidence: `2026-09-23-adr-crossref-audit`, findings sweep-resume, apply-write-failure, failure-fan-out and the re-review's per-source classification and cursor findings. It refines the Service clause and the write constraint; the funnel, bounds and surfaces are unchanged.
+
+- **Cursor.** A sweep's cursor names the last source processed. A source the provider refuses to read is held open while the sweep judges on, past its size by at most two more sources if it must: a later source the provider reads shows the refusal was that ADR's own, and the cursor moves past both. A refusal no read settles, three refusals in a row, or any other failure stops the sweep, reported in `stopped`, with the cursor before the first refusal still open, so resuming retries them. A sweep therefore judges at most 52 sources.
+- **Selection.** A sweep needs a selector. Named ADRs stand alone, and so does all; a feature and the isolated ADRs narrow together. Other combinations, an empty feature, and a cursor that names no ADR are refused.
+- **Writes.** A link write that fails, including a lock timeout, is reported against its verdict and never discards the judgment; the CLI then exits 1.
+- **Spend.** The first failure that decides a source cancels every evaluation not yet sent, and a sweep does not start a source with less than 15 seconds of its budget left.
 
 ## Rationale
 

@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-adr-crossref-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:7cde521676f32149e8fc0fb175c8791ca9ce928d170b2e644c6a9a934d8bd7ff'
+body_hash: 'sha256:4119c50dc179cde7209a14eee651713cc21aa24c45cea098d2d9703d118f7402'
 ---
 
 # `adr-crossref` plan
@@ -42,7 +42,7 @@ the crossref credential import moves to the config-layer resolver.
 - [x] `S05` - Add the crossref MCP tool on both surfaces with the read-only argument guard, and ratchet the surface budget by its measured size; `src/vaultspec_core/mcp_server/tools/crossref.py, src/vaultspec_core/mcp_server/app.py, docs/MCP.md`.
 - [x] `S06` - Adopt the cross-reference step in the ADR and curation workflows and name the tool in the CLI rule and personas, then sync; `src/vaultspec_core/builtins/skills/, src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md, src/vaultspec_core/builtins/agents/`.
 - [x] `S07` - Add the live cross-reference evaluation under the typesafe marker; `src/vaultspec_core/crossref/tests/test_live.py`.
-- [ ] `S08` - Record the amendments to the tool-schema and read-only decisions and regenerate the feature index; `.vault/adr/2026-07-09-mcp-tool-schema-adr.md, .vault/adr/2026-08-01-mcp-read-only-adr.md`.
+- [x] `S08` - Record the amendments to the tool-schema and read-only decisions and regenerate the feature index; `.vault/adr/2026-07-09-mcp-tool-schema-adr.md, .vault/adr/2026-08-01-mcp-read-only-adr.md`.
 - [x] `S09` - Review the integrated feature at plan close into the rolling audit; `.vault/audit/`.
 
 ## Parallelization

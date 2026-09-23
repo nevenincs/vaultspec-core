@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-24'
 body_schema: 'body-v2'
-body_hash: 'sha256:03654f36a464418b8ab6980c0f738f77247314900231f841102811a7c8f7260e'
+body_hash: 'sha256:7ccb9f59a9e33d175e55d983b8b25e8b6fddbdd1d4585ee7d3f2eaa4c17eb509'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -102,6 +102,7 @@ related:
 - `S09` `A` `.vault/audit/2026-09-23-adr-crossref-audit.md`
 - `S09` `M` `.vault/index/adr-crossref.index.md`
 - `S09` `verify:` `plan-close review and four re-reviews, final result` -> `pass`
+- `S08` `M` `.vault/adr/2026-09-23-adr-crossref-adr.md`
 
 ## Notes
 
