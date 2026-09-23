@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:903e28ec891d324b5c1e743470cec2334b23bb95620c07010e02cbb232511650'
+body_hash: 'sha256:951b1f771bd436933b98b90891733d64c7e0b8e12aa6da7609e6cd6cdf99bcb6'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -100,4 +100,37 @@ related:
 - `S06` `M` `src/vaultspec_core/search/_service.py`
 - `S07` `M` `src/vaultspec_core/search/_questions.py`
 - `S07` `M` `src/vaultspec_core/search/__init__.py`
-
+- `S06` `M` `src/vaultspec_core/search/_engine.py`
+- `S06` `M` `src/vaultspec_core/search/tests/test_service.py`
+- `S06` `A` `src/vaultspec_core/mcp_server/filters.py`
+- `S06` `A` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S06` `A` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/envelope.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/__init__.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/orientation.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/conftest.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_tool_surface.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_context_budget.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_stdio_e2e.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_watchdog.py`
+- `S06` `M` `docs/MCP.md`
+- `S06` `verify:` `pytest src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S11` `M` `src/vaultspec_core/core/adr.py`
+- `S11` `M` `src/vaultspec_core/core/rules.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/body_hash.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/checks/frontmatter.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/checks/structure.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/edit_engine.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/exec_recovery.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/hydration.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/models.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/parser.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/query_rename.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/related_surgery.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/rename_ops.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/tests/test_body_hash.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/tests/test_core.py`
+- `S11` `A` `src/vaultspec_core/vaultcore/tests/test_frontmatter_writers.py`
+- `S11` `M` `src/vaultspec_core/tests/cli/test_flow_bugs.py`
+- `S11` `verify:` `pytest vaultcore+checks+rename+flow_bugs targeted` -> `pass`

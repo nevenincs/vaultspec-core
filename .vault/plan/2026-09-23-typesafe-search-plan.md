@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-typesafe-search-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:d115ade0ad90e00b20c74be0429837b5324742a24daa91398f6662fe75445ed9'
+body_hash: 'sha256:22e294183c77202622b5f69a69c809a457b8f9cfb8fc786439caa6c27ad6580a'
 ---
 
 # `typesafe-search` plan
@@ -46,7 +46,8 @@ fence regexes and two section scanners, before the search corpus builds on them.
 - [ ] `S08` - Route discovery guidance to core search when configured and to vaultspec-rag otherwise; `src/vaultspec_core/core/discovery_guidance.py, src/vaultspec_core/builtins/`.
 - [x] `S09` - Add the deselected typesafe marker and a live test over a synthetic vault, then verify against this vault; `pyproject.toml, dev/toolchain.py, src/vaultspec_core/search/tests/test_live.py`.
 - [x] `S10` - Rehome the remaining fence, heading and frontmatter duplicates onto the canonical scanner and parser, and bump the graph cache schema for the changed title reading; `src/vaultspec_core/vaultcore/links.py, src/vaultspec_core/plan/parser.py, src/vaultspec_core/plan/checks/heading_level_check.py, src/vaultspec_core/vaultcore/exec_fold.py, src/vaultspec_core/mcp_server/tools/documents.py, src/vaultspec_core/graph/cache.py`.
-- [ ] `S11` - Move the byte-preserving write-path frontmatter splitters onto the canonical splitter, with YAML-block offsets and lone-CR support, keeping body_hash digests byte-identical; `src/vaultspec_core/vaultcore/parser.py, src/vaultspec_core/vaultcore/body_hash.py, src/vaultspec_core/vaultcore/models.py, src/vaultspec_core/vaultcore/hydration.py, src/vaultspec_core/vaultcore/exec_recovery.py, src/vaultspec_core/vaultcore/rename_ops.py, src/vaultspec_core/vaultcore/query_rename.py, src/vaultspec_core/vaultcore/related_surgery.py`.
+- [x] `S11` - Move the byte-preserving write-path frontmatter splitters onto the canonical splitter, with YAML-block offsets and lone-CR support, keeping body_hash digests byte-identical; `src/vaultspec_core/vaultcore/parser.py, src/vaultspec_core/vaultcore/body_hash.py, src/vaultspec_core/vaultcore/models.py, src/vaultspec_core/vaultcore/hydration.py, src/vaultspec_core/vaultcore/exec_recovery.py, src/vaultspec_core/vaultcore/rename_ops.py, src/vaultspec_core/vaultcore/query_rename.py, src/vaultspec_core/vaultcore/related_surgery.py`.
+- [ ] `S12` - Rehome the frontmatter re-rendering helpers and the related-block walkers onto one canonical implementation each; `src/vaultspec_core/core/adr.py, src/vaultspec_core/core/rules.py, src/vaultspec_core/vaultcore/checks/frontmatter.py, src/vaultspec_core/vaultcore/rename_ops.py, src/vaultspec_core/vaultcore/query_rename.py, src/vaultspec_core/vaultcore/related_surgery.py`.
 
 ## Parallelization
 
