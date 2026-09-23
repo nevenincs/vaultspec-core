@@ -743,9 +743,10 @@ def test_every_credential_gated_gate_holds_its_key_on_every_path() -> None:
     )
     needed: set[str] = set()
     for step in gated:
+        env = cast("dict[str, object]", step.get("env") or {})
         bound = {
             name
-            for name, value in (step.get("env") or {}).items()
+            for name, value in env.items()
             if str(value).strip() == f"${{{{ secrets.{name} }}}}"
         }
         assert bound, (
