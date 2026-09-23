@@ -8,7 +8,7 @@ related:
   - '[[2026-09-23-adr-crossref-adr]]'
 modified: '2026-09-23'
 body_schema: body-v2
-body_hash: 'sha256:aac0fcd19ae51c757c659a3a33d0889fb2b515771806f0e1accc5b638d48b3e5'
+body_hash: 'sha256:1e64be756ece54da0b538da9a227d299be3d909a56293a388967ce72af9e7586'
 ---
 
 # `adr-crossref` plan
@@ -38,7 +38,7 @@ the crossref credential import moves to the config-layer resolver.
 - [x] `S01` - Record the prefilter evidence and the bounded cross-referencing decision; `.vault/research/2026-09-23-adr-crossref-research.md, .vault/adr/2026-09-23-adr-crossref-adr.md`.
 - [x] `S02` - Extract the related-link writer from vault link add into core, under the document write lock with graph-cache invalidation; `src/vaultspec_core/vaultcore/related_links.py, src/vaultspec_core/cli/link_cmd.py`.
 - [x] `S03` - Build the crossref backend - corpus, fingerprint, code stage, questions, engine, service and wire projection - with offline tests against the scripted provider; `src/vaultspec_core/crossref/`.
-- [ ] `S04` - Add the vault adr crossref CLI verb and regenerate the CLI reference and handbook; `src/vaultspec_core/cli/vault_crossref_cmd.py, docs/CLI.md, src/vaultspec_core/builtins/reference/cli.md`.
+- [x] `S04` - Add the vault adr crossref CLI verb and regenerate the CLI reference and handbook; `src/vaultspec_core/cli/vault_crossref_cmd.py, docs/CLI.md, src/vaultspec_core/builtins/reference/cli.md`.
 - [ ] `S05` - Add the crossref MCP tool on both surfaces with the read-only argument guard, and ratchet the surface budget by its measured size; `src/vaultspec_core/mcp_server/tools/crossref.py, src/vaultspec_core/mcp_server/app.py, docs/MCP.md`.
 - [ ] `S06` - Adopt the cross-reference step in the ADR and curation workflows and name the tool in the CLI rule and personas, then sync; `src/vaultspec_core/builtins/skills/, src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md, src/vaultspec_core/builtins/agents/`.
 - [x] `S07` - Add the live cross-reference evaluation under the typesafe marker; `src/vaultspec_core/crossref/tests/test_live.py`.

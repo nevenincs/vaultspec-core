@@ -1580,8 +1580,9 @@ grow with the size of the vault:
 - The best 32 of the combined ranking, plus up to 8 declared links outside them, are
   judged in pairs.
 
-A source costs at most 46 requests and 60 seconds. A sweep takes at most 50 sources and
-300 seconds, and the vault may hold at most 5,000 ADRs.
+A source costs at most 46 requests and 60 seconds. A sweep takes at most 50 sources, or
+52 when it must settle a refusal, and 300 seconds, and the vault may hold at most 5,000
+ADRs.
 
 Cross-referencing uses the hosted-search key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
 [environment variables](#environment-variables)) and sends ADR text to the TypeSafe API.
@@ -1611,11 +1612,11 @@ anything.
   `--feature` to narrow further; `--all` stands alone.
 - `--after STEM` - Resume a sweep after this ADR: the `next_after` a previous sweep
   reported, with the same selector. Sweeps run in stem order and store no state. An ADR
-  the provider refuses to read is held open while the sweep judges on: once a later ADR
-  is read, the refusal counts as that ADR's own and the sweep moves past it, and at the
-  end of the selection a sweep in which the provider read something moves past it too.
-  Three refusals in a row, or any other failure, stop the sweep before the first refusal
-  still open, and resuming retries from there.
+  the provider refuses to read is held open while the sweep judges on, past its source
+  limit by up to two more ADRs if it must: a later ADR the provider reads shows the
+  refusal was that ADR's own, and the sweep moves past both. A refusal no read settles,
+  three refusals in a row, or any other failure stops the sweep with `stopped` set and
+  the cursor before the first refusal still open, so resuming retries from there.
 - `--max-sources N` (default `10`) - Most ADRs one sweep judges, from `1` to `50`.
 - `--apply` (default off) - Write each new `link` verdict into the source's `related:`,
   as each source finishes, without reading them first. Nothing is removed, and no
