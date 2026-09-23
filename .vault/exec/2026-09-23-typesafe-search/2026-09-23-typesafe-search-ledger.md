@@ -3,9 +3,9 @@ tags:
   - '#exec'
   - '#typesafe-search'
 date: '2026-09-23'
-modified: '2026-09-23'
+modified: '2026-09-24'
 body_schema: 'body-v2'
-body_hash: 'sha256:a25a2789b20c40a32f376cb55cb29e233106fa937f82cc2151e265712aef405c'
+body_hash: 'sha256:bffa8741af5e669dc05cc290c5a22f636a8978730037bd6878341878e82e9519'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -312,3 +312,4 @@ related:
 - `S13` `M` `src/vaultspec_core/cli/spec_cmd_skills.py`
 - `S13` `M` `src/vaultspec_core/cli/spec_cmd_agents.py`
 - `S13` `verify:` `just framework-reference` -> `pass`
+- `S13` `verify:` `pytest test_watchdog.py -m serial` -> `pass`

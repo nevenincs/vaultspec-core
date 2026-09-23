@@ -270,6 +270,7 @@ def test_kill_switch_disables_arming_in_worker() -> None:
     assert "still-alive" in proc.stdout
 
 
+@pytest.mark.serial
 def test_armed_worker_exits_when_dead_client_pid_signals() -> None:
     """Arming against an already-exited client exits the worker immediately.
 
