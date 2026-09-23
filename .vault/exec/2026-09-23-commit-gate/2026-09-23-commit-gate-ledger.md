@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:42304920050900d873481a411956969243a4c40fa2e0e350f80cf7da6db2b7b4'
+body_hash: 'sha256:870c0e0d6dd652f77346be180c6e7ed41b599fc96065f9472880c9855c4ab732'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -74,6 +74,8 @@ related:
 - `S03` `D` `dev/init/hooks.py`
 - `S03` `M` `dev/init/__main__.py`
 - `S03` `M` `dev/init/contract.py`
+- `S07` `M` `src/vaultspec_core/cli/root_commit_gate.py`
+- `S07` `M` `src/vaultspec_core/tests/cli/test_commit_gate_cli.py`
 
 ## Notes
 

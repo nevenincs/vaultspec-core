@@ -135,3 +135,14 @@ def test_json_reports_one_envelope_with_the_blocking_findings(repo: Path) -> Non
     assert payload["status"] == "failed"
     checks = {finding["check"] for finding in payload["data"]["blocking"]}
     assert "dangling" in checks
+
+
+def test_outside_a_workspace_the_gate_passes_quietly(tmp_path: Path) -> None:
+    root = tmp_path.resolve()
+    _git(root, "init", "-q", "-b", "main")
+
+    result = _gate(root)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
