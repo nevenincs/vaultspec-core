@@ -306,7 +306,8 @@ def test_without_a_key_nothing_is_sent(
     assert outcome.next_step is not None
     assert provider.received == []
     fields = outcome_fields(outcome)
-    assert "remediation" in fields
+    (source,) = cast("list[dict[str, Any]]", fields["sources"])
+    assert "remediation" in source
     assert "usage" not in fields
 
 

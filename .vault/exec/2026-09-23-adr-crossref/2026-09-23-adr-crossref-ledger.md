@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:04b5d70cbdafc7bd09368836dcc5192ede70085a33edb59b35a1278344f32bb2'
+body_hash: 'sha256:b5314dc814925a6a7a9f88527bc2340c947426efc273f3563df9f82382a1fc48'
 related:
   - "[[2026-09-23-adr-crossref-plan]]"
 ---
@@ -44,3 +44,6 @@ related:
 - `S04` `M` `docs/CLI.md`
 - `S04` `M` `src/vaultspec_core/builtins/reference/cli.md`
 - `S04` `verify:` `pytest tests/cli/test_vault_crossref_cmd.py dev/guards/test_cli_handbook_drift.py tests/cli/test_cli_reference_drift.py tests/cli/test_cli_reference_generated.py` -> `pass`
+- `S04` `M` `src/vaultspec_core/crossref/_wire.py`
+- `S04` `M` `src/vaultspec_core/crossref/tests/test_service.py`
+- `S04` `verify:` `worst-case 50-source sweep reply under the 10,000-token envelope ceiling` -> `pass`
