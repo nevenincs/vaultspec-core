@@ -128,7 +128,7 @@ class CrossrefResult(LeanResult):
         links: Link verdicts across sources.
         written: Links written across sources.
         remaining: Sources not reached; resume with ``after=next_after``.
-        next_after: The last source judged, when sources remain.
+        next_after: The last source processed, when sources remain.
         stopped: Why a sweep stopped early.
         usage: Requests and input tokens spent.
     """
@@ -146,7 +146,7 @@ class CrossrefResult(LeanResult):
 def _summary(payload: object) -> str:
     if not isinstance(payload, CrossrefResult):
         return type(payload).__name__
-    if payload.sources and payload.sources[0].status != CrossrefStatus.OK:
+    if len(payload.sources) == 1 and payload.sources[0].status != CrossrefStatus.OK:
         first = payload.sources[0]
         return first.status.replace("_", " ") + (
             f": {first.reason}" if first.reason else ""
@@ -224,10 +224,6 @@ def register_crossref_tools(
             """
             _ = ctx
             root = _get_ctx().target_dir
-            if not refs and feature is None and not isolated and not all_adrs:
-                raise ToolError(
-                    "name an ADR, or sweep with feature, isolated or all_adrs"
-                )
             logger.info(
                 "crossref: refs=%d feature=%r isolated=%s all=%s apply=%s",
                 len(refs),
@@ -249,6 +245,7 @@ def register_crossref_tools(
                     refs,
                     feature=feature,
                     isolated=isolated,
+                    all_adrs=all_adrs,
                     after=after,
                     max_sources=max_sources,
                     apply=apply,

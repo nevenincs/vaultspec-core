@@ -83,10 +83,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 #: ADR workflow's orchestrator calls once per ADR, and that ``invoke`` would
 #: confirm on every call and read-only launches would not reach at all.
 #: Measured 26,289 before and 29,401 after (+3,112): ``crossref`` itself,
-#: description 889, input 713, output 1,341. The plan-close review then added
-#: the ``write_failed`` field a failed link write reports, and made
-#: ``applied`` optional so both surfaces carry one row shape: 29,515
-#: (+114). Margin of 6.
+#: description 889, input 713, output 1,341. The ``write_failed`` field a
+#: failed link write reports, and an optional ``applied`` so both surfaces
+#: carry one row shape, then measured 29,515 (+114). Margin of 6.
 MAX_TOOL_DEFINITION_CHARS = 29_521
 
 #: Aggregate ceiling for the read-only surface (six tools), same rules.
@@ -99,8 +98,8 @@ MAX_TOOL_DEFINITION_CHARS = 29_521
 #: surface: measured 14,143 before and 14,057 after (-86), margin of 8.
 #: Raised from 14,065 by ``crossref``'s one-ADR, judge-only signature, which
 #: read-only launches carry: measured 14,057 before and 16,153 after (+2,096),
-#: then 16,267 with the review's ``write_failed`` and optional ``applied``
-#: (+114), margin of 8.
+#: then 16,267 with ``write_failed`` and an optional ``applied`` (+114),
+#: margin of 8.
 MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 16_275
 
 # Maximum number of tools: the tiered surface is ten hot tools plus the
