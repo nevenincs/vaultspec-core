@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:db31addfafa5d2458847c34ed4b15b072f425750df899e4949958929c772b76a'
+body_hash: 'sha256:a5a423213ecd9fc894af34ac5af30ab1629d694bacbacec619c55c1dc1dee55e'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
   - "[[2026-09-23-commit-gate-adr]]"
@@ -94,6 +94,32 @@ Recorded; no Step reopened.
 `src/vaultspec_core/vaultcore/checks/staged.py:130-168`. This is the ADR's stated behaviour for
 renamed documents. Recorded as a known limit; `git diff --cached -M --name-status` would supply
 the source path if it is revisited.
+
+### rereview-after-fixes | low | re-review of commits `bc8b251f..f95b1525` passes; one comment overstated what the gate skips
+
+The same reviewer verified each fix against a real workspace:
+
+- **Declined `--remove-yaml`:** strips only managed hooks, keeps the operator's hooks and
+  comments, and dry-runs without writing. A managed-only config is still deleted, and one
+  without vaultspec hooks is untouched.
+- **Guard:** lets a declined workspace's own config through, while a staged install manifest
+  still blocks.
+- **Committed-version read:** keeps the following document's baseline when a path is a tree
+  at HEAD, and handles missing paths, spaces, no `HEAD` and bad refs without raising.
+- **Earlier findings:** `init` leftovers, gate output, stale comments and the `NOT_INSTALLED`
+  resolver change are all correct. The subset equivalence still matches the full pass
+  exactly over this repository's vault, and real prek commits still block as intended.
+
+The stale-installed-reference finding was withdrawn. The deployed mirror consistently
+describes the released 0.2.4, and it is refreshed from the packaged builtins after each
+release. The next carry-forward must pick up the `commit-gate` entry and the
+`--gate-errors` rewording.
+
+The one new low finding: the comment in `src/vaultspec_core/cli/root_commit_gate.py` said
+that nothing is gated outside a workspace, but only the context setup is skipped there. It
+was reworded, and a mid-sentence docstring wrap in `dev/init/__main__.py` was reflowed.
+
+Result: PASS. The plan is complete.
 
 ## Recommendations
 

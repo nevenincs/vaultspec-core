@@ -25,10 +25,9 @@ phases are a DEPENDENCY CHAIN that builds one artifact. ``init-tools`` enrolls
 the framework by running executables out of the environment ``init-python``
 creates, and in ``vaultspec-dashboard`` it installs git hooks that lint the SPA
 ``init-node`` restores. This repository installs no git hook. Running
-``init-tools`` after
-``init-python`` failed does not produce a second independent finding - it
-produces a cascade of "command not found" that buries the one real cause, and
-it produces it slowly.
+``init-tools`` after ``init-python`` failed does not produce a second
+independent finding - it produces a cascade of "command not found" that buries
+the one real cause, and it produces it slowly.
 
 So `init` stops at the first failing phase. What it does NOT do is stop
 REPORTING: the phases that did not run are recorded as ``skipped`` with the

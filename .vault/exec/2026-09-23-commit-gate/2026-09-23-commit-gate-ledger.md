@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:1caa65310801ef123a4151d1b7edd048ed5a7aa08ca8ddae6d4f257d6a42a477'
+body_hash: 'sha256:7fa7e9a03f9c7667e0174d45fa6292976ee1ad6594c6cad734a36eabefa1fe75'
 related:
   - "[[2026-09-23-commit-gate-plan]]"
 ---
@@ -83,6 +83,8 @@ related:
 - `S09` `M` `src/vaultspec_core/core/resolver_repo.py`
 - `S09` `M` `src/vaultspec_core/tests/cli/test_precommit_hook_set.py`
 - `S09` `verify:` `ty check` -> `pass`
+- `S07` `verify:` `pytest test_commit_gate_cli` -> `pass`
+- `S03` `verify:` `pytest dev/tests` -> `pass`
 
 ## Notes
 

@@ -86,9 +86,9 @@ def cmd_commit_gate(
     from vaultspec_core.vaultcore.checks.staged import gate_staged_documents
 
     root = resolve_effective_target(target)
-    # Outside a vaultspec workspace there is nothing to gate. Initialising the
-    # workspace context there prints a failure and a guessed workspace path,
-    # which reads as an error from a hook that should simply pass.
+    # Outside a vaultspec workspace there is no workspace context to set up,
+    # and trying prints a failure and a guessed workspace path that read as an
+    # error. The staged documents are still checked either way.
     if (root / ".vaultspec").is_dir():
         with contextlib.suppress(Exception):
             apply_target(target)
