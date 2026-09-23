@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-23'
 body_schema: 'body-v2'
-body_hash: 'sha256:951b1f771bd436933b98b90891733d64c7e0b8e12aa6da7609e6cd6cdf99bcb6'
+body_hash: 'sha256:3c9da9ac01f369ddfe349e6fd82725cf74182660d7dff214efbe87cc200f1333'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -134,3 +134,32 @@ related:
 - `S11` `A` `src/vaultspec_core/vaultcore/tests/test_frontmatter_writers.py`
 - `S11` `M` `src/vaultspec_core/tests/cli/test_flow_bugs.py`
 - `S11` `verify:` `pytest vaultcore+checks+rename+flow_bugs targeted` -> `pass`
+- `S07` `A` `src/vaultspec_core/cli/vault_search_cmd.py`
+- `S07` `A` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S07` `M` `src/vaultspec_core/cli/status_cmd.py`
+- `S07` `M` `src/vaultspec_core/cli/vault_cmd.py`
+- `S07` `M` `src/vaultspec_core/cli/vault_cmd_app.py`
+- `S07` `M` `src/vaultspec_core/cli/vault_check_cmd.py`
+- `S07` `M` `src/vaultspec_core/tests/cli/test_vault_status.py`
+- `S07` `M` `docs/CLI.md`
+- `S07` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S07` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S07` `verify:` `pytest tests/cli/test_vault_search_cmd.py tests/cli/test_vault_status.py` -> `pass`
+- `S08` `M` `src/vaultspec_core/core/discovery_guidance.py`
+- `S08` `M` `src/vaultspec_core/tests/test_discovery_guidance.py`
+- `S08` `M` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
+- `S08` `M` `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`
+- `S08` `M` `src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md`
+- `S08` `M` `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`
+- `S08` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S08` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/references/reconciliation-playbook.md`
+- `S08` `verify:` `pytest tests/test_discovery_guidance.py` -> `pass`
+- `S07` `M` `docs/MCP.md`
+- `S07` `verify:` `pytest reference generated/surface/drift + handbook drift` -> `pass`
+- `S08` `M` `.vaultspec/agents/vaultspec-docs-curator.md`
+- `S08` `M` `.vaultspec/reference/cli.md`
+- `S08` `M` `.vaultspec/rules/vaultspec-cli.builtin.md`
+- `S08` `M` `.vaultspec/rules/vaultspec-discovery.builtin.md`
+- `S08` `M` `.vaultspec/skills/vaultspec-code-research/SKILL.md`
+- `S08` `M` `.vaultspec/skills/vaultspec-curate/SKILL.md`
+- `S08` `M` `.vaultspec/skills/vaultspec-curate/references/reconciliation-playbook.md`
