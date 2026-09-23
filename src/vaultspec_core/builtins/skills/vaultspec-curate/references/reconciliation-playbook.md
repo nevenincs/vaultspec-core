@@ -23,13 +23,16 @@ first; this playbook assumes the canonical status set.
 
 For each cluster of decisions on a shared concept:
 
-- Start from the cross-reference sweep. `vaultspec-core vault adr crossref --all --json`
+- Start from one cross-reference sweep. `vaultspec-core vault adr crossref --all --json`
   (MCP: `crossref`) judges each ADR against the rest within fixed ceilings: at most 50
-  ADRs a run, 46 requests and 60 seconds an ADR. Resume with `--after <next_after>`
-  until `remaining` is 0. `--isolated` takes only ADRs that link no other ADR. Each
-  `link` verdict is a candidate missing link; each `weak` verdict is a declared link
-  judged below the threshold. The `relation` label says which pairs to read in full; it
-  does not classify the pair for you.
+  ADRs a sweep, 46 paid requests and 60 seconds an ADR. `--isolated` takes only ADRs
+  that link no other ADR. Take one sweep per curation run and report its `next_after`,
+  `remaining`, and `stopped` in the audit; the next sweep resumes with
+  `--after <next_after>` on the orchestrator's go-ahead. On `not_configured` or a
+  `stopped` sweep, run the next step the reply names. Each `link` verdict is a candidate
+  missing link; each `weak` verdict is a declared link judged below the threshold. The
+  `relation` label says which pairs to read in full; it does not classify the pair for
+  you.
 - Surface the cluster by meaning. Search decisions and vault facts with
   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
   run the next step its reply names. Semantic recall finds same-topic ADRs that share no
@@ -134,8 +137,8 @@ Classify every finding into one of these, because the action differs by class:
   and note it in the audit.
 - **Orphaned or stranded.** Surface in the audit with the graph evidence.
 - **Missing cross-reference.** Add each confirmed link with
-  `vaultspec-core vault link add`, or rerun the sweep with `--apply` once every verdict
-  in it is confirmed. Links go on the source only.
+  `vaultspec-core vault link add`. Links go on the source only. Never rerun a sweep with
+  `--apply` to write links you read: a rerun judges again and writes its own verdicts.
 - **Weak declared link.** Never remove it on the verdict alone. Read both ADRs and
   record the link in the audit with a recommendation to keep or remove it.
 - **Restated grounding.** Confirm the fact exists in the grounding document; if the ADR

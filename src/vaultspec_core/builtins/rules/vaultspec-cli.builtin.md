@@ -12,14 +12,15 @@ when connected, else the `vaultspec-core` CLI. Bypassing them produces drift tha
 
 The MCP server exposes `status` (in-flight plans and next open Step), `find` (documents
 and features), `search` (vault questions, answered with the passage), `crossref` (the
-ADRs a decision should link, judged within fixed bounds), `create` (scaffold,
-batchable), `edit` (body prose, batchable), `plan_progress` (check or uncheck Steps),
-`plan_edit` (author and restructure Step rows), `log` (append a Step's ledger rows),
-`check` (validate and repair), and the `discover`/`invoke` gateway to every other verb.
-`invoke` asks for host confirmation on every call, so the above-Step plan verbs (`tier`,
-`wave`, `phase`, `epic intent`) and `vaultspec-core sync` are better run through the CLI
-even when connected. `vaultspec-core vault feature index`, `vaultspec-core spec mcps`,
-and `uninstall` are CLI-only.
+ADRs a decision should link, judged within fixed bounds; CLI:
+`vaultspec-core vault adr crossref`), `create` (scaffold, batchable), `edit` (body
+prose, batchable), `plan_progress` (check or uncheck Steps), `plan_edit` (author and
+restructure Step rows), `log` (append a Step's ledger rows), `check` (validate and
+repair), and the `discover`/`invoke` gateway to every other verb. `invoke` asks for host
+confirmation on every call, so the above-Step plan verbs (`tier`, `wave`, `phase`,
+`epic intent`) and `vaultspec-core sync` are better run through the CLI even when
+connected. `vaultspec-core vault feature index`, `vaultspec-core spec mcps`, and
+`uninstall` are CLI-only.
 
 The bundled CLI reference, `.vaultspec/reference/cli.md`, catalogues every command,
 flag, and exit code. Run `vaultspec-core <cmd>`, or

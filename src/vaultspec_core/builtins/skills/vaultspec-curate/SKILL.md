@@ -50,10 +50,13 @@ The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
 - **Ground.** Build the decision inventory: `vaultspec-core vault list adr --json` for
   the set, the body H1 (and any legacy status section) for each declared status, and
   `vaultspec-core vault graph --json` for the supersession and relatedness edges.
-- **Reconcile decision-vs-decision.** Start from a bounded cross-reference sweep:
-  `vaultspec-core vault adr crossref --all` (MCP: `crossref`), or `--feature`, resumed
-  with `--after <next_after>` until nothing remains. Each run judges at most 50 ADRs
-  within fixed request and time ceilings. Read the ADRs behind each `link` verdict and
+- **Reconcile decision-vs-decision.** Start from one bounded cross-reference sweep:
+  `vaultspec-core vault adr crossref --all` (MCP: `crossref`), `--feature`, or
+  `--isolated`, resumed from a reported `--after <next_after>`. One sweep judges at most
+  50 ADRs within fixed request and time ceilings, at up to 46 paid requests each. Run
+  one sweep per curation run; report its `next_after`, `remaining`, and `stopped`, and
+  start another only on the orchestrator's go-ahead. On `not_configured` or a failed
+  sweep, run the next step the reply names. Read the ADRs behind each `link` verdict and
   each `weak` declared link, and judge them. Then search decisions and vault facts with
   `vaultspec-core vault search "<question>"` (MCP: `search`); when it declines or fails,
   run the next step its reply names. Surface the ADRs covering the same concept, read
@@ -101,6 +104,10 @@ The curator acts on what is mechanically safe and proposes what needs judgment.
   belong to the `vaultspec-adr` amend-or-supersede path, on human approval. Where the
   two copies diverge in substance, it is a forked fact, not a restatement: surface it
   instead.
+- **Act directly (confirmed cross-reference).** Adding a `crossref` `link` verdict the
+  source does not declare, once reading both ADRs confirms it, with
+  `vaultspec-core vault link add`. A `weak` declared link is never removed on the
+  verdict alone; it is recorded with a recommendation.
 - **Propose for approval (judgment).** Rephrasing or amending conflicting ADR wording,
   and any contradiction whose resolution is not obvious, are written into the audit as
   recommendations, not applied unprompted.
