@@ -502,21 +502,20 @@ def test_pre_commit_blocks_manual_changelog_edits() -> None:
     assert "^CHANGELOG\\.md$" in raw
 
 
-def test_pre_commit_runs_vault_annotation_sanitizer() -> None:
+def test_pre_commit_carries_no_retired_vault_hooks() -> None:
+    """The repository's own hook config runs the canonical gate, nothing retired.
+
+    A retired hook left here would keep scanning the whole vault, or worse,
+    rewriting it, from inside a commit in this checkout even though no
+    consumer install renders it.
+    """
+    from vaultspec_core.core.precommit import CANONICAL_HOOK_IDS, RETIRED_HOOK_IDS
+
     config = _load_pre_commit_config()
     hooks = [hook for repo in config.get("repos", []) for hook in repo.get("hooks", [])]
-    hook_ids = {hook.get("id") for hook in hooks}
-    assert "vault-sanitize-annotations" in hook_ids
-    ordered_ids = [hook.get("id") for hook in hooks]
-    assert ordered_ids.index("vault-fix") < ordered_ids.index(
-        "vault-sanitize-annotations"
-    )
-    assert ordered_ids.index("vault-sanitize-annotations") < ordered_ids.index(
-        "spec-check"
-    )
-
-    raw = _read(".pre-commit-config.yaml")
-    assert "vault sanitize annotations" in raw
+    ids = {hook.get("id") for hook in hooks}
+    assert not RETIRED_HOOK_IDS & ids
+    assert ids >= CANONICAL_HOOK_IDS
 
 
 def _toolchain_targets(verb_name: str) -> set[str]:

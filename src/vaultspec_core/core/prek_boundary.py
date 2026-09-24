@@ -35,6 +35,48 @@ logger = logging.getLogger(__name__)
 #: Filename of prek's native configuration at the workspace root.
 PREK_CONFIG_NAME = "prek.toml"
 
+#: The YAML hook-config filenames prek reads, in its discovery order. prek
+#: stops at the first file present (after ``prek.toml``) and only warns about
+#: the rest, so core manages whichever of these prek would actually run.
+PRECOMMIT_CONFIG_NAMES: tuple[str, ...] = (
+    ".pre-commit-config.yaml",
+    ".pre-commit-config.yml",
+)
+
+
+def precommit_config_path(target: Path) -> Path:
+    """Return the YAML hook config prek would read at *target*.
+
+    The first of :data:`PRECOMMIT_CONFIG_NAMES` that exists wins, matching
+    prek's discovery order; with neither present the ``.yaml`` spelling is the
+    one a scaffold creates.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The path of the effective YAML config, which may not exist.
+    """
+    for name in PRECOMMIT_CONFIG_NAMES:
+        candidate = target / name
+        if candidate.exists():
+            return candidate
+    return target / PRECOMMIT_CONFIG_NAMES[0]
+
+
+def existing_precommit_configs(target: Path) -> list[Path]:
+    """Return every YAML hook config present at *target*, in discovery order.
+
+    Args:
+        target: Workspace root directory.
+
+    Returns:
+        The existing config paths; empty when there is none.
+    """
+    return [
+        target / name for name in PRECOMMIT_CONFIG_NAMES if (target / name).exists()
+    ]
+
 
 @dataclass(frozen=True)
 class PrekBoundaryState:
@@ -53,12 +95,21 @@ class PrekBoundaryState:
             treats ID presence as "hooks live here" because ``prek.toml``
             is operator-owned and a customised entry is not a stranded
             hook.
+        managed_blocks: How many vaultspec-managed blocks the file carries.
+        canonical_listings: How many hook entries in the local repos carry a
+            canonical id, inside or outside the managed blocks.
+        unowned_duplicate: The operator-owned part of the file - everything
+            outside the managed blocks - itself lists a canonical hook more
+            than once, which no vaultspec repair may clear.
     """
 
     config_exists: bool
     parse_error: bool = False
     hook_ids_present: frozenset[str] = field(default_factory=frozenset)
     entries_canonical: bool = False
+    managed_blocks: int = 0
+    canonical_listings: int = 0
+    unowned_duplicate: bool = False
 
     @property
     def owns_boundary(self) -> bool:
@@ -71,6 +122,13 @@ class PrekBoundaryState:
         from .commands import CANONICAL_HOOK_IDS
 
         return self.hook_ids_present == CANONICAL_HOOK_IDS
+
+    @property
+    def duplicated(self) -> bool:
+        """Whether prek would run a canonical hook more than once per commit."""
+        return self.managed_blocks > 1 or self.canonical_listings > len(
+            self.hook_ids_present
+        )
 
 
 def _local_hooks(data: dict[str, object]) -> list[dict[str, object]]:
@@ -124,12 +182,15 @@ def collect_prek_boundary(
         return PrekBoundaryState(config_exists=False)
 
     try:
-        data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        raw = config_path.read_text(encoding="utf-8")
+        data = tomllib.loads(raw)
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:
         logger.warning("Cannot read %s: %s", config_path, exc)
         return PrekBoundaryState(config_exists=True, parse_error=True)
 
     hooks = _local_hooks(data)
+    lines = raw.splitlines()
+    operator_ids = _operator_canonical_ids(lines)
     found = frozenset(
         str(h.get("id")) for h in hooks if h.get("id") in CANONICAL_HOOK_IDS
     )
@@ -147,6 +208,9 @@ def collect_prek_boundary(
         config_exists=True,
         hook_ids_present=found,
         entries_canonical=entries_canonical,
+        managed_blocks=len(_managed_spans(lines)),
+        canonical_listings=sum(1 for h in hooks if h.get("id") in CANONICAL_HOOK_IDS),
+        unowned_duplicate=len(operator_ids) > len(set(operator_ids)),
     )
 
 
@@ -223,13 +287,15 @@ class PrekMigrationResult:
     Attributes:
         status: One of ``migrated`` (block written), ``unchanged``
             (canonical hooks already present, byte-for-byte no-op),
+            ``declined`` (the workspace declaration refuses the hooks;
+            nothing transplanted),
             ``no_prek_config`` (``prek.toml`` absent; nothing to migrate
             into), ``unparseable`` (``prek.toml`` is not valid TOML;
             refusing to append to a broken file), or ``conflicting``
             (some canonical hook IDs exist outside the managed block;
             refusing to duplicate or overwrite operator-authored hooks).
         detail: Human-readable elaboration for the CLI surface.
-        yaml_removed: The superseded ``.pre-commit-config.yaml`` was
+        yaml_removed: The superseded YAML hook config (``.yaml`` or ``.yml``) was
             deleted as part of this run.
     """
 
@@ -239,23 +305,213 @@ class PrekMigrationResult:
 
 
 def _replace_or_append_block(raw: str, block: str) -> str:
-    """Substitute the managed block in *raw*, or append it."""
+    """Substitute the managed block in *raw*, or append it.
+
+    The file keeps its own line terminator, and a substitution keeps its
+    trailing-newline state too, so the only lines that change are vaultspec's
+    between the markers. Re-emitting a CRLF file as LF would be a whole-file
+    diff the operator never made - and the substitution also runs unattended,
+    from the release migration.
+    """
+    newline = "\r\n" if "\r\n" in raw else "\n"
+    ends_with_newline = raw.endswith(("\n", "\r"))
     lines = raw.splitlines()
     begins = [i for i, line in enumerate(lines) if line.strip() == MARKER_BEGIN]
     ends = [i for i, line in enumerate(lines) if line.strip() == MARKER_END]
     if begins and ends and begins[0] < ends[0]:
         head = lines[: begins[0]]
         tail = lines[ends[0] + 1 :]
-        body = block.splitlines()
-        new_lines = [*head, *body, *tail]
-        rendered = "\n".join(new_lines)
-        if not rendered.endswith("\n"):
-            rendered += "\n"
-        return rendered
-    if raw and not raw.endswith("\n"):
-        raw += "\n"
-    separator = "\n" if raw.strip() else ""
-    return raw + separator + block
+        rendered = newline.join([*head, *block.splitlines(), *tail])
+        return rendered + newline if ends_with_newline else rendered
+    if raw and not ends_with_newline:
+        raw += newline
+    separator = newline if raw.strip() else ""
+    return raw + separator + block.replace("\n", newline)
+
+
+def _managed_spans(lines: list[str]) -> list[tuple[int, int]]:
+    """Return the ``(begin, end)`` line indices of every managed block, in order."""
+    spans: list[tuple[int, int]] = []
+    begin: int | None = None
+    for index, line in enumerate(lines):
+        if line.strip() == MARKER_BEGIN and begin is None:
+            begin = index
+        elif line.strip() == MARKER_END and begin is not None:
+            spans.append((begin, index))
+            begin = None
+    return spans
+
+
+def _without_spans(lines: list[str], spans: list[tuple[int, int]]) -> list[str]:
+    """Return *lines* minus each span and the blank line that introduced it."""
+    dropped: set[int] = set()
+    for begin, end in spans:
+        dropped.update(range(begin, end + 1))
+        if begin > 0 and not lines[begin - 1].strip():
+            dropped.add(begin - 1)
+    return [line for index, line in enumerate(lines) if index not in dropped]
+
+
+def _operator_canonical_ids(lines: list[str]) -> list[str]:
+    """Return the canonical hook ids listed outside every managed block.
+
+    The one reading of "what the operator wrote" that both the boundary
+    assessment and the block refresh use, so the two can never disagree about
+    whether a copy of the gate is vaultspec's or the operator's.
+    """
+    from .commands import CANONICAL_HOOK_IDS
+
+    outside = "\n".join(_without_spans(lines, _managed_spans(lines)))
+    try:
+        hooks = _local_hooks(tomllib.loads(outside))
+    except tomllib.TOMLDecodeError:
+        return []
+    return [str(h.get("id")) for h in hooks if h.get("id") in CANONICAL_HOOK_IDS]
+
+
+def refresh_managed_prek_block(
+    target: Path, *, mode: InstallMode | None = None, dry_run: bool = False
+) -> str | None:
+    """Bring vaultspec's managed hook block in ``prek.toml`` to one canonical copy.
+
+    Only vaultspec's own lines between the markers are ever changed, and a
+    ``prek.toml`` with no managed block is left exactly as it is:
+    transplanting hooks into one is the operator's call through
+    ``spec precommit migrate``. Within that bound:
+
+    - a stale managed block is re-rendered to the canonical set;
+    - extra managed blocks are removed, keeping the first, because each copy
+      of the gate would run again on every commit;
+    - when the operator already lists a canonical hook outside the markers,
+      every managed block is removed, because the operator's own entry is the
+      one to keep and vaultspec never edits outside its markers.
+
+    A file that is not valid TOML is refused, as ``migrate_hooks_to_prek``
+    refuses it: markers inside a multi-line string are not a managed block.
+
+    Args:
+        target: Workspace root directory.
+        mode: Provisioning mode to render entries for; resolved from the
+            workspace declaration when ``None``.
+        dry_run: Report the change without writing.
+
+    Returns:
+        A short description of the change made (or, under *dry_run*, due),
+        or ``None`` when the managed block is already the one canonical copy.
+    """
+    from .helpers import atomic_write
+    from .workspace_mode import resolve_render_mode
+
+    config_path = target / PREK_CONFIG_NAME
+    try:
+        # Bytes, not ``read_text``: universal newlines would erase the CRLF
+        # convention the rewrite must preserve.
+        raw = config_path.read_bytes().decode("utf-8")
+        tomllib.loads(raw)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return None
+    lines = raw.splitlines()
+    spans = _managed_spans(lines)
+    if not spans:
+        return None
+
+    if _operator_canonical_ids(lines):
+        kept = _without_spans(lines, spans)
+        change = (
+            "removed vaultspec's managed block; the canonical hook written "
+            "outside it stands"
+        )
+    else:
+        if mode is None:
+            mode = resolve_render_mode(target)
+        block = render_prek_hook_block(mode).splitlines()
+        first_begin, first_end = spans[0]
+        if len(spans) == 1 and lines[first_begin : first_end + 1] == block:
+            return None
+        rest = _without_spans(lines, spans[1:])
+        # Indices of the first span are unchanged: every removed span follows it.
+        kept = [*rest[:first_begin], *block, *rest[first_end + 1 :]]
+        change = (
+            f"collapsed {len(spans)} managed blocks into one"
+            if len(spans) > 1
+            else "re-rendered the managed block"
+        )
+    if not dry_run:
+        newline = "\r\n" if "\r\n" in raw else "\n"
+        rendered = newline.join(kept)
+        if raw.endswith(("\n", "\r")):
+            rendered += newline
+        atomic_write(config_path, rendered)
+    return change
+
+
+#: Why a duplicate can outlive every repair: vaultspec never edits outside its
+#: own markers, so a canonical hook the operator wrote twice stays theirs.
+UNOWNED_DUPLICATE_DETAIL = (
+    "prek.toml lists vaultspec's commit gate more than once outside "
+    "vaultspec's managed block; those entries are yours, so remove the extra "
+    "copies by hand"
+)
+
+
+def repair_managed_prek_block(target: Path) -> None:
+    """Repair vaultspec's block in ``prek.toml`` and say what is left undone.
+
+    The shared repair behind ``sync`` and the preflight executor. It logs the
+    change :func:`refresh_managed_prek_block` made, and warns when a duplicate
+    remains that only the operator can remove, so neither caller reports a fix
+    that did not happen.
+
+    Args:
+        target: Workspace root directory.
+    """
+    change = refresh_managed_prek_block(target)
+    if change:
+        logger.warning("prek.toml: %s", change)
+    if collect_prek_boundary(target).unowned_duplicate:
+        logger.warning("%s", UNOWNED_DUPLICATE_DETAIL)
+
+
+def _strip_declined_leftovers(
+    target: Path, detail: str, *, dry_run: bool
+) -> PrekMigrationResult:
+    """Remove vaultspec's hooks from a declined workspace's YAML configs.
+
+    Only vaultspec-managed hooks are removed, exactly as uninstall removes
+    them: a config left with nothing else is deleted, and one that still
+    carries the operator's own hooks is rewritten without ours and kept. The
+    declaration refused vaultspec's hooks, not the operator's, and with no
+    ``prek.toml`` the YAML may still be the config the hook runner reads.
+    """
+    from .precommit import managed_strip_outcome, strip_managed_precommit_hooks
+
+    removed: list[str] = []
+    stripped: list[str] = []
+    unreadable: list[str] = []
+    for config in existing_precommit_configs(target):
+        outcome = managed_strip_outcome(config)
+        if outcome == "unreadable":
+            unreadable.append(config.name)
+            continue
+        if outcome == "unchanged":
+            continue
+        if not dry_run:
+            strip_managed_precommit_hooks(config)
+        (removed if outcome == "delete" else stripped).append(config.name)
+
+    notes = [detail]
+    if removed:
+        notes.append(f"removed leftover {', '.join(removed)}")
+    if stripped:
+        notes.append(
+            f"removed vaultspec hooks from {', '.join(stripped)} and kept the "
+            "operator's own hooks"
+        )
+    if unreadable:
+        notes.append(f"left {', '.join(unreadable)} alone: it could not be read")
+    return PrekMigrationResult(
+        status="declined", detail="; ".join(notes), yaml_removed=bool(removed)
+    )
 
 
 def migrate_hooks_to_prek(
@@ -269,27 +525,50 @@ def migrate_hooks_to_prek(
 
     Explicitly operator-invoked; never runs as part of install or sync.
     Idempotent: when the full canonical hook set is already present the
-    file is left byte-for-byte untouched. The managed block is replaced in
+    file is left byte-for-byte untouched, unless vaultspec's managed block is
+    stale or duplicated, in which case :func:`refresh_managed_prek_block`
+    brings it to one canonical copy. The managed block is replaced in
     place when its markers exist, appended otherwise; operator-authored
     TOML outside the markers is never parsed for writing, only read for
     the boundary assessment.
+
+    A workspace whose committed declaration sets ``hooks.pre_commit`` to
+    ``false`` has refused the hooks, so nothing is transplanted and the
+    status is ``declined``. ``remove_yaml`` then removes vaultspec's hooks
+    from any leftover YAML config, deleting the file only when nothing else
+    is left in it.
 
     Args:
         target: Workspace root directory.
         mode: Provisioning mode to render entries for; resolved from the
             workspace declaration when ``None``.
         dry_run: Report the outcome without writing anything.
-        remove_yaml: Also delete the superseded ``.pre-commit-config.yaml``
+        remove_yaml: Also delete every superseded YAML hook config
+            (``.pre-commit-config.yaml`` and ``.pre-commit-config.yml``)
             once the canonical hooks are verifiably present in
-            ``prek.toml``. Deletion is refused in every other state; prek
-            silently ignores the YAML, so leaving it is safe and removing
-            it is a tidiness action, never a repair.
+            ``prek.toml``. In a declined workspace only vaultspec's hooks are
+            removed, and the file only when nothing else remains. Deletion is
+            refused in every other state; prek silently ignores the YAML, so
+            leaving it is safe and removing it is a tidiness action, never a
+            repair.
 
     Returns:
         A :class:`PrekMigrationResult` describing what happened.
     """
     from .helpers import atomic_write
-    from .workspace_mode import resolve_render_mode
+    from .workspace_mode import read_hooks_declaration, resolve_render_mode
+
+    config_path = target / PREK_CONFIG_NAME
+
+    if not read_hooks_declaration(target).pre_commit:
+        detail = (
+            "the workspace declaration sets hooks.pre_commit to false; no hooks "
+            "transplanted (run 'vaultspec-core spec precommit enable' to "
+            "restore them)"
+        )
+        if remove_yaml:
+            return _strip_declined_leftovers(target, detail, dry_run=dry_run)
+        return PrekMigrationResult(status="declined", detail=detail)
 
     if mode is None:
         mode = resolve_render_mode(target)
@@ -309,16 +588,25 @@ def migrate_hooks_to_prek(
             detail="prek.toml is not valid TOML; fix it before migrating",
         )
 
-    config_path = target / PREK_CONFIG_NAME
-    yaml_path = target / ".pre-commit-config.yaml"
-
-    if boundary.hooks_present:
+    raw = config_path.read_bytes().decode("utf-8")
+    change = (
+        refresh_managed_prek_block(target, mode=mode, dry_run=dry_run)
+        if boundary.hooks_present
+        else None
+    )
+    if boundary.hooks_present and boundary.unowned_duplicate:
+        detail = UNOWNED_DUPLICATE_DETAIL
+        if change:
+            detail = f"{change} in prek.toml; {detail}"
+        return PrekMigrationResult(status="conflicting", detail=detail)
+    if change:
+        result = PrekMigrationResult(status="migrated", detail=f"{change} in prek.toml")
+    elif boundary.hooks_present:
         result = PrekMigrationResult(
             status="unchanged",
             detail="canonical hooks already present in prek.toml",
         )
     else:
-        raw = config_path.read_text(encoding="utf-8")
         has_block = any(line.strip() == MARKER_BEGIN for line in raw.splitlines())
         if boundary.hook_ids_present and not has_block:
             return PrekMigrationResult(
@@ -342,16 +630,19 @@ def migrate_hooks_to_prek(
     # hooks are present - or, on this run, just became present - in
     # prek.toml. Re-assess from disk before the destructive step as a
     # final guard against a concurrent rewrite.
+    superseded = existing_precommit_configs(target)
     if (
         remove_yaml
-        and yaml_path.exists()
+        and superseded
         and (dry_run or collect_prek_boundary(target, mode=mode).hooks_present)
     ):
         if not dry_run:
-            yaml_path.unlink()
+            for config in superseded:
+                config.unlink()
+        names = ", ".join(p.name for p in superseded)
         result = PrekMigrationResult(
             status=result.status,
-            detail=result.detail + "; removed superseded .pre-commit-config.yaml",
+            detail=f"{result.detail}; removed superseded {names}",
             yaml_removed=True,
         )
     return result

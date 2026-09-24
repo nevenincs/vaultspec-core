@@ -269,3 +269,231 @@ class TestCliVerbs:
         payload = json.loads(result.output)
         assert payload["status"] == "updated"
         assert payload["data"]["pre_commit"] is False
+
+
+def _hookless_prek(root: Path) -> None:
+    """Give *root* a ``prek.toml`` that owns the boundary and carries no hooks."""
+    (root / "prek.toml").write_text('[[repos]]\nrepo = "local"\n', encoding="utf-8")
+
+
+class TestDoctorHonoursTheDecline:
+    """A declined workspace is in its requested state, not a stranded one.
+
+    Before the doctor read the declaration, a hook-less ``prek.toml`` reported
+    the hooks as stranded and advised ``spec precommit migrate`` - the verb
+    that writes the declined hooks back in.
+    """
+
+    def test_hookless_prek_is_declined_not_stranded(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+        from vaultspec_core.core.diagnosis.signals import PrecommitSignal
+
+        _decline(tmp_path)
+        _hookless_prek(tmp_path)
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.DECLINED
+
+    def test_leftover_config_is_reported_and_kept(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+        from vaultspec_core.core.diagnosis.signals import PrecommitSignal
+
+        (tmp_path / _CONFIG).write_text("repos: []\n", encoding="utf-8")
+        _decline(tmp_path)
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.DECLINED_LEFTOVER
+        assert (tmp_path / _CONFIG).read_text(encoding="utf-8") == "repos: []\n"
+
+    def test_doctor_exits_zero_on_hookless_prek(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        import json
+
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        factory.install()
+        _decline(factory.root)
+        (factory.root / _CONFIG).unlink()
+        _hookless_prek(factory.root)
+        factory.sync()
+
+        result = run_vaultspec(runner, "spec", "doctor", "--json", target=factory.root)
+
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["data"]["precommit"] == "declined"
+
+    def test_doctor_reports_leftover_config_as_info(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        factory.install()
+        _decline(factory.root)
+        _hookless_prek(factory.root)
+        factory.sync()
+
+        result = run_vaultspec(runner, "spec", "doctor", target=factory.root)
+
+        assert result.exit_code == 0, result.output
+        row = next(line for line in result.output.splitlines() if "precommit" in line)
+        assert "info" in row
+        assert "warn" not in row
+        assert (factory.root / _CONFIG).exists()
+
+
+class TestMigrateHonoursTheDecline:
+    """``spec precommit migrate`` must not write the hooks a workspace refused."""
+
+    def test_prek_toml_is_left_byte_identical(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        import json
+
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        root = _bare_workspace(factory.root)
+        _decline(root)
+        _hookless_prek(root)
+        before = (root / "prek.toml").read_bytes()
+
+        result = run_vaultspec(
+            runner, "spec", "precommit", "migrate", "--json", target=root
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "declined"
+        assert payload["data"]["yaml_removed"] is False
+        assert "spec precommit enable" in payload["data"]["detail"]
+        assert (root / "prek.toml").read_bytes() == before
+
+    def test_remove_yaml_removes_the_leftover_and_adds_no_hooks(
+        self, runner: CliRunner, factory: WorkspaceFactory
+    ) -> None:
+        import json
+
+        from vaultspec_core.tests.cli.conftest import run_vaultspec
+
+        root = _bare_workspace(factory.root)
+        scaffold_precommit(root)
+        _decline(root)
+        _hookless_prek(root)
+        before = (root / "prek.toml").read_bytes()
+
+        result = run_vaultspec(
+            runner,
+            "spec",
+            "precommit",
+            "migrate",
+            "--remove-yaml",
+            "--json",
+            target=root,
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "declined"
+        assert payload["data"]["yaml_removed"] is True
+        assert not (root / _CONFIG).exists()
+        assert (root / "prek.toml").read_bytes() == before
+
+    def test_dry_run_keeps_the_leftover(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        scaffold_precommit(tmp_path)
+        _decline(tmp_path)
+        before = (tmp_path / _CONFIG).read_bytes()
+
+        result = migrate_hooks_to_prek(tmp_path, dry_run=True, remove_yaml=True)
+
+        assert result.status == "declined"
+        assert result.yaml_removed is True
+        assert (tmp_path / _CONFIG).read_bytes() == before
+
+    def test_remove_yaml_keeps_the_operators_own_hooks(self, tmp_path: Path) -> None:
+        """Declining refuses vaultspec's hooks, not the operator's.
+
+        With no prek.toml the YAML may still be the config the hook runner
+        reads, so deleting it would silently drop the operator's own gates.
+        """
+        import yaml
+
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        (tmp_path / _CONFIG).write_text(
+            "repos:\n- repo: local\n  hooks:\n"
+            "  - id: ruff\n    entry: ruff check\n    language: system\n",
+            encoding="utf-8",
+        )
+        scaffold_precommit(tmp_path)
+        _decline(tmp_path)
+
+        result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)
+
+        assert result.status == "declined"
+        assert result.yaml_removed is False
+        data = yaml.safe_load((tmp_path / _CONFIG).read_text(encoding="utf-8"))
+        ids = [h["id"] for r in data["repos"] for h in r["hooks"]]
+        assert ids == ["ruff"]
+
+    def test_remove_yaml_leaves_a_config_without_vaultspec_hooks(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
+
+        (tmp_path / _CONFIG).write_text("repos: []\n", encoding="utf-8")
+        _decline(tmp_path)
+
+        result = migrate_hooks_to_prek(tmp_path, remove_yaml=True)
+
+        assert result.yaml_removed is False
+        assert (tmp_path / _CONFIG).read_text(encoding="utf-8") == "repos: []\n"
+
+
+class TestConfigLockSentinel:
+    """``/.pre-commit-config.yaml.lock`` is listed only while something takes it.
+
+    The scaffold is the only thing that locks the config, and it does not run
+    once the workspace declines the hooks or ``prek.toml`` owns them.
+    """
+
+    def test_default_workspace_lists_the_sentinel(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+
+        assert f"/{_CONFIG}.lock" in get_recommended_entries(factory.root)
+
+    def test_declined_workspace_omits_the_sentinel(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        _decline(factory.root)
+
+        entries = get_recommended_entries(factory.root)
+
+        assert f"/{_CONFIG}.lock" not in entries
+        assert f"/{_CONFIG}" in entries
+
+    def test_prek_owned_workspace_omits_the_sentinel(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        factory.install()
+        _hookless_prek(factory.root)
+
+        assert f"/{_CONFIG}.lock" not in get_recommended_entries(factory.root)
+
+    def test_sync_removes_the_sentinel_beside_a_leftover_config(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """A sentinel no longer ignored must not linger as untracked noise."""
+        factory.install()
+        sentinel = factory.root / f"{_CONFIG}.lock"
+        assert sentinel.is_file()
+        _decline(factory.root)
+
+        factory.sync()
+
+        assert (factory.root / _CONFIG).exists()
+        assert not sentinel.exists()
+        text = (factory.root / ".gitignore").read_text(encoding="utf-8")
+        assert f"/{_CONFIG}.lock\n" not in text

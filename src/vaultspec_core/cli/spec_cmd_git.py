@@ -158,6 +158,9 @@ def cmd_precommit_migrate(
     prek.toml. Idempotent: re-running with the hooks already present is a
     no-op. The superseded YAML config is never deleted unless
     --remove-yaml is passed and the hooks are verified present.
+
+    A workspace that declined the hooks (spec precommit disable) gets
+    nothing transplanted; --remove-yaml still deletes a leftover YAML config.
     """
     apply_target(target)
     from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
@@ -168,7 +171,7 @@ def cmd_precommit_migrate(
         ctx.target_dir, dry_run=dry_run, remove_yaml=remove_yaml
     )
 
-    ok = result.status in ("migrated", "unchanged")
+    ok = result.status in ("migrated", "unchanged", "declined")
     if json_output:
         emit_json(
             "spec.precommit.migrate",

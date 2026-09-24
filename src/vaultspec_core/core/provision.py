@@ -360,6 +360,8 @@ def _detect_precommit_managed(path: Path) -> bool:
     return collect_precommit_state(path) not in (
         PrecommitSignal.NO_FILE,
         PrecommitSignal.NO_HOOKS,
+        PrecommitSignal.DECLINED,
+        PrecommitSignal.DECLINED_LEFTOVER,
     )
 
 

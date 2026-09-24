@@ -179,8 +179,12 @@ def collect_mcp_config_state(target: Path) -> ConfigSignal:
 def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, int]:
     """Assess generated template annotations in ``.vault/`` without mutating.
 
-    This collector intentionally avoids the vault scanner because scanner access
-    can trigger lazy migrations. Doctor must remain a read-only signal surface.
+    An aggregate of the canonical vault checkers rather than a scan of its own:
+    the annotated count is what ``check_annotations`` reports in its read-only
+    mode, and the unreadable count is what ``check_encoding`` reports, so doctor
+    and ``vault check`` can never disagree about the same documents. Neither
+    checker writes, and the scanner they share no longer runs migrations; it
+    only reports pending ones.
 
     Args:
         target: Workspace root directory.
@@ -189,27 +193,20 @@ def collect_vault_content_state(target: Path) -> tuple[VaultContentSignal, int, 
         ``(signal, annotated_document_count, unreadable_markdown_count)``.
     """
     from ...config import get_config
-    from ...vaultcore.checks.annotations import strip_template_annotations
-    from ...vaultcore.exclusions import is_excluded_vault_path
+    from ...graph import VaultGraph
+    from ...vaultcore.checks import check_annotations, check_encoding
 
-    vault_dir = target / get_config().docs_dir
-    if not vault_dir.is_dir():
+    if not (target / get_config().docs_dir).is_dir():
         return VaultContentSignal.NO_VAULT, 0, 0
 
-    annotated = 0
-    unreadable = 0
-    for path in sorted(vault_dir.rglob("*.md")):
-        if is_excluded_vault_path(path):
-            continue
-        try:
-            content = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            unreadable += 1
-            continue
-
-        _cleaned, stats = strip_template_annotations(content)
-        if stats.total:
-            annotated += 1
+    # One read of the corpus feeds both checkers, as in the combined check
+    # run; standalone, each walks and reads every document again. The graph
+    # cache stays untouched because a diagnosis writes nothing.
+    graph = VaultGraph(target, use_cache=False)
+    annotated = len(
+        check_annotations(target, fix=False, raw_texts=graph.raw_texts).diagnostics
+    )
+    unreadable = len(check_encoding(target, graph=graph).diagnostics)
 
     if annotated:
         return VaultContentSignal.ANNOTATIONS, annotated, unreadable

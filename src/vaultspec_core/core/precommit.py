@@ -11,14 +11,21 @@ from __future__ import annotations
 import io
 import logging
 from contextlib import nullcontext
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from ruamel.yaml import YAML, YAMLError
 
 from .enums import InstallMode, PrecommitHook, render_mode
 from .helpers import advisory_lock, atomic_write
-from .prek_boundary import PrekBoundaryState, collect_prek_boundary
+from .prek_boundary import (
+    PrekBoundaryState,
+    collect_prek_boundary,
+    existing_precommit_configs,
+    precommit_config_path,
+)
 from .workspace_mode import (
     CORE_DISTRIBUTION_NAME,
     read_hooks_declaration,
@@ -33,10 +40,15 @@ __all__ = [
     "CANONICAL_HOOK_ENTRIES",
     "CANONICAL_HOOK_IDS",
     "CANONICAL_PRECOMMIT_HOOKS",
+    "RETIRED_HOOK_IDS",
+    "HookChange",
+    "YamlHookAssessment",
+    "assess_precommit_yaml",
     "canonical_hook_entries_for_mode",
     "canonical_precommit_hooks_for_mode",
     "entry_prefix_for_mode",
     "hook_defs_for_mode",
+    "managed_strip_outcome",
     "scaffold_precommit",
     "strip_managed_precommit_hooks",
 ]
@@ -105,39 +117,16 @@ CANONICAL_ENTRY_PREFIX = entry_prefix_for_mode(InstallMode.DEPENDENCY)
 # insertion order here is the order hooks are scaffolded into
 # ``.pre-commit-config.yaml`` and must be preserved.
 _HOOK_SUBCOMMAND: dict[PrecommitHook, str] = {
-    # A pure gate, deliberately not ``--fix``. Unattended corpus-mutating
-    # repair from inside a commit is retired by the modified-stamp-provenance
-    # decision: ``pass_filenames: false`` hands the hook the whole corpus as
-    # blast radius no matter what the commit touches, a hook-time fix writes
-    # changes nobody reviewed into commits that are not about them, and the
-    # hook runner's revert-based staging protocol makes hook-time tree
-    # mutation unsafe in shared worktrees. The non-fix run is an exact,
-    # deterministic preview, so a failing gate names precisely what a
-    # deliberate operator-run ``--fix`` will do. The hook id keeps its
-    # historical ``vault-fix`` spelling so existing installs are updated in
-    # place rather than accumulating a second, near-duplicate entry.
-    PrecommitHook.VAULT_FIX: "vault check all",
-    PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: "vault sanitize annotations",
-    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: "check-providers",
-    # ``--gate-errors`` folds the doctor's warning exit (1) to 0 so the gate
-    # blocks only on errors. Warning-level provider-mirror lag is the expected
-    # steady state after any builtins change - check-provider-artifacts forbids
-    # committing the regenerated mirror - so a warning-strict gate would
-    # deadlock every commit. This is the canonical entry, not a hand-hardened
-    # local override, so sync renders it directly rather than clobbering it.
-    PrecommitHook.SPEC_CHECK: "spec doctor --gate-errors",
+    # A pure gate, never ``--fix``: a hook-time fix writes changes nobody
+    # reviewed into commits that are not about them, and the hook runner's
+    # revert-based staging protocol makes hook-time tree mutation unsafe in
+    # shared worktrees.
+    PrecommitHook.COMMIT_GATE: "commit-gate",
 }
 _HOOK_META: dict[PrecommitHook, dict[str, object]] = {
-    PrecommitHook.VAULT_FIX: {"name": "Vault gate", "types": ["markdown"]},
-    PrecommitHook.VAULT_SANITIZE_ANNOTATIONS: {
-        "name": "Vault sanitize annotations",
-        "types": ["markdown"],
-    },
-    PrecommitHook.CHECK_PROVIDER_ARTIFACTS: {
-        "name": "Check provider artifacts",
-        "always_run": True,
-    },
-    PrecommitHook.SPEC_CHECK: {"name": "Spec check", "types": ["markdown"]},
+    # ``always_run`` so the per-machine file guard sees every commit, not only
+    # those touching markdown; the gate itself ignores paths it has no rule for.
+    PrecommitHook.COMMIT_GATE: {"name": "Vaultspec commit gate", "always_run": True},
 }
 
 
@@ -171,7 +160,9 @@ def canonical_precommit_hooks_for_mode(mode: InstallMode) -> list[dict[str, obje
             "id": hook.value,
             **meta,
             "language": "system",
-            "pass_filenames": False,
+            # The gate checks exactly the staged files the runner passes, which
+            # is what keeps its cost proportional to the commit.
+            "pass_filenames": True,
         }
         for hook, meta in hook_defs_for_mode(mode).items()
     ]
@@ -199,8 +190,26 @@ CANONICAL_HOOK_ENTRIES: dict[str, str] = canonical_hook_entries_for_mode(
     InstallMode.DEPENDENCY
 )
 
+#: Hook IDs vaultspec-core once scaffolded and no longer renders. Existing
+#: installs still carry them, so the scaffold removes them and uninstall still
+#: strips them.
+#:
+#: ``vault-sanitize-annotations`` rewrote the whole vault from inside a commit,
+#: contradicting the pure-gate rule above. ``vault-fix``, ``spec-check`` and
+#: ``check-provider-artifacts`` each spent a process, and the first two a
+#: vault-sized scan, on every commit; ``commit-gate`` does their commit-scoped
+#: work in one process, and the whole-vault checks run in CI and on demand.
+RETIRED_HOOK_IDS: frozenset[str] = frozenset(
+    {
+        "vault-sanitize-annotations",
+        "vault-fix",
+        "spec-check",
+        "check-provider-artifacts",
+    }
+)
+
 # All managed hook IDs for uninstall filtering.
-ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS
+ALL_MANAGED_HOOK_IDS: frozenset[str] = CANONICAL_HOOK_IDS | RETIRED_HOOK_IDS
 
 
 def _precommit_yaml() -> YAML:
@@ -264,6 +273,34 @@ def _drop_managed_hook_entries(repos: list[Any]) -> bool:
     return changed
 
 
+def managed_strip_outcome(
+    config_file: Path,
+) -> Literal["delete", "rewrite", "unchanged", "unreadable"]:
+    """Report what :func:`strip_managed_precommit_hooks` would do, writing nothing.
+
+    Returns:
+        ``"delete"`` when only managed hooks (and nothing else) would remain to
+        remove, ``"rewrite"`` when managed hooks would be stripped and other
+        content kept, ``"unchanged"`` when the config parsed and carries
+        nothing managed, and ``"unreadable"`` when it could not be read or
+        parsed - kept apart from ``"unchanged"`` so no caller mistakes a
+        config nobody could read for a clean one.
+    """
+    handler = _precommit_yaml()
+    try:
+        data = _as_mapping(handler.load(config_file.read_text(encoding="utf-8")))
+    except (YAMLError, OSError, UnicodeDecodeError):
+        return "unreadable"
+    if data is None:
+        return "unchanged"
+    repos = _as_list(data.get("repos", []))
+    if repos is None or not _drop_managed_hook_entries(repos):
+        return "unchanged"
+    if repos or len(data) > 1:
+        return "rewrite"
+    return "delete"
+
+
 def strip_managed_precommit_hooks(config_file: Path) -> bool:
     """Remove vaultspec-managed hooks from an existing ``.pre-commit-config.yaml``.
 
@@ -310,16 +347,16 @@ def _log_prek_boundary_status(target: Path, boundary: PrekBoundaryState) -> None
     needs to move, and flags a co-present, now-superseded YAML config in
     either case.
     """
-    config_file = target / ".pre-commit-config.yaml"
+    leftovers = existing_precommit_configs(target)
     if boundary.hooks_present:
         logger.info(
             "prek.toml at %s already carries the vaultspec-core hooks; "
             "skipping .pre-commit-config.yaml scaffold.",
             target,
         )
-        if config_file.exists():
+        if leftovers:
             logger.info(
-                "A superseded .pre-commit-config.yaml is still present at %s. "
+                "A superseded YAML hook config is still present at %s. "
                 "prek reads prek.toml exclusively; remove the YAML config "
                 "once nothing else consumes it.",
                 target,
@@ -331,15 +368,47 @@ def _log_prek_boundary_status(target: Path, boundary: PrekBoundaryState) -> None
         "transplant the vaultspec-core hooks into prek.toml.",
         target,
     )
-    if config_file.exists():
+    if leftovers:
         logger.warning(
-            "Both prek.toml and .pre-commit-config.yaml are present at "
+            "Both prek.toml and a YAML hook config are present at "
             "%s and prek.toml lacks the vaultspec-core hooks. prek "
             "reads prek.toml exclusively; vaultspec will not refresh "
             "the YAML hooks. Run 'vaultspec-core spec precommit "
             "migrate' to transplant them.",
             target,
         )
+
+
+def _parse_precommit_config(config_file: Path, handler: YAML) -> tuple[bool, object]:
+    """Read and parse *config_file* with the round-trip *handler*.
+
+    Returns:
+        ``(readable, loaded)``: ``readable`` is ``False`` when the file could
+        not be read, decoded or parsed; ``loaded`` is the parsed document
+        (``{}`` for an empty file) when it could.
+    """
+    try:
+        raw = config_file.read_text(encoding="utf-8")
+        return True, handler.load(raw) or {}
+    # UnicodeDecodeError subclasses ValueError, not OSError, so a file that
+    # exists and cannot be decoded escaped this net and surfaced as a raw
+    # traceback (issue #407).
+    except (YAMLError, OSError, UnicodeDecodeError):
+        return False, None
+
+
+def _as_config_mapping(loaded: object) -> dict[str, Any] | None:
+    """Return *loaded* as a config mapping with a list ``repos``, or ``None``.
+
+    ``None`` means a shape the reconcile does not recognise, which tells a
+    writer to leave the file alone rather than risk corrupting it.
+    """
+    data = _as_mapping(loaded)
+    if data is None:
+        return None
+    if _as_list(data.setdefault("repos", [])) is None:
+        return None
+    return data
 
 
 def _load_existing_precommit_config(
@@ -354,65 +423,104 @@ def _load_existing_precommit_config(
         skip scaffolding for this run rather than risk corrupting a config
         it doesn't recognize.
     """
-    try:
-        raw = config_file.read_text(encoding="utf-8")
-        loaded: object = handler.load(raw) or {}
-    # UnicodeDecodeError subclasses ValueError, not OSError, so a file that
-    # exists and cannot be decoded escaped this net and surfaced as a raw
-    # traceback (issue #407).
-    except (YAMLError, OSError, UnicodeDecodeError):
-        return None
-    data = _as_mapping(loaded)
-    if data is None:
-        return None
-    if _as_list(data.setdefault("repos", [])) is None:
-        return None
-    return data
+    readable, loaded = _parse_precommit_config(config_file, handler)
+    return _as_config_mapping(loaded) if readable else None
+
+
+class HookChange(StrEnum):
+    """One reason the reconcile would rewrite a hook config.
+
+    The reconcile reports these instead of logging as it goes, so a reader can
+    ask what a writer would do - and why - without the writer's side effects.
+    """
+
+    ADDED = "added"
+    UPDATED = "updated"
+    RETIRED = "retired"
+    DEDUPLICATED = "deduplicated"
+
+
+_CHANGE_LOG: dict[HookChange, tuple[int, str]] = {
+    HookChange.ADDED: (logging.INFO, "Added pre-commit hook '%s'"),
+    HookChange.UPDATED: (
+        logging.INFO,
+        "Updated pre-commit hook '%s' entry to canonical pattern",
+    ),
+    HookChange.RETIRED: (logging.INFO, "Removed retired pre-commit hook '%s'"),
+    HookChange.DEDUPLICATED: (
+        logging.WARNING,
+        "Removed duplicate pre-commit hook '%s'; it was listed more than once "
+        "and would have run on every commit twice",
+    ),
+}
 
 
 def _merge_local_repo_hooks(
-    existing_hooks: list[Any], canonical_hooks: list[dict[str, object]]
-) -> bool:
-    """Reconcile *existing_hooks* against *canonical_hooks* in place.
+    local_hook_lists: list[list[Any]], canonical_hooks: list[dict[str, object]]
+) -> list[tuple[HookChange, str]]:
+    """Reconcile every local repo's hooks against *canonical_hooks* in place.
 
-    Missing hooks are appended; hooks whose entry drifted from the canonical
-    pattern are updated in place; hooks already canonical are left untouched.
+    All ``repo: local`` entries are considered together, because prek runs
+    each of them: hooks whose ID is in :data:`RETIRED_HOOK_IDS` are removed
+    wherever they sit; a canonical hook listed more than once keeps only its
+    first entry, since every copy would run again on each commit; a canonical
+    hook present anywhere has a drifted entry updated in place; and one present
+    nowhere is appended to the first local repo.
+
+    Args:
+        local_hook_lists: The ``hooks`` list of each local repo, in file order.
+        canonical_hooks: The canonical hook mappings to reconcile against.
 
     Returns:
-        ``True`` when *existing_hooks* was changed.
+        Each change made, with the hook id it concerns, in the order made.
     """
-    existing_by_id: dict[Any, dict[str, Any]] = {}
-    for raw_hook in existing_hooks:
-        hook = _as_mapping(raw_hook)
-        if hook is not None:
-            existing_by_id[hook.get("id")] = hook
-    changed = False
+    changes: list[tuple[HookChange, str]] = []
+    canonical_ids = {str(hook["id"]) for hook in canonical_hooks}
+    first_by_id: dict[str, dict[str, Any]] = {}
+    for hooks in local_hook_lists:
+        for i in reversed(range(len(hooks))):
+            hook = _as_mapping(hooks[i])
+            if hook is not None and hook.get("id") in RETIRED_HOOK_IDS:
+                changes.append((HookChange.RETIRED, str(hook.get("id"))))
+                del hooks[i]
+    for hooks in local_hook_lists:
+        kept: list[Any] = []
+        for raw_hook in hooks:
+            hook = _as_mapping(raw_hook)
+            hook_id = str(hook.get("id")) if hook is not None else None
+            if hook is not None and hook_id in canonical_ids:
+                if hook_id in first_by_id:
+                    changes.append((HookChange.DEDUPLICATED, hook_id))
+                    continue
+                first_by_id[hook_id] = hook
+            kept.append(raw_hook)
+        hooks[:] = kept
     for canonical in canonical_hooks:
         hook_id = str(canonical["id"])
-        existing = existing_by_id.get(hook_id)
+        existing = first_by_id.get(hook_id)
         if existing is None:
-            existing_hooks.append(dict(canonical))
-            logger.info("Added pre-commit hook '%s'", hook_id)
-            changed = True
+            local_hook_lists[0].append(dict(canonical))
+            changes.append((HookChange.ADDED, hook_id))
             continue
         if existing.get("entry") == canonical["entry"]:
             continue
         existing["entry"] = canonical["entry"]
-        logger.info("Updated pre-commit hook '%s' entry to canonical pattern", hook_id)
-        changed = True
-    return changed
+        changes.append((HookChange.UPDATED, hook_id))
+    return changes
 
 
 def _reconcile_precommit_repos(
     data: dict[str, Any], canonical_hooks: list[dict[str, object]]
-) -> bool:
-    """Reconcile the local repo's hooks in *data* against *canonical_hooks*.
+) -> list[tuple[HookChange, str]] | None:
+    """Reconcile the local repos' hooks in *data* against *canonical_hooks*.
 
-    Creates the local repo when none exists; otherwise merges via
-    :func:`_merge_local_repo_hooks`.
+    Creates a local repo when none exists; otherwise merges via
+    :func:`_merge_local_repo_hooks` and drops any local repo the merge emptied.
 
     Returns:
-        ``True`` when *data* should be written back to disk.
+        The changes made to *data* (empty when it already matches), or
+        ``None`` when a local repo's ``hooks`` is not a list, which leaves the
+        config unrecognised and *data* untouched.
     """
     repos = cast("list[Any]", data["repos"])
     local_repos = [
@@ -422,13 +530,112 @@ def _reconcile_precommit_repos(
     ]
     if not local_repos:
         repos.append({"repo": "local", "hooks": [dict(h) for h in canonical_hooks]})
-        return True
+        return [(HookChange.ADDED, str(h["id"])) for h in canonical_hooks]
 
-    local_repo = local_repos[0]
-    existing_hooks = _as_list(local_repo.setdefault("hooks", []))
-    if existing_hooks is None:
-        return False
-    return _merge_local_repo_hooks(existing_hooks, canonical_hooks)
+    hook_lists: list[list[Any]] = []
+    for local_repo in local_repos:
+        hooks = _as_list(local_repo.setdefault("hooks", []))
+        if hooks is None:
+            return None
+        hook_lists.append(hooks)
+    had_hooks = [bool(hooks) for hooks in hook_lists]
+    changes = _merge_local_repo_hooks(hook_lists, canonical_hooks)
+    # Only a repo the merge itself emptied goes: an empty stanza the operator
+    # wrote is theirs, and one the merge emptied is residue vaultspec created.
+    for local_repo, hooks, had in zip(local_repos, hook_lists, had_hooks, strict=True):
+        if had and not hooks:
+            repos.remove(local_repo)
+    return changes
+
+
+def _managed_local_hooks(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the vaultspec-managed hook mappings across every local repo."""
+    hooks: list[dict[str, Any]] = []
+    for raw_repo in cast("list[Any]", data["repos"]):
+        repo = _as_mapping(raw_repo)
+        if repo is None or repo.get("repo") != "local":
+            continue
+        for raw_hook in _as_list(repo.get("hooks", [])) or []:
+            hook = _as_mapping(raw_hook)
+            if hook is not None and hook.get("id") in ALL_MANAGED_HOOK_IDS:
+                hooks.append(hook)
+    return hooks
+
+
+@dataclass(frozen=True)
+class YamlHookAssessment:
+    """What the YAML hook config prek would read says, and what a sync would do.
+
+    Built by the same parse and the same reconcile the scaffold writes with,
+    so every reader - doctor, sync's stand-down decision, uninstall, mode
+    detection - reaches the verdict the writer would, rather than a parallel
+    one that could drift from it.
+
+    Attributes:
+        config: The YAML config prek would read.
+        exists: The config exists.
+        readable: It could be read and parsed.
+        recognised: It parsed to a shape the reconcile works on.
+        vaultspec_hooks: It lists at least one vaultspec hook, current or
+            retired, in a local repo.
+        changes: What the scaffold would change, in order; empty when it
+            already matches the canonical set.
+        canonical_entries: The ``entry`` of each canonical-id hook as found,
+            in file order.
+    """
+
+    config: Path
+    exists: bool
+    readable: bool = False
+    recognised: bool = False
+    vaultspec_hooks: bool = False
+    changes: tuple[tuple[HookChange, str], ...] = ()
+    canonical_entries: tuple[str, ...] = ()
+
+    @property
+    def change_kinds(self) -> frozenset[HookChange]:
+        """The distinct kinds of change the scaffold would make."""
+        return frozenset(kind for kind, _hook_id in self.changes)
+
+
+def assess_precommit_yaml(
+    target: Path, *, mode: InstallMode | None = None
+) -> YamlHookAssessment:
+    """Assess the YAML hook config prek would read at *target*, writing nothing.
+
+    Args:
+        target: Workspace root directory.
+        mode: Provisioning mode to render canonical entries for; resolved from
+            the workspace declaration when ``None``, as the scaffold does.
+
+    Returns:
+        The :class:`YamlHookAssessment` for the effective config.
+    """
+    config = precommit_config_path(target)
+    if not config.exists():
+        return YamlHookAssessment(config=config, exists=False)
+    readable, loaded = _parse_precommit_config(config, _precommit_yaml())
+    if not readable:
+        return YamlHookAssessment(config=config, exists=True)
+    data = _as_config_mapping(loaded)
+    if data is None:
+        return YamlHookAssessment(config=config, exists=True, readable=True)
+    managed = _managed_local_hooks(data)
+    entries = tuple(
+        str(h.get("entry", "")) for h in managed if h.get("id") in CANONICAL_HOOK_IDS
+    )
+    if mode is None:
+        mode = resolve_render_mode(target, package=CORE_DISTRIBUTION_NAME)
+    changes = _reconcile_precommit_repos(data, canonical_precommit_hooks_for_mode(mode))
+    return YamlHookAssessment(
+        config=config,
+        exists=True,
+        readable=True,
+        recognised=changes is not None,
+        vaultspec_hooks=bool(managed),
+        changes=tuple(changes or ()),
+        canonical_entries=entries,
+    )
 
 
 def scaffold_precommit(
@@ -439,6 +646,11 @@ def scaffold_precommit(
     Ensures the full canonical hook set is present with canonical entry
     patterns.  Existing hooks with matching IDs are updated to the
     canonical entry; missing hooks are appended.
+
+    The file is the one prek would read
+    (:func:`~vaultspec_core.core.prek_boundary.precommit_config_path`): an
+    existing ``.pre-commit-config.yml`` is managed in place rather than joined
+    by a ``.yaml`` that would take precedence over it.
 
     The entry each hook is rendered with follows the resolved provisioning
     mode: dependency mode keeps the ``uv run --no-sync vaultspec-core`` prefix,
@@ -488,9 +700,9 @@ def scaffold_precommit(
         _log_prek_boundary_status(target, boundary)
         return []
 
-    config_file = target / ".pre-commit-config.yaml"
+    config_file = precommit_config_path(target)
     handler = _precommit_yaml()
-    result = [(".pre-commit-config.yaml", "precommit")]
+    result = [(config_file.name, "precommit")]
 
     with nullcontext() if dry_run else advisory_lock(config_file):
         if not config_file.exists():
@@ -506,9 +718,15 @@ def scaffold_precommit(
         data = _load_existing_precommit_config(config_file, handler)
         if data is None:
             return []
-        if not _reconcile_precommit_repos(data, canonical_hooks):
+        changes = _reconcile_precommit_repos(data, canonical_hooks)
+        if not changes:
             return []
 
         if not dry_run:
             atomic_write(config_file, _dump_precommit_yaml(handler, data))
+            # Logged only once the write has happened: the reconcile reports
+            # its changes rather than logging them, so readers can run it too.
+            for kind, hook_id in changes:
+                level, message = _CHANGE_LOG[kind]
+                logger.log(level, message, hook_id)
         return result

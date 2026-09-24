@@ -88,17 +88,19 @@ class TestCheckProvidersIgnoresDeletions:
 
     def test_staged_deletion_is_not_flagged(self, tmp_path: Path) -> None:
         _init_git_repo(tmp_path)
-        # Track .mcp.json then stage its removal.
-        (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
-        _run_git(tmp_path, "add", ".mcp.json")
-        _run_git(tmp_path, "commit", "-q", "-m", "track mcp")
-        _run_git(tmp_path, "rm", "--cached", ".mcp.json")
+        # Track the per-machine manifest, then stage its removal.
+        manifest = tmp_path / ".vaultspec" / "providers.json"
+        manifest.parent.mkdir()
+        manifest.write_text("{}", encoding="utf-8")
+        _run_git(tmp_path, "add", "-f", ".vaultspec/providers.json")
+        _run_git(tmp_path, "commit", "-q", "-m", "track manifest")
+        _run_git(tmp_path, "rm", "--cached", ".vaultspec/providers.json")
 
         # Sanity check: confirm the staged change is indeed a deletion.
         staged = _run_git(
             tmp_path, "diff", "--cached", "--name-only", "--diff-filter=D"
         )
-        assert ".mcp.json" in staged.stdout.splitlines()
+        assert ".vaultspec/providers.json" in staged.stdout.splitlines()
 
         violations = check_staged_provider_artifacts(cwd=tmp_path)
 
@@ -106,12 +108,14 @@ class TestCheckProvidersIgnoresDeletions:
 
     def test_staged_addition_is_flagged(self, tmp_path: Path) -> None:
         _init_git_repo(tmp_path)
-        (tmp_path / ".mcp.json").write_text("{}", encoding="utf-8")
-        _run_git(tmp_path, "add", ".mcp.json")
+        manifest = tmp_path / ".vaultspec" / "providers.json"
+        manifest.parent.mkdir()
+        manifest.write_text("{}", encoding="utf-8")
+        _run_git(tmp_path, "add", "-f", ".vaultspec/providers.json")
 
         violations = check_staged_provider_artifacts(cwd=tmp_path)
 
-        assert ".mcp.json" in violations
+        assert ".vaultspec/providers.json" in violations
 
 
 # ---- Domain 1: untrack historically-committed managed paths -----------------
@@ -463,11 +467,18 @@ class TestPrekMigrationVerb:
         assert raw.count(MARKER_BEGIN) == 1
         assert collect_prek_boundary(tmp_path).hooks_present
 
-    def test_conflicting_hooks_outside_block_refuse(self, tmp_path: Path) -> None:
+    def test_operator_authored_canonical_hook_is_respected(
+        self, tmp_path: Path
+    ) -> None:
+        """A canonical hook the operator wrote outside the block is theirs.
+
+        prek.toml is operator-owned, so a customised entry is not stranding:
+        migration must neither duplicate it into a managed block nor rewrite it.
+        """
         from vaultspec_core.core.commands import CANONICAL_HOOK_IDS
         from vaultspec_core.core.prek_boundary import migrate_hooks_to_prek
 
-        hook_id = sorted(CANONICAL_HOOK_IDS)[0]
+        (hook_id,) = CANONICAL_HOOK_IDS
         config = tmp_path / "prek.toml"
         config.write_text(
             "[[repos]]\n"
@@ -482,7 +493,7 @@ class TestPrekMigrationVerb:
 
         result = migrate_hooks_to_prek(tmp_path)
 
-        assert result.status == "conflicting"
+        assert result.status == "unchanged"
         assert config.read_bytes() == before
 
     def test_missing_prek_config_refuses(self, tmp_path: Path) -> None:
@@ -540,65 +551,88 @@ class TestUninstallUnderPrek:
             assert not any(f"id: {hid}" in raw for hid in CANONICAL_HOOK_IDS)
 
 
-class TestSpecCheckGateEntry:
-    """Regression: the canonical ``spec-check`` entry is the error-gating form.
+class TestRetiredHooksConverge:
+    """An install carrying the retired hook set converges on the commit gate.
 
-    Warning-strict ``spec doctor`` deadlocks commits because provider-mirror
-    lag is a warning-level steady state. The canonical hook must carry
-    ``--gate-errors`` so ``sync`` renders the non-deadlocking form directly,
-    and a config already on that form must be a no-op (no clobber, no diff).
+    ``vault-fix``, ``spec-check`` and ``check-provider-artifacts`` are gone from
+    the canonical set. A config that still carries them must be read as an
+    older install awaiting convergence - not as one whose owner removed the
+    hooks - and the scaffold must replace them with the gate, leaving the
+    operator's own hooks alone.
     """
 
-    def _spec_check_entry(self, root: Path) -> str:
+    _RETIRED = (
+        "repos:\n"
+        "- repo: local\n"
+        "  hooks:\n"
+        "  - id: ruff\n"
+        "    entry: ruff check\n"
+        "    language: system\n"
+        "  - id: vault-fix\n"
+        "    name: Vault gate\n"
+        "    entry: uv run --no-sync vaultspec-core vault check all\n"
+        "    language: system\n"
+        "    pass_filenames: false\n"
+        "  - id: spec-check\n"
+        "    name: Spec check\n"
+        "    entry: uv run --no-sync vaultspec-core spec doctor --gate-errors\n"
+        "    language: system\n"
+        "    pass_filenames: false\n"
+        "  - id: check-provider-artifacts\n"
+        "    name: Check provider artifacts\n"
+        "    entry: uv run --no-sync vaultspec-core check-providers\n"
+        "    always_run: true\n"
+        "    language: system\n"
+        "    pass_filenames: false\n"
+    )
+
+    def _ids(self, root: Path) -> list[str]:
         import yaml
 
         data = yaml.safe_load(
             (root / ".pre-commit-config.yaml").read_text(encoding="utf-8")
         )
         local = next(r for r in data["repos"] if r.get("repo") == "local")
-        return next(h["entry"] for h in local["hooks"] if h["id"] == "spec-check")
+        return [h["id"] for h in local["hooks"]]
 
-    def test_scaffold_emits_gate_errors_form(self, tmp_path: Path) -> None:
-        scaffold_precommit(tmp_path)
-        assert self._spec_check_entry(tmp_path).endswith("spec doctor --gate-errors")
+    def test_retired_set_reads_as_repairable(self, tmp_path: Path) -> None:
+        from vaultspec_core.core.diagnosis.collectors import collect_precommit_state
+        from vaultspec_core.core.diagnosis.signals import PrecommitSignal
 
-    def test_bare_entry_is_upgraded_to_gate_form(self, tmp_path: Path) -> None:
-        import yaml
-
-        # A repo carrying the old warning-strict bare form.
         (tmp_path / ".pre-commit-config.yaml").write_text(
-            yaml.dump(
-                {
-                    "repos": [
-                        {
-                            "repo": "local",
-                            "hooks": [
-                                {
-                                    "id": "spec-check",
-                                    "name": "Spec check",
-                                    "entry": "uv run --no-sync vaultspec-core "
-                                    "spec doctor",
-                                    "language": "system",
-                                    "types": ["markdown"],
-                                    "pass_filenames": False,
-                                }
-                            ],
-                        }
-                    ]
-                },
-                sort_keys=False,
-            ),
-            encoding="utf-8",
+            self._RETIRED, encoding="utf-8"
+        )
+
+        assert collect_precommit_state(tmp_path) is PrecommitSignal.INCOMPLETE
+
+    def test_scaffold_replaces_the_retired_set_with_the_gate(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text(
+            self._RETIRED, encoding="utf-8"
         )
 
         changed = scaffold_precommit(tmp_path)
 
         assert changed == [(".pre-commit-config.yaml", "precommit")]
-        assert self._spec_check_entry(tmp_path).endswith("spec doctor --gate-errors")
+        assert self._ids(tmp_path) == ["ruff", "vaultspec-commit-gate"]
 
-    def test_gate_form_entry_is_noop(self, tmp_path: Path) -> None:
-        # First scaffold renders the canonical gating form; a second pass over
-        # the identical config must make no change (no clobber loop).
+    def test_sync_converges_an_installed_workspace(
+        self, factory: WorkspaceFactory
+    ) -> None:
+        """The path a real upgrade takes: install, old hooks on disk, sync."""
+        factory.install()
+        (factory.root / ".pre-commit-config.yaml").write_text(
+            self._RETIRED, encoding="utf-8"
+        )
+
+        factory.sync()
+
+        assert self._ids(factory.root) == ["ruff", "vaultspec-commit-gate"]
+
+    def test_canonical_config_is_noop(self, tmp_path: Path) -> None:
+        # First scaffold renders the canonical form; a second pass over the
+        # identical config must make no change (no clobber loop).
         scaffold_precommit(tmp_path)
         before = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")
 
@@ -630,8 +664,8 @@ class TestScaffoldPreservesAuthorContent:
 
     def _authored_config(self) -> str:
         # A correctly-authored config: explanatory comment, single-quoted
-        # exclude regexes on non-vaultspec hooks, and a vaultspec spec-check
-        # hook still on the bare (pre-gate) entry so the reassembly path fires.
+        # exclude regexes on non-vaultspec hooks, and a retired vaultspec hook
+        # the scaffold must replace, so the reassembly path fires.
         return (
             "default_stages:\n"
             "- pre-commit\n"
@@ -670,14 +704,15 @@ class TestScaffoldPreservesAuthorContent:
         config = factory.root / ".pre-commit-config.yaml"
         config.write_text(self._authored_config(), encoding="utf-8")
 
-        # This pass edits the spec-check entry, so it reassembles the file.
+        # This pass replaces the retired hook, so it reassembles the file.
         changed = scaffold_precommit(factory.root)
         assert changed == [(".pre-commit-config.yaml", "precommit")]
 
         rendered = config.read_text(encoding="utf-8")
 
         # The managed edit landed.
-        assert "spec doctor --gate-errors" in rendered
+        assert "vaultspec-core commit-gate" in rendered
+        assert "spec doctor" not in rendered
         # The explanatory comment survived reassembly.
         assert "# Read-only checks only" in rendered
         assert "stash cycle never rolls back fixes" in rendered
@@ -1599,10 +1634,7 @@ _HOOK_SUBCOMMANDS = {
     # A pure gate: the hook reports and blocks, it never repairs. Unattended
     # corpus-mutating repair from inside a commit is retired, so a stray
     # ``--fix`` here would be a regression, not a formatting detail.
-    "vault-fix": "vault check all",
-    "vault-sanitize-annotations": "vault sanitize annotations",
-    "check-provider-artifacts": "check-providers",
-    "spec-check": "spec doctor --gate-errors",
+    "vaultspec-commit-gate": "commit-gate",
 }
 _DEPENDENCY_HOOK_PREFIX = "uv run --no-sync vaultspec-core"
 _TOOL_HOOK_PREFIX = "uvx --from vaultspec-core vaultspec-core"
@@ -1627,7 +1659,7 @@ def _expected_entries(prefix: str) -> dict[str, str]:
 
 @pytest.mark.unit
 class TestHookEntryModeRendering:
-    """The four canonical hook entries render for the resolved install mode.
+    """The canonical hook entries render for the resolved install mode.
 
     Marked ``unit`` (in addition to the module's ``integration`` mark) so the
     unit gate exercises the mode-rendering guarantee directly; each test drives

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from vaultspec_core.core.diagnosis import (
         GitattributesSignal,
         GitignoreSignal,
+        PrecommitSignal,
         ProviderDiagnosis,
         ProviderHookSignal,
         WorkspaceDiagnosis,
@@ -55,9 +56,9 @@ def cmd_doctor(
         typer.Option(
             "--gate-errors",
             help=(
-                "Exit 0 on warnings; fail (exit 2) only on errors. For the "
-                "pre-commit gate, where warning-level provider-mirror lag is an "
-                "expected steady state that must not block commits."
+                "Exit 0 on warnings; fail (exit 2) only on errors. For CI and "
+                "other automation gates, where warning-level provider-mirror lag "
+                "is an expected steady state that must not fail the run."
             ),
         ),
     ] = False,
@@ -510,9 +511,13 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             PrecommitSignal.UNREFRESHABLE: ("warn", "yellow"),
             PrecommitSignal.ORPHANED: ("info", "dim"),
             PrecommitSignal.NO_HOOKS: ("warn", "yellow"),
-            PrecommitSignal.NOT_INSTALLED: ("warn", "yellow"),
+            PrecommitSignal.NOT_INSTALLED: ("info", "dim"),
             PrecommitSignal.NO_FILE: ("info", "dim"),
             PrecommitSignal.UNREADABLE: ("warn", "yellow"),
+            PrecommitSignal.DECLINED: ("info", "dim"),
+            PrecommitSignal.DECLINED_LEFTOVER: ("info", "dim"),
+            PrecommitSignal.DUPLICATED: ("error", "red"),
+            PrecommitSignal.SHADOWED: ("warn", "yellow"),
         },
     )
     pc_detail = {
@@ -530,13 +535,43 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "precommit migrate --remove-yaml')"
         ),
         PrecommitSignal.NO_HOOKS: "no vaultspec hooks found",
+        # States the fact and both legitimate responses. A repository may
+        # keep the config and run its checks explicitly, so an unconditional
+        # "install the hook" would contradict that choice.
         PrecommitSignal.NOT_INSTALLED: (
-            "every hook is configured and none of them runs - git has no "
-            "pre-commit hook installed, so a commit executes nothing. Run "
-            "'prek install' (or 'pre-commit install') in this checkout"
+            "the hooks are configured but git has no pre-commit hook installed, "
+            "so nothing is checked at commit time - run the project's checks "
+            "yourself, or install the hook ('prek install' or 'pre-commit "
+            "install') if this repository wants commit-time checks"
         ),
         PrecommitSignal.NO_FILE: "no .pre-commit-config.yaml",
-        PrecommitSignal.UNREADABLE: ("could not be read; this check did not run"),
+        PrecommitSignal.UNREADABLE: (
+            "could not be read, or has a shape vaultspec does not recognise "
+            "and will not rewrite; this check did not run"
+        ),
+        PrecommitSignal.DECLINED: (
+            "declined by the workspace declaration (hooks.pre_commit = false); "
+            "run 'vaultspec-core spec precommit enable' to restore the hooks"
+        ),
+        PrecommitSignal.DECLINED_LEFTOVER: (
+            "declined by the workspace declaration (hooks.pre_commit = false), "
+            "but a pre-commit YAML config is still on disk - 'vaultspec-core "
+            "spec precommit migrate --remove-yaml' removes vaultspec's hooks "
+            "from it and keeps any of your own"
+        ),
+        PrecommitSignal.DUPLICATED: (
+            "the hook config prek reads lists a vaultspec hook more than once, "
+            "so it runs repeatedly on every commit - 'vaultspec-core sync' "
+            "removes the copies vaultspec manages (with prek.toml: "
+            "'vaultspec-core spec precommit migrate'); copies written by hand "
+            "outside vaultspec's managed block are yours to remove"
+        ),
+        PrecommitSignal.SHADOWED: (
+            "vaultspec hooks are also listed in a config file prek does not "
+            "read, so they look configured and never run - delete that file "
+            "or its vaultspec entries (with prek.toml: 'vaultspec-core spec "
+            "precommit migrate --remove-yaml')"
+        ),
     }.get(diag.precommit, str(diag.precommit))
     rows.append(
         {
@@ -803,6 +838,37 @@ def _provider_hooks_weigh_warn(reports: "list[ProviderHookReport]") -> bool:
     return any(report.signal not in benign for report in reports)
 
 
+def _precommit_weight(signal: "PrecommitSignal") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for the pre-commit row.
+
+    ``NOT_INSTALLED`` weighs nothing. A complete config that no git hook runs
+    is reported, because nothing is checked at commit time, but running the
+    project's checks explicitly instead is a legitimate choice rather than a
+    fault, and a warning would call it one.
+    """
+    from vaultspec_core.core.diagnosis import PrecommitSignal
+
+    return (
+        # The live config runs a vaultspec hook more than once per commit.
+        signal == PrecommitSignal.DUPLICATED,
+        signal
+        in (
+            PrecommitSignal.INCOMPLETE,
+            PrecommitSignal.NON_CANONICAL,
+            PrecommitSignal.NO_HOOKS,
+            # Content-verified genuine stranding: prek.toml owns the boundary
+            # and lacks the canonical hooks, so nothing runs them anywhere.
+            PrecommitSignal.UNREFRESHABLE,
+            # The collector could not run, or no writer maintains the hooks
+            # in the shape found, so this row vouches for nothing.
+            PrecommitSignal.UNREADABLE,
+            # A copy of vaultspec's hooks prek never reads: harmless to run,
+            # but it misleads anyone reading that file.
+            PrecommitSignal.SHADOWED,
+        ),
+    )
+
+
 def _gitignore_weight(signal: "GitignoreSignal") -> tuple[bool, bool]:
     """Return ``(error, warn)`` for the gitignore row.
 
@@ -840,7 +906,6 @@ def doctor_exit_code(
         FrameworkSignal,
         ManifestEntrySignal,
         ModeMismatchSignal,
-        PrecommitSignal,
         ProviderDirSignal,
         RenameIntegritySignal,
         VaultContentSignal,
@@ -865,20 +930,9 @@ def doctor_exit_code(
     gitattributes_error, gitattributes_warn = _gitattributes_weight(diag.gitattributes)
     has_error = has_error or gitattributes_error
     has_warn = has_warn or gitattributes_warn
-    if diag.precommit in (
-        PrecommitSignal.INCOMPLETE,
-        PrecommitSignal.NON_CANONICAL,
-        PrecommitSignal.NO_HOOKS,
-        # A perfect config that nothing executes is the failure this whole
-        # row exists to report, so it warns exactly as a broken config does.
-        PrecommitSignal.NOT_INSTALLED,
-        # Content-verified genuine stranding: prek.toml owns the boundary
-        # and lacks the canonical hooks, so nothing runs them anywhere.
-        PrecommitSignal.UNREFRESHABLE,
-        # The collector could not run, so this row vouches for nothing.
-        PrecommitSignal.UNREADABLE,
-    ):
-        has_warn = True
+    precommit_error, precommit_warn = _precommit_weight(diag.precommit)
+    has_error = has_error or precommit_error
+    has_warn = has_warn or precommit_warn
     has_warn = has_warn or _provider_hooks_weigh_warn(diag.provider_hooks)
     if diag.builtin_version == BuiltinVersionSignal.DELETED:
         has_error = True
@@ -941,8 +995,7 @@ def doctor_exit_code(
         # ProviderDirSignal.MIXED is a soft, informational signal: it means the
         # provider directory carries extra files vaultspec does not own. That is
         # benign (genuine managed-content drift surfaces via ContentSignal), so
-        # it must not fail the doctor exit code and block markdown commits via
-        # the bundled spec-check hook (issue #122).
+        # it must not fail the doctor exit code (issue #122).
         if prov.config in (
             ConfigSignal.MISSING,
             ConfigSignal.FOREIGN,
@@ -970,12 +1023,11 @@ def doctor_exit_code(
 def _gate(exit_code: int, *, gate_errors: bool) -> int:
     """Fold the warning exit to 0 when *gate_errors* is set.
 
-    The doctor's native contract is 0/1/2 for ok/warnings/errors. The
-    pre-commit gate opts into error-only blocking with ``--gate-errors``:
+    The doctor's native contract is 0/1/2 for ok/warnings/errors. An
+    automation gate opts into error-only blocking with ``--gate-errors``:
     warning-level provider-mirror lag is the expected steady state after any
-    builtins change (``check-provider-artifacts`` forbids committing the
-    regenerated mirror), so a warning-strict gate would deadlock every commit.
-    Errors (exit 2) still fail; a clean run (0) is unaffected.
+    builtins change, so a warning-strict gate would fail every run. Errors
+    (exit 2) still fail; a clean run (0) is unaffected.
 
     Args:
         exit_code: The native doctor exit code (0, 1, or 2).

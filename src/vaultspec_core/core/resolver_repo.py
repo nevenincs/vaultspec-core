@@ -179,6 +179,9 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
     PrecommitSignal.NON_CANONICAL: (
         "Hook entries use non-canonical pattern; should use '{entry_prefix}'"
     ),
+    PrecommitSignal.DUPLICATED: (
+        "A vaultspec hook is listed more than once and would run repeatedly"
+    ),
 }
 
 #: Signals that describe a coherent boundary no resolution step acts on.
@@ -188,14 +191,25 @@ _PRECOMMIT_REPAIR_REASONS: dict[PrecommitSignal, str] = {
 #: hooks live safely in ``prek.toml`` and the leftover
 #: ``.pre-commit-config.yaml`` is superseded and operator-owned; removal is
 #: operator-gated, never a sync-time repair.
-#: UNREADABLE means the collector failed, so nothing about the config was
-#: observed. `doctor` weighs that as a warning; a repair here would be acting
-#: on a state nobody has seen (issue #407).
+#: UNREADABLE means the collector failed, or the config lists vaultspec hooks
+#: in a shape the scaffold will not rewrite. `doctor` weighs that as a
+#: warning; a repair here would act on a state nobody has seen (issue #407) or
+#: that no writer can change.
+#: DECLINED and DECLINED_LEFTOVER mean the committed declaration refused the
+#: hooks; the scaffold declines too, so a repair would be a permanent no-op.
+#: SHADOWED means a copy of vaultspec's hooks sits in a config prek does not
+#: read. That file is the operator's; its removal is theirs to make.
+#: NOT_INSTALLED means the config is complete but no git hook runs it.
+#: Installing a hook is the operator's call, never sync's; `doctor` reports it.
 _PRECOMMIT_INERT_SIGNALS = (
     PrecommitSignal.COMPLETE,
+    PrecommitSignal.NOT_INSTALLED,
+    PrecommitSignal.SHADOWED,
     PrecommitSignal.UNREFRESHABLE,
     PrecommitSignal.ORPHANED,
     PrecommitSignal.UNREADABLE,
+    PrecommitSignal.DECLINED,
+    PrecommitSignal.DECLINED_LEFTOVER,
 )
 
 

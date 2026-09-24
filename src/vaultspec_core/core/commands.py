@@ -21,7 +21,6 @@ from typing import Any
 
 from . import types as _t
 from .git_artifacts import (
-    PROVIDER_ARTIFACT_PATTERNS,
     check_staged_provider_artifacts,
     untrack_managed_paths,
 )
@@ -64,7 +63,6 @@ __all__ = [
     "CANONICAL_HOOK_ENTRIES",
     "CANONICAL_HOOK_IDS",
     "CANONICAL_PRECOMMIT_HOOKS",
-    "PROVIDER_ARTIFACT_PATTERNS",
     "PROVIDER_TO_TOOLS",
     "SYNC_PROVIDERS",
     "VALID_PROVIDERS",

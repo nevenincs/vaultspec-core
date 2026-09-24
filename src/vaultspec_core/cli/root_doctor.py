@@ -20,25 +20,27 @@ from vaultspec_core.cli.json_output import json_format_kwargs
 
 
 def cmd_check_providers() -> None:
-    """Guard against committing provider artifacts.
+    """Guard against committing per-machine artifacts.
 
-    Inspects the git staging area for files that should never be
-    committed (provider directories, generated configs, manifests).
-    Used as a pre-commit hook entry point.
+    Inspects the git staging area for files the managed ``.gitignore`` block
+    covers (snapshots, the install manifest, lock sentinels, local vault
+    caches). Team-shared projections pass. Used as a pre-commit hook entry
+    point.
     """
     from vaultspec_core.core.commands import check_staged_provider_artifacts
 
     violations = check_staged_provider_artifacts()
     if violations:
         typer.echo(
-            "Error: provider artifacts must not be committed:",
+            "Error: per-machine files must not be committed:",
             err=True,
         )
         for v in violations:
             typer.echo(f"  {v}", err=True)
         typer.echo(
-            "\nRun 'git reset HEAD <file>' to unstage, "
-            "or 'git rm --cached <file>' to untrack.",
+            "\nUnstage them with 'git restore --staged <file>'; they stay on "
+            "disk and the managed .gitignore block keeps them out of later "
+            "commits.",
             err=True,
         )
         raise typer.Exit(code=1)

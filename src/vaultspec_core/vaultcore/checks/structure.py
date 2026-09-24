@@ -280,8 +280,8 @@ def _detect_legacy_root_indexes(
 
     Reading from the pre-built snapshot rather than a fresh
     :func:`pathlib.Path.rglob` walk avoids a redundant filesystem scan
-    inside the ``vault-fix`` pre-commit hook, which already has the
-    full document tree in memory.
+    inside ``vault check all``, which already has the full document tree
+    in memory.
 
     Args:
         root_dir: Project root directory.

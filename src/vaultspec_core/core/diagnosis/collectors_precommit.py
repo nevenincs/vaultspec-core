@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from .signals import PrecommitSignal
 
 if TYPE_CHECKING:
     from ..enums import InstallMode
+    from ..precommit import YamlHookAssessment
+    from ..prek_boundary import PrekBoundaryState
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +29,13 @@ logger = logging.getLogger(__name__)
 def collect_precommit_state(target: Path) -> PrecommitSignal:
     """Assess the state of vaultspec-core hooks in ``.pre-commit-config.yaml``.
 
-    Checks that all canonical hooks are present and use the canonical entry
-    pattern (``uv run --no-sync vaultspec-core ...``). When ``prek.toml``
+    Doctor implements no hook check of its own here. The YAML side maps the
+    scaffold's own assessment
+    (:func:`~vaultspec_core.core.precommit.assess_precommit_yaml`) onto a
+    signal, and the prek side maps the boundary assessment
+    (:func:`~vaultspec_core.core.prek_boundary.collect_prek_boundary`) the
+    same way, so what doctor reports and what the repair verbs do can never
+    disagree. When ``prek.toml``
     is present the hook scaffold never runs, so the boundary is assessed
     through
     :func:`~vaultspec_core.core.prek_boundary.collect_prek_boundary` and
@@ -49,25 +56,121 @@ def collect_precommit_state(target: Path) -> PrecommitSignal:
       prek never reads it and sync will not refresh it. The remediation is
       ``spec precommit migrate``.
 
+    A committed opt-out (``hooks.pre_commit`` set to ``false``) is read first
+    and outranks every configuration reading above: the workspace declined the
+    hooks, so their absence from either file is the requested state, not
+    stranding. The signal is
+    :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.DECLINED`,
+    or
+    :attr:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal.DECLINED_LEFTOVER`
+    when a YAML hook config (``.yaml`` or ``.yml``) is still on disk. Nothing is
+    deleted.
+
+    Two cross-config readings sit on top: ``DUPLICATED`` when the config prek
+    reads lists a canonical hook more than once (an error, since prek would run
+    it repeatedly), and ``SHADOWED`` when vaultspec hooks sit in a config prek
+    does not read while the live one is sound (a warning, since they look
+    configured and never run). A leftover YAML beside a healthy ``prek.toml``
+    that carries no vaultspec hooks stays ``ORPHANED``.
+
+    The YAML config read is the one prek would read, per
+    :func:`~vaultspec_core.core.prek_boundary.precommit_config_path`.
+
     Args:
         target: Workspace root directory.
 
     Returns:
         :class:`~vaultspec_core.core.diagnosis.signals.PrecommitSignal`
         reflecting the observed state.
+
+    Raises:
+        VaultSpecError: If the workspace declaration is malformed.
     """
-    from ..prek_boundary import collect_prek_boundary
+    from ..prek_boundary import collect_prek_boundary, existing_precommit_configs
+    from ..workspace_mode import read_hooks_declaration
+
+    if not read_hooks_declaration(target).pre_commit:
+        if existing_precommit_configs(target):
+            return PrecommitSignal.DECLINED_LEFTOVER
+        return PrecommitSignal.DECLINED
 
     boundary = collect_prek_boundary(target)
     if not boundary.owns_boundary:
-        return _reassess_against_installation(
-            target, _collect_precommit_yaml_state(target)
-        )
-    if boundary.hooks_present:
-        if (target / ".pre-commit-config.yaml").exists():
-            return PrecommitSignal.ORPHANED
-        return _reassess_against_installation(target, PrecommitSignal.COMPLETE)
-    return PrecommitSignal.UNREFRESHABLE
+        return _yaml_side_state(target)
+    return _prek_side_state(target, boundary)
+
+
+def _yaml_side_state(target: Path) -> PrecommitSignal:
+    """Assess a workspace whose hooks live in a YAML config."""
+    from ..precommit import assess_precommit_yaml
+    from ..prek_boundary import existing_precommit_configs
+
+    assessment = assess_precommit_yaml(target)
+    signal = _reassess_against_installation(target, _yaml_signal(assessment))
+    unread = [c for c in existing_precommit_configs(target) if c != assessment.config]
+    if signal in _HEALTHY and any(_carries_vaultspec_hooks(c) for c in unread):
+        return PrecommitSignal.SHADOWED
+    return signal
+
+
+def _yaml_signal(assessment: YamlHookAssessment) -> PrecommitSignal:
+    """Name, as a signal, what the scaffold would do to the live YAML config.
+
+    A pure mapping: whether the config exists, parses and carries vaultspec
+    hooks, and which changes the scaffold's own reconcile reports, all come
+    from :func:`~vaultspec_core.core.precommit.assess_precommit_yaml`. Doctor
+    therefore reaches the verdict the writer would, and a repair it plans is
+    one the writer will actually make.
+    """
+    from ..precommit import HookChange
+
+    if not assessment.exists:
+        return PrecommitSignal.NO_FILE
+    if not assessment.readable:
+        return PrecommitSignal.UNREADABLE
+    if not assessment.vaultspec_hooks:
+        return PrecommitSignal.NO_HOOKS
+    # Vaultspec hooks in a shape the reconcile refuses: no writer will touch
+    # the file, so it can vouch for no gate, whatever hooks it appears to list.
+    if not assessment.recognised:
+        return PrecommitSignal.UNREADABLE
+    kinds = assessment.change_kinds
+    if HookChange.DEDUPLICATED in kinds:
+        return PrecommitSignal.DUPLICATED
+    if kinds & {HookChange.ADDED, HookChange.RETIRED}:
+        return PrecommitSignal.INCOMPLETE
+    if HookChange.UPDATED in kinds:
+        return PrecommitSignal.NON_CANONICAL
+    return PrecommitSignal.COMPLETE
+
+
+def _prek_side_state(target: Path, boundary: PrekBoundaryState) -> PrecommitSignal:
+    """Assess a workspace whose hook boundary ``prek.toml`` owns."""
+    from ..prek_boundary import existing_precommit_configs
+
+    if boundary.duplicated:
+        return PrecommitSignal.DUPLICATED
+    if not boundary.hooks_present:
+        return PrecommitSignal.UNREFRESHABLE
+    leftovers = existing_precommit_configs(target)
+    if any(_carries_vaultspec_hooks(c) for c in leftovers):
+        return PrecommitSignal.SHADOWED
+    if leftovers:
+        return PrecommitSignal.ORPHANED
+    return _reassess_against_installation(target, PrecommitSignal.COMPLETE)
+
+
+#: Signals a shadowed copy may displace: the live config is otherwise sound,
+#: so the copy prek ignores is the one thing left to report. A signal naming
+#: a fault in the live config stays, as the more urgent finding.
+_HEALTHY = (PrecommitSignal.COMPLETE, PrecommitSignal.NOT_INSTALLED)
+
+
+def _carries_vaultspec_hooks(config: Path) -> bool:
+    """Whether *config* lists any vaultspec hook, current or retired."""
+    from ..precommit import managed_strip_outcome
+
+    return managed_strip_outcome(config) in ("delete", "rewrite")
 
 
 def _hooks_directory(target: Path) -> Path | None:
@@ -148,106 +251,14 @@ def _reassess_against_installation(
     return signal
 
 
-def _local_precommit_hooks(config_path: Path) -> list[dict[str, object]] | None:
-    """Return the hook mappings declared by ``repo: local`` entries.
-
-    Args:
-        config_path: Path to ``.pre-commit-config.yaml``.
-
-    Returns:
-        The local hook mappings, or ``None`` when the file is absent or cannot
-        be parsed. An empty list means the config parsed but declares no local
-        hooks, which includes a config whose top level or ``repos`` key carries
-        an unexpected shape.
-    """
-    import yaml
-
-    if not config_path.exists():
-        return None
-
-    try:
-        data: object = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    # See the note in `core/precommit.py`: an undecodable file is a
-    # ValueError, not an OSError (issue #407).
-    except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
-        logger.warning("Cannot read .pre-commit-config.yaml %s: %s", config_path, exc)
-        return None
-
-    if not isinstance(data, dict):
-        return []
-
-    repos = cast("dict[str, object]", data).get("repos", [])
-    if not isinstance(repos, list):
-        return []
-
-    local_hooks: list[dict[str, object]] = []
-    for repo in cast("list[object]", repos):
-        if isinstance(repo, dict):
-            repo_map = cast("dict[str, object]", repo)
-            if repo_map.get("repo") == "local":
-                hooks = repo_map.get("hooks", [])
-                if isinstance(hooks, list):
-                    local_hooks.extend(
-                        cast("dict[str, object]", h)
-                        for h in cast("list[object]", hooks)
-                        if isinstance(h, dict)
-                    )
-    return local_hooks
-
-
-def _collect_precommit_yaml_state(target: Path) -> PrecommitSignal:
-    """Assess ``.pre-commit-config.yaml`` hook state, ignoring ``prek.toml``."""
-    from ..commands import CANONICAL_HOOK_IDS, canonical_hook_entries_for_mode
-    from ..workspace_mode import resolve_render_mode
-
-    # Derive the expected hook entries from the workspace's resolved mode so a
-    # correctly-provisioned tool-mode workspace (uvx entries) is not diagnosed
-    # as non-canonical against the dependency-mode shape. resolve_render_mode's
-    # legacy-absent rule keeps a pre-install-mode workspace on dependency-shaped
-    # expectations. P04 layers a dedicated mode-mismatch signal on top of this.
-    expected_entries = canonical_hook_entries_for_mode(resolve_render_mode(target))
-
-    config_path = target / ".pre-commit-config.yaml"
-    local_hooks = _local_precommit_hooks(config_path)
-    if local_hooks is None:
-        # `_local_precommit_hooks` answers None both for an absent file and for
-        # one it could not read. Widening its exception net so an undecodable
-        # file no longer escapes as a raw traceback means it no longer reaches
-        # `_safe_precommit_state`'s handler either, so the distinction has to
-        # be made here or the row silently reverts to the benign reading
-        # (issue #407).
-        if config_path.exists():
-            return PrecommitSignal.UNREADABLE
-        return PrecommitSignal.NO_FILE
-
-    found_ids = frozenset(
-        str(h.get("id")) for h in local_hooks if h.get("id") in CANONICAL_HOOK_IDS
-    )
-
-    if not found_ids:
-        return PrecommitSignal.NO_HOOKS
-
-    if found_ids != CANONICAL_HOOK_IDS:
-        return PrecommitSignal.INCOMPLETE
-
-    # All hooks present - check entry patterns match exactly
-    for hook in local_hooks:
-        hook_id = hook.get("id")
-        if hook_id in CANONICAL_HOOK_IDS:
-            entry = str(hook.get("entry", ""))
-            expected = expected_entries.get(str(hook_id), "")
-            if entry != expected:
-                return PrecommitSignal.NON_CANONICAL
-
-    return PrecommitSignal.COMPLETE
-
-
 def observed_precommit_mode(
     target: Path, package: str | None = None
 ) -> InstallMode | None:
     """Infer the install mode the deployed hook entries are shaped for.
 
-    Reads ``.pre-commit-config.yaml`` and inspects the canonical hook entries.
+    Reads the canonical hook entries from the same assessment of the YAML
+    config the scaffold and doctor use
+    (:func:`~vaultspec_core.core.precommit.assess_precommit_yaml`).
     Each mode renders a distinct entry prefix (``uv run --no-sync
     vaultspec-core`` for dependency mode, ``uvx --from vaultspec-core
     vaultspec-core`` for tool mode), so the prefix a deployed entry carries
@@ -271,17 +282,16 @@ def observed_precommit_mode(
         canonical hook entry agrees on, or ``None`` when there is no config, no
         canonical hook, the entries disagree, or *package* is not core.
     """
-    from ..commands import CANONICAL_HOOK_IDS, entry_prefix_for_mode
+    from ..commands import entry_prefix_for_mode
     from ..enums import InstallMode
+    from ..precommit import assess_precommit_yaml
     from ..workspace_mode import CORE_DISTRIBUTION_NAME, canonical_distribution_name
 
     pkg = package if package is not None else CORE_DISTRIBUTION_NAME
     if canonical_distribution_name(pkg) != CORE_DISTRIBUTION_NAME:
         return None
 
-    local_hooks = _local_precommit_hooks(target / ".pre-commit-config.yaml")
-    if local_hooks is None:
-        return None
+    entries = assess_precommit_yaml(target).canonical_entries
 
     # Longest prefix first so tool mode's "uvx --from vaultspec-core
     # vaultspec-core" is tested before any shorter prefix could partial-match.
@@ -292,10 +302,7 @@ def observed_precommit_mode(
     )
 
     observed: set[InstallMode] = set()
-    for hook in local_hooks:
-        if hook.get("id") not in CANONICAL_HOOK_IDS:
-            continue
-        entry = str(hook.get("entry", ""))
+    for entry in entries:
         for prefix, mode in prefixes:
             if entry.startswith(prefix):
                 observed.add(mode)

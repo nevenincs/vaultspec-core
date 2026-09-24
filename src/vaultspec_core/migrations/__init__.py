@@ -402,6 +402,7 @@ def _build_registry() -> list[Migration]:
     from .m_0_1_58_exec_ledger_fold import MIGRATION as M_EXEC_LEDGER_FOLD
     from .m_0_1_74_exec_ledger_only import MIGRATION as M_EXEC_LEDGER_ONLY
     from .m_0_2_4_trigger_split import MIGRATION as M_TRIGGER_SPLIT
+    from .m_0_2_5_commit_gate import MIGRATION as M_COMMIT_GATE
 
     entries: list[Migration] = [
         M_INDEX_SUBFOLDER,
@@ -415,6 +416,7 @@ def _build_registry() -> list[Migration]:
         M_EXEC_LEDGER_FOLD,
         M_EXEC_LEDGER_ONLY,
         M_TRIGGER_SPLIT,
+        M_COMMIT_GATE,
     ]
     return sorted(entries, key=lambda m: parse_version_tuple(m.target_version))
 

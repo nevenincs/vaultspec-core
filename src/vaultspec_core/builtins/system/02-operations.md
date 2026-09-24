@@ -11,8 +11,9 @@ order: 2
 - **Secrets:** Never write, log, or commit secrets, keys, or credentials.
 
 - **Commits:** Commit after each Step under a plan, and after each cohesive change
-  outside one. Pre-commit hooks and lint must pass on the files you touched. Match the
-  style of recent commits and write the message for *why*, not *what*. If a commit
-  fails, report it; do not work around the hook unasked.
+  outside one. Before committing, run the project's lint, format, type checks, and
+  covering tests on the files you touched. Match the style of recent commits and write
+  the message for *why*, not *what*. If a commit or a configured commit hook fails,
+  report it; do not bypass the hook unasked.
 
 - **Remotes:** Never push, force-push, or open a pull request unless the user asked.

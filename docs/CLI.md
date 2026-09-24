@@ -123,6 +123,7 @@ of that release; it is never hand-maintained.
 
 Commands:
 
+- `vaultspec-core commit-gate`
 - `vaultspec-core vault search`
 
 MCP tools:
@@ -143,6 +144,8 @@ full options.
 - `vaultspec-core install` - Install Vaultspec resources for the selected providers.
 - `vaultspec-core uninstall` - Remove the vaultspec framework from the target directory.
 - `vaultspec-core sync` - Sync rules, skills, agents, configs, system prompts, and MCPs.
+- `vaultspec-core commit-gate` - Check the files a commit stages, in one read-only
+  process.
 - `vaultspec-core doctor` - Diagnose overall workspace and vault health.
 - `vaultspec-core status` - Orient in a vaultspec vault: rollup, or a grounding trace
   for a target.
