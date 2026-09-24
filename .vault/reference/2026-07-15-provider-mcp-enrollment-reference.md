@@ -56,6 +56,7 @@ class McpScope(StrEnum):
     LOCAL = "local"
     USER = "user"
 
+
 @dataclass(frozen=True)
 class McpTarget:
     provider: Tool
@@ -63,12 +64,14 @@ class McpTarget:
     path: Path
     format: McpTargetFormat
 
+
 def resolve_mcp_targets(
     provider: Tool | str = "all",
     *,
     scope: McpScope = McpScope.PROJECT,
     target_dir: Path | None = None,
 ) -> tuple[McpTarget, ...]: ...
+
 
 def mcp_sync(
     *,
@@ -81,11 +84,13 @@ def mcp_sync(
     force_managed: frozenset[str] = frozenset(),
 ) -> SyncResult: ...
 
+
 def mcp_status(
     *,
     provider: Tool | str = "all",
     scope: McpScope = McpScope.PROJECT,
 ) -> dict[str, object]: ...
+
 
 def mcp_uninstall(
     target_dir: Path,

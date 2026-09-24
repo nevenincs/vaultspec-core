@@ -67,6 +67,7 @@ The refactoring achieves its primary objectives: `cli.py` is reduced from 2459 t
 
   ```python
   from ..protocol.providers import ClaudeProvider, GeminiProvider
+
   PROVIDERS: dict[str, Any] = {
       "claude": ClaudeProvider(),
       "gemini": GeminiProvider(),

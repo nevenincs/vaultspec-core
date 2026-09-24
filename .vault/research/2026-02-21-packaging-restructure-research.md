@@ -27,7 +27,6 @@ All four CLI scripts (`cli.py`, `subagent.py`, `vault.py`, `team.py`) in
 (`.vaultspec/lib/scripts/_paths.py`) that performs:
 
 ```python
-
 # line 22-25
 
 LIB_SRC_DIR: Path = _LIB_DIR / "src"
@@ -295,7 +294,6 @@ ______________________________________________________________________
 ### 3.1 FastMCP Initialization
 
 ```python
-
 # line 58-67
 
 mcp = FastMCP(
@@ -363,16 +361,17 @@ ______________________________________________________________________
 
 ```python
 _SCRIPTS_DIR = Path(__file__).resolve().parent
-_LIB_DIR = _SCRIPTS_DIR.parent           # .vaultspec/lib/
-_FRAMEWORK_ROOT = _LIB_DIR.parent        # .vaultspec/
+_LIB_DIR = _SCRIPTS_DIR.parent  # .vaultspec/lib/
+_FRAMEWORK_ROOT = _LIB_DIR.parent  # .vaultspec/
 LIB_SRC_DIR = _LIB_DIR / "src"
-sys.path.insert(0, str(LIB_SRC_DIR))     # The sys.path hack
+sys.path.insert(0, str(LIB_SRC_DIR))  # The sys.path hack
 ```
 
 **Step 2 -- Workspace layout resolution** (lines 35-44):
 
 ```python
 from core.workspace import resolve_workspace
+
 _layout = resolve_workspace(
     root_override=_env_path("VAULTSPEC_ROOT_DIR"),
     content_override=_env_path("VAULTSPEC_CONTENT_DIR"),
@@ -389,12 +388,12 @@ ROOT_DIR: Path = _layout.output_root
 ```python
 @dataclass(frozen=True)
 class WorkspaceLayout:
-    content_root: Path     # Where rules/agents/skills live
-    output_root: Path      # Where .vault/ output goes (project root)
-    vault_root: Path       # output_root / ".vault"
-    framework_root: Path   # Where the Python code lives (.vaultspec/)
-    mode: LayoutMode       # STANDALONE or EXPLICIT
-    git: GitInfo | None    # Discovered git metadata
+    content_root: Path  # Where rules/agents/skills live
+    output_root: Path  # Where .vault/ output goes (project root)
+    vault_root: Path  # output_root / ".vault"
+    framework_root: Path  # Where the Python code lives (.vaultspec/)
+    mode: LayoutMode  # STANDALONE or EXPLICIT
+    git: GitInfo | None  # Discovered git metadata
 ```
 
 **Resolution priority** (line 261-405):

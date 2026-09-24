@@ -123,11 +123,12 @@ entries are picked up.
 MARKER_BEGIN = "# >>> vaultspec-managed (do not edit this block) >>>"
 MARKER_END = "# <<< vaultspec-managed <<<"
 
+
 def ensure_gitignore_block(
     target: Path,
     entries: list[str],
     *,
-    state: str = "present",   # "present" or "absent"
+    state: str = "present",  # "present" or "absent"
 ) -> bool:
     """Manage the vaultspec block in .gitignore.
 

@@ -201,6 +201,7 @@ The callback-based architecture makes this clean:
 
 ```python
 from rich.console import Console
+
 console = Console(stderr=True)
 
 # Tool call — dim

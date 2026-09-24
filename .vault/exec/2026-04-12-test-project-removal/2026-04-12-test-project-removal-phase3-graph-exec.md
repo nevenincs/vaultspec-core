@@ -34,7 +34,12 @@ build_synthetic_vault(
     root,
     n_docs=120,
     seed=9,
-    feature_names=["editor-demo", "displaymap-integration", "alpha-engine", "beta-pipeline"],
+    feature_names=[
+        "editor-demo",
+        "displaymap-integration",
+        "alpha-engine",
+        "beta-pipeline",
+    ],
     named_docs={
         "editor_demo_adr": "2026-02-05-editor-demo-architecture-adr",
         "editor_demo_research": "2026-02-05-editor-demo-research",

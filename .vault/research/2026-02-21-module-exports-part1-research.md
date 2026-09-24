@@ -406,21 +406,19 @@ from vaultspec.orchestration.task_engine import (
     generate_task_id,
     is_terminal,
 )
-from vaultspec.orchestration.utils import SecurityError, find_project_root, safe_read_text
+from vaultspec.orchestration.utils import (
+    SecurityError,
+    find_project_root,
+    safe_read_text,
+)
 
 __all__ = [
-
     # constants
-
     "READONLY_PERMISSION_PROMPT",
-
     # session_logger
-
     "SessionLogger",
     "cleanup_old_logs",
-
     # task_engine
-
     "TaskStatus",
     "is_terminal",
     "SubagentTask",
@@ -429,9 +427,7 @@ __all__ = [
     "generate_task_id",
     "LockManager",
     "TaskEngine",
-
     # utils
-
     "SecurityError",
     "find_project_root",
     "safe_read_text",

@@ -152,10 +152,7 @@ def run_pending_migrations(workspace: Path) -> list[MigrationResult]:
     if manifest.version == "":
         return []
     current = parse_version_tuple(manifest.vaultspec_version)
-    pending = [
-        m for m in REGISTRY
-        if parse_version_tuple(m.target_version) > current
-    ]
+    pending = [m for m in REGISTRY if parse_version_tuple(m.target_version) > current]
     if not pending:
         return []
     results: list[MigrationResult] = []

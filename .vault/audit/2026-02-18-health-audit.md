@@ -60,10 +60,10 @@ ______________________________________________________________________
 
 ```python
 def _execute_shell(hook_name, action, ctx):
-    cmd = _interpolate(action.command, ctx)   # user-controlled {path}, {root}, etc.
+    cmd = _interpolate(action.command, ctx)  # user-controlled {path}, {root}, etc.
     result = subprocess.run(
         cmd,
-        shell=True,          # ← executes through /bin/sh
+        shell=True,  # ← executes through /bin/sh
         capture_output=True,
         text=True,
         timeout=60,
@@ -84,7 +84,6 @@ The `ctx` dict values are literal replacements — no shell escaping is applied.
 Hook context values come from caller-controlled data. For example:
 
 ```python
-
 # In vault.py or cli.py:
 
 trigger(hooks, "vault.document.created", {"path": str(doc_path)})
@@ -150,7 +149,6 @@ TTL expiry is set **only when a task reaches a terminal state** (completed,
 failed, cancelled):
 
 ```python
-
 # In update_status(), complete_task(), fail_task():
 
 if is_terminal(status):
@@ -187,7 +185,6 @@ No test covers a permanently-working task (stuck in WORKING state).
 **Fix:** Add a creation-time TTL cap for WORKING tasks:
 
 ```python
-
 # In create_task():
 
 # Set a maximum working TTL (e.g., 2x the normal TTL or a config value)
@@ -205,7 +202,6 @@ ______________________________________________________________________
 **File:** `protocol/a2a/executors/claude_executor.py`, lines 88–168
 
 ```python
-
 # execute() — stores client
 
 self._active_clients[task_id] = sdk_client
@@ -226,8 +222,8 @@ the bytecode level, there are two problems:
 ```python
 client = self._active_clients.pop(task_id, None)  # removes from dict
 if client is not None:
-    client.interrupt()          # sync — may block
-    client.disconnect()         # NOT awaited (bug from CC audit #1)
+    client.interrupt()  # sync — may block
+    client.disconnect()  # NOT awaited (bug from CC audit #1)
 ```
 
 Between `pop` and `interrupt()`, `execute()` is still running and may be
@@ -238,7 +234,6 @@ safe. No documentation or code comment confirms this.
 **Problem 2: execute() checks `_active_clients` implicitly (via finally).**
 
 ```python
-
 # In execute() finally:
 
 self._active_clients.pop(task_id, None)
@@ -283,9 +278,10 @@ ______________________________________________________________________
 ```python
 @property
 def model(self) -> EmbeddingModel:
-    if self._model is None:           # ← check
+    if self._model is None:  # ← check
         from rag.embeddings import EmbeddingModel as _EmbeddingModel
-        self._model = _EmbeddingModel()   # ← set
+
+        self._model = _EmbeddingModel()  # ← set
     return self._model
 ```
 
@@ -311,7 +307,7 @@ The same pattern exists for `store`, `indexer`, and `searcher` properties.
 ```python
 def get_engine(root_dir) -> VaultRAG:
     global _engine
-    if _engine is None or _engine.root_dir != root_dir:   # ← not locked
+    if _engine is None or _engine.root_dir != root_dir:  # ← not locked
         if _engine is not None:
             _engine.close()
         _engine = VaultRAG(root_dir)
@@ -334,6 +330,7 @@ for RAG are added.
 
 ```python
 _engine_lock = threading.Lock()
+
 
 def get_engine(root_dir):
     global _engine
@@ -391,10 +388,9 @@ The resource lifecycle in `run_subagent()`:
 try:
     async with contextlib.AsyncExitStack() as stack:
         async with spawn_agent_process(client, ...) as (conn, _proc):
-
             # ... work ...
 
-            return SubagentResult(...)   # ← return inside nested context managers
+            return SubagentResult(...)  # ← return inside nested context managers
 
 except Exception:
     logger.exception("Subagent execution failed")
@@ -404,7 +400,6 @@ except Exception:
         written_files=client.written_files,
     )
 finally:
-
     # Cleanup spec.cleanup_paths
 
     # Clear callbacks
@@ -467,7 +462,7 @@ def _get_graph(self) -> VaultGraph | None:
     now = time.monotonic()
     if self._cached_graph is None or (now - self._graph_built_at) > self._graph_ttl:
         try:
-            self._cached_graph = _VaultGraph(self.root_dir)   # ← may take 1-5s
+            self._cached_graph = _VaultGraph(self.root_dir)  # ← may take 1-5s
             self._graph_built_at = now
         except Exception as e:
             logger.error(...)
@@ -521,7 +516,7 @@ def get_document(root_dir, doc_id):
 And `get_status()`, lines 289–291:
 
 ```python
-store = VaultStore(root_dir)    # ← another standalone connection
+store = VaultStore(root_dir)  # ← another standalone connection
 result["index"]["indexed_count"] = store.count()
 ```
 

@@ -166,23 +166,27 @@ logger = logging.getLogger(__name__)
 
 # ===== ENUMS =====
 
+
 class AgentMode(str, Enum):
     """Agent sandboxing modes."""
+
     READ_WRITE = "read-write"
     READ_ONLY = "read-only"
 
 
 # ===== CONFIG METADATA REGISTRY =====
 
+
 @dataclass
 class ConfigVariable:
     """Metadata for a single configuration variable."""
-    name: str                          # Environment variable name
-    var_type: type                     # Expected type (str, int, float, Path, etc)
-    default: Any                       # Default value
-    description: str                   # Human-readable description
-    required: bool = False             # Must be set to proceed
-    options: Optional[List[str]] = None # Valid values for enum-like vars
+
+    name: str  # Environment variable name
+    var_type: type  # Expected type (str, int, float, Path, etc)
+    default: Any  # Default value
+    description: str  # Human-readable description
+    required: bool = False  # Must be set to proceed
+    options: Optional[List[str]] = None  # Valid values for enum-like vars
     min_value: Optional[float] = None  # Minimum for numeric values
     max_value: Optional[float] = None  # Maximum for numeric values
     parser: Optional[callable] = None  # Custom parser function
@@ -191,9 +195,7 @@ class ConfigVariable:
 # ===== REGISTRY =====
 
 CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
-
     # Agent variables
-
     "VAULTSPEC_AGENT_MODE": ConfigVariable(
         name="VAULTSPEC_AGENT_MODE",
         var_type=str,
@@ -269,9 +271,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         description="Workspace root directory",
         parser=_parse_path,
     ),
-
     # MCP variables
-
     "VAULTSPEC_MCP_ROOT_DIR": ConfigVariable(
         name="VAULTSPEC_MCP_ROOT_DIR",
         var_type=Path,
@@ -301,9 +301,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         description="MCP task retention period in seconds",
         min_value=60.0,
     ),
-
     # A2A variables
-
     "VAULTSPEC_A2A_DEFAULT_PORT": ConfigVariable(
         name="VAULTSPEC_A2A_DEFAULT_PORT",
         var_type=int,
@@ -318,9 +316,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         default="localhost",
         description="A2A agent discovery host",
     ),
-
     # Storage variables
-
     "VAULTSPEC_DOCS_DIR": ConfigVariable(
         name="VAULTSPEC_DOCS_DIR",
         var_type=Path,
@@ -345,9 +341,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         default="index_meta.json",
         description="Index metadata filename",
     ),
-
     # Tool directories
-
     "VAULTSPEC_CLAUDE_DIR": ConfigVariable(
         name="VAULTSPEC_CLAUDE_DIR",
         var_type=Path,
@@ -366,9 +360,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         default=".agent",
         description="Agent tool configuration directory",
     ),
-
     # Orchestration variables
-
     "VAULTSPEC_TASK_ENGINE_TTL_SECONDS": ConfigVariable(
         name="VAULTSPEC_TASK_ENGINE_TTL_SECONDS",
         var_type=float,
@@ -376,9 +368,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         description="Task engine cleanup TTL in seconds",
         min_value=60.0,
     ),
-
     # RAG variables
-
     "VAULTSPEC_GRAPH_TTL_SECONDS": ConfigVariable(
         name="VAULTSPEC_GRAPH_TTL_SECONDS",
         var_type=float,
@@ -402,9 +392,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         min_value=100,
         max_value=100000,
     ),
-
     # I/O variables
-
     "VAULTSPEC_IO_BUFFER_SIZE": ConfigVariable(
         name="VAULTSPEC_IO_BUFFER_SIZE",
         var_type=int,
@@ -421,9 +409,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         min_value=10000,
         max_value=100000000,
     ),
-
     # Reference variables (read-only, not configurable at runtime)
-
     "VAULTSPEC_GEMINI_MIN_VERSION_WINDOWS": ConfigVariable(
         name="VAULTSPEC_GEMINI_MIN_VERSION_WINDOWS",
         var_type=str,
@@ -436,9 +422,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
         default="0.27.0",
         description="Recommended Gemini CLI version",
     ),
-
     # Test variables
-
     "VAULTSPEC_TEST_LANCE_SUFFIX": ConfigVariable(
         name="VAULTSPEC_TEST_LANCE_SUFFIX",
         var_type=str,
@@ -449,6 +433,7 @@ CONFIG_REGISTRY: Dict[str, ConfigVariable] = {
 
 
 # ===== HELPER PARSERS =====
+
 
 def _parse_csv_list(value: str) -> List[str]:
     """Parse comma-separated list, stripping whitespace."""
@@ -473,6 +458,7 @@ def _parse_float(value: str) -> float:
 
 
 # ===== MAIN CONFIG DATACLASS =====
+
 
 @dataclass
 class VaultSpecConfig:
@@ -547,7 +533,9 @@ class VaultSpecConfig:
     test_lance_suffix: str = "-fast"
 
     @classmethod
-    def from_environment(cls, override: Optional[Dict[str, Any]] = None) -> "VaultSpecConfig":
+    def from_environment(
+        cls, override: Optional[Dict[str, Any]] = None
+    ) -> "VaultSpecConfig":
         """
         Load configuration from environment variables.
 
@@ -563,12 +551,15 @@ class VaultSpecConfig:
         kwargs = {}
 
         for attr_name, config_var in CONFIG_REGISTRY.items():
-
             # Check override first
 
-            if override and config_var.name.lower().replace("vaultspec_", "") in override:
-                kwargs[config_var.name.lower().replace("vaultspec_", "")] = \
-                    override[config_var.name.lower().replace("vaultspec_", "")]
+            if (
+                override
+                and config_var.name.lower().replace("vaultspec_", "") in override
+            ):
+                kwargs[config_var.name.lower().replace("vaultspec_", "")] = override[
+                    config_var.name.lower().replace("vaultspec_", "")
+                ]
                 continue
 
             # Read from environment
@@ -580,7 +571,9 @@ class VaultSpecConfig:
                     raise ValueError(
                         f"Required environment variable missing: {config_var.name}"
                     )
-                kwargs[config_var.name.lower().replace("vaultspec_", "")] = config_var.default
+                kwargs[config_var.name.lower().replace("vaultspec_", "")] = (
+                    config_var.default
+                )
                 continue
 
             # Parse value
@@ -607,11 +600,17 @@ class VaultSpecConfig:
 
                 # Validate min/max if provided
 
-                if config_var.min_value is not None and parsed_value < config_var.min_value:
+                if (
+                    config_var.min_value is not None
+                    and parsed_value < config_var.min_value
+                ):
                     raise ValueError(
                         f"Value for {config_var.name} ({parsed_value}) below minimum ({config_var.min_value})"
                     )
-                if config_var.max_value is not None and parsed_value > config_var.max_value:
+                if (
+                    config_var.max_value is not None
+                    and parsed_value > config_var.max_value
+                ):
                     raise ValueError(
                         f"Value for {config_var.name} ({parsed_value}) exceeds maximum ({config_var.max_value})"
                     )
@@ -619,30 +618,26 @@ class VaultSpecConfig:
                 kwargs[config_var.name.lower().replace("vaultspec_", "")] = parsed_value
                 logger.debug(f"Loaded {config_var.name} = {parsed_value}")
 
-
             except (ValueError, TypeError) as e:
                 logger.error(
                     f"Failed to parse {config_var.name}={env_value}: {e}. Using default: {config_var.default}"
                 )
 
-                kwargs[config_var.name.lower().replace("vaultspec_", "")] = config_var.default
-
+                kwargs[config_var.name.lower().replace("vaultspec_", "")] = (
+                    config_var.default
+                )
 
         return cls(**kwargs)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
 
-
         return asdict(self)
-
 
     def validate(self) -> None:
         """Validate all configuration after loading."""
         if self.mcp_root_dir is None:
-
             raise ValueError("MCP root directory is required")
-
 
         logger.info("Configuration validated successfully")
 
@@ -666,33 +661,23 @@ def get_config(override: Optional[Dict[str, Any]] = None) -> VaultSpecConfig:
     """
     global _config
 
-
     if override is not None:
-
-
         # Testing: create fresh instance with overrides
 
         return VaultSpecConfig.from_environment(override)
 
-
     if _config is None:
-
         _config = VaultSpecConfig.from_environment()
-
 
     return _config
 
 
 def reset_config() -> None:
-
     """Reset the global config instance (mainly for testing)."""
-
 
     global _config
 
-
     _config = None
-
 ```
 
 ### Key Design Features
@@ -736,13 +721,9 @@ Constructor param (override dict)
 #### 5. Testing Support
 
 ```python
-
 # Override via dict (no os.environ changes needed)
 
-config = get_config(override={
-    "mcp_port": 9999,
-    "embedding_batch_size": 32
-})
+config = get_config(override={"mcp_port": 9999, "embedding_batch_size": 32})
 
 # Reset between tests
 
@@ -751,8 +732,8 @@ reset_config()
 
 # Or use pytest fixture
 
-@pytest.fixture
 
+@pytest.fixture
 def config():
 
     config = get_config()
@@ -799,40 +780,32 @@ TEST_VAULT = TEST_PROJECT / ".vault"
 
 # RAG test corpus (representative subset for fast tests)
 
-GPU_FAST_CORPUS_STEMS: FrozenSet[str] = frozenset({
-    "adr/2025-12-05-gemini-provider-acp-integration",
-    "adr/2026-01-10-vector-store-incremental-indexing",
-    "adr/2026-02-07-task-engine-phase-2-async",
-    "exec/2025-11-15-initial-vaultspec-setup",
-
-
-    "exec/2025-11-22-claude-bridge-phase-1",
-
-    "exec/2026-01-05-rag-integration-phase-1",
-    "exec/2026-02-01-subagent-mcp-phase-2",
-
-    "plan/2025-12-01-q1-roadmap",
-
-
-    "plan/2026-01-01-implementation-phases",
-    "reference/agentic-patterns",
-
-    "reference/python-async-patterns",
-    "research/2026-01-15-lance-db-performance",
-    "research/2026-02-07-a2a-research",
-})
+GPU_FAST_CORPUS_STEMS: FrozenSet[str] = frozenset(
+    {
+        "adr/2025-12-05-gemini-provider-acp-integration",
+        "adr/2026-01-10-vector-store-incremental-indexing",
+        "adr/2026-02-07-task-engine-phase-2-async",
+        "exec/2025-11-15-initial-vaultspec-setup",
+        "exec/2025-11-22-claude-bridge-phase-1",
+        "exec/2026-01-05-rag-integration-phase-1",
+        "exec/2026-02-01-subagent-mcp-phase-2",
+        "plan/2025-12-01-q1-roadmap",
+        "plan/2026-01-01-implementation-phases",
+        "reference/agentic-patterns",
+        "reference/python-async-patterns",
+        "research/2026-01-15-lance-db-performance",
+        "research/2026-02-07-a2a-research",
+    }
+)
 
 
 # Detection flags
 
 try:
-
-
     import torch
 
     HAS_CUDA = torch.cuda.is_available()
 except ImportError:
-
     HAS_CUDA = False
 
 
@@ -841,10 +814,10 @@ HAS_RAG = HAS_CUDA  # RAG tests only run on GPU systems
 
 # Lance test directory suffixes (for test isolation)
 
-LANCE_SUFFIX_FAST = "-fast"      # Fast corpus subset
-LANCE_SUFFIX_FULL = "-full"      # Full corpus (slow tests)
+LANCE_SUFFIX_FAST = "-fast"  # Fast corpus subset
+LANCE_SUFFIX_FULL = "-full"  # Full corpus (slow tests)
 
-LANCE_SUFFIX_UNIT = "-fast-unit" # Unit test isolation
+LANCE_SUFFIX_UNIT = "-fast-unit"  # Unit test isolation
 
 
 # Test port ranges (safe ranges that don't conflict)
@@ -896,45 +869,43 @@ ACP_TIMEOUT_MESSAGE = 30.0
 **`.vaultspec/tests/conftest.py`:**
 
 ```python
-
 # BEFORE (lines 37-58):
 
 
-GPU_FAST_CORPUS_STEMS = frozenset({
-    "adr/2025-12-05-gemini-provider-acp-integration",
-
-    # ... 12 more items
-
-})
+GPU_FAST_CORPUS_STEMS = frozenset(
+    {
+        "adr/2025-12-05-gemini-provider-acp-integration",
+        # ... 12 more items
+    }
+)
 
 
 # AFTER:
 
 from tests.constants import GPU_FAST_CORPUS_STEMS, HAS_RAG, TEST_PROJECT
-
-
 ```
 
 **`.vaultspec/lib/src/rag/tests/conftest.py`:**
 
 ```python
-
 # BEFORE (lines 31-47):
 
-GPU_FAST_CORPUS_STEMS = frozenset({
-
-    "adr/2025-12-05-gemini-provider-acp-integration",
-
-
-    # ... 12 more items
-
-})
+GPU_FAST_CORPUS_STEMS = frozenset(
+    {
+        "adr/2025-12-05-gemini-provider-acp-integration",
+        # ... 12 more items
+    }
+)
 
 
 # AFTER:
 
-from tests.constants import GPU_FAST_CORPUS_STEMS, LANCE_SUFFIX_FAST, LANCE_SUFFIX_FULL, LANCE_SUFFIX_UNIT
-
+from tests.constants import (
+    GPU_FAST_CORPUS_STEMS,
+    LANCE_SUFFIX_FAST,
+    LANCE_SUFFIX_FULL,
+    LANCE_SUFFIX_UNIT,
+)
 ```
 
 ### Benefits
@@ -1056,7 +1027,6 @@ ______________________________________________________________________
 **`.vaultspec/lib/src/rag/store.py` (Line 122)**
 
 ```python
-
 # BEFORE:
 
 self.db_path = self.root_dir / ".lance"
@@ -1065,6 +1035,7 @@ self.db_path = self.root_dir / ".lance"
 # AFTER:
 
 from core.config import get_config
+
 cfg = get_config()
 
 self.db_path = self.root_dir / cfg.lance_dir
@@ -1073,32 +1044,28 @@ self.db_path = self.root_dir / cfg.lance_dir
 **`.vaultspec/lib/src/vault/models.py` (Line 106)**
 
 ```python
-
 # BEFORE:
 
+
 class VaultConstants:
-
-
     DOCS_DIR = ".vault"
 
 
 # AFTER:
 
+
 class VaultConstants:
     @property
-
     def DOCS_DIR(self):
 
-
         from core.config import get_config
-        return get_config().docs_dir
 
+        return get_config().docs_dir
 ```
 
 **`.vaultspec/scripts/cli.py` (Lines 145-190)**
 
 ```python
-
 # BEFORE:
 
 RULES_SRC_DIR = root / ".vaultspec" / "rules"
@@ -1118,8 +1085,6 @@ RULES_SRC_DIR = root / cfg.framework_dir / "rules"
 AGENTS_SRC_DIR = root / cfg.framework_dir / "agents"
 
 # ... etc
-
-
 ```
 
 ##### B. Port Numbers (5 files)
@@ -1171,7 +1136,6 @@ def write_agent_discovery(..., host: str = None, port: int = None):
 **`.vaultspec/scripts/subagent.py` (Line 181)**
 
 ```python
-
 # BEFORE:
 
 uvicorn.run(app, host="0.0.0.0", port=port)
@@ -1180,12 +1144,12 @@ uvicorn.run(app, host="0.0.0.0", port=port)
 # AFTER:
 
 from core.config import get_config
+
 cfg = get_config()
 host = args.host or cfg.mcp_host
 
 
 uvicorn.run(app, host=host, port=port)
-
 ```
 
 ##### C. Timeouts/TTLs (4 files)
@@ -1237,8 +1201,6 @@ def __init__(self, ..., ttl_seconds: float = None):
 **`.vaultspec/lib/src/rag/embeddings.py` (Lines 95, 101)**
 
 ```python
-
-
 # BEFORE:
 
 DEFAULT_BATCH_SIZE = 64
@@ -1248,8 +1210,8 @@ MAX_EMBED_CHARS = 8000
 
 # AFTER:
 
-def get_batch_size():
 
+def get_batch_size():
 
     from core.config import get_config
 
@@ -1258,8 +1220,8 @@ def get_batch_size():
 
 def get_max_embed_chars():
 
-
     from core.config import get_config
+
     return get_config().max_embed_chars
 ```
 
@@ -1382,8 +1344,6 @@ def with_small_batch(config_override):
 1. **Update all conftest.py files** to use constants and fixtures:
 
 ```python
-
-
 # Old pattern:
 
 GPU_FAST_CORPUS_STEMS = frozenset({...})  # Duplicated
@@ -2003,12 +1963,14 @@ def test_config_int_parsing():
     assert config.mcp_port == 10010
     assert isinstance(config.mcp_port, int)
 
+
 def test_config_float_parsing():
     """Verify float config values parse correctly."""
     os.environ["VAULTSPEC_MCP_TTL_SECONDS"] = "3600.5"
 
     config = VaultSpecConfig.from_environment()
     assert config.mcp_ttl_seconds == 3600.5
+
 
 def test_config_path_parsing():
     """Verify Path config values resolve correctly."""
@@ -2025,6 +1987,7 @@ def test_config_validates_port_range():
     os.environ["VAULTSPEC_MCP_PORT"] = "999"  # Below 1024
     with pytest.raises(ValueError):
         VaultSpecConfig.from_environment()
+
 
 def test_config_validates_enum_values():
     """Verify enum validation."""
@@ -2046,6 +2009,7 @@ def test_legacy_vs_variables_still_work():
     config = VaultSpecConfig.from_environment()
 
     assert config.agent_mode == "read-only"
+
 
 def test_new_vaultspec_variables_take_precedence():
     """Verify VAULTSPEC_* takes precedence over VS_*."""
@@ -2069,6 +2033,7 @@ def test_config_disables_hardcoded_paths():
 
     assert store.db_path == Path("/custom/lance").resolve()
 
+
 def test_config_enables_port_override():
     """Verify port configuration affects server."""
     os.environ["VAULTSPEC_MCP_PORT"] = "9999"
@@ -2091,11 +2056,13 @@ def clean_config():
     yield
     reset_config()
 
+
 def test_config_isolation_1(clean_config):
     os.environ["VAULTSPEC_MCP_PORT"] = "10010"
     config1 = get_config()
 
     assert config1.mcp_port == 10010
+
 
 def test_config_isolation_2(clean_config):
 

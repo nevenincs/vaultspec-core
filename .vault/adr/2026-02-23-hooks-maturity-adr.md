@@ -79,7 +79,7 @@ the command string before splitting. Introduce a `_build_command()` helper:
 ```python
 def _build_command(template: str, ctx: dict[str, str]) -> list[str]:
     """Build command args list, passing context values as trailing args."""
-    base_parts = shlex.split(template, posix=(os.name != 'nt'))
+    base_parts = shlex.split(template, posix=(os.name != "nt"))
     return base_parts
 ```
 
@@ -92,8 +92,17 @@ Replace the hardcoded `lib/scripts/subagent.py` path with a
 `sys.executable` + module invocation pattern:
 
 ```python
-cmd = [sys.executable, "-m", "vaultspec", "subagent", "run",
-       "--agent", action.agent_name, "--goal", interpolated_task]
+cmd = [
+    sys.executable,
+    "-m",
+    "vaultspec",
+    "subagent",
+    "run",
+    "--agent",
+    action.agent_name,
+    "--goal",
+    interpolated_task,
+]
 ```
 
 This uses the same Python interpreter and avoids path resolution issues.
@@ -118,6 +127,7 @@ re-triggering the same event recursively:
 
 ```python
 _triggering: set[str] = set()
+
 
 def trigger(hooks, event, ctx):
     if event in _triggering:

@@ -48,6 +48,7 @@ Added at the end of `setup_logging()`, after the `configure_logging()` call:
 
 ```python
 from .printer import Printer
+
 args.printer = Printer(quiet=getattr(args, "quiet", False))
 ```
 

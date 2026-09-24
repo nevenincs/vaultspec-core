@@ -152,6 +152,7 @@ Every CLI module executes this at module load:
 
 ```python
 from vaultspec.core import WorkspaceLayout, resolve_workspace
+
 _default_layout: WorkspaceLayout = resolve_workspace(framework_dir_name=".vaultspec")
 ROOT_DIR = _default_layout.output_root
 ```
@@ -169,10 +170,12 @@ reconfiguration pattern is:
 ```python
 if args.debug:
     from vaultspec.logging_config import reset_logging
+
     reset_logging()
     configure_logging(level="DEBUG")
 elif args.verbose:
     from vaultspec.logging_config import reset_logging
+
     reset_logging()
     configure_logging(level="INFO")
 ```
@@ -247,6 +250,7 @@ except Exception as e:
     logger.error("Error: %s", e)
     if args.debug:
         import traceback
+
         traceback.print_exc()
     sys.exit(1)
 ```
@@ -381,6 +385,7 @@ unconditionally.
 ```python
 try:
     from vaultspec.protocol.providers import ClaudeProvider, GeminiProvider
+
     PROVIDERS: dict[str, Any] = {"claude": ClaudeProvider(), "gemini": GeminiProvider()}
 except ImportError:
     PROVIDERS = {}
@@ -461,7 +466,6 @@ traceback.
 ##### 3.6.6 Lazy RAG imports in vault_cli.py (lines 377-383, 428-433)
 
 ```python
-
 # vault_cli.py:377-383
 
 try:

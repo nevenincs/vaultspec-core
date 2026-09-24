@@ -36,15 +36,12 @@ related:
 - **[HIGH]** `cli.py:2249-2254` — `resolve_workspace()` called from `main()` without `framework_root`. When `--content-dir` is provided, EXPLICIT mode falls back to `fw_root = framework_root or (content_root / framework_dir_name)`, producing a nested path like `<content_dir>/.vaultspec` which is almost certainly wrong. The structurally-known `_FRAMEWORK_ROOT` from `_paths.py` is available as `_PATHS_LAYOUT.framework_root` but is not forwarded.
 
   ```python
-
   # cli.py main() — missing framework_root
 
   layout = resolve_workspace(
       root_override=args.root,
       content_override=getattr(args, "content_dir", None),
-
       # framework_root NOT passed — falls to content_root / ".vaultspec"
-
   )
   ```
 

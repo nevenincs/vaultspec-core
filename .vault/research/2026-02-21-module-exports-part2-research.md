@@ -48,6 +48,7 @@ No re-exports. No `__all__`.
 
 ```python
 from .base import CapabilityLevel, ClaudeModels, GeminiModels, ModelRegistry
+
 __all__ = ["CapabilityLevel", "ClaudeModels", "GeminiModels", "ModelRegistry"]
 ```
 
@@ -204,8 +205,12 @@ __all__ = ["CapabilityLevel", "ClaudeModels", "GeminiModels", "ModelRegistry"]
 
 ```python
 from vaultspec.protocol.sandbox import (
-    _SHELL_TOOLS, _WRITE_TOOLS, _is_vault_path, _make_sandbox_callback,
+    _SHELL_TOOLS,
+    _WRITE_TOOLS,
+    _is_vault_path,
+    _make_sandbox_callback,
 )
+
 __all__ = ["_SHELL_TOOLS", "_WRITE_TOOLS", "_is_vault_path", "_make_sandbox_callback"]
 ```
 
@@ -280,8 +285,14 @@ Note: All symbols are underscore-prefixed but are consumed by other sub-packages
 
 ```python
 __all__ = [
-    "AgentProvider", "CapabilityLevel", "ClaudeModels", "GeminiModels",
-    "ModelRegistry", "ProcessSpec", "resolve_includes", "resolve_executable",
+    "AgentProvider",
+    "CapabilityLevel",
+    "ClaudeModels",
+    "GeminiModels",
+    "ModelRegistry",
+    "ProcessSpec",
+    "resolve_includes",
+    "resolve_executable",
 ]
 ```
 
@@ -358,8 +369,12 @@ __all__ = ["GeminiA2AExecutor"]
 ```python
 from vaultspec.protocol.sandbox import _make_sandbox_callback
 from vaultspec.protocol.providers.base import (
-    AgentProvider, CapabilityLevel, ClaudeModels, GeminiModels,
-    ModelRegistry, ProcessSpec,
+    AgentProvider,
+    CapabilityLevel,
+    ClaudeModels,
+    GeminiModels,
+    ModelRegistry,
+    ProcessSpec,
 )
 from vaultspec.protocol.providers.claude import ClaudeProvider
 from vaultspec.protocol.providers.gemini import GeminiProvider
@@ -367,9 +382,18 @@ from vaultspec.protocol.acp.types import SubagentError, SubagentResult
 from vaultspec.protocol.acp.client import SessionLogger, SubagentClient
 
 __all__ = [
-    "AgentProvider", "CapabilityLevel", "ClaudeModels", "ClaudeProvider",
-    "GeminiModels", "GeminiProvider", "ModelRegistry", "ProcessSpec",
-    "SessionLogger", "SubagentClient", "SubagentError", "SubagentResult",
+    "AgentProvider",
+    "CapabilityLevel",
+    "ClaudeModels",
+    "ClaudeProvider",
+    "GeminiModels",
+    "GeminiProvider",
+    "ModelRegistry",
+    "ProcessSpec",
+    "SessionLogger",
+    "SubagentClient",
+    "SubagentError",
+    "SubagentResult",
 ]
 ```
 
@@ -381,8 +405,11 @@ from vaultspec.protocol.acp.client import SessionLogger, SubagentClient
 from vaultspec.protocol.acp.claude_bridge import ClaudeACPBridge
 
 __all__ = [
-    "ClaudeACPBridge", "SessionLogger", "SubagentClient",
-    "SubagentError", "SubagentResult",
+    "ClaudeACPBridge",
+    "SessionLogger",
+    "SubagentClient",
+    "SubagentError",
+    "SubagentResult",
 ]
 ```
 
@@ -392,14 +419,20 @@ __all__ = [
 from vaultspec.protocol.a2a.server import create_app
 from vaultspec.protocol.a2a.agent_card import agent_card_from_definition
 from vaultspec.protocol.a2a.discovery import (
-    generate_agent_md, write_agent_discovery, write_gemini_settings,
+    generate_agent_md,
+    write_agent_discovery,
+    write_gemini_settings,
 )
 from vaultspec.protocol.a2a.state_map import A2A_TO_VAULTSPEC, VAULTSPEC_TO_A2A
 
 __all__ = [
-    "A2A_TO_VAULTSPEC", "VAULTSPEC_TO_A2A",
-    "agent_card_from_definition", "create_app",
-    "generate_agent_md", "write_agent_discovery", "write_gemini_settings",
+    "A2A_TO_VAULTSPEC",
+    "VAULTSPEC_TO_A2A",
+    "agent_card_from_definition",
+    "create_app",
+    "generate_agent_md",
+    "write_agent_discovery",
+    "write_gemini_settings",
 ]
 ```
 
@@ -573,9 +606,15 @@ All intra-package imports are either lazy (inside method bodies) or under `TYPE_
 
 ```python
 __all__ = [
-    "VaultRAG", "get_engine", "reset_engine",
-    "list_documents", "get_document", "get_related", "get_status",
-    "index", "search",
+    "VaultRAG",
+    "get_engine",
+    "reset_engine",
+    "list_documents",
+    "get_document",
+    "get_related",
+    "get_status",
+    "index",
+    "search",
 ]
 ```
 
@@ -583,8 +622,11 @@ __all__ = [
 
 ```python
 __all__ = [
-    "CUDA_INDEX_TAG", "CUDA_INDEX_URL",
-    "GPUNotAvailableError", "EmbeddingModel", "get_device_info",
+    "CUDA_INDEX_TAG",
+    "CUDA_INDEX_URL",
+    "GPUNotAvailableError",
+    "EmbeddingModel",
+    "get_device_info",
 ]
 ```
 
@@ -598,8 +640,11 @@ __all__ = ["IndexResult", "VaultIndexer", "prepare_document"]
 
 ```python
 __all__ = [
-    "ParsedQuery", "SearchResult", "VaultSearcher",
-    "parse_query", "rerank_with_graph",
+    "ParsedQuery",
+    "SearchResult",
+    "VaultSearcher",
+    "parse_query",
+    "rerank_with_graph",
 ]
 ```
 
@@ -631,10 +676,19 @@ from vaultspec.rag.search import SearchResult
 from vaultspec.rag.store import VaultDocument
 
 __all__ = [
-    "GPUNotAvailableError", "IndexResult", "SearchResult",
-    "VaultDocument", "VaultRAG",
-    "get_document", "get_engine", "get_related", "get_status",
-    "index", "list_documents", "reset_engine", "search",
+    "GPUNotAvailableError",
+    "IndexResult",
+    "SearchResult",
+    "VaultDocument",
+    "VaultRAG",
+    "get_document",
+    "get_engine",
+    "get_related",
+    "get_status",
+    "index",
+    "list_documents",
+    "reset_engine",
+    "search",
 ]
 ```
 
@@ -689,8 +743,12 @@ The `hooks` package is consumed exclusively by `cli.py`.
 
 ```python
 __all__ = [
-    "SUPPORTED_EVENTS", "Hook", "HookAction", "HookResult",
-    "load_hooks", "trigger",
+    "SUPPORTED_EVENTS",
+    "Hook",
+    "HookAction",
+    "HookResult",
+    "load_hooks",
+    "trigger",
 ]
 ```
 
@@ -709,8 +767,12 @@ from vaultspec.hooks.engine import (
 )
 
 __all__ = [
-    "SUPPORTED_EVENTS", "Hook", "HookAction", "HookResult",
-    "load_hooks", "trigger",
+    "SUPPORTED_EVENTS",
+    "Hook",
+    "HookAction",
+    "HookResult",
+    "load_hooks",
+    "trigger",
 ]
 ```
 
