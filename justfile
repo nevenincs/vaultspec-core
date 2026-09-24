@@ -507,10 +507,20 @@ analytics *args='':
 docs-renders:
     {{dev}} docs renders
 
+# Regenerate the committed README walkthrough stills.
+[group('docs')]
+docs-walkthrough:
+    {{dev}} docs walkthrough
+
 # Regenerate the committed documentation demo.
 [group('docs')]
 docs-demo:
     {{dev}} docs demo
+
+# Regenerate the committed feature-cycle video.
+[group('docs')]
+docs-video:
+    {{dev}} docs video
 
 # Regenerate every committed documentation asset under docs/assets/.
 [group('docs')]

@@ -84,6 +84,13 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 RICH_STROKE = 'stroke="rgba(255,255,255,0.35)"'
 LIGHT_STROKE = 'stroke="rgba(30,27,24,0.22)"'
 
+# Rich clips the terminal one pixel short of its last line's box, which cuts
+# the descenders of that line - an underscore there renders as a space.
+# render_svg extends the clip into the window's bottom padding (8px in rich
+# 15), which is empty, so nothing else becomes visible.
+CLIP_TERMINAL = re.compile(r'(-clip-terminal">\s*<rect [^>]*height=")([\d.]+)(")')
+CLIP_ALLOWANCE = 6.0
+
 # ---------------------------------------------------------------------------
 # Demo vault definition
 # ---------------------------------------------------------------------------
@@ -460,6 +467,11 @@ def render_svg(
             "rich's window-border stroke literal changed; update RICH_STROKE"
         )
     svg = svg.replace(RICH_STROKE, LIGHT_STROKE)
+    svg, clips = CLIP_TERMINAL.subn(
+        lambda m: f"{m[1]}{float(m[2]) + CLIP_ALLOWANCE:g}{m[3]}", svg
+    )
+    if clips != 1:
+        raise RuntimeError("rich's terminal clip markup changed; update CLIP_TERMINAL")
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(svg)
     print(f"wrote {out_path} ({len(lines)} lines)")

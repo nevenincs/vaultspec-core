@@ -10,6 +10,7 @@ arithmetic a move silently breaks.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,7 +19,18 @@ import pytest
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+    from docs._render.walkthrough import Stage
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+@dataclass(frozen=True)
+class FeatureBuild:
+    """One played walkthrough: its stages, the video storyboard, and its graph."""
+
+    stages: list[Stage]
+    story: dict[str, object]
+    graph: dict[str, object]
 
 
 @pytest.fixture(scope="session")
@@ -45,3 +57,36 @@ def preserved_no_color() -> Generator[None]:
         os.environ.pop("NO_COLOR", None)
     else:
         os.environ["NO_COLOR"] = saved
+
+
+@pytest.fixture(scope="session")
+def feature_build() -> FeatureBuild:
+    """Play the README walkthrough once and keep what the renderers draw from.
+
+    The build runs in a throwaway repository with the working directory moved
+    into it, so everything that needs the repository - the video storyboard,
+    the graph it draws - is computed inside the build and returned as plain
+    data. No test runs while the working directory is elsewhere.
+
+    Importing the walkthrough deletes ``NO_COLOR``, as the renderers do; the
+    variable is restored here because a session fixture cannot take the
+    function-scoped :func:`preserved_no_color`.
+    """
+    import json
+
+    saved = os.environ.get("NO_COLOR")
+    try:
+        from docs._render.render_readme_video import storyboard
+        from docs._render.walkthrough import FEATURE, run_core, walkthrough
+
+        with walkthrough() as stages:
+            graph = json.loads(
+                run_core(["vault", "graph", "--feature", FEATURE, "--json"])
+            )
+            story = storyboard(stages, Path.cwd(), graph["data"])
+    finally:
+        if saved is None:
+            os.environ.pop("NO_COLOR", None)
+        else:
+            os.environ["NO_COLOR"] = saved
+    return FeatureBuild(stages, story, graph["data"])

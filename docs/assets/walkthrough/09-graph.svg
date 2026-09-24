@@ -1,0 +1,150 @@
+<svg class="rich-terminal" viewBox="0 0 1238 611.1999999999999" xmlns="http://www.w3.org/2000/svg">
+    <!-- Generated with Rich https://www.textualize.io -->
+    <style>
+
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Regular"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
+        font-style: normal;
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Bold"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
+        font-style: bold;
+        font-weight: 700;
+    }
+
+    .terminal-2903040674-matrix {
+        font-family: Fira Code, monospace;
+        font-size: 20px;
+        line-height: 24.4px;
+        font-variant-east-asian: full-width;
+    }
+
+    .terminal-2903040674-title {
+        font-size: 18px;
+        font-weight: bold;
+        font-family: arial;
+    }
+
+    .terminal-2903040674-r1 { fill: #918981 }
+.terminal-2903040674-r2 { fill: #1e1b18 }
+.terminal-2903040674-r3 { fill: #4a7c74 }
+.terminal-2903040674-r4 { fill: #1e1b18;font-weight: bold }
+.terminal-2903040674-r5 { fill: #76736f }
+    </style>
+
+    <defs>
+    <clipPath id="terminal-2903040674-clip-terminal">
+      <rect x="0" y="0" width="1219.0" height="566.2" />
+    </clipPath>
+    <clipPath id="terminal-2903040674-line-0">
+    <rect x="0" y="1.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-1">
+    <rect x="0" y="25.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-2">
+    <rect x="0" y="50.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-3">
+    <rect x="0" y="74.7" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-4">
+    <rect x="0" y="99.1" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-5">
+    <rect x="0" y="123.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-6">
+    <rect x="0" y="147.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-7">
+    <rect x="0" y="172.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-8">
+    <rect x="0" y="196.7" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-9">
+    <rect x="0" y="221.1" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-10">
+    <rect x="0" y="245.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-11">
+    <rect x="0" y="269.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-12">
+    <rect x="0" y="294.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-13">
+    <rect x="0" y="318.7" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-14">
+    <rect x="0" y="343.1" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-15">
+    <rect x="0" y="367.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-16">
+    <rect x="0" y="391.9" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-17">
+    <rect x="0" y="416.3" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-18">
+    <rect x="0" y="440.7" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-19">
+    <rect x="0" y="465.1" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-20">
+    <rect x="0" y="489.5" width="1220" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-2903040674-line-21">
+    <rect x="0" y="513.9" width="1220" height="24.65"/>
+            </clipPath>
+    </defs>
+
+    <rect fill="#faf7f2" stroke="rgba(30,27,24,0.22)" stroke-width="1" x="1" y="1" width="1236" height="609.2" rx="8"/><text class="terminal-2903040674-title" fill="#1e1b18" text-anchor="middle" x="618" y="27">Trace</text>
+            <g transform="translate(26,22)">
+            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
+            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
+            <circle cx="44" cy="0" r="7" fill="#28c840"/>
+            </g>
+        
+    <g transform="translate(9, 41)" clip-path="url(#terminal-2903040674-clip-terminal)">
+    
+    <g class="terminal-2903040674-matrix">
+    <text class="terminal-2903040674-r1" x="0" y="20" textLength="573.4" clip-path="url(#terminal-2903040674-line-0)">#&#160;Follow&#160;the&#160;feature&#x27;s&#160;records&#160;and&#160;their&#160;links.</text><text class="terminal-2903040674-r2" x="1220" y="20" textLength="12.2" clip-path="url(#terminal-2903040674-line-0)">
+</text><text class="terminal-2903040674-r2" x="1220" y="44.4" textLength="12.2" clip-path="url(#terminal-2903040674-line-1)">
+</text><text class="terminal-2903040674-r3" x="0" y="68.8" textLength="12.2" clip-path="url(#terminal-2903040674-line-2)">❯</text><text class="terminal-2903040674-r4" x="24.4" y="68.8" textLength="573.4" clip-path="url(#terminal-2903040674-line-2)">vaultspec-core&#160;vault&#160;graph&#160;--feature&#160;search-api</text><text class="terminal-2903040674-r2" x="1220" y="68.8" textLength="12.2" clip-path="url(#terminal-2903040674-line-2)">
+</text><text class="terminal-2903040674-r4" x="0" y="93.2" textLength="341.6" clip-path="url(#terminal-2903040674-line-3)">#search-api&#160;&#160;5&#160;docs,&#160;7&#160;links</text><text class="terminal-2903040674-r2" x="1220" y="93.2" textLength="12.2" clip-path="url(#terminal-2903040674-line-3)">
+</text><text class="terminal-2903040674-r4" x="24.4" y="117.6" textLength="97.6" clip-path="url(#terminal-2903040674-line-4)">adr&#160;&#160;(1)</text><text class="terminal-2903040674-r2" x="1220" y="117.6" textLength="12.2" clip-path="url(#terminal-2903040674-line-4)">
+</text><text class="terminal-2903040674-r2" x="0" y="142" textLength="1220" clip-path="url(#terminal-2903040674-line-5)">&#160;&#160;&#160;&#160;2026-09-24-search-api-adr&#160;&#160;`search-api`&#160;adr:&#160;`rank&#160;item&#160;search&#160;with&#160;postgres&#160;full-text&#160;search`&#160;…</text><text class="terminal-2903040674-r2" x="1220" y="142" textLength="12.2" clip-path="url(#terminal-2903040674-line-5)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="166.4" textLength="439.2" clip-path="url(#terminal-2903040674-line-6)">-&gt;&#160;2026-06-02-storage-layer-adr&#160;&#160;adr</text><text class="terminal-2903040674-r2" x="1220" y="166.4" textLength="12.2" clip-path="url(#terminal-2903040674-line-6)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="190.8" textLength="451.4" clip-path="url(#terminal-2903040674-line-7)">-&gt;&#160;2026-06-18-api-pagination-adr&#160;&#160;adr</text><text class="terminal-2903040674-r2" x="1220" y="190.8" textLength="12.2" clip-path="url(#terminal-2903040674-line-7)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="215.2" textLength="524.6" clip-path="url(#terminal-2903040674-line-8)">-&gt;&#160;2026-09-24-search-api-research&#160;&#160;research</text><text class="terminal-2903040674-r2" x="1220" y="215.2" textLength="12.2" clip-path="url(#terminal-2903040674-line-8)">
+</text><text class="terminal-2903040674-r4" x="24.4" y="239.6" textLength="109.8" clip-path="url(#terminal-2903040674-line-9)">exec&#160;&#160;(1)</text><text class="terminal-2903040674-r2" x="1220" y="239.6" textLength="12.2" clip-path="url(#terminal-2903040674-line-9)">
+</text><text class="terminal-2903040674-r2" x="0" y="264" textLength="1012.6" clip-path="url(#terminal-2903040674-line-10)">&#160;&#160;&#160;&#160;2026-09-24-search-api-ledger&#160;&#160;`search-api`&#160;ledger&#160;&#160;2026-09-24&#160;&#160;(27w,&#160;1in,&#160;1out)</text><text class="terminal-2903040674-r2" x="1220" y="264" textLength="12.2" clip-path="url(#terminal-2903040674-line-10)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="288.4" textLength="427" clip-path="url(#terminal-2903040674-line-11)">-&gt;&#160;2026-09-24-search-api-plan&#160;&#160;plan</text><text class="terminal-2903040674-r2" x="1220" y="288.4" textLength="12.2" clip-path="url(#terminal-2903040674-line-11)">
+</text><text class="terminal-2903040674-r4" x="24.4" y="312.8" textLength="122" clip-path="url(#terminal-2903040674-line-12)">index&#160;&#160;(1)</text><text class="terminal-2903040674-r2" x="1220" y="312.8" textLength="12.2" clip-path="url(#terminal-2903040674-line-12)">
+</text><text class="terminal-2903040674-r2" x="0" y="337.2" textLength="951.6" clip-path="url(#terminal-2903040674-line-13)">&#160;&#160;&#160;&#160;search-api.index&#160;&#160;`search-api`&#160;feature&#160;index&#160;&#160;2026-09-24&#160;&#160;(55w,&#160;0in,&#160;4out)</text><text class="terminal-2903040674-r2" x="1220" y="337.2" textLength="12.2" clip-path="url(#terminal-2903040674-line-13)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="361.6" textLength="402.6" clip-path="url(#terminal-2903040674-line-14)">-&gt;&#160;2026-09-24-search-api-adr&#160;&#160;adr</text><text class="terminal-2903040674-r2" x="1220" y="361.6" textLength="12.2" clip-path="url(#terminal-2903040674-line-14)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="386" textLength="451.4" clip-path="url(#terminal-2903040674-line-15)">-&gt;&#160;2026-09-24-search-api-ledger&#160;&#160;exec</text><text class="terminal-2903040674-r2" x="1220" y="386" textLength="12.2" clip-path="url(#terminal-2903040674-line-15)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="410.4" textLength="427" clip-path="url(#terminal-2903040674-line-16)">-&gt;&#160;2026-09-24-search-api-plan&#160;&#160;plan</text><text class="terminal-2903040674-r2" x="1220" y="410.4" textLength="12.2" clip-path="url(#terminal-2903040674-line-16)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="434.8" textLength="524.6" clip-path="url(#terminal-2903040674-line-17)">-&gt;&#160;2026-09-24-search-api-research&#160;&#160;research</text><text class="terminal-2903040674-r2" x="1220" y="434.8" textLength="12.2" clip-path="url(#terminal-2903040674-line-17)">
+</text><text class="terminal-2903040674-r4" x="24.4" y="459.2" textLength="109.8" clip-path="url(#terminal-2903040674-line-18)">plan&#160;&#160;(1)</text><text class="terminal-2903040674-r2" x="1220" y="459.2" textLength="12.2" clip-path="url(#terminal-2903040674-line-18)">
+</text><text class="terminal-2903040674-r2" x="0" y="483.6" textLength="963.8" clip-path="url(#terminal-2903040674-line-19)">&#160;&#160;&#160;&#160;2026-09-24-search-api-plan&#160;&#160;`search-api`&#160;plan&#160;&#160;2026-09-24&#160;&#160;(86w,&#160;2in,&#160;1out)</text><text class="terminal-2903040674-r2" x="1220" y="483.6" textLength="12.2" clip-path="url(#terminal-2903040674-line-19)">
+</text><text class="terminal-2903040674-r5" x="73.2" y="508" textLength="402.6" clip-path="url(#terminal-2903040674-line-20)">-&gt;&#160;2026-09-24-search-api-adr&#160;&#160;adr</text><text class="terminal-2903040674-r2" x="1220" y="508" textLength="12.2" clip-path="url(#terminal-2903040674-line-20)">
+</text><text class="terminal-2903040674-r4" x="24.4" y="532.4" textLength="158.6" clip-path="url(#terminal-2903040674-line-21)">research&#160;&#160;(1)</text><text class="terminal-2903040674-r2" x="1220" y="532.4" textLength="12.2" clip-path="url(#terminal-2903040674-line-21)">
+</text><text class="terminal-2903040674-r2" x="0" y="556.8" textLength="1220" clip-path="url(#terminal-2903040674-line-22)">&#160;&#160;&#160;&#160;2026-09-24-search-api-research&#160;&#160;`search-api`&#160;research:&#160;`full-text&#160;search&#160;options`&#160;&#160;2026-09-24&#160;&#160;…</text><text class="terminal-2903040674-r2" x="1220" y="556.8" textLength="12.2" clip-path="url(#terminal-2903040674-line-22)">
+</text>
+    </g>
+    </g>
+</svg>

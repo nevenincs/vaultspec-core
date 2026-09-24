@@ -906,9 +906,9 @@ DOCS = Verb(
     name="docs",
     summary="Regenerate the committed documentation assets under docs/assets/.",
     note=(
-        "Both renderers drive real commands against a throwaway synthetic vault, "
-        "and both are invoked as modules rather than file paths so the demo "
-        "renderer's import of its sibling resolves by its real dotted name."
+        "Every renderer drives real commands against a throwaway vault, and each "
+        "is invoked as a module rather than a file path so its imports of its "
+        "siblings resolve by their real dotted names."
     ),
     targets=(
         Target(
@@ -917,14 +917,24 @@ DOCS = Verb(
             (uv_run("python", "-m", "docs._render.render_readme_assets"),),
         ),
         Target(
+            "walkthrough",
+            "Regenerate the README walkthrough stills.",
+            (uv_run("python", "-m", "docs._render.render_readme_walkthrough"),),
+        ),
+        Target(
             "demo",
             "Regenerate the pipeline demo GIF (needs agg on PATH).",
             (uv_run("python", "-m", "docs._render.render_readme_demo"),),
         ),
         Target(
+            "video",
+            "Regenerate the feature-cycle video (needs Chromium and ffmpeg).",
+            (uv_run("python", "-m", "docs._render.render_readme_video"),),
+        ),
+        Target(
             "all",
             "Regenerate every documentation asset.",
-            (Ref("renders"), Ref("demo")),
+            (Ref("renders"), Ref("walkthrough"), Ref("demo"), Ref("video")),
             keep_going=True,
         ),
     ),

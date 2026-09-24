@@ -1,0 +1,259 @@
+<!doctype html>
+<!--
+  The feature-cycle video player. docs/_render/render_readme_video.py fills in
+  the storyboard and captures one screenshot per frame, calling renderAt(t)
+  before each: every visible state is a pure function of t, so no CSS
+  transition or timer runs. Edit this file and the renderer, never the video.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>vaultspec-core feature cycle</title>
+<style>
+:root {
+  --paper: #faf7f2;
+  --canvas: #efe9df;
+  --ink: #1e1b18;
+  --muted: #5e564e;
+  --faint: #918981;
+  --line: rgba(30, 27, 24, 0.14);
+  --teal: #4a7c74;
+  --teal-soft: #dcebe7;
+  --sage: #6a7a4d;
+  --sand: #a37a3a;
+  --rose: #a65c5c;
+  --lavender: #7c6a9c;
+  --card: #fffdf9;
+  --sans: "Inter", "Segoe UI", "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+  --mono: "Cascadia Mono", "JetBrains Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1120px; height: 630px; overflow: hidden; }
+body { background: var(--canvas); color: var(--ink); font-family: var(--sans); }
+#frame { position: relative; width: 1120px; height: 630px; overflow: hidden; }
+
+/* Header: brand and the stage timeline */
+header { position: absolute; left: 24px; right: 24px; top: 16px; height: 36px; display: flex; align-items: center; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: 0.1px; white-space: nowrap; }
+.brand img { width: 26px; height: 26px; border-radius: 6px; }
+.pills { display: flex; gap: 5px; margin-left: auto; }
+.pill { font-size: 11.5px; padding: 4px 9px; border-radius: 999px; color: var(--faint); background: rgba(255, 255, 255, 0.45); border: 1px solid transparent; white-space: nowrap; }
+.pill.done { color: var(--teal); }
+.pill.done::before { content: "\2713\00a0"; }
+.pill.active { color: #fff; background: var(--teal); font-weight: 600; }
+
+/* Terminal */
+.term { position: absolute; left: 24px; top: 64px; width: 640px; height: 454px; background: var(--paper); border: 1px solid rgba(30, 27, 24, 0.18); border-radius: 10px; box-shadow: 0 10px 30px rgba(30, 27, 24, 0.10); overflow: hidden; }
+.term .bar { height: 30px; display: flex; align-items: center; padding: 0 12px; gap: 7px; border-bottom: 1px solid var(--line); }
+.dot { width: 11px; height: 11px; border-radius: 50%; }
+.term .title { margin-left: 10px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.screen { position: absolute; top: 31px; left: 0; right: 0; bottom: 0; padding: 10px 14px; overflow: hidden; font-family: var(--mono); font-size: 12.6px; line-height: 1.42; }
+.screen .ln { white-space: pre; overflow: hidden; text-overflow: ellipsis; min-height: 1.42em; }
+.screen .cmd { font-weight: 700; }
+.prompt { color: var(--teal); }
+.cursor { display: inline-block; width: 0.6em; height: 1.1em; background: var(--ink); vertical-align: text-bottom; }
+
+/* Record card */
+.card { position: absolute; left: 684px; top: 64px; width: 412px; height: 454px; background: var(--card); border: 1px solid rgba(30, 27, 24, 0.14); border-radius: 12px; box-shadow: 0 12px 34px rgba(30, 27, 24, 0.12); overflow: hidden; opacity: 0; }
+.card .head { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: #fbf8f3; }
+.card .path { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge { margin-left: auto; flex: none; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); }
+.badge.agent { background: #efe4d2; color: var(--sand); }
+.card .body { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+.card .scroll { padding: 12px 18px 30px; }
+.card .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 38px; background: linear-gradient(rgba(255, 253, 249, 0), var(--card)); }
+
+/* Rendered markdown */
+.md { font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+.md h1 { font-size: 16px; line-height: 1.3; margin: 2px 0 8px; }
+.md h2 { font-size: 13.5px; margin: 12px 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
+.md h3 { font-size: 12.5px; margin: 10px 0 3px; }
+.md p { margin: 0 0 7px; }
+.md ul { margin: 0 0 7px; padding-left: 18px; }
+.md li { margin: 2px 0; }
+.md code { font-family: var(--mono); font-size: 11px; background: #f1ebe2; padding: 1px 4px; border-radius: 4px; }
+.md a { color: var(--teal); text-decoration: none; }
+.md .task { list-style: none; margin-left: -18px; }
+.md .box { display: inline-block; width: 12px; height: 12px; border: 1.5px solid var(--faint); border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.md .box.on { background: var(--teal); border-color: var(--teal); }
+.fm { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.chip { font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 999px; background: #efe9df; color: var(--muted); }
+.chip.tag { background: var(--teal-soft); color: var(--teal); }
+.chip.new { background: #e3ecd6; color: var(--sage); font-weight: 700; }
+
+/* Special cards */
+.kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--faint); margin: 2px 0 8px; font-weight: 600; }
+.files .row { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.files .name { font-family: var(--mono); font-size: 12px; font-weight: 700; flex: 0 0 150px; }
+.files .what { color: var(--muted); }
+.rank { margin: 6px 0 14px; }
+.rank .row { margin: 12px 0; }
+.rank .label { display: flex; justify-content: space-between; font-size: 12px; font-family: var(--mono); }
+.rank .rel { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.rank .track { height: 9px; border-radius: 5px; background: #efe9df; margin-top: 5px; overflow: hidden; }
+.rank .fill { height: 100%; background: var(--teal); border-radius: 5px; }
+.yaml { font-family: var(--mono); font-size: 11.5px; line-height: 1.6; background: #f6f1e9; border-radius: 8px; padding: 9px 11px; white-space: pre; }
+.yaml .add { color: var(--sage); font-weight: 700; }
+.note { font-size: 11px; color: var(--faint); margin-top: 12px; line-height: 1.45; }
+.big { font-size: 38px; font-weight: 800; color: var(--teal); line-height: 1.05; }
+.sub { font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+.checks { display: flex; flex-wrap: wrap; gap: 5px; }
+.checks .chip { background: #e8f0ec; color: var(--teal); }
+.progress { height: 12px; border-radius: 6px; background: #efe9df; overflow: hidden; margin: 10px 0 14px; }
+.progress .fill { height: 100%; background: var(--teal); }
+.steps .row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.steps .id { font-family: var(--mono); font-weight: 700; flex: 0 0 34px; }
+.steps .next { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--sand); }
+svg.graph text { font-family: var(--mono); font-size: 10.5px; }
+
+/* Caption */
+.caption { position: absolute; left: 24px; right: 24px; bottom: 18px; height: 78px; display: flex; align-items: center; gap: 16px; }
+.num { flex: none; width: 46px; height: 46px; border-radius: 12px; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
+.ctext .t { font-size: 22px; font-weight: 800; letter-spacing: -0.2px; }
+.ctext .c { font-size: 15px; color: var(--muted); margin-top: 3px; }
+
+/* Title cards */
+.overlay { position: absolute; inset: 0; background: var(--canvas); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; opacity: 0; }
+.overlay img { width: 92px; height: 92px; border-radius: 20px; margin-bottom: 18px; }
+.overlay h1 { font-size: 42px; margin: 0; letter-spacing: -0.5px; }
+.overlay .tag { font-size: 20px; color: var(--muted); margin-top: 8px; }
+.overlay .lead { font-size: 16px; color: var(--teal); margin-top: 26px; font-weight: 600; }
+.overlay .install { font-family: var(--mono); font-size: 20px; background: var(--paper); border: 1px solid rgba(30, 27, 24, 0.18); border-radius: 10px; padding: 12px 20px; margin-top: 26px; }
+.overlay .install .prompt { margin-right: 10px; }
+.overlay .links { font-size: 15px; color: var(--muted); margin-top: 18px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <header>
+    <div class="brand"><img id="logo-small" alt=""><span>vaultspec-core</span></div>
+    <div class="pills" id="pills"></div>
+  </header>
+  <div class="term">
+    <div class="bar">
+      <span class="dot" style="background:var(--rose)"></span><span class="dot" style="background:var(--sand)"></span><span class="dot" style="background:var(--sage)"></span>
+      <span class="title">~/code/search-api</span>
+    </div>
+    <div class="screen" id="screen"></div>
+  </div>
+  <div class="card" id="card">
+    <div class="head"><span class="path" id="card-path"></span><span class="badge" id="card-badge"></span></div>
+    <div class="body"><div class="scroll" id="card-scroll"></div><div class="fade"></div></div>
+  </div>
+  <div class="caption">
+    <div class="num" id="num"></div>
+    <div class="ctext"><div class="t" id="ctitle"></div><div class="c" id="ccaption"></div></div>
+  </div>
+  <div class="overlay" id="intro">
+    <img id="logo-intro" alt="">
+    <h1>vaultspec-core</h1>
+    <div class="tag" id="tagline"></div>
+    <div class="lead" id="intro-lead"></div>
+  </div>
+  <div class="overlay" id="outro">
+    <img id="logo-outro" alt="">
+    <h1 id="outro-title"></h1>
+    <div class="install"><span class="prompt">&#10095;</span><span id="outro-command"></span></div>
+    <div class="links" id="outro-links"></div>
+  </div>
+</div>
+<script>
+const STORY = /*STORYBOARD*/null;
+
+const $ = (id) => document.getElementById(id);
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const ease = (x) => { const p = clamp(x, 0, 1); return p * p * (3 - 2 * p); };
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function setup() {
+  for (const id of ["logo-small", "logo-intro", "logo-outro"]) $(id).src = STORY.logo;
+  $("tagline").textContent = STORY.tagline;
+  $("intro-lead").textContent = STORY.introLead;
+  $("outro-title").textContent = STORY.outroTitle;
+  $("outro-command").textContent = STORY.outroCommand;
+  $("outro-links").innerHTML = STORY.outroLinks.map(esc).join("<br>");
+  $("pills").innerHTML = STORY.stages.map((s) => `<span class="pill">${esc(s.title)}</span>`).join("");
+}
+
+function stageAt(t) {
+  let current = STORY.stages[0];
+  for (const stage of STORY.stages) if (t >= stage.start) current = stage;
+  return current;
+}
+
+function terminal(stage, t) {
+  const out = [];
+  let typing = false;
+  for (const command of stage.commands) {
+    if (t < command.typeStart) break;
+    const total = command.lines.reduce((n, line) => n + line.length, 0);
+    const span = Math.max(command.typeEnd - command.typeStart, 0.001);
+    let left = Math.floor(total * clamp((t - command.typeStart) / span, 0, 1));
+    const done = left >= total;
+    command.lines.forEach((line, i) => {
+      if (left <= 0 && i > 0) return;
+      const shown = line.slice(0, Math.max(left, 0));
+      left -= line.length;
+      const lead = i === 0 ? '<span class="prompt">&#10095;</span> ' : "    ";
+      out.push(`<div class="ln cmd">${lead}${esc(shown)}</div>`);
+    });
+    if (!done) { typing = true; break; }
+    if (t < command.outAt) { typing = true; break; }
+    const count = Math.min(command.output.length, Math.floor((t - command.outAt) / 0.018) + 1);
+    for (const line of command.output.slice(0, count)) out.push(`<div class="ln">${line || "&nbsp;"}</div>`);
+    out.push('<div class="ln">&nbsp;</div>');
+  }
+  if (!typing) out.push('<div class="ln"><span class="prompt">&#10095;</span> <span class="cursor"></span></div>');
+  else if (out.length) out[out.length - 1] = out[out.length - 1].replace(/<\/div>$/, '<span class="cursor"></span></div>');
+  const screen = $("screen");
+  screen.innerHTML = out.join("");
+  screen.scrollTop = screen.scrollHeight;
+}
+
+function card(stage, t) {
+  const el = $("card");
+  const c = stage.card;
+  if (!c || t < c.at) { el.style.opacity = 0; return; }
+  const p = ease((t - c.at) / 0.4);
+  el.style.opacity = p;
+  el.style.transform = `translateY(${(1 - p) * 14}px)`;
+  $("card-path").textContent = c.path;
+  const badge = $("card-badge");
+  badge.textContent = c.badge;
+  badge.className = "badge" + (c.agent ? " agent" : "");
+  const scroll = $("card-scroll");
+  if (scroll.dataset.stage !== stage.slug) { scroll.innerHTML = c.html; scroll.dataset.stage = stage.slug; }
+  const grow = ease((t - c.at - 0.25) / 0.8);
+  for (const bar of scroll.querySelectorAll("[data-fill]")) bar.style.width = `${grow * Number(bar.dataset.fill) * 100}%`;
+  for (const edge of scroll.querySelectorAll("[data-draw]")) {
+    const len = Number(edge.dataset.draw);
+    edge.style.strokeDasharray = `${len}`;
+    edge.style.strokeDashoffset = `${(1 - grow) * len}`;
+  }
+  const room = scroll.scrollHeight - el.querySelector(".body").clientHeight;
+  const read = c.scroll ? ease((t - c.at - 1.0) / Math.max(stage.end - c.at - 1.6, 0.5)) : 0;
+  scroll.style.transform = `translateY(${-Math.max(room, 0) * read}px)`;
+}
+
+function renderAt(t) {
+  const intro = STORY.intro, outro = STORY.outro;
+  $("intro").style.opacity = t < intro.end ? 1 - ease((t - (intro.end - 0.45)) / 0.45) : 0;
+  $("outro").style.opacity = ease((t - outro.start) / 0.5);
+  const stage = stageAt(t);
+  document.querySelectorAll(".pill").forEach((pill, i) => {
+    const s = STORY.stages[i];
+    pill.className = "pill" + (s === stage && t >= intro.end - 0.45 ? " active" : t >= s.end ? " done" : "");
+  });
+  $("num").textContent = stage.number;
+  $("ctitle").textContent = stage.title;
+  $("ccaption").textContent = stage.caption;
+  terminal(stage, t);
+  card(stage, t);
+  return true;
+}
+
+setup();
+renderAt(0);
+</script>
+</body>
+</html>

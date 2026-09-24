@@ -9,6 +9,11 @@ Vaultspec is a coding harness: it implements a structured coding workflow focuse
 skills, and tools to author the documents that describe and track a feature's
 development.
 
+Your agent researches before it decides, records the decision before it builds, and logs
+every Step it closes, as linked Markdown in your repository. The next session, the next
+agent, or the next teammate picks up where the work stopped, and can see why it went the
+way it did.
+
 The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
 
 [![ci](https://img.shields.io/github/actions/workflow/status/nevenincs/vaultspec-core/main-health.yml?branch=main&style=flat&label=ci&logo=githubactions&logoColor=white&labelColor=24292f)](https://github.com/nevenincs/vaultspec-core/actions/workflows/main-health.yml)
@@ -17,7 +22,28 @@ The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
 [![runtime](https://img.shields.io/badge/runtime-Python%203.13%20%7C%203.14-57606a?style=flat&logo=python&logoColor=white&labelColor=24292f)](https://www.python.org/downloads/)
 
 [Install](#install) · [Start a feature](#start-a-feature) ·
+[See a feature built](#see-a-feature-built) · [TypeSafe](#rank-and-link-with-typesafe) ·
 [Documentation](#documentation)
+
+[![One feature built with vaultspec-core: install, research, decide, cross-reference, plan, execute, verify, track, and trace, with each command's output beside the record it produced](docs/assets/feature-cycle.gif)](docs/assets/feature-cycle.mp4)
+
+One feature, from research to a traced graph: real commands on the left, the record each
+one produced on the right. [Watch the 45-second MP4](docs/assets/feature-cycle.mp4) for
+full resolution.
+
+## What you get
+
+- **Decisions before code.** A costly-to-reverse choice gets an architecture decision
+  record (ADR) grounded in research, and you approve it before implementation relies on
+  it.
+- **Plans that survive sessions.** Approved work becomes a plan of verifiable Steps. A
+  ledger records what each Step changed and how it was checked, so any agent resumes
+  from the next open Step.
+- **One linked record.** Research, decisions, plans, and ledgers link to each other in
+  `.vault/`. `vaultspec-core vault check all` keeps their structure and links sound.
+- **Your agent, your repository.** Rules, skills, and agents install into each supported
+  agent, with an MCP server for the tools. Everything is plain Markdown you commit and
+  review.
 
 ## Install
 
@@ -54,8 +80,8 @@ Open your repository in your coding agent and describe the work:
 The agent uses the parts of the workflow the task needs:
 
 - Routine changes can proceed directly within your request.
-- A costly-to-reverse choice needs evidence and an approved architecture decision record
-  (ADR). Reuse an existing accepted ADR when it already covers the work.
+- A costly-to-reverse choice needs evidence and an approved ADR. Reuse an existing
+  accepted ADR when it already covers the work.
 - Work that needs durable sequencing or handoff uses a plan, with or without a new ADR.
   The agent implements and verifies each Step, logs the changes, and reviews the
   integrated result.
@@ -75,6 +101,95 @@ For planned work, ask the agent to resume the feature from its next open Step. T
 [workflow guide](docs/framework.md#begin-a-pipeline) explains how to choose a route,
 approve work, and continue across sessions.
 
+## See a feature built
+
+This is the `search-api` request above, built in a small repository that already records
+three earlier decisions. Your agent runs these commands and writes the prose; you
+approve the decision and the plan. Each image is the command's own output; the
+cross-reference judgments come from a local stand-in for TypeSafe, as that image notes.
+
+**1. Decide.** After a research record gathers the evidence, the agent scaffolds the
+decision, linked to that research, and drafts it for your approval. Each scaffold names
+the step that usually follows.
+
+![vaultspec-core vault add adr creating the search-api decision linked to its research, and suggesting a plan as the next step](docs/assets/walkthrough/03-decide.svg)
+
+**2. Cross-reference.** [TypeSafe](#rank-and-link-with-typesafe) ranks every earlier
+decision against the new one, and `--apply` links the ones that govern the same code.
+
+![vaultspec-core vault adr crossref linking the new decision to the api-pagination and storage-layer decisions, with scores and relations](docs/assets/walkthrough/04-crossref.svg)
+
+**3. Plan.** The approved decision becomes a plan of verifiable Steps, each with the
+files it touches.
+
+![vaultspec-core vault plan step add adding three Steps to the search-api plan](docs/assets/walkthrough/05-plan.svg)
+
+**4. Execute.** For each Step, the agent logs the files it changed and the checks it ran
+to the plan's ledger, then closes the Step.
+
+![vaultspec-core vault exec log recording a Step's changed file and passing test, then vault plan step check closing it](docs/assets/walkthrough/06-execute.svg)
+
+**5. Track.** Once `vaultspec-core vault check all` passes, `status` shows what is done,
+what each Step recorded, and where the next session starts.
+
+![vaultspec-core status search-api showing two of three Steps complete with ledger rows, and S03 next](docs/assets/walkthrough/08-status.svg)
+
+**6. Trace.** The graph shows the feature's records and every link between them,
+including the decisions it now references.
+
+![vaultspec-core vault graph for search-api listing the decision, plan, ledger, research, and index with their links](docs/assets/walkthrough/09-graph.svg)
+
+## Rank and link with TypeSafe
+
+Vaultspec can use the [TypeSafe](https://docs.typesafe.ai) API to judge relevance where
+keywords fall short. It is optional, and off until you set a key in the environment your
+agent and its MCP server start from:
+
+```bash
+export VAULTSPEC_CORE_TYPESAFE_API_KEY=<your TypeSafe key>
+```
+
+With a key set, two commands rank by meaning:
+
+- **Ask the vault.** `vaultspec-core vault search` (MCP: `search`) ranks the vault's
+  records against a plain-language question and quotes the passage that answers it, with
+  its line range. Type, feature, and date filters apply before anything is sent, and
+  there is no index to build.
+- **Connect decisions.** `vaultspec-core vault adr crossref` (MCP: `crossref`) finds the
+  earlier ADRs a decision should link. It ranks every other ADR by the code and wording
+  they share, has TypeSafe rank the strongest candidates, then has it judge the best
+  pairs. `--apply` writes the new links into the ADR's `related:` field, which adds them
+  to the vault graph. Each ADR costs at most 46 requests and 60 seconds, so the cost
+  does not grow with the vault.
+
+```bash
+vaultspec-core vault search "why do pages use opaque cursors" --feature search-api
+vaultspec-core vault adr crossref 2026-09-24-search-api-adr --apply
+```
+
+Every search and cross-reference sends vault text to the TypeSafe API; setting the key
+is your consent to that. The key never appears in any output, and
+`vaultspec-core status` shows whether one is configured and where it came from. A
+project-local install can also read it from the workspace `.env`; see
+[environment variables](docs/CLI.md#environment-variables).
+
+Without a key nothing is sent, and everything else works. Both commands say that hosted
+search is not configured and name what to run instead: a vaultspec-rag search when the
+workspace provisions vaultspec-rag, otherwise `vaultspec-core vault list` and grep. See
+the [search](docs/CLI.md#vaultspec-core-vault-search) and
+[cross-reference](docs/CLI.md#vaultspec-core-vault-adr-crossref) references.
+
+## Browse and search further
+
+Open `.vault/` in [Obsidian](https://obsidian.md) to read the records and walk their
+links. A mature vault looks like this:
+
+<img src="docs/assets/obsidian-vault.png" width="720" alt="An Obsidian graph of a mature vault: clusters of linked research, decision, plan, and ledger records, beside one ADR's properties and related links">
+
+The optional [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package adds
+local semantic search across the vault and your code. Code search is always its job;
+hosted search covers the vault only.
+
 ## Documentation
 
 - [Documentation index](docs/README.md): choose a guide for your task.
@@ -83,18 +198,6 @@ approve work, and continue across sessions.
 - [Verifying a workspace](docs/verification.md): check the setup and repair errors.
 - [CLI reference](docs/CLI.md) and [MCP reference](docs/MCP.md): commands, tools, and
   configuration.
-
-Open `.vault/` in [Obsidian](https://obsidian.md) to browse its linked documents. The
-optional [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package adds
-semantic search across the vault and your code.
-
-Hosted vault search is also optional. Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` and
-`vaultspec-core vault search` (MCP: `search`) answers questions about the vault with the
-passage that answers them. Every search sends vault text to the TypeSafe API. Without a
-key, everything else works. A vault search then names what to run instead: a
-vaultspec-rag vault search when the workspace provisions vaultspec-rag, otherwise
-`vaultspec-core vault list` and grep. Code search is always vaultspec-rag's job. See
-[`vaultspec-core vault search`](docs/CLI.md#vaultspec-core-vault-search).
 
 ## Support and license
 

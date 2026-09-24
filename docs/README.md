@@ -38,10 +38,15 @@ nobody has been shown rather than a half-finished release to walk back. Fix the 
 and re-dispatch `Core Release` for the same tag; the steps that already succeeded are
 skipped or repeated harmlessly.
 
-The terminal renders and the demo GIF in `assets/` are produced by the renderers in
-`_render/`, which run `vaultspec-core` against a throwaway vault. Edit the renderer
-rather than the SVG, then run `just docs` to regenerate. That covers `demo.gif` and the
-`term-*.svg` files; the logo and the Obsidian screenshot are not generated.
+The terminal renders, the demo GIF, the README walkthrough stills, and the feature-cycle
+video in `assets/` are produced by the renderers in `_render/`, which run
+`vaultspec-core` against a throwaway vault. Edit the renderer rather than its output,
+then run `just docs-all` to regenerate. That covers `demo.gif`, the `term-*.svg` files,
+`walkthrough/*.svg`, and `feature-cycle.mp4` with its GIF; the logo and the Obsidian
+screenshot are not generated. The walkthrough and the video share one scripted build,
+whose cross-reference step runs against a local stand-in for the TypeSafe API, so
+neither needs a key or a network. The demo needs `agg`, and the video needs Chromium and
+ffmpeg.
 
 ### Update package-manager manifests
 

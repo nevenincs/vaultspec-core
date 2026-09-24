@@ -192,3 +192,19 @@ def test_render_svg_honours_start_match(tmp_path: Path) -> None:
     assert "preamble" not in svg
     assert "Vault Check" in svg
     assert "findings" in svg
+
+
+def test_render_svg_keeps_the_descenders_of_the_last_line(tmp_path: Path) -> None:
+    """Rich clips one pixel short of the last line; an underscore there vanished."""
+    from docs._render.render_readme_assets import (
+        CLIP_ALLOWANCE,
+        CLIP_TERMINAL,
+        render_svg,
+    )
+
+    out = tmp_path / "clip.svg"
+    render_svg("first\nlast_line\n", str(out), "clip", 40)
+
+    (clip,) = CLIP_TERMINAL.findall(out.read_text(encoding="utf-8"))
+    # Rich's own clip for two lines of its 24.4-pixel line box, less one pixel.
+    assert float(clip[1]) == pytest.approx(2 * 24.4 - 1 + CLIP_ALLOWANCE)
