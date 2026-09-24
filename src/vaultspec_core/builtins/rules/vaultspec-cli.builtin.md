@@ -11,8 +11,8 @@ when connected, else the `vaultspec-core` CLI. Bypassing them produces drift tha
 ## Tools
 
 The MCP server exposes `status` (in-flight plans and next open Step), `find` (documents
-and features), `search` (vault questions, answered with the passage), `crossref` (the
-ADRs a decision should link, judged within fixed bounds; CLI:
+and features), `search` (vault questions, answered with the passage), `crossref` (ADRs a
+decision should link, judged within fixed bounds; CLI:
 `vaultspec-core vault adr crossref`), `create` (scaffold, batchable), `edit` (body
 prose, batchable), `plan_progress` (check or uncheck Steps), `plan_edit` (author and
 restructure Step rows), `log` (append a Step's ledger rows), `check` (validate and
