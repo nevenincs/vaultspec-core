@@ -26,7 +26,7 @@ from .conftest import EXPECTED_TOOLS, READ_ONLY_TOOLS, data_of, vault_root
 
 __all__ = ["vault_root"]
 
-pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
+pytestmark = [pytest.mark.unit]
 
 #: vaultspec-rag's search and read tools. Core never proxies them: an agent
 #: reaches rag on rag's own MCP channel, so none of these names may appear on

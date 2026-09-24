@@ -31,7 +31,7 @@ from .conftest import data_of
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
+pytestmark = [pytest.mark.unit]
 
 
 async def _create(client: Client, documents: list[dict[str, Any]]) -> Any:
