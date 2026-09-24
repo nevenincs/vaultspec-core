@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.5](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.4...vaultspec-core-v0.2.5) (2026-09-24)
+
+
+### Features
+
+* **precommit:** one staged-scoped commit gate that honours the hook opt-out ([#555](https://github.com/nevenincs/vaultspec-core/issues/555)) ([59a7362](https://github.com/nevenincs/vaultspec-core/commit/59a736245c32a9acc6277ec51f7c5c8eaed06532))
+
+
+### Bug Fixes
+
+* **ci:** adopt the fleet's canonical workflow checkers ([#553](https://github.com/nevenincs/vaultspec-core/issues/553)) ([17a98cc](https://github.com/nevenincs/vaultspec-core/commit/17a98cc6565317d3e74a419784e7082a6e9926dd))
+* **ci:** read local composite actions when checking the just install pin ([#544](https://github.com/nevenincs/vaultspec-core/issues/544)) ([6c7e549](https://github.com/nevenincs/vaultspec-core/commit/6c7e549a3b0a2087a78be1823a3bb9f13f49ff50))
+* **ci:** repair the two release checks that could not report what they measured ([#541](https://github.com/nevenincs/vaultspec-core/issues/541)) ([066eee7](https://github.com/nevenincs/vaultspec-core/commit/066eee7670c5de301b147825645bc3d60fff91f7))
+
 ## [0.2.4](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.3...vaultspec-core-v0.2.4) (2026-09-21)
 
 
