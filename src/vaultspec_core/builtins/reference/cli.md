@@ -53,10 +53,12 @@ of that release; it is never hand-maintained.
 Commands:
 
 - `vaultspec-core commit-gate`
+- `vaultspec-core vault adr crossref`
 - `vaultspec-core vault search`
 
 MCP tools:
 
+- `crossref`
 - `search`
 
 <!-- vaultspec:generated:end unreleased-surface -->
@@ -164,6 +166,8 @@ hand-edit between the markers.
 
 #### Adr
 
+- `vaultspec-core vault adr crossref` - Find the ADRs a decision should cross-reference,
+  within fixed bounds.
 - `vaultspec-core vault adr supersede` - Supersede an old ADR with a new ADR.
 
 #### Plan
@@ -760,6 +764,33 @@ refuse), `--json`, `--no-hints`.
 `vaultspec-core vault adr supersede [OPTIONS] OLD_ADR` - mark an ADR superseded by a
 newer one. Options: `--by STEM` (the superseding ADR), `--dry-run`, `--json`.
 
+### vaultspec-core vault adr crossref
+
+`vaultspec-core vault adr crossref [OPTIONS] [REFS]...` - judge which ADRs each source
+ADR should cross-reference, with hosted search, within fixed ceilings: a code-only rank
+of every ADR, Choice questions over the best 192, and pair judgments of the best 32 plus
+up to 8 declared links. At most 46 requests and 60 seconds per source; a sweep takes at
+most 50 sources, or 52 when it must settle a refusal, and 300 seconds; a vault may hold
+at most 5,000 ADRs. Lists `link` verdicts (should be linked) and `weak` ones (declared,
+judged below the threshold, never removed), each with an advisory relation. One `REFS`
+entry is judged alone; several, `--feature TAG` (`-f`), `--isolated` (ADRs linking no
+other ADR) or `--all` (every ADR that still governs) sweep in stem order, resumable with
+`--after STEM` from the reply's `next_after` and the same selector; `--feature` and
+`--isolated` narrow together, while named ADRs and `--all` each stand alone. An ADR the
+provider refuses to read is held open while the sweep judges on, past its source limit
+by up to two more ADRs if it must: a later ADR the provider reads shows the refusal was
+that ADR's own, and the sweep moves past both. A refusal no read settles, three refusals
+in a row, or any other failure stops the sweep with `stopped` set and the cursor before
+the first refusal still open, so resuming retries from there. A link `--apply` could not
+write exits 1. `--max-sources N` (default `10`, `1`..`50`) caps a sweep. `--apply`
+writes new `link` verdicts, unread, into each source's `related:` as it finishes.
+`--json` emits `vaultspec.vault.adr.crossref.v1`: `data.sources` (each with `status`,
+`verdicts`, `links`, `written`, `verdicts_total`, `truncated`, and when they apply
+`unjudged_declared`, `write_failed`, `reason`, `next_step`, `remediation`), the totals,
+`remaining`, `next_after`, `stopped` and `usage`; at most 80 verdict rows per reply.
+Requires `VAULTSPEC_CORE_TYPESAFE_API_KEY`; without it nothing is sent and the reply is
+`not_configured` with the search to run instead. MCP: `crossref`.
+
 ### vaultspec-core vault rule promote
 
 `vaultspec-core vault rule promote [OPTIONS]` - promote an audit finding to a
@@ -973,15 +1004,16 @@ order and bumps the manifest version.
 
 ## Exit codes
 
-| Command                            | Codes                                                                                           |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `vaultspec-core vault check`       | `0` clean, `1` errors found.                                                                    |
-| `vaultspec-core vault plan check`  | `0` clean, `1` at least one ERROR-severity finding.                                             |
-| `vaultspec-core spec doctor`       | `0` all ok, `1` warnings, `2` errors (`--gate-errors` folds `1` to `0`).                        |
-| `vaultspec-core spec mcps status`  | `0` config status ok, `1` otherwise.                                                            |
-| `vaultspec-core migrations status` | `0` up to date or no manifest, `1` migrations pending.                                          |
-| `vaultspec-core migrations run`    | `0` success (including no-op), `1` a migration failed.                                          |
-| `vaultspec-core vault search`      | `0` searched, or not configured (`skipped`); `1` configured but unavailable; `2` invalid input. |
+| Command                             | Codes                                                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vaultspec-core vault check`        | `0` clean, `1` errors found.                                                                                                                   |
+| `vaultspec-core vault plan check`   | `0` clean, `1` at least one ERROR-severity finding.                                                                                            |
+| `vaultspec-core spec doctor`        | `0` all ok, `1` warnings, `2` errors (`--gate-errors` folds `1` to `0`).                                                                       |
+| `vaultspec-core spec mcps status`   | `0` config status ok, `1` otherwise.                                                                                                           |
+| `vaultspec-core migrations status`  | `0` up to date or no manifest, `1` migrations pending.                                                                                         |
+| `vaultspec-core migrations run`     | `0` success (including no-op), `1` a migration failed.                                                                                         |
+| `vaultspec-core vault search`       | `0` searched, or not configured (`skipped`); `1` configured but unavailable; `2` invalid input.                                                |
+| `vaultspec-core vault adr crossref` | `0` judged, or not configured (`skipped`); `1` configured but a source could not be judged, or a link could not be written; `2` invalid input. |
 
 ## Environment variables
 

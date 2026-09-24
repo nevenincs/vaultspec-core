@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.unit]
 
-#: The eleven tools the full surface advertises, and nothing else: nine hot
+#: The twelve tools the full surface advertises, and nothing else: ten hot
 #: tools plus the ``discover`` / ``invoke`` gateway. Every surface test holds
 #: the server against this one set, so a tool cannot join the surface in one
 #: test's view and not another's.
@@ -55,6 +55,7 @@ EXPECTED_TOOLS = frozenset(
         "status",
         "find",
         "search",
+        "crossref",
         "create",
         "edit",
         "plan_progress",
@@ -67,7 +68,9 @@ EXPECTED_TOOLS = frozenset(
 )
 
 #: The non-mutating subset the ``--read-only`` launch advertises.
-READ_ONLY_TOOLS = frozenset({"status", "find", "search", "check", "discover"})
+READ_ONLY_TOOLS = frozenset(
+    {"status", "find", "search", "crossref", "check", "discover"}
+)
 
 
 def _build_installed_workspace(dest: Path) -> None:

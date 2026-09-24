@@ -5,7 +5,7 @@ An MCPServer's tool definitions are serialized into every LLM
 request  - keeping them compact is a hard requirement.
 
 The budget is the concern here; the ``test_tool_surface`` module covers what
-the same eleven tools do end-to-end and the annotation matrix they declare.
+the same twelve tools do end-to-end and the annotation matrix they declare.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 TOOL_BUDGETS: dict[str, int] = {
     "status": 3_470,
     "search": 2_860,
+    "crossref": 2_550,
     "find": 2_370,
     "create": 1_690,
     "invoke": 1_610,
@@ -53,10 +54,11 @@ TOOL_BUDGETS: dict[str, int] = {
     "log": 1_210,
 }
 
-# Maximum number of tools: the tiered surface is nine hot tools plus the
+# Maximum number of tools: the tiered surface is ten hot tools plus the
 # discover/invoke gateway; growth beyond that needs a deliberate decision.
-# Raised from 10 by exactly one, for ``search``, the ninth hot tool.
-MAX_TOOL_COUNT = 11
+# Raised from 10 by exactly one, for ``search``, the ninth hot tool, and from
+# 11 by exactly one, for ``crossref``, the tenth.
+MAX_TOOL_COUNT = 12
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +119,7 @@ def mcp_server(tmp_path: Path) -> Generator[MCPServer[None]]:
 def surface(
     request: pytest.FixtureRequest, tmp_path: Path
 ) -> Generator[MCPServer[None]]:
-    """Build the server on each surface: all eleven tools, and read-only's five.
+    """Build the server on each surface: all twelve tools, and read-only's six.
 
     Read-only registers a subset, and ``check`` without its repair argument,
     so a change that bloats a shared result model surfaces there at a

@@ -27,6 +27,13 @@ the work, including across features; return its stem without drafting a duplicat
   `create`). Read `.vaultspec/templates/adr.md`.
 - Draft the decision, or dispatch `vaultspec-adr-researcher` with the existing evidence
   and requested decision scope; it returns content for persistence.
+- Once the decision sections are persisted, cross-reference the ADR with `crossref`
+  (CLI: `vaultspec-core vault adr crossref <adr-stem>`). This step is optional and
+  recommended. Read each `link` verdict's ADR and add the ones you confirm to `related:`
+  with `vaultspec-core vault link add`. Read in full every pair labelled `supersedes`,
+  `refines`, or `conflicts` before you settle amendment, supersession, or a distinct
+  decision. The label marks a pair to read; it never decides. When the reply is
+  `not_configured` or `unavailable`, run the next step it names instead.
 - For an amendment, preserve accepted content while proposing the revision separately.
   Follow the system's pending-proposal procedure if it must survive handoff.
 - For a reversal, draft the successor first. After its content is authorized, set it

@@ -29,6 +29,7 @@ from vaultspec_core.cli._app import MCP_PROG_NAME, make_app
 
 from .envelope import lean_tool_schema
 from .tools import (
+    register_crossref_tools,
     register_document_tools,
     register_exec_tools,
     register_gateway_tools,
@@ -40,10 +41,15 @@ from .tools import (
 logger = logging.getLogger(__name__)
 
 
-class _ReadOnlyCheckGuard(Extension):
-    """Reject repair arguments that the SDK would otherwise ignore."""
+class _ReadOnlyArgumentGuard(Extension):
+    """Reject write arguments that the SDK would otherwise ignore.
 
-    identifier = "io.vaultspec/read-only-check"
+    The read-only ``check`` takes no ``fix`` and the read-only ``crossref``
+    takes one ``ref``; the SDK drops an undeclared argument silently, which
+    would let a caller believe a repair or a link write ran.
+    """
+
+    identifier = "io.vaultspec/read-only-arguments"
 
     @override
     async def intercept_tool_call(
@@ -52,14 +58,15 @@ class _ReadOnlyCheckGuard(Extension):
         ctx: ServerRequestContext[Any, Any],
         call_next: CallNext,
     ) -> HandlerResult:
-        if params.name == "check" and "fix" in (params.arguments or {}):
+        arguments = params.arguments or {}
+        refused: str | None = None
+        if params.name == "check" and "fix" in arguments:
+            refused = "read-only check does not accept the 'fix' argument"
+        elif params.name == "crossref" and set(arguments) - {"ref"}:
+            refused = "read-only crossref judges one 'ref' and writes nothing"
+        if refused is not None:
             return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text="read-only check does not accept the 'fix' argument",
-                    )
-                ],
+                content=[TextContent(type="text", text=refused)],
                 is_error=True,
             )
         return await call_next(ctx)
@@ -115,8 +122,9 @@ def _build_instructions(*, read_only: bool) -> str:
             f"{__version__}). It exposes only 'status' (project orientation and "
             "grounding traces), 'find' (document and feature discovery with blob "
             "hashes and resource links), 'search' (ranked vault records with the "
-            "passage that answers a question), 'check' (vault health validation "
-            "without repair), and 'discover' (read-only search of the verb "
+            "passage that answers a question), 'crossref' (the ADRs one decision "
+            "should link, judged within fixed bounds), 'check' (vault health "
+            "validation without repair), and 'discover' (read-only search of the verb "
             "catalog). Mutation tools and the invocation gateway are deliberately "
             "absent."
         )
@@ -127,8 +135,10 @@ def _build_instructions(*, read_only: bool) -> str:
         "'status' (project orientation and grounding traces), 'find' (document "
         "and feature discovery with blob hashes and resource links), 'search' "
         "(ranked vault records with the passage that answers a question), "
-        "'create' (batch document scaffolding from templates), 'edit' (batch "
-        "body-prose editing with optimistic-concurrency guards), 'plan_progress' "
+        "'crossref' (the ADRs a decision should link, judged within fixed "
+        "bounds, optionally written), 'create' (batch document scaffolding "
+        "from templates), 'edit' (batch body-prose editing with "
+        "optimistic-concurrency guards), 'plan_progress' "
         "(mark plan steps checked/unchecked), 'plan_edit' (add/insert/edit/remove "
         "plan steps), 'log' (append a Step's rows to its plan's execution "
         "ledger), and 'check' (vault health checks with optional fix). "
@@ -172,7 +182,7 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
         name="vaultspec-core-mcp",
         instructions=_build_instructions(read_only=read_only),
         lifespan=_lifespan,
-        extensions=[_ReadOnlyCheckGuard()] if read_only else None,
+        extensions=[_ReadOnlyArgumentGuard()] if read_only else None,
     )
 
     # The restricted mode is a positive allowlist: only non-mutating handlers
@@ -180,6 +190,7 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
     register_document_tools(mcp, include_mutations=not read_only)
     register_orientation_tools(mcp, include_fix=not read_only)
     register_search_tools(mcp)
+    register_crossref_tools(mcp, include_apply=not read_only)
     if not read_only:
         register_plan_tools(mcp)
         register_exec_tools(mcp)

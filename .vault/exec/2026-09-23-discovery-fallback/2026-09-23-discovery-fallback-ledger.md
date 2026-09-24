@@ -6,6 +6,7 @@ date: '2026-09-23'
 modified: '2026-09-24'
 body_schema: 'body-v2'
 body_hash: 'sha256:689e3a21673c46df253977a12df2bcf19170d5ad947503eb4300986dfebc556f'
+body_hash: 'sha256:4f22532eff4cae3dea6239a97ef3267b2a48b22819292639f56a8b77b8e4d522'
 related:
   - "[[2026-09-23-discovery-fallback-plan]]"
 ---

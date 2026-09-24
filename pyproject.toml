@@ -563,6 +563,10 @@ reportInvalidCast = "error"
 
   [[tool.basedpyright.executionEnvironments]]
   reportPrivateUsage = false
+  root = "src/vaultspec_core/crossref/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  reportPrivateUsage = false
   root = "src/vaultspec_core/mcp_server/tests"
 
   [[tool.basedpyright.executionEnvironments]]

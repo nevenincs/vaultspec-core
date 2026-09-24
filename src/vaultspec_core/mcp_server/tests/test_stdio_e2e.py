@@ -42,7 +42,7 @@ async def _drive_session(project: Path) -> None:
 
     Spawns ``python -m vaultspec_core.mcp_server.app`` as a child, rooted at a
     real installed vault, and exercises: the ``initialize`` handshake, the
-    eleven-tool ``list_tools`` surface with output schemas, a structured ``status``
+    twelve-tool ``list_tools`` surface with output schemas, a structured ``status``
     call, the load-bearing ``invoke`` of a real long-tail verb, and denylist
     rejection - all over the actual JSON-RPC-on-stdio transport.
     """

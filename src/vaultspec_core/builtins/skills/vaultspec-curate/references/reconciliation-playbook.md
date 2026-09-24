@@ -23,6 +23,22 @@ first; this playbook assumes the canonical status set.
 
 For each cluster of decisions on a shared concept:
 
+- Start from one cross-reference sweep. `vaultspec-core vault adr crossref --all --json`
+  (MCP: `crossref`) judges each ADR against the rest within fixed ceilings: at most 50
+  ADRs a sweep, 46 paid requests and 60 seconds an ADR. `--isolated` takes only ADRs
+  that link no other ADR. Take one sweep per curation run and report its `next_after`,
+  `remaining`, and `stopped` in the audit; the next sweep repeats the selector with
+  `--after <next_after>` on the orchestrator's go-ahead. On `not_configured`, run the
+  next step the reply names. On `stopped`, report the reason; a sweep stopped on time or
+  a transient failure is resumed later, and one stopped on a refusal (`content_rejected`
+  or `request_too_large`) means no read settled it: cross-reference one other ADR on its
+  own, and if that is judged, cross-reference the first refused ADR on its own. If it is
+  refused again, its refusal is its own: record it and resume with `--after` set to it.
+  Otherwise resume as usual. Every refused source at or before `next_after` was refused
+  on its own text, whether or not the sweep stopped: record it. Each `link` verdict is a
+  candidate missing link; each `weak` verdict is a declared link judged below the
+  threshold. The `relation` label says which pairs to read in full; it does not classify
+  the pair for you.
 - Surface the cluster with the `vaultspec-discovery` rule's decision search and ADR
   listing. Search finds same-topic ADRs that share no obvious filename or feature tag;
   the listing catches what search misses.
@@ -80,6 +96,11 @@ Classify every finding into one of these, because the action differs by class:
   successor, or disconnected from the decision graph.
 - **Off-taxonomy or missing status (mechanical).** A status value outside the canonical
   set, or none at all.
+- **Missing cross-reference (safe once confirmed).** A `crossref` `link` verdict the
+  source does not declare, which reading both ADRs confirms.
+- **Weak declared link (judgment).** A declared ADR link `crossref` judged below the
+  threshold. The link may be stale, or the two decisions may share context the judgment
+  missed.
 - **Restated grounding (content-preserving).** An ADR re-narrates evidence its grounding
   documents record, substance identical. Safe to fix.
 - **Displaced decision (content-preserving when homed; judgment when homeless).** A
@@ -118,6 +139,11 @@ Classify every finding into one of these, because the action differs by class:
   Implementation prose via `vaultspec-core vault set-body` / `vaultspec-core vault edit`
   and note it in the audit.
 - **Orphaned or stranded.** Surface in the audit with the graph evidence.
+- **Missing cross-reference.** Add each confirmed link with
+  `vaultspec-core vault link add`. Links go on the source only. Never rerun a sweep with
+  `--apply` to write links you read: a rerun judges again and writes its own verdicts.
+- **Weak declared link.** Never remove it on the verdict alone. Read both ADRs and
+  record the link in the audit with a recommendation to keep or remove it.
 - **Restated grounding.** Confirm the fact exists in the grounding document; if the ADR
   is its only home, relocate it into the grounding body first. Then replace the ADR's
   restatement with a stem citation (e.g. "per `2026-02-04-editor-demo-research`, ...")
