@@ -137,9 +137,12 @@ def data_of(result: CallToolResult) -> Any:
     return sc
 
 
-#: Overall ceiling for one stdio client session. Deliberately below the 60s
-#: ``invoke`` subprocess timeout so a stdin-inheritance regression trips this
-#: bound and fails fast rather than hanging CI to the per-call ceiling.
+#: Ceiling for one stdio client session, from spawn to close. Deliberately
+#: below the 60s ``invoke`` subprocess timeout so a stdin-inheritance
+#: regression trips this bound and fails fast rather than hanging CI to the
+#: per-call ceiling. It bounds each session rather than a whole test: a test
+#: that opens several sessions would otherwise share one budget between
+#: server launches, and a loaded machine fails it without anything hanging.
 STDIO_SESSION_TIMEOUT = 45.0
 
 
@@ -191,6 +194,10 @@ async def stdio_session(
 
     Yields:
         A client session over the child's stdio.
+
+    Raises:
+        TimeoutError: When the session, including the caller's calls on it,
+            outlives :data:`STDIO_SESSION_TIMEOUT`.
     """
     base = os.environ if environ is None else environ
     params = StdioServerParameters(
@@ -200,6 +207,7 @@ async def stdio_session(
         env={**base, "VAULTSPEC_TARGET_DIR": str(project)},
     )
     async with (
+        asyncio.timeout(STDIO_SESSION_TIMEOUT),
         _server_errlog() as errlog,
         stdio_client(params, errlog=errlog) as (read, write),
         ClientSession(read, write) as session,
@@ -210,12 +218,13 @@ async def stdio_session(
 def run_in_fresh_workspace(
     driver: Callable[[Path], Coroutine[Any, Any, None]], *, prefix: str
 ) -> None:
-    """Install a fresh workspace and run *driver* against it within the ceiling.
+    """Install a fresh workspace and run *driver* against it.
 
     For the stdio tests, which own their event loop: they run through
     :func:`asyncio.run` (the default Windows policy is the Proactor loop the
-    stdio transport requires), so they need no async plugin marker and fail
-    fast on :data:`STDIO_SESSION_TIMEOUT` rather than hanging.
+    stdio transport requires), so they need no async plugin marker. Each
+    session the driver opens fails fast on :data:`STDIO_SESSION_TIMEOUT`
+    rather than hanging.
 
     Args:
         driver: Drives one or more sessions against the workspace root.
@@ -225,11 +234,7 @@ def run_in_fresh_workspace(
     project = Path(tempfile.mkdtemp(prefix=prefix)).resolve()
     try:
         WorkspaceFactory(project).install()
-
-        async def _runner() -> None:
-            await asyncio.wait_for(driver(project), timeout=STDIO_SESSION_TIMEOUT)
-
-        asyncio.run(_runner())
+        asyncio.run(driver(project))
     finally:
         reset_config()
         shutil.rmtree(project, ignore_errors=True)
