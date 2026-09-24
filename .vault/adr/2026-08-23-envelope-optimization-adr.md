@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#envelope-optimization'
 date: '2026-08-23'
-modified: '2026-08-23'
+modified: '2026-09-24'
 body_schema: 'body-v1'
-body_hash: 'sha256:f6bf0189114dd2c853eb596d2f0c145027bea76ec6d9006c42e49a17a1d43d2c'
+body_hash: 'sha256:51e85b0383a28c45252734b096b6385d6167b57fd4856daff2a486fd90765b8f'
 related:
   - "[[2026-08-23-envelope-optimization-research]]"
 ---
@@ -122,6 +122,25 @@ The contract inversion follows. The quadratic enumeration is then bounded at the
 streaming candidate pairs through a bounded per-node structure rather than materialising the
 full pair set. Per-command envelopes follow in measured-byte order, and the static schema
 surface last, since it is fixed cost rather than corpus-scaled.
+
+**Amendment note, 2026-09-24, per-tool definition budgets**: decided by the orchestrating agent
+on the user's explicit delegation in session on 2026-09-24 ("Make your best decision - the tool
+limits need to be optimized and made relevant to this tool"). The aggregate definition ceiling
+had been raised three times on the `typesafe-search` branch, to 26,115 characters, against the
+ratchet rule above.
+
+- **Budgets are per tool.** Each tool has its own measured character ceiling. The full and
+  read-only surface ceilings are the sums of those entries, so no aggregate number is set on its
+  own.
+- **Growth shows up.** A new tool, or growth in an existing one, changes that tool's entry,
+  where review sees it. Entries move down as work lands.
+- **Leaning is a schema-generation hook, not prose editing.** The hook applies to every
+  published input and output schema. It removes derived titles, optional-property null
+  branches and null defaults, and it inlines single-use definitions. Descriptions use single
+  backticks on the wire.
+- **Result.** The full surface fell from 26,111 to 20,345 characters, about 5,880 tokens, and
+  the read-only surface from 13,875 to 11,275. The 5,000-token target stands, and closing the
+  remaining gap is the next ratchet step.
 
 ## Rationale
 
