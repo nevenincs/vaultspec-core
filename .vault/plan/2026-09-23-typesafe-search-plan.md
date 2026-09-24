@@ -6,9 +6,9 @@ date: '2026-09-23'
 tier: L1
 related:
   - '[[2026-09-23-typesafe-search-adr]]'
-modified: '2026-09-23'
+modified: '2026-09-24'
 body_schema: body-v2
-body_hash: 'sha256:2e1fc893f1f5fed64ca4b7485c0a8a6a0a0abdac4f8dcddf1980dc0921440bcd'
+body_hash: 'sha256:ddd418b345a6c1ed57b5dc4d21f8f010be8213a918e2bde1352dc3d63e64f14a'
 ---
 
 # `typesafe-search` plan
@@ -50,6 +50,7 @@ fence regexes and two section scanners, before the search corpus builds on them.
 - [x] `S12` - Rehome the frontmatter re-rendering helpers and the related-block walkers onto one canonical implementation each; `src/vaultspec_core/core/adr.py, src/vaultspec_core/core/rules.py, src/vaultspec_core/vaultcore/checks/frontmatter.py, src/vaultspec_core/vaultcore/rename_ops.py, src/vaultspec_core/vaultcore/query_rename.py, src/vaultspec_core/vaultcore/related_surgery.py`.
 - [x] `S13` - Register every environment variable the code reads in the config registry, route all reads through config, and resolve the hosted-search credential in the config layer; `src/vaultspec_core/config/, .env.example, src/vaultspec_core/search/_credential.py, src/vaultspec_core/cli/, src/vaultspec_core/core/, src/vaultspec_core/mcp_server/, src/vaultspec_core/triggers/`.
 - [x] `S14` - Guard environment-variable drift: every variable read or registered is documented in .env.example, and no read happens outside the config layer; `dev/guards/, src/vaultspec_core/config/tests/`.
+- [ ] `S15` - Optimise the MCP tool surface through schema-generation hooks and replace the aggregate definition ceilings with measured per-tool budgets whose sum is the surface ceiling; `src/vaultspec_core/mcp_server/envelope.py, src/vaultspec_core/mcp_server/tools/, src/vaultspec_core/mcp_server/tests/test_context_budget.py, docs/MCP.md`.
 
 ## Parallelization
 
