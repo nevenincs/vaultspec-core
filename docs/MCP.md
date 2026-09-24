@@ -241,11 +241,7 @@ from the recorded surface of that release, so it empties itself when the next on
 
 <!-- vaultspec:generated:begin unreleased-mcp-surface -->
 
-The latest published release is `0.2.4`. These tools are on this branch and not in that
-release, so a host installing the published server will not see them:
-
-- `crossref`
-- `search`
+The latest published release is `0.2.5`, and every tool above is in it.
 
 <!-- vaultspec:generated:end unreleased-mcp-surface -->
 
