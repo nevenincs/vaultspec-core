@@ -2,7 +2,8 @@
 
 ``tool_description`` drops what the model cannot act on - the ``Returns:`` and
 ``Raises:`` sections and the ``ctx`` argument no input schema carries - and
-must keep every argument a caller can pass. The unit test pins the trimming on
+must keep every argument a caller can pass, rendered in the Markdown a model
+reads rather than reST's layout. The unit tests pin the trimming on
 a docstring shaped as ``inspect.getdoc`` leaves it; the server test reads the
 registered tools themselves.
 """
@@ -55,9 +56,28 @@ def test_every_argument_after_ctx_survives() -> None:
         "Answer a question.\n"
         "\n"
         "Args:\n"
-        "    query: The question, in plain language.\n"
-        "    limit: Hits to return, clamped to\n"
-        "        the ceiling."
+        "query: The question, in plain language.\n"
+        "limit: Hits to return, clamped to the ceiling."
+    )
+
+
+def _literal(path: str) -> None:
+    """Read ``path`` and pass ``--json`` or ``--dry-run``.
+
+    Args:
+        path: A path, as ``stem`` or
+            ``stem.md``; see ``find``.
+    """
+    _ = path
+
+
+@pytest.mark.unit
+def test_a_rest_literal_renders_as_a_markdown_literal() -> None:
+    assert tool_description(_literal) == (
+        "Read `path` and pass `--json` or `--dry-run`.\n"
+        "\n"
+        "Args:\n"
+        "path: A path, as `stem` or `stem.md`; see `find`."
     )
 
 

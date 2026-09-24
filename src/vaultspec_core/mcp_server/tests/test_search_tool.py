@@ -434,8 +434,11 @@ async def test_search_is_registered_with_its_bounds_on_both_surfaces(
     assert properties["query"]["maxLength"] == MAX_QUERY_CHARS
     assert properties["limit"]["maximum"] == MAX_RESULTS
     assert properties["limit"]["default"] == DEFAULT_RESULTS
-    for searchable in SEARCHABLE_TYPES:
-        assert searchable.value in properties["type"]["description"]
+    # The filter offers exactly the types search ranks, never one it refuses.
+    assert properties["type"]["items"]["enum"] == [
+        doc_type.value for doc_type in DocType if doc_type in SEARCHABLE_TYPES
+    ]
+    assert DocType.INDEX.value not in properties["type"]["items"]["enum"]
 
 
 @pytest.mark.unit
@@ -446,9 +449,17 @@ async def test_the_output_schema_describes_the_domain_shapes_leanly(
     schema = search.output_schema
     assert schema is not None
 
-    definitions = schema["$defs"]
-    for shape in (Excerpt, SearchUsage, NextStep):
-        definition = definitions[shape.__name__]
+    # A shape used twice is described once and referenced; a shape used once
+    # is inlined where it is used.
+    hit = schema["properties"]["hits"]["items"]["properties"]
+    assert hit["excerpt"] == hit["supporting"] == {"$ref": "#/$defs/Excerpt"}
+    assert list(schema["$defs"]) == [Excerpt.__name__]
+    shapes = {
+        Excerpt: schema["$defs"][Excerpt.__name__],
+        SearchUsage: schema["properties"]["usage"],
+        NextStep: schema["properties"]["next_step"],
+    }
+    for shape, definition in shapes.items():
         fields = list(shape.__dataclass_fields__)
         # Every field is always serialised, so every field is required, and
         # the maintainer docstring and derived titles stay off the wire.
@@ -458,13 +469,13 @@ async def test_the_output_schema_describes_the_domain_shapes_leanly(
         for prop in definition["properties"].values():
             assert "title" not in prop
             assert "default" not in prop
-    assert definitions["SearchUsage"]["properties"]["elapsed_ms"]["type"] == "integer"
+    assert shapes[SearchUsage]["properties"]["elapsed_ms"]["type"] == "integer"
     # An enum field of a shape ships as its values, with no definition of its own.
-    assert definitions["NextStep"]["properties"]["kind"] == {
+    assert shapes[NextStep]["properties"]["kind"] == {
         "enum": [kind.value for kind in NextStepKind],
         "type": "string",
     }
-    assert NextStepKind.__name__ not in definitions
+    assert NextStepKind.__name__ not in schema["$defs"]
     # A result is never input, so none of its properties carries a default.
     assert all("default" not in prop for prop in schema["properties"].values())
 
@@ -479,9 +490,11 @@ async def test_find_and_search_share_one_declaration_of_each_filter(
 
     assert find["feature"] == search["feature"]
     assert find["date"] == search["date"]
-    for properties in (find, search):
-        items = properties["type"]["anyOf"][0]["items"]
-        assert items["enum"] == [doc_type.value for doc_type in DocType]
+    # Find lists every record type; search lists the ones it ranks.
+    assert find["type"]["items"]["enum"] == [doc_type.value for doc_type in DocType]
+    assert search["type"]["items"]["enum"] == [
+        doc_type.value for doc_type in DocType if doc_type in SEARCHABLE_TYPES
+    ]
     # The type descriptions differ only in the default each tool applies.
     assert find["type"]["description"] != search["type"]["description"]
 

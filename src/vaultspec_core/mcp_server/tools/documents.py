@@ -40,7 +40,7 @@ from ...core.windowing import clip_text
 from ...vaultcore.markdown import iter_headings
 from ...vaultcore.models import DocType, vault_today
 from ...vaultcore.parser import split_frontmatter
-from ..envelope import LeanModel, compact_result
+from ..envelope import LeanModel, LeanResult, compact_result
 from ..filters import DateFilter, FeatureFilter, TypeFilter
 from ..isolation import isolated_context as _isolated_context
 from ..results import (
@@ -76,7 +76,7 @@ _FindTypes = Annotated[
 ]
 
 
-class FindEntry(LeanModel):
+class FindEntry(LeanResult):
     """One ``find`` result row, covering both find modes as a superset.
 
     Feature-listing mode populates the feature fields (``doc_count`` /
@@ -1070,10 +1070,9 @@ def register_document_tools(
 
         Each spec is normalized, its related references resolved, and its
         feature lifecycle validated (against the vault including earlier
-        same-batch items) before scaffolding through the owning
-        ``create_vault_doc`` core.  Items apply sequentially and item
-        failures do not abort the batch.  The affected feature indexes are
-        regenerated as an automatic side effect.
+        same-batch items) before scaffolding. Items apply sequentially and
+        item failures do not abort the batch. The affected feature indexes
+        are regenerated as an automatic side effect.
 
         A failed schema migration aborts the call, not an item: no
         envelope, nothing written.
@@ -1156,10 +1155,10 @@ def register_document_tools(
 
         Each operation composes a full body (``set_body`` replaces it;
         ``append_section`` / ``replace_section`` address an existing section
-        by exact heading text) and routes the write through the shared edit
-        engine, which enforces the optional ``expected_blob_hash`` guard,
-        runs pre-write conformance checks, and returns the post-write blob
-        hash for chaining.  Frontmatter and filenames are never touched.
+        by exact heading text). The write enforces the optional
+        ``expected_blob_hash`` guard, runs pre-write conformance checks, and
+        returns the post-write blob hash for chaining. Frontmatter and
+        filenames are never touched.
 
         Args:
             ctx: The MCP request context.

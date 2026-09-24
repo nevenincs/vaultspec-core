@@ -64,7 +64,7 @@ from ..catalog import (
     CommandCatalog,
     build_catalog,
 )
-from ..envelope import LeanModel, compact_result
+from ..envelope import LeanResult, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -91,7 +91,7 @@ _KILL_GRACE = 2.0
 # ---------------------------------------------------------------------------
 
 
-class FlagSchema(LeanModel):
+class FlagSchema(LeanResult):
     """One declared option of a discovered verb.
 
     Attributes:
@@ -105,7 +105,7 @@ class FlagSchema(LeanModel):
     help: str = ""
 
 
-class ArgumentSchema(LeanModel):
+class ArgumentSchema(LeanResult):
     """One declared positional argument of a discovered verb.
 
     Attributes:
@@ -120,7 +120,7 @@ class ArgumentSchema(LeanModel):
     variadic: bool = False
 
 
-class VerbSchema(LeanModel):
+class VerbSchema(LeanResult):
     """A ranked verb returned by ``discover`` with its full parameter schema.
 
     Attributes:
@@ -141,7 +141,7 @@ class VerbSchema(LeanModel):
     arguments: list[ArgumentSchema] = Field(default_factory=list)
 
 
-class DiscoverResult(LeanModel):
+class DiscoverResult(LeanResult):
     """The whole-call result of a ``discover`` invocation.
 
     Attributes:
@@ -160,7 +160,7 @@ class DiscoverResult(LeanModel):
 # ---------------------------------------------------------------------------
 
 
-class InvokeError(LeanModel):
+class InvokeError(LeanResult):
     """The structured failure payload of a verb that ran but did not succeed.
 
     Attributes:
@@ -178,7 +178,7 @@ class InvokeError(LeanModel):
     message: str
 
 
-class InvokeResult(LeanModel):
+class InvokeResult(LeanResult):
     """The whole-call result of an ``invoke`` invocation.
 
     A verb that runs and exits non-zero is a *successful* ``invoke`` reporting
@@ -659,8 +659,7 @@ def register_gateway_tools(
 
         Ranks every cataloged verb against ``query`` across its path and
         description and returns the best matches with their full parameter
-        schemas, so a verb's schema enters context only when the agent
-        deliberately fetches it. The returned verbs are exactly those
+        schemas. The returned verbs are exactly those
         addressable by ``invoke`` - the static denylist is already applied.
 
         Args:

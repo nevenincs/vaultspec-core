@@ -12,6 +12,8 @@ the model. The record-type filter is typed by
 :class:`~vaultspec_core.vaultcore.models.DocType` itself, so the accepted
 values are the vault's own type list, listed in the schema, and an unknown
 type is refused by schema validation rather than silently matching nothing.
+Search ranks fewer types than the vault holds, so its filter lists the search
+package's own set: a type every search refuses is not one to offer.
 """
 
 from __future__ import annotations
@@ -20,10 +22,11 @@ from typing import Annotated
 
 from pydantic import Field
 
+from ..search import SEARCHABLE_TYPES
 from ..vaultcore.models import DocType
 from .envelope import LeanEnum
 
-__all__ = ["DateFilter", "FeatureFilter", "TypeFilter"]
+__all__ = ["DateFilter", "FeatureFilter", "SearchTypeFilter", "TypeFilter"]
 
 #: A feature tag, without the leading ``#``.
 FeatureFilter = Annotated[str | None, Field(description="Feature tag, no '#'.")]
@@ -34,3 +37,6 @@ DateFilter = Annotated[str | None, Field(description="Exact date, YYYY-MM-DD.")]
 #: The record types to keep. The enum's values are the whole contract, so its
 #: docstring stays off the wire.
 TypeFilter = list[Annotated[DocType, LeanEnum()]] | None
+
+#: The record types a search may keep: the searchable ones alone.
+SearchTypeFilter = list[Annotated[DocType, LeanEnum(SEARCHABLE_TYPES)]] | None

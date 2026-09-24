@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-24'
 body_schema: 'body-v2'
-body_hash: 'sha256:bffa8741af5e669dc05cc290c5a22f636a8978730037bd6878341878e82e9519'
+body_hash: 'sha256:18f4fcad27c35a6084dfe58b9f2901c53842bc6db6cb45b79743363e5e345555'
 related:
   - "[[2026-09-23-typesafe-search-plan]]"
 ---
@@ -313,3 +313,21 @@ related:
 - `S13` `M` `src/vaultspec_core/cli/spec_cmd_agents.py`
 - `S13` `verify:` `just framework-reference` -> `pass`
 - `S13` `verify:` `pytest test_watchdog.py -m serial` -> `pass`
+- `S15` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/envelope.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/filters.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/results.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_context_budget.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_log_tool.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_orientation_tools.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_result_schema_nulls.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_tool_description.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/exec.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/gateway.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/plan.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S15` `A` `src/vaultspec_core/mcp_server/tests/test_lean_tool_schema.py`
+- `S15` `verify:` `pytest mcp_server tests` -> `pass`
+- `S15` `verify:` `measure_tools full surface 20345 chars` -> `pass`

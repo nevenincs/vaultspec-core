@@ -140,15 +140,18 @@ async def test_status_schema_omits_null_only_where_the_wire_does(
     schema = tools["status"].output_schema
     assert schema is not None
 
+    properties = schema["properties"]
     # Absent outside rollup mode, never null.
-    assert schema["properties"]["companion"] == {"$ref": "#/$defs/CompanionCapability"}
-    assert "null" not in json.dumps(schema["properties"]["target"])
+    companion = properties["companion"]
+    assert "anyOf" not in companion
+    assert companion["type"] == "object"
+    assert "null" not in json.dumps(properties["target"])
     # Always present, null when the plan has no open step.
-    line = schema["$defs"]["PlanProgressLine"]
+    line = properties["plans_in_flight"]["items"]
     assert "next_open_step" in line["required"]
     assert line["properties"]["next_open_step"] == {"type": ["string", "null"]}
     # A dataclass field that may be null keeps null among its values.
-    mode = schema["$defs"]["CompanionCapability"]["properties"]["mode"]
+    mode = companion["properties"]["mode"]
     assert None in mode["enum"]
 
 

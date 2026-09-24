@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
+    from mcp.types import Tool
 
 from mcp.server.extension import Extension
 from mcp.server.mcpserver import MCPServer
@@ -26,6 +27,7 @@ from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 from vaultspec_core import __version__
 from vaultspec_core.cli._app import MCP_PROG_NAME, make_app
 
+from .envelope import lean_tool_schema
 from .tools import (
     register_document_tools,
     register_exec_tools,
@@ -61,6 +63,38 @@ class _ReadOnlyCheckGuard(Extension):
                 is_error=True,
             )
         return await call_next(ctx)
+
+
+class _LeanToolServer(MCPServer[None]):
+    """An ``MCPServer`` whose tool list publishes leaned schemas.
+
+    The SDK builds each tool's input schema from the function signature and
+    wraps a ``list`` result in an output model of its own; neither passes a
+    hook this project's models declare. ``tools/list`` is answered from
+    :meth:`list_tools`, so leaning the schemas here changes what every client,
+    and every test that lists tools, reads - and nothing else: arguments are
+    still validated by the SDK's argument model and results by the declared
+    output model.
+    """
+
+    @override
+    async def list_tools(self) -> list[Tool]:
+        """List the registered tools with :func:`lean_tool_schema` applied.
+
+        Returns:
+            The published tools.
+        """
+        return [
+            tool.model_copy(
+                update={
+                    "input_schema": lean_tool_schema(tool.input_schema),
+                    "output_schema": None
+                    if tool.output_schema is None
+                    else lean_tool_schema(tool.output_schema),
+                }
+            )
+            for tool in await super().list_tools()
+        ]
 
 
 def _build_instructions(*, read_only: bool) -> str:
@@ -134,7 +168,7 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
     Returns:
         Configured :class:`~mcp.server.mcpserver.MCPServer` ready to serve.
     """
-    mcp = MCPServer(
+    mcp = _LeanToolServer(
         name="vaultspec-core-mcp",
         instructions=_build_instructions(read_only=read_only),
         lifespan=_lifespan,

@@ -23,7 +23,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from ...core.types import get_context as _get_ctx
-from ..envelope import LeanModel, compact_result
+from ..envelope import LeanModel, LeanResult, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -100,7 +100,7 @@ class PlanEditOperation(LeanModel):
 # ---------------------------------------------------------------------------
 
 
-class StepChangeResult(LeanModel):
+class StepChangeResult(LeanResult):
     """The outcome of one ``plan_progress`` state change.
 
     Attributes:
@@ -118,7 +118,7 @@ class StepChangeResult(LeanModel):
     error: dict[str, Any] | None = None
 
 
-class PlanProgressResult(LeanModel):
+class PlanProgressResult(LeanResult):
     """The whole-call result of a ``plan_progress`` invocation.
 
     Attributes:
@@ -140,7 +140,7 @@ class PlanProgressResult(LeanModel):
     next_open_step: str | None
 
 
-class PlanEditItemResult(LeanModel):
+class PlanEditItemResult(LeanResult):
     """The outcome of one ``plan_edit`` operation.
 
     Attributes:
@@ -158,7 +158,7 @@ class PlanEditItemResult(LeanModel):
     error: dict[str, Any] | None = None
 
 
-class PlanEditResult(LeanModel):
+class PlanEditResult(LeanResult):
     """The whole-call result of a ``plan_edit`` invocation.
 
     Attributes:
@@ -423,11 +423,11 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
         """Mark plan steps closed or open by canonical identifier.
 
         Resolves the plan by feature tag or stem, then applies each explicit
-        ``checked`` / ``unchecked`` state through the plan step-ops core. A
-        step already in the requested state is a successful ``unchanged``; an
-        unresolvable step id is a per-item ``failed``. The plan is written
-        once at the end (only when a state actually changed), and the
-        updated completion counts and next open step are returned.
+        ``checked`` / ``unchecked`` state. A step already in the requested
+        state is a successful ``unchanged``; an unresolvable step id is a
+        per-item ``failed``. The plan is written once at the end (only when a
+        state actually changed), and the updated completion counts and next
+        open step are returned.
 
         Args:
             ctx: The MCP request context (unused; logging routes through the
@@ -484,11 +484,11 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
         """Author plan steps: add, insert, edit, or remove.
 
         Resolves the plan by feature tag or stem, then applies each
-        operation through the plan step-ops core that owns canonical
-        identifiers and the gap-no-reuse rule. Operations apply sequentially
-        against one parsed plan and item failures do not abort the batch; the
-        plan is serialised and written once at the end. Phase and wave
-        operations are not first-class here - they live behind the gateway.
+        operation; a retired step identifier is never reused. Operations
+        apply sequentially against one parsed plan and item failures do not
+        abort the batch; the plan is serialised and written once at the end.
+        Phase and wave operations are not first-class here - they live behind
+        the gateway.
 
         Args:
             ctx: The MCP request context (unused; logging routes through the

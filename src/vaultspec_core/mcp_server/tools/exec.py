@@ -9,14 +9,14 @@ plan resolution is authored here.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from ...core.types import get_context as _get_ctx
-from ..envelope import LeanModel, compact_result
+from ..envelope import LeanResult, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ __all__ = ["LogResult", "register_exec_tools"]
 _ExecToolContext = Context[None, Any]
 
 
-class LogResult(LeanModel):
+class LogResult(LeanResult):
     """The result of one ``log`` call.
 
     Attributes:
@@ -53,15 +53,12 @@ class LogResult(LeanModel):
 
 def _log_summary(payload: object) -> str:
     """One-line summary of a :class:`LogResult` for the compact envelope."""
-    if not isinstance(payload, dict):
-        return str(payload)
-    data = cast("dict[str, Any]", payload)
+    if not isinstance(payload, LogResult):
+        return type(payload).__name__
     verb = (
-        "created"
-        if data.get("created")
-        else ("logged" if data.get("changed") else "unchanged")
+        "created" if payload.created else ("logged" if payload.changed else "unchanged")
     )
-    return f"{verb}: {data.get('step')} -> {data.get('path')} ({data.get('rows')} rows)"
+    return f"{verb}: {payload.step} -> {payload.path} ({payload.rows} rows)"
 
 
 def register_exec_tools(mcp: MCPServer[None]) -> None:

@@ -38,7 +38,6 @@ from ...search import (
     DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
     MAX_RESULTS,
-    SEARCHABLE_TYPE_NAMES,
     Excerpt,
     InvalidQueryError,
     NextStep,
@@ -52,7 +51,7 @@ from ...search import (
     unscored_note,
 )
 from ..envelope import LeanResult, LeanShape, compact_result
-from ..filters import DateFilter, FeatureFilter, TypeFilter
+from ..filters import DateFilter, FeatureFilter, SearchTypeFilter
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -75,12 +74,9 @@ _Query = Annotated[str, Field(min_length=1, max_length=MAX_QUERY_CHARS)]
 #: Hits per page, within the search package's hard ceiling.
 _Limit = Annotated[int, Field(ge=1, le=MAX_RESULTS)]
 
-#: ``search``'s record-type filter: the shared declaration, with the types a
-#: search covers by default stated from the search package's own set.
-_SearchTypes = Annotated[
-    TypeFilter,
-    Field(description=f"Default: {SEARCHABLE_TYPE_NAMES}."),
-]
+#: ``search``'s record-type filter: the shared declaration of the types search
+#: ranks, every one of them when the caller names none.
+_SearchTypes = Annotated[SearchTypeFilter, Field(description="Default: all.")]
 
 
 class SearchHitRow(LeanResult):

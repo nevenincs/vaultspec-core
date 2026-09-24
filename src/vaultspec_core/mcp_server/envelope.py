@@ -52,7 +52,8 @@ from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel, GetJsonSchemaHandler, TypeAdapter
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Collection
+    from enum import Enum
 
 __all__ = [
     "LeanEnum",
@@ -61,6 +62,7 @@ __all__ = [
     "LeanShape",
     "compact_result",
     "describe",
+    "lean_tool_schema",
     "tool_description",
 ]
 
@@ -103,14 +105,20 @@ _CTX_ARG = re.compile(r"\n(?P<indent>[ \t]*)ctx:[^\n]*(?:\n(?P=indent)[ \t]+[^\n
 #: An ``Args:`` heading left with nothing under it after the ctx removal.
 _EMPTY_ARGS = re.compile(r"\n\s*Args:\s*(?=\Z)")
 
+#: A reST inline literal. The model reads Markdown, where one backtick marks
+#: code; the doubled reST form costs two characters a literal and means the
+#: same thing.
+_REST_LITERAL = re.compile(r"``([^`]+)``")
+
 
 def tool_description(fn: object) -> str:
     """Return *fn*'s docstring trimmed to what the model can act on.
 
     The summary and the per-parameter guidance survive; the sections that
     duplicate the schema or describe machinery the caller never touches do
-    not. Applied at registration, so the docstring stays intact in source for
-    whoever maintains the function.
+    not. reST literals render as Markdown ones, and each argument as one
+    unindented line. Applied at registration, so the docstring stays intact
+    in source for whoever maintains the function.
 
     Args:
         fn: The tool function whose docstring becomes the tool description.
@@ -125,7 +133,39 @@ def tool_description(fn: object) -> str:
             doc = doc[:idx]
     doc = _CTX_ARG.sub("", doc)
     doc = _EMPTY_ARGS.sub("", doc)
-    return doc.strip()
+    doc = _REST_LITERAL.sub(r"`\1`", doc)
+    return _flatten_indents(doc).strip()
+
+
+def _flatten_indents(doc: str) -> str:
+    """Render each indented entry of *doc* as one unindented line.
+
+    A docstring indents an ``Args:`` entry under its heading and its wrapped
+    lines under the entry. The indentation is layout for a fixed-width reader:
+    every wrapped line spends eight spaces saying it continues the line above,
+    which a line break already says. Entries keep a line each; their wrapped
+    lines join them. Unindented prose is untouched.
+
+    Args:
+        doc: A dedented docstring.
+
+    Returns:
+        The docstring with indentation removed and wrapped entries joined.
+    """
+    lines: list[str] = []
+    entry_indent: int | None = None
+    for line in doc.split("\n"):
+        text = line.lstrip()
+        indent = len(line) - len(text)
+        if not indent or not text:
+            entry_indent = None
+            lines.append(line)
+        elif entry_indent is None or indent <= entry_indent:
+            entry_indent = indent
+            lines.append(text)
+        else:
+            lines[-1] = f"{lines[-1]} {text}"
+    return "\n".join(lines)
 
 
 class LeanModel(BaseModel):
@@ -217,7 +257,21 @@ class LeanEnum:
     LeanEnum()]`` inlines ``{"enum": [...], "type": "string"}`` in place; the
     unreferenced definition is then dropped from the schema. Validation and
     serialisation are untouched - only the schema changes.
+
+    A field that accepts only some of the enum's members names them, and the
+    schema lists those alone: a value the tool always refuses is not one a
+    caller can act on.
     """
+
+    __slots__ = ("_values",)
+
+    def __init__(self, members: Collection[Enum] | None = None) -> None:
+        """Mark an enum field, optionally listing only *members*.
+
+        Args:
+            members: The members the field accepts; ``None`` lists them all.
+        """
+        self._values = None if members is None else {m.value for m in members}
 
     def __get_pydantic_json_schema__(
         self, core_schema: Any, handler: GetJsonSchemaHandler
@@ -232,11 +286,15 @@ class LeanEnum:
             The enum's schema fragment, inlined.
         """
         produced = handler.resolve_ref_schema(handler(core_schema))
-        return {
+        lean = {
             key: value
             for key, value in produced.items()
             if key not in ("description", "title")
         }
+        if self._values is not None:
+            values = cast("list[Any]", lean["enum"])
+            lean["enum"] = [value for value in values if value in self._values]
+        return lean
 
 
 class LeanShape:
@@ -367,8 +425,67 @@ def _collapse_nullable(node: Any, *, omissible: bool) -> Any:
     return collapsed
 
 
+#: Keywords whose value maps names to subschemas. A key inside one of these
+#: maps is a property or definition name, never a keyword, so a property
+#: named ``title`` survives the title stripping.
+_SCHEMA_MAPS = frozenset(
+    {"properties", "patternProperties", "$defs", "definitions", "dependentSchemas"}
+)
+
+#: Keywords whose value is a single subschema.
+_SCHEMA_VALUES = frozenset(
+    {
+        "items",
+        "additionalProperties",
+        "not",
+        "contains",
+        "propertyNames",
+        "if",
+        "then",
+        "else",
+        "unevaluatedItems",
+        "unevaluatedProperties",
+    }
+)
+
+#: Keywords whose value is a list of subschemas.
+_SCHEMA_LISTS = frozenset({"anyOf", "allOf", "oneOf", "prefixItems"})
+
+#: The prefix of a reference into the schema's own ``$defs``.
+_LOCAL_DEFS = "#/$defs/"
+
+
+def _map_subschemas(
+    schema: dict[str, Any], transform: Callable[[Any], Any]
+) -> dict[str, Any]:
+    """Return *schema* with *transform* applied to each immediate subschema.
+
+    Only keyword positions that hold schemas are visited: an ``enum`` or
+    ``default`` value is data, and a ``properties`` key is a name.
+
+    Args:
+        schema: A schema object.
+        transform: Applied to every direct subschema.
+
+    Returns:
+        A new schema object; *schema* is not modified.
+    """
+    mapped: dict[str, Any] = {}
+    for key, value in schema.items():
+        if key in _SCHEMA_MAPS and isinstance(value, dict):
+            named = cast("dict[str, Any]", value)
+            mapped[key] = {name: transform(sub) for name, sub in named.items()}
+        elif key in _SCHEMA_VALUES and isinstance(value, dict):
+            mapped[key] = transform(value)
+        elif key in _SCHEMA_LISTS and isinstance(value, list):
+            mapped[key] = [transform(sub) for sub in cast("list[Any]", value)]
+        else:
+            mapped[key] = value
+    return mapped
+
+
 def _strip_titles(node: Any) -> Any:
-    """Drop derived ``title`` keys from a property fragment.
+    """Drop derived ``title`` keywords from a schema fragment and its subschemas.
 
     Args:
         node: A schema fragment.
@@ -376,15 +493,167 @@ def _strip_titles(node: Any) -> Any:
     Returns:
         The fragment without derived titles.
     """
-    if isinstance(node, dict):
-        return {
-            key: _strip_titles(value)
-            for key, value in cast("dict[str, Any]", node).items()
-            if key != "title"
+    if not isinstance(node, dict):
+        return node
+    stripped = _map_subschemas(cast("dict[str, Any]", node), _strip_titles)
+    stripped.pop("title", None)
+    return stripped
+
+
+def lean_tool_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Return a tool's input or output schema without what carries no meaning.
+
+    The models a tool declares are leaned where Pydantic renders them, but
+    the SDK wraps them in schemas of its own - the arguments object built
+    from the function signature, and the wrapper around a ``list`` result -
+    that no model hook reaches. This is applied to the whole published
+    schema instead, and removes only what validates nothing and tells the
+    caller nothing:
+
+    * derived ``title`` keywords, such as ``"Query"`` for ``query`` and
+      ``"searchArguments"`` for the arguments object;
+    * ``"additionalProperties": true``, which is the JSON Schema default;
+    * the ``null`` branch and ``null`` default of a property absent from
+      ``required``, as :class:`LeanResult` drops them from a result: leaving
+      the key out already says the value is optional, and a non-null default
+      is kept because it tells the caller what omission means;
+    * a ``$defs`` entry referenced once, which is inlined where it is used.
+      An entry shared by two properties stays shared, so the schema never
+      grows.
+
+    Every value the schema accepted before, other than an explicit ``null``
+    for an omissible key, it accepts after.
+
+    Args:
+        schema: A tool's published input or output schema.
+
+    Returns:
+        The leaned schema; *schema* is not modified.
+    """
+    return _inline_single_use(_lean_node(schema))
+
+
+def _lean_node(node: Any) -> Any:
+    """Lean one schema object and its subschemas; see :func:`lean_tool_schema`.
+
+    Args:
+        node: A schema fragment.
+
+    Returns:
+        The leaned fragment.
+    """
+    if not isinstance(node, dict):
+        return node
+    lean = _map_subschemas(cast("dict[str, Any]", node), _lean_node)
+    lean.pop("title", None)
+    if lean.get("additionalProperties") is True:
+        del lean["additionalProperties"]
+    properties = lean.get("properties")
+    if isinstance(properties, dict):
+        required = set(cast("list[str]", lean.get("required", [])))
+        lean["properties"] = {
+            name: prop if name in required else _without_null_default(prop)
+            for name, prop in cast("dict[str, Any]", properties).items()
         }
-    if isinstance(node, list):
-        return [_strip_titles(item) for item in cast("list[Any]", node)]
-    return node
+    return lean
+
+
+def _without_null_default(prop: Any) -> Any:
+    """Collapse an omissible property whose default is ``null``.
+
+    Args:
+        prop: The schema of a property absent from ``required``.
+
+    Returns:
+        The non-null branch alone when the property is a nullable union
+        defaulting to ``null``; otherwise *prop* unchanged.
+    """
+    if not isinstance(prop, dict):
+        return prop
+    fragment = cast("dict[str, Any]", prop)
+    if "default" not in fragment or fragment["default"] is not None:
+        return fragment
+    bare = {key: value for key, value in fragment.items() if key != "default"}
+    collapsed = _collapse_nullable(bare, omissible=True)
+    return fragment if collapsed is bare else collapsed
+
+
+def _local_refs(node: Any) -> list[str]:
+    """Return the ``$defs`` names every reference in *node* points at.
+
+    Args:
+        node: A schema fragment.
+
+    Returns:
+        One name per reference, repeated as often as it is referenced.
+    """
+    if not isinstance(node, dict):
+        return []
+    fragment = cast("dict[str, Any]", node)
+    names: list[str] = []
+    ref = fragment.get("$ref")
+    if isinstance(ref, str) and ref.startswith(_LOCAL_DEFS):
+        names.append(ref.removeprefix(_LOCAL_DEFS))
+
+    def collect(sub: Any) -> Any:
+        names.extend(_local_refs(sub))
+        return sub
+
+    _map_subschemas(fragment, collect)
+    return names
+
+
+def _inline_single_use(schema: dict[str, Any]) -> dict[str, Any]:
+    """Inline every ``$defs`` entry that exactly one reference points at.
+
+    A shared definition earns its place when two references reuse it. With
+    one, the definition and its reference cost the name twice plus the
+    reference syntax, and the reader resolves an indirection for nothing.
+    A definition reached recursively, or referenced more than once, stays.
+
+    Args:
+        schema: A whole schema, carrying its ``$defs`` at the root.
+
+    Returns:
+        The schema with single-use definitions inlined and unreferenced ones
+        dropped.
+    """
+    definitions = schema.get("$defs")
+    if not isinstance(definitions, dict) or not definitions:
+        return schema
+    defs = cast("dict[str, Any]", definitions)
+    counts: dict[str, int] = {}
+    for name in _local_refs(schema):
+        counts[name] = counts.get(name, 0) + 1
+
+    def expand(node: Any, active: frozenset[str]) -> Any:
+        if not isinstance(node, dict):
+            return node
+        fragment = cast("dict[str, Any]", node)
+        ref = fragment.get("$ref")
+        if isinstance(ref, str) and ref.startswith(_LOCAL_DEFS):
+            name = ref.removeprefix(_LOCAL_DEFS)
+            if counts.get(name) == 1 and name in defs and name not in active:
+                siblings = {key: v for key, v in fragment.items() if key != "$ref"}
+                body = expand(defs[name], active | {name})
+                return {
+                    **body,
+                    **_map_subschemas(siblings, lambda s: expand(s, active)),
+                }
+        return _map_subschemas(fragment, lambda sub: expand(sub, active))
+
+    root = expand({k: v for k, v in schema.items() if k != "$defs"}, frozenset())
+    kept: dict[str, Any] = {}
+    pending = _local_refs(root)
+    while pending:
+        name = pending.pop()
+        if name in kept or name not in defs:
+            continue
+        kept[name] = expand(defs[name], frozenset({name}))
+        pending.extend(_local_refs(kept[name]))
+    if not kept:
+        return root
+    return {"$defs": dict(sorted(kept.items())), **root}
 
 
 def _prune_optional_nulls(model: BaseModel, dumped: dict[str, Any]) -> dict[str, Any]:

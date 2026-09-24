@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from mcp import Client
+from mcp.types import TextContent
 
 from vaultspec_core.mcp_server.app import create_server
 
@@ -121,3 +122,39 @@ async def test_log_is_absent_from_the_read_only_surface(vault_root: Path) -> Non
     tools = await create_server(read_only=True).list_tools()
 
     assert "log" not in {tool.name for tool in tools}
+
+
+async def test_the_text_summary_names_the_step_and_the_ledger(
+    vault_root: Path,
+) -> None:
+    _plan(vault_root)
+    mcp = create_server()
+    async with Client(mcp) as client:
+        first = await client.call_tool(
+            "log",
+            {
+                "feature": "log-feat",
+                "plan": _PLAN_STEM,
+                "step": "S01",
+                "rows": ["M:src/foo.py"],
+            },
+        )
+        again = await client.call_tool(
+            "log",
+            {
+                "feature": "log-feat",
+                "plan": _PLAN_STEM,
+                "step": "S01",
+                "rows": ["M:src/foo.py"],
+            },
+        )
+
+    summaries = [
+        content.text
+        for result in (first, again)
+        for content in result.content
+        if isinstance(content, TextContent)
+    ]
+    assert summaries[0].startswith("created: S01 -> ")
+    assert summaries[0].endswith("(1 rows)")
+    assert summaries[1].startswith("unchanged: S01 -> ")

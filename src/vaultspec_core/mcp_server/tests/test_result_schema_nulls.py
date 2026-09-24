@@ -110,23 +110,32 @@ def _model(model: type[BaseModel], fill: _Fill) -> BaseModel:
     )
 
 
-def _tool_contracts(vault_root: Path) -> dict[str, tuple[Any, dict[str, Any]]]:
-    """Map each tool to its declared result type and published output schema."""
+async def _tool_contracts(vault_root: Path) -> dict[str, tuple[Any, dict[str, Any]]]:
+    """Map each tool to its declared result type and published output schema.
+
+    The schema is the one ``tools/list`` sends, after every hook that leans
+    it, since that is the schema a client validates a reply against.
+    """
     _ = vault_root
     server = create_server()
-    return {
-        tool.name: (tool.fn_metadata.output_model, tool.output_schema)
-        for tool in server._tool_manager.list_tools()
+    published = {
+        tool.name: tool.output_schema
+        for tool in await server.list_tools()
         if tool.output_schema is not None
+    }
+    return {
+        tool.name: (tool.fn_metadata.output_model, published[tool.name])
+        for tool in server._tool_manager.list_tools()
+        if tool.name in published
     }
 
 
 @pytest.mark.parametrize("fill", ["null", "nested"])
 @pytest.mark.parametrize("name", sorted(EXPECTED_TOOLS))
-def test_a_null_filled_reply_validates_against_the_published_schema(
+async def test_a_null_filled_reply_validates_against_the_published_schema(
     vault_root: Path, name: str, fill: _Fill
 ) -> None:
-    contracts = _tool_contracts(vault_root)
+    contracts = await _tool_contracts(vault_root)
     assert name in contracts, f"{name} publishes no output schema"
     output_model, schema = contracts[name]
 
