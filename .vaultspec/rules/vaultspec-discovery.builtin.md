@@ -5,12 +5,10 @@ name: vaultspec-discovery
 # Discovery
 
 Discover before changing: at each phase start, and before a session's first edit to
-source or vault, at any horizon. Run the steps in order: locate by meaning, read the
-epicenter whole, confirm with grep, list the decisions.
+source or vault, at any horizon. Run the steps in order.
 
 1. **Locate by meaning.**
-   - Code: `vaultspec-rag search "<concept and domain nouns>" --type code` (narrow with
-     `--language` or `--path`).
+   - Code: `vaultspec-rag search "<concept and domain nouns>" --type code`.
    - Search decisions and vault facts with `vaultspec-core vault search "<question>"`
      (MCP: `search`); when it declines or fails, run the next step its reply names.
    - Orientation: `vaultspec-core status [target]` and
@@ -23,8 +21,7 @@ epicenter whole, confirm with grep, list the decisions.
 1. **List decisions.** Run `vaultspec-core vault list adr` (MCP: `find`) across all
    features; add `--feature` only to cut noise. Search can miss a record, so this step
    runs before a plan or ADR is written and for work outside a plan. Read each covering
-   accepted decision in full, and follow its evidence links. This discovery does not
-   itself require a persisted Research or Reference record.
+   accepted decision in full, and follow its evidence links.
 
 Under an approved plan, its linked decisions replace the decision search and step 4 for
 Steps inside their scope. Code search still runs.

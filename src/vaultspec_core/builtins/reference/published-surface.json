@@ -1,5 +1,9 @@
 {
   "commands": {
+    "commit-gate": [
+      "--json",
+      "--target"
+    ],
     "config get": [
       "--json",
       "--target"
@@ -382,6 +386,16 @@
       "--tier",
       "--title",
       "--topic"
+    ],
+    "vault adr crossref": [
+      "--after",
+      "--all",
+      "--apply",
+      "--feature",
+      "--isolated",
+      "--json",
+      "--max-sources",
+      "--target"
     ],
     "vault adr supersede": [
       "--by",
@@ -925,6 +939,14 @@
       "--target",
       "--verbose"
     ],
+    "vault search": [
+      "--date",
+      "--feature",
+      "--json",
+      "--limit",
+      "--target",
+      "--type"
+    ],
     "vault set-body": [
       "--body-file",
       "--body-stdin",
@@ -956,6 +978,7 @@
   "mcp_tools": [
     "check",
     "create",
+    "crossref",
     "discover",
     "edit",
     "find",
@@ -963,8 +986,9 @@
     "log",
     "plan_edit",
     "plan_progress",
+    "search",
     "status"
   ],
   "schema": 1,
-  "version": "0.2.4"
+  "version": "0.2.5"
 }
