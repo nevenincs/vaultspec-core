@@ -77,6 +77,8 @@ def check_entry_points_registered() -> None:
 
 def check_mcp_server_factory() -> None:
     try:
+        from mcp.server.mcpserver import MCPServer
+
         from vaultspec_core.mcp_server.app import create_server
 
         server = create_server()
@@ -86,10 +88,11 @@ def check_mcp_server_factory() -> None:
             "  This may be caused by import-time side effects in "
             "register_vault_tools when running in a bare environment."
         )
-    cls_name = type(server).__name__
-    if cls_name != "MCPServer":
-        _fail(f"create_server() returned {cls_name}, expected MCPServer")
-    print("PASS: create_server() returns MCPServer")
+    if not isinstance(server, MCPServer):
+        _fail(
+            f"create_server() returned {type(server).__name__}, expected an MCPServer"
+        )
+    print(f"PASS: create_server() returns an MCPServer ({type(server).__name__})")
 
 
 def check_cli_version() -> None:
