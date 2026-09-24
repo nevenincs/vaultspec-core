@@ -19,6 +19,7 @@ from mcp import Client
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.core.enums import AdrStatus
 from vaultspec_core.crossref import (
     MAX_SOURCES,
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mcp.types import CallToolResult, Tool
+
+CREDENTIAL_VARIABLE = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
 
 _SOURCE = "2026-02-20-widget-adr"
 

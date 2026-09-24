@@ -60,7 +60,8 @@ def environ() -> dict[str, str]:
     credential = resolve_credential(VAULTSPEC_CORE_TYPESAFE_API_KEY, WORKSPACE_ROOT)
     if credential is None:
         pytest.fail(
-            f"the typesafe marker needs {VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name} in the environment "
+            f"the typesafe marker needs {VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name} "
+            "in the environment "
             f"or in {WORKSPACE_ROOT / '.env'}"
         )
     return {VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: credential.key}
