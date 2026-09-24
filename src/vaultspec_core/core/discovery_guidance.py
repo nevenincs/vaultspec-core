@@ -14,11 +14,16 @@ single source of truth that
 against, which is what stops the wordings diverging again without also freezing
 each document's role-specific framing.
 
-Two properties matter and are enforced by that test:
+Three properties matter and are enforced by that test:
 
-* The fallback sentence is identical everywhere, so a reader who has seen it
-  once does not have to re-read a variant to check whether it says something
-  new.
+* The code-search invocation and the fallback sentence live in the
+  discovery rule alone. Other builtins cite the rule, so a reader never has
+  to compare a variant against the original.
+* No builtin offers rag's vault search. Decision and vault-fact questions go
+  to core's ``search``, whose reply names the search to run when it declines
+  or fails, resolved from what the workspace provisions; guidance that chose a
+  route itself would need runtime state it cannot see. The routing sentence
+  lives in the discovery rule alone; other builtins cite the rule.
 * No builtin invents a rag CLI flag. Several of rag's strongest capabilities -
   intent ranking, relevance feedback, and the noise-domain filters - exist only
   on its MCP tools and as inline query tokens, with no CLI flag at all. Prose
@@ -28,30 +33,58 @@ Two properties matter and are enforced by that test:
 
 from __future__ import annotations
 
-#: The single sentence every builtin uses for rag's absence.
+#: The discovery rule's sentence for rag's absence.
 #:
-#: Names core's own discovery verbs rather than only ``rg``/``fd``, because the
-#: degraded path is not merely grep: ``status``, ``find``, and the vault list
-#: and graph verbs carry the orientation half of the sequence, and only the
-#: confirmation step is grep's.
+#: rag is the only semantic code search, so its absence changes the locate
+#: step for code: a targeted grep takes its place. That is the one case where
+#: grep leads, which is why the sentence names it rather than leaving it to
+#: contradict "grep is the confirmation step". Vault questions are not covered
+#: here; the search reply names their next step.
 #:
-#: Says *unavailable* rather than *not installed* because the degraded path is
-#: reached by a rag that is installed but whose service is down just as often
-#: as by one that was never installed, and the reader's next move is the same
-#: either way.
+#: Says *unavailable* rather than *not installed* because a rag whose service
+#: is down reaches the same path as one never installed. The report line lets
+#: a reviewer weigh findings that were located without semantic search.
 DISCOVERY_FALLBACK = (
-    "Where `vaultspec-rag` is unavailable, the `vaultspec-core` discovery "
-    "verbs and grep carry the same sequence."
+    "Where `vaultspec-rag` is unavailable, locate code with a targeted grep, "
+    "and say in your report that discovery ran without semantic search."
 )
 
 #: Canonical spelling for locating code by meaning.
 SEARCH_CODE = '`vaultspec-rag search "<concept and domain nouns>" --type code`'
 
-#: Canonical spelling for locating governing decisions.
+#: rag's vault search before its record-type filter. ``--doc-type`` narrows it
+#: to one type or, comma-separated, a union of types. Only a declined core
+#: search names it, over the record types that search was asked for; no
+#: builtin offers it.
+RAG_VAULT_SEARCH = 'vaultspec-rag search "<intent>" --type vault'
+
+#: Core's listing verb, the orientation half of the no-semantic route; an
+#: optional record type narrows it. Its MCP counterpart is ``find``.
+LIST_VAULT = "vaultspec-core vault list"
+
+#: The decision listing that runs beside search. Summary-based recall can miss
+#: a record whose answer lives only in body detail, so listing the ADRs stays
+#: mandatory at discovery until that recall is measured. Under an approved
+#: plan, the decisions the plan links stand in for it within their scope.
+LIST_ADR = f"`{LIST_VAULT} adr`"
+
+#: Canonical spelling for asking the vault a question through core's hosted
+#: search, which answers with the passage and its line range and abstains when
+#: nothing answers.
+SEARCH_VAULT = '`vaultspec-core vault search "<question>"`'
+
+#: The single sentence routing decision and vault-fact questions.
 #:
-#: The directed ``--doc-type adr`` filter, not catch-all ``--type vault``,
-#: which is materially noisier for decision recall.
-SEARCH_ADR = '`vaultspec-rag search "<intent>" --type vault --doc-type adr`'
+#: State-free: it carries no runtime condition, because the reader who needs
+#: it - a dispatched worker, a read-only session - often cannot see the state
+#: a condition would name, and a configured key can still be rejected. The
+#: search itself decides: when it declines or fails, its reply names the next
+#: step, a rag vault search when rag is provisioned and core's listing verbs
+#: and grep otherwise. Code search is rag's alone and is not routed.
+VAULT_SEARCH_ROUTING = (
+    f"Search decisions and vault facts with {SEARCH_VAULT} (MCP: `search`); "
+    "when it declines or fails, run the next step its reply names."
+)
 
 #: rag CLI flags that exist, as of the floor in
 #: :data:`~vaultspec_core.core.diagnosis.collectors_companion.RAG_MINIMUM_VERSION`.
@@ -112,26 +145,27 @@ DISCOVERY_HOME = "rules/vaultspec-discovery.builtin.md"
 
 #: Sentences the home must define. A sentence missing from the home is a
 #: broken registry, not a missing citation.
-DISCOVERY_CANONICAL_SENTENCES = (DISCOVERY_FALLBACK, SEARCH_CODE, SEARCH_ADR)
+DISCOVERY_CANONICAL_SENTENCES = (
+    DISCOVERY_FALLBACK,
+    LIST_ADR,
+    SEARCH_CODE,
+    SEARCH_VAULT,
+    VAULT_SEARCH_ROUTING,
+)
 
-#: Entry points allowed to spell ``vaultspec-rag`` out instead of citing the
-#: rule. Each is a role whose job is search itself; a reader arriving there
-#: needs the invocation, not a pointer. Everything else cites
-#: :data:`DISCOVERY_RULE` by name. Paths are relative to the builtins root.
-DISCOVERY_RESTATERS = frozenset(
+#: Entry points allowed to name ``vaultspec-rag`` outside the home. Each keeps
+#: rag's code index current before a reconciliation, a step no other role
+#: takes; for the search itself and the fallback it cites :data:`DISCOVERY_RULE`
+#: like everything else. No builtin restates the code-search invocation or the
+#: fallback: both live in the home alone. Paths are relative to the builtins
+#: root.
+RAG_INDEX_CHECKERS = frozenset(
     {
-        # Auditing a codebase into a Reference: search is the deliverable.
-        "agents/vaultspec-reference-auditor.md",
-        # Reconciles ADRs against code: decision recall is the whole task.
         "agents/vaultspec-docs-curator.md",
-        # The skill that exists to locate code for the pipeline.
-        "skills/vaultspec-code-research/SKILL.md",
-        # Curator's skill; same reason as the persona.
         "skills/vaultspec-curate/SKILL.md",
     }
 )
 
 #: Vocabulary that marks a restatement of the sequence rather than a citation.
-#: A file using it without citing the rule and without being a registered
-#: restater has grown a second definition.
+#: A file using it without citing the rule has grown a second definition.
 DISCOVERY_SEQUENCE_MARKER = "epicenter"

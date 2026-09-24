@@ -14,13 +14,13 @@ so no drift can develop between them.
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, cast
 
 import yaml
 
 from ..core.helpers import atomic_write_bytes
 from .models import refresh_modified_stamp, vault_today
+from .parser import related_block, split_frontmatter
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,10 +32,6 @@ __all__ = [
     "read_preserve_newlines",
     "remove_related_entries",
 ]
-
-# Matches a YAML list entry of the form:  - "[[some-target]]"
-# Captures the inner stem (without the [[ ]] delimiters and optional quotes).
-_RELATED_ENTRY_RE = re.compile(r'^\s*-\s*["\']?\[\[(.+?)\]\]["\']?\s*$')
 
 
 def read_preserve_newlines(path: Path) -> tuple[str, str]:
@@ -110,55 +106,31 @@ def remove_related_entries(path: Path, targets: list[str]) -> int:
     except (OSError, UnicodeDecodeError):
         return 0
 
-    lines = content.split("\n")
+    parts = _yaml_lines(content)
+    if parts is None:
+        return 0
+    prefix, lines, suffix = parts
     target_set = {t.lower() for t in targets}
 
-    in_frontmatter = False
-    in_related = False
-    related_idx: int | None = None
-    new_lines: list[str] = []
-    removed = 0
-
-    for line in lines:
-        if line.strip() == "---":
-            if not in_frontmatter:
-                in_frontmatter = True
-            else:
-                in_frontmatter = False
-                in_related = False
-            new_lines.append(line)
-            continue
-
-        if in_frontmatter:
-            if line.startswith("related:"):
-                in_related = True
-                related_idx = len(new_lines)
-                new_lines.append(line)
-                continue
-
-            # Exit the related block on any non-indented key
-            if in_related and line and line[0] not in (" ", "\t"):
-                in_related = False
-
-            if in_related:
-                m = _RELATED_ENTRY_RE.match(line)
-                if m and m.group(1).lower() in target_set:
-                    removed += 1
-                    continue
-
-        new_lines.append(line)
-
-    if not removed:
+    block = related_block(lines)
+    dropped = {
+        entry.index for entry in block.entries if entry.target.lower() in target_set
+    }
+    if not dropped:
         return 0
+    removed = len(dropped)
+    new_lines = [line for index, line in enumerate(lines) if index not in dropped]
 
     # If all entries were removed, emit `related: []` so the YAML stays valid.
+    # Removed lines all follow the key, so its index is unchanged.
+    related_idx = block.key_index
     if related_idx is not None:
         after_idx = related_idx + 1
         after = new_lines[after_idx] if after_idx < len(new_lines) else ""
-        if not (after.startswith((" ", "\t")) and after.lstrip().startswith("-")):
+        if not after.lstrip().startswith("-"):
             new_lines[related_idx] = "related: []"
 
-    new_content = source_newline.join(new_lines)
+    new_content = _rejoin(prefix, new_lines, suffix, source_newline)
     # Vault-orientation ADR (decision D3): a link mutation refreshes the
     # target document's modified stamp.
     new_content = refresh_modified_stamp(new_content, vault_today())
@@ -209,56 +181,77 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
         raise ValueError(f"Cannot parse stem from wiki_link: {wiki_link!r}")
 
     content, source_newline = read_preserve_newlines(path)
-    lines = content.split("\n")
+    parts = _yaml_lines(content)
+    if parts is None:
+        # No frontmatter at all - insert a frontmatter block.
+        entry = f"  - '[[{stem}]]'"
+        new_lines = ["---", "related:", entry, "---", *content.split("\n")]
+        new_content = source_newline.join(new_lines)
+    else:
+        appended = _append_in_block(*parts, stem=stem, newline=source_newline)
+        if appended is None:
+            return False
+        new_content = appended
 
-    in_frontmatter = False
-    in_related = False
-    related_idx: int | None = None
-    last_related_item_idx: int | None = None
-    last_related_indent: str | None = None
-    frontmatter_close_idx: int | None = None
-    inline_value: str | None = None
+    # Vault-orientation ADR (decision D3): a link mutation refreshes the
+    # target document's modified stamp.
+    new_content = refresh_modified_stamp(new_content, vault_today())
+    atomic_write_restore(path, new_content)
+    return True
 
-    for i, line in enumerate(lines):
-        if line.strip() == "---":
-            if not in_frontmatter:
-                in_frontmatter = True
-            else:
-                in_frontmatter = False
-                in_related = False
-                frontmatter_close_idx = i
-            continue
 
-        if in_frontmatter:
-            if line.startswith("related:"):
-                in_related = True
-                related_idx = i
-                # Capture any inline value: `related: []` (empty) or
-                # `related: ['[[a]]']` (a flow sequence requiring normalisation).
-                stripped = line[len("related:") :].strip()
-                inline_value = stripped if stripped not in ("", "[]") else None
-                continue
+def _yaml_lines(content: str) -> tuple[str, list[str], str] | None:
+    """Split LF-normalised *content* around its frontmatter's YAML lines.
 
-            if not in_related:
-                continue
+    Returns:
+        ``(prefix, lines, suffix)`` where *lines* are the YAML lines split on
+        ``\\n`` (the last one empty, left by the final line break), or
+        ``None`` when the document has no frontmatter.
+    """
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
+        return None
+    return (
+        content[: split.yaml_start],
+        content[split.yaml_start : split.yaml_end].split("\n"),
+        content[split.yaml_end :],
+    )
 
-            if line and line[0] not in (" ", "\t"):
-                # New top-level key; block ended
-                in_related = False
-                continue
 
-            m = _RELATED_ENTRY_RE.match(line)
-            if not m:
-                continue
+def _rejoin(prefix: str, lines: list[str], suffix: str, newline: str) -> str:
+    """Reassemble a document around edited YAML *lines* in its *newline*."""
+    return (prefix + "\n".join(lines) + suffix).replace("\n", newline)
 
-            # Idempotency check on the bare stem: an aliased existing entry
-            # (`[[foo|Foo]]`) must dedupe against a plain `[[foo]]` append, so
-            # compare only the stem left of any `|` alias pipe.
-            existing_stem = m.group(1).split("|", 1)[0].strip()
-            if existing_stem.lower() == stem.lower():
-                return False
-            last_related_item_idx = i
-            last_related_indent = line[: len(line) - len(line.lstrip())]
+
+def _append_in_block(
+    prefix: str, lines: list[str], suffix: str, *, stem: str, newline: str
+) -> str | None:
+    """Append ``[[stem]]`` to the ``related:`` list among the YAML *lines*.
+
+    Returns:
+        The reassembled document, or ``None`` when the entry already exists.
+    """
+    block = related_block(lines)
+    related_idx = block.key_index
+    # An inline value on the key line: `related: []` (empty) or
+    # `related: ['[[a]]']` (a flow sequence requiring normalisation).
+    inline_value = block.inline if block.inline not in ("", "[]") else None
+
+    # Idempotency check on the bare stem: an aliased existing entry
+    # (`[[foo|Foo]]`) must dedupe against a plain `[[foo]]` append, so
+    # compare only the stem left of any `|` alias pipe.
+    if any(
+        entry.target.split("|", 1)[0].strip().lower() == stem.lower()
+        for entry in block.entries
+    ):
+        return None
+    last_entry = block.entries[-1] if block.entries else None
+    last_related_item_idx = last_entry.index if last_entry is not None else None
+    last_related_indent = (
+        last_entry.prefix[: len(last_entry.prefix) - len(last_entry.prefix.lstrip())]
+        if last_entry is not None
+        else None
+    )
 
     # Match the existing block's indentation so the appended item cannot
     # introduce a mixed-indent block sequence - invalid under strict YAML yet
@@ -280,7 +273,7 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
         existing_stems = _parse_inline_related(inline_value)
         # Idempotency: the new stem may already be in the inline sequence.
         if any(s.lower() == stem.lower() for s in existing_stems):
-            return False
+            return None
         block_lines = [f"  - '[[{_normalise_stem(s)}]]'" for s in existing_stems]
         block_lines.append(new_entry)
         new_lines[related_idx] = "related:"
@@ -294,20 +287,13 @@ def append_related_entry(path: Path, wiki_link: str) -> bool:
         # block items.  Rewrite the key to block form and seed the entry.
         new_lines[related_idx] = "related:"
         new_lines.insert(related_idx + 1, new_entry)
-    elif frontmatter_close_idx is not None:
-        # No related: key found - insert one before the closing ---
-        new_lines.insert(frontmatter_close_idx, new_entry)
-        new_lines.insert(frontmatter_close_idx, "related:")
     else:
-        # No frontmatter at all - insert a frontmatter block
-        new_lines = ["---", "related:", new_entry, "---", *new_lines]
+        # No related: key found - insert one before the closing ---, which
+        # follows the empty string the YAML lines' final break leaves last.
+        close_idx = len(new_lines) - 1
+        new_lines[close_idx:close_idx] = ["related:", new_entry]
 
-    new_content = source_newline.join(new_lines)
-    # Vault-orientation ADR (decision D3): a link mutation refreshes the
-    # target document's modified stamp.
-    new_content = refresh_modified_stamp(new_content, vault_today())
-    atomic_write_restore(path, new_content)
-    return True
+    return _rejoin(prefix, new_lines, suffix, newline)
 
 
 def _parse_inline_related(inline_value: str) -> list[str]:

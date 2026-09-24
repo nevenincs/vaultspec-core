@@ -237,118 +237,31 @@ def cmd_link_add(
 
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
-    from vaultspec_core.graph import VaultGraph
-    from vaultspec_core.vaultcore.related_surgery import append_related_entry
-    from vaultspec_core.vaultcore.resolve import (
-        RelatedResolutionError,
-        resolve_related_inputs,
+    from vaultspec_core.vaultcore.related_links import (
+        LinkError,
+        LinkStatus,
+        add_related_link,
     )
 
     console = get_console()
-    root_dir = _get_ctx().target_dir
-
-    # Resolve src to an on-disk path
     try:
-        src_links = resolve_related_inputs([src], root_dir)
-    except RelatedResolutionError:
-        src_links = []
-
-    if not src_links:
-        _emit_fail(
-            json_output,
-            console,
-            "vault.link.add",
-            f"Cannot resolve source document: '{src}'",
+        result = add_related_link(
+            _get_ctx().target_dir, src, dst, dry_run=dry_run, force=force
         )
-        raise typer.Exit(code=1)
-
-    src_stem = src_links[0][2:-2]  # strip [[ ]]
-
-    # Resolve dst - may or may not exist (dangling check follows)
-    try:
-        dst_links = resolve_related_inputs([dst], root_dir)
-        dst_stem = dst_links[0][2:-2]
-        dangling = False
-    except RelatedResolutionError:
-        # Target does not resolve - may still be allowed with --force
-        dst_stem = _normalise_stem(dst)
-        dangling = True
-
-    if dangling and not force:
-        _emit_fail(
-            json_output,
-            console,
-            "vault.link.add",
-            (
-                f"Target '{dst}' does not resolve to a real document. "
-                "Use --force to create a dangling edge."
-            ),
-        )
-        raise typer.Exit(code=1)
-
-    # Find the source file path
-    graph = VaultGraph(root_dir)
-    src_node = graph.nodes.get(src_stem)
-    if src_node is None or src_node.path is None:
-        _emit_fail(
-            json_output,
-            console,
-            "vault.link.add",
-            f"Source node has no backing file: '{src_stem}'",
-        )
-        raise typer.Exit(code=1)
-
-    # Idempotency check: edge already exists?
-    if dst_stem in src_node.out_links:
-        _emit_ok(
-            json_output,
-            console,
-            "vault.link.add",
-            "unchanged",
-            src_stem,
-            dst_stem,
-            dry_run=False,
-            message="edge already exists",
-        )
-        return
-
-    if dry_run:
-        _emit_ok(
-            json_output,
-            console,
-            "vault.link.add",
-            "created",
-            src_stem,
-            dst_stem,
-            dry_run=True,
-        )
-        return
-
-    try:
-        added = append_related_entry(src_node.path, f"[[{dst_stem}]]")
-    except Exception as exc:
-        _emit_fail(
-            json_output,
-            console,
-            "vault.link.add",
-            f"Write failed: {exc}",
-        )
+    except LinkError as exc:
+        _emit_fail(json_output, console, "vault.link.add", str(exc))
         raise typer.Exit(code=1) from exc
 
-    if added:
-        from vaultspec_core.cli._cache_hook import invalidate_graph_cache
-
-        invalidate_graph_cache(root_dir)
-
-    status = "created" if added else "unchanged"
+    unchanged = result.status is LinkStatus.UNCHANGED
     _emit_ok(
         json_output,
         console,
         "vault.link.add",
-        status,
-        src_stem,
-        dst_stem,
-        dry_run=False,
+        result.status.value,
+        result.src,
+        result.dst,
+        dry_run=result.dry_run and not unchanged,
+        message="edge already exists" if unchanged else "",
     )
 
 

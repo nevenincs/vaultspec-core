@@ -2,14 +2,33 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from typing import TYPE_CHECKING
+
 import pytest
 
+from vaultspec_core.vaultcore.checks.markdown import apply_markdown_hygiene
 from vaultspec_core.vaultcore.exec_ledger import (
+    VERIFY_LABEL,
+    append_notes,
     append_rows,
+    format_note,
     format_row,
     is_ledger_stem,
     ledger_step_ids,
+    note_lines,
     parse_ledger_rows,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+#: A freshly scaffolded ledger: its ``## Changes`` section holds only the
+#: template's hint comment.
+_SCAFFOLDED = (
+    "# `demo` ledger\n\n## Changes\n\n<!-- Rows are appended here,\n"
+    "     one per path touched. -->\n"
 )
 
 LEDGER = """# `demo` ledger
@@ -70,6 +89,15 @@ def test_absent_changes_section_yields_nothing() -> None:
     assert ledger_step_ids("# heading\n") == ()
 
 
+def test_changes_heading_inside_fenced_code_is_not_the_section() -> None:
+    body = (
+        "# `demo` ledger\n\n```markdown\n## Changes\n\n- `S07` `M` `sample.py`\n```\n\n"
+        "## Changes\n\n- `S01` `M` `src/a.py`\n"
+    )
+
+    assert ledger_step_ids(body) == ("S01",)
+
+
 def test_malformed_rows_are_skipped_not_raised() -> None:
     body = "## Changes\n\n- no backticks here\n-\n- `S01` `M` `src/a.py`\n"
 
@@ -112,6 +140,35 @@ class TestAppendRows:
         updated = append_rows(LEDGER, [row])
 
         assert updated == LEDGER
+
+    def test_row_appended_to_an_empty_section_starts_its_own_line(self) -> None:
+        body = "# `demo` ledger\n\n## Changes\n\n## Notes\n\n- `S01` note.\n"
+        updated = append_rows(body, [format_row("S01", "M", "src/a.py")])
+
+        assert "## Changes\n\n- `S01` `M` `src/a.py`\n\n## Notes" in updated
+        assert ledger_step_ids(updated) == ("S01",)
+
+    def test_rows_after_a_hint_comment_start_their_own_list(self) -> None:
+        updated = append_rows(_SCAFFOLDED, [format_row("S01", "M", "src/a.py")])
+
+        assert updated == _SCAFFOLDED + "\n- `S01` `M` `src/a.py`\n"
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            LEDGER,
+            _SCAFFOLDED,
+            "# `demo` ledger\n\n## Changes\n",
+            "# `demo` ledger\n\n## Changes\n\n\n- `S01` `M` `a.py`\n\n\n",
+        ],
+    )
+    def test_appending_leaves_nothing_for_the_hygiene_check(self, body: str) -> None:
+        rows = append_rows(body, [format_row("S09", "A", "src/z.py")])
+        noted = append_notes(rows, [format_note("S09", "left a scaffold")])
+
+        for text in (rows, noted):
+            assert apply_markdown_hygiene(text)[1].total == 0, repr(text)
+            assert "\n## Changes\n\n" in text
 
     def test_repeated_appends_do_not_accumulate_blank_lines(self) -> None:
         body = LEDGER
@@ -225,8 +282,6 @@ class TestNotes:
     """Notes are exception-only, Step-keyed, and never evidence."""
 
     def test_append_notes_creates_the_section_at_the_end(self) -> None:
-        from vaultspec_core.vaultcore.exec_ledger import append_notes, format_note
-
         body = "# `demo` ledger\n\n## Changes\n\n- `S01` `M` `a.py`\n"
         updated = append_notes(body, [format_note("S01", "left  a\nscaffold")])
 
@@ -234,8 +289,6 @@ class TestNotes:
         assert ledger_step_ids(updated) == ("S01",)
 
     def test_append_notes_reuses_an_existing_section_idempotently(self) -> None:
-        from vaultspec_core.vaultcore.exec_ledger import append_notes, format_note
-
         line = format_note("S03", "skipped")
         once = append_notes(LEDGER, [line])
         twice = append_notes(once, [line])
@@ -253,3 +306,52 @@ class TestNotes:
             (None, "bullet"),
         )
         assert note_lines("## Changes\n\n- `S01` `M` `a.py`\n") == ()
+
+
+class TestMarkdownCheck:
+    """What the writer emits passes the markdown gate without hand escaping."""
+
+    _NOTES = (
+        "search/_models.py and search/_credential.py moved",
+        "a *starred* claim, 2 * 3 and snake_case",
+        "left a scaffold in `src/new.py`.",
+        "ran `just check-python`; html <div>, [x](y), ~~gone~~ and &amp;",
+        "don`t and ``a`b`` quote backticks",
+    )
+
+    def test_rows_and_notes_pass_mdformat_check(self, tmp_path: Path) -> None:
+        rows = append_rows(
+            LEDGER,
+            [
+                format_row("S03", "M", "src/pkg/_private.py"),
+                format_row(
+                    "S03", VERIFY_LABEL, "pytest -k not_slow and *_test", "pass"
+                ),
+            ],
+        )
+        body = append_notes(rows, [format_note("S03", note) for note in self._NOTES])
+        ledger = tmp_path / "ledger.md"
+        ledger.write_text(body, encoding="utf-8", newline="\n")
+
+        checked = subprocess.run(
+            [sys.executable, "-m", "mdformat", "--check", str(ledger)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert checked.returncode == 0, checked.stderr
+
+    def test_a_note_reads_back_as_written(self) -> None:
+        body = append_notes(LEDGER, [format_note("S03", note) for note in self._NOTES])
+        texts = [text for step, text in note_lines(body) if step == "S03"]
+
+        assert texts[0] == "`search/_models.py` and `search/_credential.py` moved"
+        assert texts[2] == "left a scaffold in `src/new.py`."
+
+    def test_rendering_a_rendered_note_changes_nothing(self) -> None:
+        lines = [format_note("S03", note) for note in self._NOTES]
+        body = append_notes(LEDGER, lines)
+        again = [format_note("S03", text) for step, text in note_lines(body) if step]
+
+        assert again[1:] == lines

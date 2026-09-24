@@ -1,20 +1,51 @@
 """Runtime configuration and workspace-layout primitives for vaultspec_core.
 
 Re-exports :class:`VaultSpecConfig`, :func:`get_config`, :data:`CONFIG_REGISTRY`,
-and env-var parsers from :mod:`.config`; and :class:`WorkspaceLayout`,
-:class:`LayoutMode`, :func:`resolve_workspace`, :func:`discover_git`, and
-:class:`WorkspaceError` from :mod:`.workspace`. Consumed by nearly every
-subpackage that needs vault/spec paths or runtime settings.
+its named entries, the :func:`env_value` and :func:`child_environment`
+accessors, and env-var parsers from :mod:`.config`; :func:`resolve_credential`
+and its types from :mod:`.credential`; :func:`read_dotenv_value` from
+:mod:`.dotenv`; and :class:`WorkspaceLayout`, :class:`LayoutMode`,
+:func:`resolve_workspace`, :func:`discover_git`, and :class:`WorkspaceError`
+from :mod:`.workspace`. Consumed by nearly every subpackage that needs
+vault/spec paths or runtime settings.
 """
 
+from .config import CI as CI
+from .config import CLAUDE_CONFIG_DIR as CLAUDE_CONFIG_DIR
+from .config import CODEX_HOME as CODEX_HOME
+from .config import COLUMNS as COLUMNS
 from .config import CONFIG_REGISTRY as CONFIG_REGISTRY
+from .config import EDITOR as EDITOR
+from .config import NO_COLOR as NO_COLOR
+from .config import (
+    VAULTSPEC_CORE_TYPESAFE_API_KEY as VAULTSPEC_CORE_TYPESAFE_API_KEY,
+)
+from .config import VAULTSPEC_EDITOR as VAULTSPEC_EDITOR
+from .config import VAULTSPEC_JSON_PRETTY as VAULTSPEC_JSON_PRETTY
+from .config import VAULTSPEC_LOG_LEVEL as VAULTSPEC_LOG_LEVEL
+from .config import (
+    VAULTSPEC_MCP_GATEWAY_INVOCATION as VAULTSPEC_MCP_GATEWAY_INVOCATION,
+)
+from .config import VAULTSPEC_NO_HINTS as VAULTSPEC_NO_HINTS
+from .config import VAULTSPEC_NON_INTERACTIVE as VAULTSPEC_NON_INTERACTIVE
+from .config import VAULTSPEC_STDIO_WATCHDOG as VAULTSPEC_STDIO_WATCHDOG
+from .config import VAULTSPEC_TARGET_DIR as VAULTSPEC_TARGET_DIR
+from .config import VISUAL as VISUAL
 from .config import ConfigVariable as ConfigVariable
+from .config import VariableScope as VariableScope
 from .config import VaultSpecConfig as VaultSpecConfig
+from .config import child_environment as child_environment
+from .config import env_value as env_value
 from .config import get_config as get_config
 from .config import parse_csv_list as parse_csv_list
 from .config import parse_float_or_none as parse_float_or_none
 from .config import parse_int_or_none as parse_int_or_none
 from .config import reset_config as reset_config
+from .credential import Credential as Credential
+from .credential import CredentialSource as CredentialSource
+from .credential import HostedSearchConfig as HostedSearchConfig
+from .credential import resolve_credential as resolve_credential
+from .dotenv import read_dotenv_value as read_dotenv_value
 from .workspace import GitInfo as GitInfo
 from .workspace import LayoutMode as LayoutMode
 from .workspace import WorkspaceError as WorkspaceError

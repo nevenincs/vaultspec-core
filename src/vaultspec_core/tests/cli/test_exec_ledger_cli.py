@@ -226,6 +226,25 @@ def test_malformed_row_is_refused(
     assert not _ledger_path(synthetic_project).exists()
 
 
+def test_every_verify_flag_is_recorded(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
+    setup_test_plan(synthetic_project)
+
+    result = _log(
+        runner,
+        synthetic_project,
+        "P01.S01",
+        "M:src/foo.py",
+        bare=("--verify", "ruff check=pass", "--verify", "pytest -q=fail"),
+    )
+
+    assert result.exit_code == 0, result.output
+    text = _ledger_text(synthetic_project)
+    first = text.index("- `S01` `verify:` `ruff check` -> `pass`")
+    assert first < text.index("- `S01` `verify:` `pytest -q` -> `fail`")
+
+
 @pytest.mark.parametrize("spec", ["pytest", "pytest=maybe", "=pass"])
 def test_malformed_verify_is_refused(
     runner: CliRunner, synthetic_project: Path, spec: str
@@ -318,3 +337,33 @@ def test_ledger_passes_the_vault_checks(
         ],
     )
     assert stamp.exit_code == 0, stamp.output
+
+
+def test_appended_ledger_needs_no_markdown_fix(
+    runner: CliRunner, synthetic_project: Path
+) -> None:
+    """Every append leaves the ledger clean under the markdown hygiene check."""
+    from vaultspec_core.vaultcore.checks.markdown import check_markdown
+
+    setup_test_plan(synthetic_project)
+    ledger = _ledger_path(synthetic_project).relative_to(synthetic_project)
+
+    def _assert_clean() -> None:
+        report = check_markdown(synthetic_project, feature="test-feature")
+        assert [d.message for d in report.diagnostics if d.path == ledger] == []
+
+    first = _log(runner, synthetic_project, "P01.S01", "M:src/foo.py")
+    assert first.exit_code == 0, first.output
+    _assert_clean()
+
+    checked = _log(
+        runner, synthetic_project, "P01.S02", "A:src/bar.py", verify="pytest=pass"
+    )
+    assert checked.exit_code == 0, checked.output
+    _assert_clean()
+
+    noted = _log(
+        runner, synthetic_project, "P01.S02", "D:src/baz.py", note="removed a scaffold"
+    )
+    assert noted.exit_code == 0, noted.output
+    _assert_clean()

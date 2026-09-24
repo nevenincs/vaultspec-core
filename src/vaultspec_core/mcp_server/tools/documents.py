@@ -27,7 +27,6 @@ read converges nothing, and an edit writes to a path the caller named.
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from mcp.server.mcpserver import Context
@@ -37,8 +36,12 @@ from pydantic import Field
 
 from ...cli._migration_hook import ensure_migrated
 from ...core.types import get_context as _get_ctx
+from ...core.windowing import clip_text
+from ...vaultcore.markdown import iter_headings
 from ...vaultcore.models import DocType, vault_today
-from ..envelope import LeanModel, compact_result
+from ...vaultcore.parser import split_frontmatter
+from ..envelope import LeanModel, LeanResult, compact_result
+from ..filters import DateFilter, FeatureFilter, TypeFilter
 from ..isolation import isolated_context as _isolated_context
 from ..results import (
     MAX_BATCH_ITEMS,
@@ -64,10 +67,16 @@ __all__ = ["register_document_tools"]
 
 #: The default document-search types when the caller supplies no ``type``
 #: filter; exec and audit are excluded unless explicitly requested.
-_DEFAULT_TYPES = ["adr", "plan", "research", "reference"]
+_DEFAULT_TYPES = (DocType.ADR, DocType.PLAN, DocType.RESEARCH, DocType.REFERENCE)
+
+#: ``find``'s record-type filter: the shared declaration, with the default this
+#: tool applies stated from :data:`_DEFAULT_TYPES` rather than restated.
+_FindTypes = Annotated[
+    TypeFilter, Field(description=f"Default: {', '.join(_DEFAULT_TYPES)}.")
+]
 
 
-class FindEntry(LeanModel):
+class FindEntry(LeanResult):
     """One ``find`` result row, covering both find modes as a superset.
 
     Feature-listing mode populates the feature fields (``doc_count`` /
@@ -494,8 +503,12 @@ def _apply_seed_content(
 
     from ...vaultcore.edit_engine import execute_edit
 
-    _frontmatter, body = _split_body(doc_path.read_text(encoding="utf-8"))
-    new_body = body.rstrip("\n") + "\n\n## Context\n\n" + content.strip("\n") + "\n"
+    new_body = (
+        _editable_body(doc_path).rstrip("\n")
+        + "\n\n## Context\n\n"
+        + content.strip("\n")
+        + "\n"
+    )
     result = execute_edit(root_dir, ref=str(doc_path), new_body=new_body)
     if result.status == "failed":
         message = "unknown error"
@@ -510,69 +523,44 @@ def _apply_seed_content(
 # ---------------------------------------------------------------------------
 
 
-_FRONTMATTER_RE = re.compile(r"^(﻿?---[ \t]*\n.*?\n---[ \t]*\n?)(.*)$", re.DOTALL)
-_HEADING_RE = re.compile(r"^(#{1,6})\s")
+def _editable_body(doc_path: Path) -> str:
+    """Return the text after *doc_path*'s frontmatter, which an edit replaces."""
+    text = doc_path.read_text(encoding="utf-8")
+    return text[split_frontmatter(text).frontmatter_end :]
 
 
-def _split_body(text: str) -> tuple[str, str]:
-    """Split full document text into ``(frontmatter_block, body)``.
-
-    The frontmatter block keeps its fences and trailing newline, so the body
-    is exactly the bytes after the frontmatter - the portion the edit engine
-    replaces.  A document with no frontmatter yields ``("", text)``.
-
-    Args:
-        text: Full document text (LF line endings).
-
-    Returns:
-        A two-tuple ``(frontmatter_block, body)``.
-    """
-    match = _FRONTMATTER_RE.match(text)
-    if not match:
-        return "", text
-    return match.group(1), match.group(2)
-
-
-def _heading_level(line: str) -> int | None:
-    """Return the ATX heading level of *line*, or ``None`` if not a heading.
-
-    Args:
-        line: A single body line.
-
-    Returns:
-        The number of leading ``#`` (1-6) for a heading line; ``None``
-        otherwise.
-    """
-    match = _HEADING_RE.match(line)
-    return len(match.group(1)) if match else None
-
-
-def _locate_section(lines: list[str], heading: str) -> tuple[int, int] | None:
+def _locate_section(body: str, heading: str) -> tuple[int, int] | None:
     """Locate a section by exact heading-line text (first match).
 
-    The section spans from its heading line through to the next heading of
-    the same or a higher level (fewer or equal ``#``), or end of body.
+    Only real headings address or bound a section: a heading-shaped line
+    inside fenced code is sample text. The section spans from its heading
+    line through to the next heading of the same or a higher level (fewer or
+    equal ``#``), or end of body.
 
     Args:
-        lines: The body split on ``\\n``.
+        body: The document body.
         heading: The exact heading-line text to match (whitespace-trimmed).
 
     Returns:
-        A ``(heading_index, section_end_index)`` half-open line range, or
-        ``None`` when no line matches the heading text.
+        A ``(heading_index, section_end_index)`` half-open range over
+        ``body.split("\\n")``, or ``None`` when no heading line matches the
+        heading text.
     """
     wanted = heading.strip()
-    for i, line in enumerate(lines):
-        if line.strip() != wanted:
+    lines = body.split("\n")
+    headings = list(iter_headings(body))
+    for position, found in enumerate(headings):
+        if lines[found.line - 1].strip() != wanted:
             continue
-        level = _heading_level(line)
-        end = len(lines)
-        for k in range(i + 1, len(lines)):
-            klevel = _heading_level(lines[k])
-            if klevel is not None and level is not None and klevel <= level:
-                end = k
-                break
-        return i, end
+        end = next(
+            (
+                later.line - 1
+                for later in headings[position + 1 :]
+                if later.level <= found.level
+            ),
+            len(lines),
+        )
+        return found.line - 1, end
     return None
 
 
@@ -593,7 +581,7 @@ def _compose_body(op: EditOperation, body: str) -> str | None:
         return "\n" + content.strip("\n") + "\n"
 
     lines = body.split("\n")
-    located = _locate_section(lines, op.section or "")
+    located = _locate_section(body, op.section or "")
     if located is None:
         return None
     start, end = located
@@ -651,8 +639,7 @@ def _edit_one(root_dir: Path, index: int, op: EditOperation) -> ItemResult:
             error={"message": f"Cannot resolve document: '{op.target}'"},
         )
 
-    _frontmatter, body = _split_body(doc_path.read_text(encoding="utf-8"))
-    new_body = _compose_body(op, body)
+    new_body = _compose_body(op, _editable_body(doc_path))
     if new_body is None:
         return build_item(
             index,
@@ -845,32 +832,15 @@ def _find_features(limit: int, want_json: bool) -> list[FindEntry]:
 _FULL_BODY_MAX_ROWS = 5
 
 
-#: Characters of document text carried by an ``excerpt`` body request.
+#: UTF-8 bytes of document text carried by an ``excerpt`` body request.
 #:
 #: Enough to recognise a document and decide whether to fetch it; not enough
 #: for twenty of them to fill a context window. Measured, twenty adr documents
 #: at ``body="full"`` cost 197,490 bytes - the default limit, on a healthy
-#: vault, past a 50k-token budget for a single exploratory call.
-_EXCERPT_CHARS = 600
-
-
-def _excerpt(text: str) -> str:
-    """Return the leading slice of *text* used for an excerpt body.
-
-    Cuts on a line boundary where one falls near the limit, so an excerpt does
-    not end mid-word and read as corrupted content.
-
-    Args:
-        text: The full document text.
-
-    Returns:
-        The excerpt, or the whole text when it already fits.
-    """
-    if len(text) <= _EXCERPT_CHARS:
-        return text
-    cut = text[:_EXCERPT_CHARS]
-    newline = cut.rfind("\n")
-    return cut[:newline] if newline > _EXCERPT_CHARS // 2 else cut
+#: vault, past a 50k-token budget for a single exploratory call. Counted in
+#: bytes, as the reply budget is, so text in a multi-byte script costs no more
+#: than ASCII does.
+_EXCERPT_BYTES = 600
 
 
 def _matches_text(doc: Any, needle: str) -> bool:
@@ -896,7 +866,7 @@ def _matches_text(doc: Any, needle: str) -> bool:
 
 def _find_documents(
     feature: str | None,
-    types: list[str] | None,
+    types: list[DocType] | None,
     date: str | None,
     body: str,
     limit: int,
@@ -964,7 +934,7 @@ def _find_documents(
         if body != "none":
             text = raw.decode("utf-8", errors="replace") if raw is not None else ""
             if body == "excerpt":
-                entry.body = _excerpt(text)
+                entry.body = clip_text(text, _EXCERPT_BYTES)
                 entry.body_bytes = len(text.encode("utf-8"))
                 entry.body_truncated = len(entry.body) < len(text)
             else:
@@ -1028,9 +998,9 @@ def register_document_tools(
     @_isolated_context
     async def find(
         ctx: Context[Any, Any],
-        feature: str | None = None,
-        type: list[str] | None = None,
-        date: str | None = None,
+        feature: FeatureFilter = None,
+        type: _FindTypes = None,
+        date: DateFilter = None,
         text: str | None = None,
         body: Literal["none", "excerpt", "full"] = "none",
         json: bool = False,
@@ -1045,15 +1015,10 @@ def register_document_tools(
         result carries the document's current ``blob_hash`` and a
         ``resource_uri``, a ``file://`` locator the host reads directly
         rather than a resource this server serves; inline the text instead by
-        setting ``body``.  The
-        ``type`` filter defaults to adr, plan, research, reference; exec and
-        audit are excluded unless explicitly requested.
+        setting ``body``.
 
         Args:
             ctx: The MCP request context.
-            feature: Feature filter without ``#`` (switches to search mode).
-            type: Document-type filter (switches to search mode).
-            date: Exact-date filter (switches to search mode).
             text: Case-insensitive substring over document stem and feature
                 (switches to search mode). Composes with the other filters,
                 and is matched over identifiers rather than document bodies -
@@ -1105,10 +1070,9 @@ def register_document_tools(
 
         Each spec is normalized, its related references resolved, and its
         feature lifecycle validated (against the vault including earlier
-        same-batch items) before scaffolding through the owning
-        ``create_vault_doc`` core.  Items apply sequentially and item
-        failures do not abort the batch.  The affected feature indexes are
-        regenerated as an automatic side effect.
+        same-batch items) before scaffolding. Items apply sequentially and
+        item failures do not abort the batch. The affected feature indexes
+        are regenerated as an automatic side effect.
 
         A failed schema migration aborts the call, not an item: no
         envelope, nothing written.
@@ -1191,10 +1155,10 @@ def register_document_tools(
 
         Each operation composes a full body (``set_body`` replaces it;
         ``append_section`` / ``replace_section`` address an existing section
-        by exact heading text) and routes the write through the shared edit
-        engine, which enforces the optional ``expected_blob_hash`` guard,
-        runs pre-write conformance checks, and returns the post-write blob
-        hash for chaining.  Frontmatter and filenames are never touched.
+        by exact heading text). The write enforces the optional
+        ``expected_blob_hash`` guard, runs pre-write conformance checks, and
+        returns the post-write blob hash for chaining. Frontmatter and
+        filenames are never touched.
 
         Args:
             ctx: The MCP request context.

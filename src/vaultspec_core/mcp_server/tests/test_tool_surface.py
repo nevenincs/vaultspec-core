@@ -1,8 +1,8 @@
-"""Full ten-tool surface integration test over the real ``create_server``.
+"""Full twelve-tool surface integration test over the real ``create_server``.
 
 Builds the production server through ``create_server`` on a
 :class:`WorkspaceFactory`-installed vault and drives it over the in-memory
-MCPServer client - no mocks, stubs, or skips. Asserts that exactly the ten
+MCPServer client - no mocks, stubs, or skips. Asserts that exactly the twelve
 expected tools are registered with the ADR Q6 annotation matrix and an
 ``outputSchema`` each, exercises a representative call on every tool end-to-end
 (including a gateway ``invoke`` of the real ``vault list`` verb), confirms a
@@ -22,29 +22,42 @@ from mcp import Client
 from vaultspec_core import __version__
 from vaultspec_core.mcp_server.app import create_server
 
-from .conftest import data_of, vault_root
+from .conftest import EXPECTED_TOOLS, READ_ONLY_TOOLS, data_of, vault_root
 
 __all__ = ["vault_root"]
 
-pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
+pytestmark = [pytest.mark.unit]
 
-#: The ten tools the redesigned surface must advertise, and nothing else.
-_EXPECTED_TOOLS = frozenset(
+#: vaultspec-rag's search and read tools. Core never proxies them: an agent
+#: reaches rag on rag's own MCP channel, so none of these names may appear on
+#: core's surface, whatever core's own ``search`` is called.
+_RAG_TOOLS = frozenset(
     {
-        "status",
-        "find",
-        "create",
-        "edit",
-        "plan_progress",
-        "plan_edit",
-        "log",
-        "check",
-        "discover",
-        "invoke",
+        "search_vault",
+        "search_codebase",
+        "search_documents",
+        "search_combined",
+        "get_code_file",
     }
 )
 
-_READ_ONLY_TOOLS = frozenset({"status", "find", "check", "discover"})
+#: ``search`` is open-world: with a key configured it sends vault text to the
+#: TypeSafe API. It mutates nothing, so it stays read-only on both surfaces.
+_SEARCH_ANNOTATIONS = {
+    "read_only_hint": True,
+    "idempotent_hint": True,
+    "open_world_hint": True,
+}
+
+#: ``crossref`` is open-world like ``search``. On the full surface it can write
+#: links, so it is not read-only, yet repeating a call writes nothing new; the
+#: read-only surface registers a judge-only signature.
+_CROSSREF_ANNOTATIONS = {
+    "read_only_hint": False,
+    "destructive_hint": False,
+    "idempotent_hint": True,
+    "open_world_hint": True,
+}
 
 #: The ADR Q6 annotation matrix: each tool mapped to the hints it must declare.
 #: Read-only tools (status/find/discover) leave ``destructive_hint`` unset
@@ -56,6 +69,8 @@ _ANNOTATIONS = {
         "open_world_hint": False,
     },
     "find": {"read_only_hint": True, "idempotent_hint": True, "open_world_hint": False},
+    "search": _SEARCH_ANNOTATIONS,
+    "crossref": _CROSSREF_ANNOTATIONS,
     "discover": {
         "read_only_hint": True,
         "idempotent_hint": True,
@@ -112,6 +127,8 @@ _READ_ONLY_ANNOTATIONS = {
         "open_world_hint": False,
     },
     "find": {"read_only_hint": True, "idempotent_hint": True, "open_world_hint": False},
+    "search": _SEARCH_ANNOTATIONS,
+    "crossref": _SEARCH_ANNOTATIONS,
     "check": {
         "read_only_hint": True,
         "idempotent_hint": True,
@@ -125,14 +142,14 @@ _READ_ONLY_ANNOTATIONS = {
 }
 
 
-async def test_surface_registers_exactly_ten_tools_with_schemas(
+async def test_surface_registers_exactly_twelve_tools_with_schemas(
     vault_root: Path,
 ) -> None:
-    """``create_server`` advertises exactly the ten tools, schema'd and annotated."""
+    """``create_server`` advertises exactly the twelve tools, schema'd and annotated."""
     mcp = create_server()
     tools = await mcp.list_tools()
     names = {t.name for t in tools}
-    assert names == _EXPECTED_TOOLS, names
+    assert names == EXPECTED_TOOLS, names
 
     by_name = {t.name: t for t in tools}
     for name, expected in _ANNOTATIONS.items():
@@ -154,7 +171,7 @@ async def test_read_only_surface_omits_mutation_tools_and_repair(
     mcp = create_server(read_only=True)
     tools = await mcp.list_tools()
     names = {tool.name for tool in tools}
-    assert names == _READ_ONLY_TOOLS, names
+    assert names == READ_ONLY_TOOLS, names
 
     by_name = {tool.name: tool for tool in tools}
     for name, expected in _READ_ONLY_ANNOTATIONS.items():
@@ -174,6 +191,7 @@ async def test_read_only_surface_omits_mutation_tools_and_repair(
         rejected_repair = await client.call_tool("check", {"fix": True})
     assert checked["fixed"] is False
     assert rejected_repair.is_error
+    assert set(by_name["crossref"].input_schema.get("properties", {})) == {"ref"}
 
 
 async def test_surface_instructions_name_the_tools_and_version(
@@ -203,12 +221,17 @@ async def test_read_only_instructions_name_only_the_read_only_surface(
     registered = {tool.name for tool in await mcp.list_tools()}
     for name in registered:
         assert f"'{name}'" in instructions, f"{name} missing from instructions"
-    for name in _EXPECTED_TOOLS - registered:
+    for name in EXPECTED_TOOLS - registered:
         assert f"'{name}'" not in instructions, f"{name} advertised in read-only mode"
 
 
 async def test_surface_representative_call_per_tool(vault_root: Path) -> None:
-    """Every tool answers a representative call end-to-end on the real server."""
+    """Every tool answers a representative call end-to-end on the real server.
+
+    ``search`` is the exception: in-process, its outcome would depend on
+    whether the ambient environment holds a hosted-search key, so its call is
+    driven over stdio with a controlled environment in ``test_search_tool``.
+    """
     mcp = create_server()
     async with Client(mcp) as client:
         # create: scaffold a full research/adr/plan lifecycle in one batch so
@@ -333,7 +356,7 @@ def test_registry_entry_launches_this_server_unchanged(vault_root: Path) -> None
     The builtin registry definition (ADR Q8: installation is a no-op for
     existing projects) must keep resolving to the module whose
     ``create_server`` this test drives, so a synced project picks up the
-    ten-tool surface with no registry migration. Since the install-mode
+    twelve-tool surface with no registry migration. Since the install-mode
     model, the seeded registry carries the mode-neutral launch tokens and
     the concrete launch is rendered per install mode; every mode must still
     target this server module.
@@ -350,7 +373,7 @@ def test_registry_entry_launches_this_server_unchanged(vault_root: Path) -> None
         assert rendered["args"][-1] == "vaultspec_core.mcp_server.app", mode
 
     # The module the registry launches exposes the exact bootstrap this test
-    # exercised, so the launched process serves the same ten-tool surface.
+    # exercised, so the launched process serves the same twelve-tool surface.
     from vaultspec_core.mcp_server import app as launched
 
     assert callable(launched.create_server)
@@ -413,8 +436,11 @@ async def test_tool_list_is_invariant_under_companion_presence(
         "core's tool list changed with rag's presence; the surface must be a "
         "pure function of core's version"
     )
-    assert with_rag == _EXPECTED_TOOLS
-    assert not any("search" in name for name in with_rag), (
-        "core must not advertise a search tool; semantic search stays on "
-        "rag's own MCP channel"
+    assert with_rag == EXPECTED_TOOLS
+    assert not with_rag & _RAG_TOOLS, (
+        "core must not advertise rag's tools; semantic search over rag's index "
+        "stays on rag's own MCP channel"
     )
+    # Core's own hosted search is always registered, so its presence is not a
+    # proxy of rag's: it is there with rag absent too.
+    assert "search" in without_rag

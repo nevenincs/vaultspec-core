@@ -43,6 +43,11 @@ class TestScopePaths:
     def test_empty_scope_yields_nothing(self) -> None:
         assert scope_paths("## Scope\n\n## Description\n\nProse.\n") == ()
 
+    def test_heading_inside_fenced_code_neither_opens_nor_ends_scope(self) -> None:
+        body = "## Scope\n\n- `a.py`\n\n~~~markdown\n## Notes\n~~~\n\n- `b.py`\n"
+
+        assert scope_paths(body) == ("a.py", "b.py")
+
     def test_duplicates_collapse(self) -> None:
         body = "## Scope\n\n- `a.py`\n- `a.py`\n- `b.py`\n"
 

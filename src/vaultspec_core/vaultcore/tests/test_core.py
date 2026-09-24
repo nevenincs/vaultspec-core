@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 from ...protocol.providers import GeminiModels
 from .. import parse_frontmatter, parse_vault_metadata
-from ..parser import SafeLoader
+from ..parser import SafeLoader, related_block, split_frontmatter
 
 pytestmark = [pytest.mark.unit]
 
@@ -112,6 +112,139 @@ class TestParseFrontmatterBOM:
         meta, body = parse_frontmatter(content)
         assert meta["tier"] == "LOW"
         assert "Body." in body
+
+
+class TestSplitFrontmatter:
+    """Where the frontmatter ends and the body begins, as offsets and lines."""
+
+    _DOC = "---\ntags:\n  - '#x'\n---\n\n\n# Title\n\nBody.\n"
+
+    def test_body_is_whole_source_lines_from_body_line(self):
+        split = split_frontmatter(self._DOC)
+        assert split.yaml_block == "tags:\n  - '#x'"
+        assert split.body == "# Title\n\nBody.\n"
+        assert split.body_line == 7
+        assert "\n".join(self._DOC.split("\n")[split.body_line - 1 :]) == split.body
+        assert self._DOC[split.body_start :] == split.body
+
+    def test_frontmatter_end_keeps_blank_lines_with_the_body(self):
+        split = split_frontmatter(self._DOC)
+        assert self._DOC[: split.frontmatter_end] == "---\ntags:\n  - '#x'\n---\n"
+        assert self._DOC[split.frontmatter_end :] == "\n\n# Title\n\nBody.\n"
+
+    def test_bom_stays_with_the_frontmatter_block(self):
+        split = split_frontmatter(_BOM + self._DOC)
+        plain = split_frontmatter(self._DOC)
+        assert split.yaml_block == plain.yaml_block
+        assert split.body == plain.body
+        assert split.body_line == plain.body_line
+        assert split.frontmatter_end == plain.frontmatter_end + 1
+
+    def test_first_body_line_keeps_its_indentation(self):
+        split = split_frontmatter("---\na: 1\n---\n    indented code\nnext\n")
+        assert split.body == "    indented code\nnext\n"
+        assert split.body_line == 4
+
+    def test_without_frontmatter_leading_blank_lines_are_skipped(self):
+        split = split_frontmatter("\n\n  Text\nmore")
+        assert split.yaml_block is None
+        assert split.frontmatter_end == 0
+        assert split.body == "  Text\nmore"
+        assert split.body_line == 3
+
+    def test_crlf_text_counts_lines_by_newline(self):
+        doc = "---\r\na: 1\r\n---\r\n\r\nBody\r\n"
+        split = split_frontmatter(doc)
+        assert split.yaml_block == "a: 1\r"
+        assert doc[: split.frontmatter_end] == "---\r\na: 1\r\n---\r\n"
+        assert split.body == "Body\r\n"
+        assert split.body_line == 5
+
+    def test_closing_fence_must_be_a_whole_line(self):
+        doc = "---\na: 1\n--- not a fence\nb: 2\n---\nBody"
+        split = split_frontmatter(doc)
+        assert split.yaml_block == "a: 1\n--- not a fence\nb: 2"
+        assert split.body == "Body"
+
+    def test_closing_fence_is_the_first_fence_line_after_the_opening(self):
+        split = split_frontmatter("---\n\n---\na: 1\n---\nbody")
+        assert split.yaml_block == ""
+        assert split.body == "a: 1\n---\nbody"
+
+    def test_yaml_span_holds_the_lines_between_the_fences(self):
+        doc = _BOM + "---\na: 1\nb: 2\n---\nbody"
+        split = split_frontmatter(doc)
+        assert doc[split.yaml_start : split.yaml_end] == "a: 1\nb: 2\n"
+        assert split.frontmatter_start == 1
+        assert split.at_start is True
+        assert split.unclosed is False
+
+    def test_lone_cr_line_endings(self):
+        doc = "---\ra: 1\r---\r\rbody\r"
+        split = split_frontmatter(doc)
+        assert split.yaml_block == "a: 1"
+        assert doc[split.yaml_start : split.yaml_end] == "a: 1\r"
+        assert split.body == "body\r"
+        assert split.body_line == 5
+
+    def test_a_crlf_pair_is_one_line_break(self):
+        split = split_frontmatter("---\r\n---\r\nbody")
+        assert split.yaml_block is None
+        assert split.body == "---\r\n---\r\nbody"
+
+    def test_frontmatter_after_blank_lines_is_not_at_start(self):
+        split = split_frontmatter("\n---\na: 1\n---\nbody")
+        assert split.yaml_block == "a: 1"
+        assert split.frontmatter_start == 1
+        assert split.at_start is False
+
+    def test_unclosed_opening_fence_is_reported(self):
+        unclosed = split_frontmatter("---\na: 1\nbody\n")
+        assert unclosed.yaml_block is None
+        assert unclosed.unclosed is True
+        assert split_frontmatter("text\n---\na: 1\n").unclosed is False
+
+
+class TestRelatedBlock:
+    """The one reading of a frontmatter's ``related:`` list."""
+
+    def test_entries_run_to_the_next_key(self):
+        lines = [
+            "tags:",
+            "  - '#a'",
+            "related:",
+            "  - '[[x]]'",
+            '  - "[[y|Y]]"  # note',
+            "",
+            "- '[[z]]'",
+            "date: '2026-01-01'",
+            "  - '[[after-the-list]]'",
+        ]
+        block = related_block(lines)
+        assert block.key_index == 2
+        assert block.inline == ""
+        assert [(e.index, e.target) for e in block.entries] == [
+            (3, "x"),
+            (4, "y|Y"),
+            (6, "z"),
+        ]
+        for entry in block.entries:
+            assert entry.prefix + entry.target + entry.suffix == lines[entry.index]
+
+    def test_indented_key_is_found(self):
+        block = related_block(["date: x", "  related:", "    - '[[a]]'"])
+        assert block.key_index == 1
+        assert [e.target for e in block.entries] == ["a"]
+
+    def test_inline_value_is_reported_without_entries(self):
+        block = related_block(["related: ['[[a]]']"])
+        assert block.inline == "['[[a]]']"
+        assert block.entries == ()
+
+    def test_no_key(self):
+        block = related_block(["tags:", "  - '[[looks-like-a-link]]'"])
+        assert block.key_index is None
+        assert block.entries == ()
 
 
 class TestParseVaultMetadataBOM:

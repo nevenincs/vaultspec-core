@@ -75,8 +75,12 @@ Use `--read-only` to limit the tools the server advertises:
 vaultspec-core-mcp --read-only
 ```
 
-This exposes only `status`, `find`, `check`, and `discover` to connected clients. In
-this mode, `check` has no `fix` parameter.
+This exposes only `status`, `find`, `search`, `crossref`, `check`, and `discover` to
+connected clients. In this mode, `check` has no `fix` parameter, and `crossref` judges
+one ADR and cannot write links; any other argument to either is refused rather than
+ignored. `search` and `crossref` change nothing on disk, but when a hosted-search key is
+configured they send vault text to the TypeSafe API, so read-only mode still carries
+that data flow. See [`search`](#search) and [`crossref`](#crossref).
 
 ### Install modes
 
@@ -156,8 +160,9 @@ the server, grant trust, or bypass provider approval.
 
 Call the `status` tool with no arguments. It returns a rollup report:
 `tool_schema_version`, the workspace's features with document counts and lifecycle
-status, and any plans in flight with their completion and next open step. A populated
-report confirms the server found the workspace.
+status, any plans in flight with their completion and next open step, and
+`hosted_search`, whether [`search`](#search) has a key configured. A populated report
+confirms the server found the workspace.
 
 Call `find` with no arguments. It returns the feature listing, for example
 `[{"name": "auth", "doc_count": 4, "weight": 7}, ...]`. A non-empty listing confirms the
@@ -166,12 +171,13 @@ each with a `blob_hash` ready for a later `edit` call.
 
 ## Environment
 
-| Variable                   | Default                   | Controls                                                                                                             |
-| -------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`     | current working directory | The workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI.                      |
-| `VAULTSPEC_STDIO_WATCHDOG` | enabled                   | Set to `0`, `false`, `off`, or `no` to disable the stdio lifetime watchdog. See [Server lifetime](#server-lifetime). |
+| Variable                          | Default                   | Controls                                                                                                                                |
+| --------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`            | current working directory | The workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI.                                         |
+| `VAULTSPEC_STDIO_WATCHDOG`        | enabled                   | Set to `0`, `false`, `off`, or `no` to disable the stdio lifetime watchdog. See [Server lifetime](#server-lifetime).                    |
+| `VAULTSPEC_CORE_TYPESAFE_API_KEY` | unset                     | The key that enables hosted vault search for `search`. It is secret: no response, log, or error ever shows it. See [`search`](#search). |
 
-Those are the two `VAULTSPEC_` variables the MCP server reads directly. See
+Those are the three `VAULTSPEC_` variables the MCP server reads directly. See
 [CLI reference](./CLI.md) for the full `VAULTSPEC_` variable family.
 
 ## Verification
@@ -196,10 +202,11 @@ Run `vaultspec-core spec doctor --json` for a broader workspace diagnosis.
 ## Tools
 
 Most tools cover the everyday path: `status` orients you in the workspace, `find`
-locates documents, `create` scaffolds new ones, `edit` makes body-prose changes, `check`
-validates and repairs the vault, `plan_progress` marks steps complete, `plan_edit`
-authors step content, and `log` appends a step's rows to the plan's execution ledger.
-`discover` and `invoke` form a gateway that reaches every remaining CLI verb.
+locates documents, `search` answers a question with the passage that answers it,
+`create` scaffolds new ones, `edit` makes body-prose changes, `check` validates and
+repairs the vault, `plan_progress` marks steps complete, `plan_edit` authors step
+content, and `log` appends a step's rows to the plan's execution ledger. `discover` and
+`invoke` form a gateway that reaches every remaining CLI verb.
 
 The table below is generated from the running server: each tool's purpose is its own
 handler's summary and each annotation column its declared MCP hints. Run
@@ -208,7 +215,7 @@ markers.
 
 <!-- vaultspec:generated:begin mcp-tool-inventory -->
 
-The server exposes 10 tools.
+The server exposes 12 tools.
 
 | Tool            | Purpose                                                                                                                                  | Annotations                     |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
@@ -217,6 +224,8 @@ The server exposes 10 tools.
 | `edit`          | Apply one or more body-prose edits to vault documents.                                                                                   | destructive, not idempotent     |
 | `status`        | Orient in a vaultspec project, project-wide or targeted.                                                                                 | read-only, idempotent           |
 | `check`         | Run the vault health-check suite, optionally repairing.                                                                                  | non-destructive, idempotent     |
+| `search`        | Answer a question from the vault, quoting the passage that answers.                                                                      | read-only, idempotent           |
+| `crossref`      | Find the ADRs a decision should cross-reference, within fixed bounds.                                                                    | non-destructive, idempotent     |
 | `plan_progress` | Mark plan steps closed or open by canonical identifier.                                                                                  | non-destructive, idempotent     |
 | `plan_edit`     | Author plan steps: add, insert, edit, or remove.                                                                                         | destructive, not idempotent     |
 | `log`           | Append one Step's rows to its plan's execution ledger.                                                                                   | non-destructive, idempotent     |
@@ -232,7 +241,11 @@ from the recorded surface of that release, so it empties itself when the next on
 
 <!-- vaultspec:generated:begin unreleased-mcp-surface -->
 
-The latest published release is `0.2.4`, and every tool above is in it.
+The latest published release is `0.2.4`. These tools are on this branch and not in that
+release, so a host installing the published server will not see them:
+
+- `crossref`
+- `search`
 
 <!-- vaultspec:generated:end unreleased-mcp-surface -->
 
@@ -277,15 +290,15 @@ With no arguments, `find` lists features: each row gives a feature's name, docum
 count, and graph weight. Pass any filter (`feature`, `type`, `date`, or `text`) and
 `find` switches to search mode, returning matching documents instead.
 
-| Parameter | Type                         | Default | Description                                                                                                                                                                                                                                                                                        |
-| --------- | ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `feature` | string or null               | `null`  | Feature filter, without the `#` prefix. Passing it switches `find` to search mode.                                                                                                                                                                                                                 |
-| `type`    | list of strings or null      | `null`  | Document-type filter (for example, `adr`, `plan`, `research`, `reference`). Passing it switches `find` to search mode. In search mode with no `type` given, the default set is `adr`, `plan`, `research`, and `reference`; `exec` and `audit` documents appear only when you name them explicitly. |
-| `date`    | string or null               | `null`  | Exact ISO-8601 date filter. Passing it switches `find` to search mode.                                                                                                                                                                                                                             |
-| `text`    | string or null               | `null`  | Case-insensitive substring over the document stem and feature tag. Composes with the other filters, and matches identifiers rather than body prose. Passing it switches `find` to search mode.                                                                                                     |
-| `body`    | `none`, `excerpt`, or `full` | `none`  | In search mode, how much document text to inline in each row. This is an enum, not a boolean: passing `true` is rejected by schema validation.                                                                                                                                                     |
-| `json`    | boolean                      | `false` | In feature-listing mode, enrich each row with `status`, `types`, `earliest_date`, and `has_plan`.                                                                                                                                                                                                  |
-| `limit`   | integer, 1 to 100            | `20`    | Maximum number of rows to return.                                                                                                                                                                                                                                                                  |
+| Parameter | Type                         | Default | Description                                                                                                                                                                                                                                                                                                               |
+| --------- | ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feature` | string or null               | `null`  | Feature filter, without the `#` prefix. Passing it switches `find` to search mode.                                                                                                                                                                                                                                        |
+| `type`    | list of record types or null | `null`  | Document-type filter: any of `adr`, `audit`, `exec`, `index`, `plan`, `reference`, and `research`. Passing it switches `find` to search mode. In search mode with no `type` given, the default set is `adr`, `plan`, `research`, and `reference`; `exec` and `audit` documents appear only when you name them explicitly. |
+| `date`    | string or null               | `null`  | Exact ISO-8601 date filter. Passing it switches `find` to search mode.                                                                                                                                                                                                                                                    |
+| `text`    | string or null               | `null`  | Case-insensitive substring over the document stem and feature tag. Composes with the other filters, and matches identifiers rather than body prose. Passing it switches `find` to search mode.                                                                                                                            |
+| `body`    | `none`, `excerpt`, or `full` | `none`  | In search mode, how much document text to inline in each row. This is an enum, not a boolean: passing `true` is rejected by schema validation.                                                                                                                                                                            |
+| `json`    | boolean                      | `false` | In feature-listing mode, enrich each row with `status`, `types`, `earliest_date`, and `has_plan`.                                                                                                                                                                                                                         |
+| `limit`   | integer, 1 to 100            | `20`    | Maximum number of rows to return.                                                                                                                                                                                                                                                                                         |
 
 Behavior notes:
 
@@ -303,7 +316,10 @@ Behavior notes:
   a per-type cap. If an early type fills the cap, later types can be crowded out
   entirely. Call `find` once per type when you need a fair spread across types.
 - `find` never raises an error for filters that match nothing; an empty result comes
-  back as an empty list.
+  back as an empty list. A type that is not a record type, such as `adrs`, is refused by
+  schema validation instead of matching nothing.
+- `find` and `search` share their `feature`, `date`, and `type` filters, so each
+  argument selects the same records on both tools.
 
 Example feature-listing response:
 
@@ -327,6 +343,221 @@ Example document-search response row:
   "resource_uri": "file:///.../2026-07-11-search-api-research.md"
 }
 ```
+
+______________________________________________________________________
+
+### `search`
+
+Answer a question from the vault, quoting the passage that answers it. Read-only,
+idempotent, open-world.
+
+`search` ranks vault records against a question in plain language and returns the best
+matches first. Each hit quotes the record's own text, the block judged to answer, with
+the file lines it came from, so you can cite it or open the file at that span. The reply
+also says whether anything in the vault answers the question at all.
+
+| Parameter | Type                          | Default  | Description                                                                                                                                           |
+| --------- | ----------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `query`   | string, 1 to 2,000 characters | required | The question.                                                                                                                                         |
+| `type`    | list of record types or null  | `null`   | Record-type filter. With no `type`, every type except `index` is searched. Naming `index` is refused, since a feature index only lists other records. |
+| `feature` | string or null                | `null`   | Feature filter, without the `#` prefix.                                                                                                               |
+| `date`    | string or null                | `null`   | Exact date filter, `YYYY-MM-DD`.                                                                                                                      |
+| `limit`   | integer, 1 to 11              | `4`      | Maximum number of hits to return.                                                                                                                     |
+
+The filters are applied in code before anything is sent, so no record they exclude
+reaches the model. An empty or blank query, a query over 2,000 characters, a `limit`
+outside 1 to 11, an unknown type, or `index` fails the whole call with a protocol error.
+
+**Enabling hosted search.** Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` in the server's
+environment. If the variable is absent there, the server reads that one variable from
+the workspace-root `.env` instead, but only when both hold: the server runs from the
+workspace's own environment (its Python interpreter lives inside the workspace, as a
+project virtual environment does), and the workspace declares the `dependency` or `dev`
+install mode. A globally installed vaultspec-core, such as a uv tool, a pipx install, or
+a release binary, never reads the workspace `.env`, so a cloned repository cannot supply
+the key. No other variable enables search: `TYPESAFE_API_KEY` and vaultspec-rag's own
+variables do not. With a key set, every search sends the question and vault text to the
+TypeSafe API at `api.typesafe.ai`. Setting the key is the consent to that data flow, and
+it applies in read-only mode too. Without a key, nothing leaves the machine. The key
+never appears in a response, a log, or an error. `status` reports only whether a key is
+configured and where it was found.
+
+**Outcomes.** The `status` field is one of three values:
+
+- `ok`: the vault was judged. `answered` says whether any record was judged to answer
+  the question, and `verdict` words it: `answered`, `nothing_answers`, or
+  `none_read_answers` when the provider would not read some records in full. `answered`
+  is a verdict on the whole vault only when `usage.unscored` is `0`: a record the
+  provider would not read in full was not judged. `hits` is empty only when every record
+  was read.
+- `not_configured`: no key is set and nothing was sent.
+- `unavailable`: a key is set but the search failed. `reason` names the failure:
+  `credential_rejected`, `content_rejected`, `rate_limited`, `transport`, `deadline`,
+  `invalid_response`, or `request_too_large`. `content_rejected` means the provider
+  refused to read the question itself, or every record the ranking needed. No partial
+  ranking is returned.
+
+**Next step.** A `not_configured` or `unavailable` reply carries `next_step`, the search
+to run instead, and `remediation`, one sentence giving the reason and that step.
+`next_step.kind` is `rag_search` when the workspace provisions vaultspec-rag, and
+`command` is a vaultspec-rag vault search over the requested record types. Otherwise
+`kind` is `listing`, and `command` is `vaultspec-core vault list`, with the type when
+one was requested; run it or `find`, then grep `.vault/` for the passage. `types` lists
+the record types the step covers, and `<intent>` in `command` stands for your question.
+When the request carried `feature` or `date`, `command` keeps them as `--feature` and
+`--date`. Provisioning is read from the workspace configuration, not checked for
+liveness. The server never calls vaultspec-rag itself; you or your agent run the step.
+`search` covers the vault only: use vaultspec-rag for code.
+
+**Hits.** Each hit reports `path`, `type`, `feature`, `date`, `title`, `score` (the
+ranking score), `answers` (the probability that the record states the answer),
+`premise_conflict` (the probability that the record contradicts an assumption in the
+question, reported on its own and never folded into `score`), `blob_hash`, and up to two
+excerpts. `excerpt` is the block judged to answer, and `supporting` is a second block
+when the answer spans two. A hit with no `excerpt` was ranked, but no single block was
+chosen. Unlike `find`, a hit carries no `resource_uri`: `path` is relative to the
+workspace, and `blob_hash` names the file version.
+
+**Excerpts.** Each excerpt has these fields:
+
+- `section`: the heading path, outermost first, each heading separated by `" > "`.
+- `line_start` and `line_end`: the lines of `text` in the file version that `blob_hash`
+  names.
+- `text`: the file's own text, never text a model wrote.
+- `truncated`: whether the block goes on past `line_end`.
+
+An excerpt's text is at most 700 bytes of UTF-8, or 300 for `supporting`, and the
+section's headings are bounded the same way. A longer block keeps its opening whole
+lines, `line_end` is the last line kept, and `truncated` is `true`; the rest of the
+block starts at `line_end + 1`. The one exception is a block whose first line alone is
+over the limit: `text` is then the start of that line, and `line_end` equals
+`line_start`.
+
+**Paging.** A ranked reply carries `returned`, `total`, and `truncated`. The ranking is
+computed fresh for each request, so there is no offset to resume from. When `truncated`
+is `true`, raise `limit` (up to 11) or narrow the filters. `usage` reports the model
+version, the request count, input tokens, elapsed milliseconds, and `unscored`, the
+number of records the provider would not read in full: its content filter refused them,
+or one of their passages exceeded the request size. A record refused only in part is
+still ranked, on the text that was read, and is counted too. `usage` is absent when
+nothing was sent. The reply never echoes the question back.
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "answered": true,
+  "verdict": "answered",
+  "hits": [
+    {
+      "path": ".vault/adr/2026-07-12-search-api-adr.md",
+      "type": "adr",
+      "feature": "search-api",
+      "date": "2026-07-12",
+      "title": "`search-api` adr: `page with opaque cursors`",
+      "score": 0.912,
+      "answers": 0.877,
+      "premise_conflict": 0.012,
+      "blob_hash": "<git blob OID>",
+      "excerpt": {
+        "section": "Decision",
+        "line_start": 41,
+        "line_end": 46,
+        "text": "Pages are addressed by an opaque cursor, never an offset...",
+        "truncated": false
+      }
+    }
+  ],
+  "returned": 1,
+  "total": 6,
+  "truncated": true,
+  "usage": {
+    "model": "jev-1.13.0",
+    "requests": 6,
+    "input_tokens": 41250,
+    "elapsed_ms": 1234,
+    "unscored": 0
+  }
+}
+```
+
+Example response with no key configured, for a request with `type` `["adr"]` in a
+workspace that provisions vaultspec-rag:
+
+```json
+{
+  "status": "not_configured",
+  "answered": false,
+  "hits": [],
+  "next_step": {
+    "kind": "rag_search",
+    "types": ["adr"],
+    "command": "vaultspec-rag search \"<intent>\" --type vault --doc-type adr"
+  },
+  "remediation": "Hosted vault search is not configured: set VAULTSPEC_CORE_TYPESAFE_API_KEY to enable it, or run `vaultspec-rag search \"<intent>\" --type vault --doc-type adr`."
+}
+```
+
+______________________________________________________________________
+
+### `crossref`
+
+Find the ADRs a decision should cross-reference, within fixed bounds. Not read-only (it
+can write links), non-destructive, idempotent, open-world. On a read-only server it is
+read-only and judges one ADR.
+
+`crossref` judges a source ADR against every other ADR in the vault and returns the ones
+it should link, plus the links it already declares that were judged weak. It is the same
+backend as `vaultspec-core vault adr crossref`, and it uses the hosted-search key and
+data flow described under [`search`](#search).
+
+| Parameter     | Type                   | Default | Description                                                                                  |
+| ------------- | ---------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`, at most 50. One ref is judged alone. |
+| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                   |
+| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                      |
+| `all_adrs`    | boolean                | `false` | Sweep every ADR that still governs; superseded and rejected ones are skipped unless named.   |
+| `after`       | string or null         | `null`  | Resume a sweep after this ADR, the `next_after` of the previous reply.                       |
+| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                  |
+| `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                         |
+
+A call needs `refs`, `feature`, `isolated`, or `all_adrs`. `feature` and `isolated`
+narrow together; `refs` and `all_adrs` each stand alone, and combining either with
+another selector is refused. The read-only server takes one parameter, `ref`, the ADR to
+judge.
+
+**Bounds.** Every other ADR is ranked by code alone, the best 192 are put to the model
+as Choice questions of at most 32 options, and the best 32, plus up to 8 declared links
+outside them, are judged in pairs. A source costs at most 46 requests and 60 seconds, a
+sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300 seconds,
+and a vault may hold at most 5,000 ADRs. Sweeps run in stem order and store no state. An
+ADR the provider refuses to read is held open while the sweep judges on, past its source
+limit by up to two more ADRs if it must: a later ADR the provider reads shows the
+refusal was that ADR's own, and the sweep moves past both. A refusal no read settles,
+three refusals in a row, or any other failure stops the sweep with `stopped` set and the
+cursor before the first refusal still open, so resuming retries from there.
+
+**Verdicts.** Each row has `stem`, `kind`, `score`, `relation`, `status`, `declared`,
+and `applied` when this call wrote it. `link` means the source should link the ADR;
+`weak` is a declared link judged below the threshold, listed for a reader and never
+removed. `relation` (`supersedes`, `refines`, `depends_on`, `conflicts`,
+`shared_artifact`, `topic_only`, `unrelated`) is advisory: it says which pairs to read
+in full, not what to decide.
+
+**Reply.** `sources` holds one entry per source, with its `status` (`ok`,
+`not_configured`, or `unavailable` with its `reason`), its `verdicts`, and the counts
+`links`, `written`, and `verdicts_total`; `truncated` marks a source whose rows were
+cut, since a reply carries at most 80 verdict rows. A source also carries
+`unjudged_declared` when declared links were beyond the judged ceiling, `write_failed`
+for links `apply` could not write, and, when it was not judged, `next_step` and
+`remediation`: the search to run instead, which is the `vaultspec-rag` search when rag
+is provisioned and the ADR listing otherwise. The totals `judged`, `links`, and
+`written` follow, then `remaining`, `next_after` when sources remain and one was
+processed (without it, a resume starts from the beginning), `stopped` when a sweep ended
+early, and `usage` (requests, input tokens, and `unscored`, the requests the provider
+refused to read) when anything was sent. A source whose every pair was refused is
+`unavailable` with `content_rejected`, never a source with no links.
 
 ______________________________________________________________________
 
@@ -514,9 +745,16 @@ Read-only, idempotent.
 Call `status` without a target to get a rollup: the features in the vault (name,
 document count, latest activity, whether a plan exists, lifecycle status, plan tier, and
 plan completion percent), the plans currently in flight (stem, feature, tier, open and
-closed step counts, completion percent, and the next open step), and vault-wide totals.
-Every response carries a `tool_schema_version` field so a client can detect a server
-upgrade.
+closed step counts, completion percent, and the next open step), vault-wide totals, and
+`hosted_search`. That field reports whether [`search`](#search) has a key (`configured`)
+and, when it does, where the key was found (`source`: `environment` or `dotenv`). It
+describes configuration, not whether the key works. Next to it, `companion` reports
+whether the `vaultspec-rag` companion is provisioned, which decides the next step a
+declined `search` names (`package`, `signal`, `mode`, `version`, `floor`,
+`health_authority`; the key is absent when the probe failed). It reports configuration,
+not liveness: a provisioned companion can still be down. Both fields come from the same
+backend call as `vaultspec-core status --json`. Every response carries a
+`tool_schema_version` field so a client can detect a server upgrade.
 
 Pass a target to trace one plan or feature instead. The response then reports each
 plan's steps in full detail (canonical ID, display path, checked state, the ledger stem
@@ -563,7 +801,8 @@ plan of the eleven and four it returned:
     "orphaned_count": 0,
     "dangling_link_count": 0
   },
-  "plans": []
+  "plans": [],
+  "hosted_search": { "configured": false }
 }
 ```
 
@@ -760,7 +999,7 @@ this tool and `vaultspec-core vault exec log` share one writer.
 | `plan`    | string                  | - (required) | The parent plan's stem.                                                                        |
 | `step`    | string                  | - (required) | Canonical step id (`S01`) or display path (`P01.S01`).                                         |
 | `rows`    | list of strings or null | `null`       | One `OP:path` per path touched: `A:` added, `M:` modified, `D:` deleted, `R:old->new` renamed. |
-| `verify`  | string or null          | `null`       | A check that ran, as `<command>=pass` or `<command>=fail`.                                     |
+| `verify`  | list of strings or null | `null`       | One `<command>=pass` or `<command>=fail` per check that ran.                                   |
 | `by`      | string or null          | `null`       | The persona that closed the step.                                                              |
 | `notes`   | list of strings or null | `null`       | Exception notes only (data loss, skipped work, a scaffold left in code, a persistent failure). |
 
@@ -782,7 +1021,7 @@ ______________________________________________________________________
 
 ### `discover` and `invoke`
 
-`discover` and `invoke` are the gateway pair for everything else. The eight hot tools
+`discover` and `invoke` are the gateway pair for everything else. The ten hot tools
 cover the verbs a client reaches for constantly; `discover` and `invoke` reach the rest
 of the CLI - the long tail of verbs that don't earn a dedicated tool but still need to
 run. `discover` searches that catalog and returns ranked schemas. `invoke` runs one of

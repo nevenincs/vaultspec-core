@@ -49,9 +49,7 @@ import time
 
 logger = logging.getLogger(__name__)
 
-#: Operator kill switch; off values disable all arming.
-STDIO_WATCHDOG_ENV = "VAULTSPEC_STDIO_WATCHDOG"
-
+#: Values of the operator kill switch that disable all arming.
 _OFF_VALUES = frozenset({"0", "false", "off", "no"})
 
 #: Ancestors beyond this depth are noise (session managers, init); the
@@ -88,9 +86,17 @@ _WAIT_TIMEOUT = 0x0000_0102
 _TH32CS_SNAPPROCESS = 0x0000_0002
 
 
-def watchdog_disabled() -> bool:
-    """Return whether the operator kill switch disables the watchdog."""
-    return os.environ.get(STDIO_WATCHDOG_ENV, "").strip().lower() in _OFF_VALUES
+def watchdog_disabled(kill_switch: str | None) -> bool:
+    """Return whether the operator kill switch disables the watchdog.
+
+    This module stays standard-library only, so it does not read the
+    environment itself: the entry point reads ``VAULTSPEC_STDIO_WATCHDOG``
+    through the configuration layer and hands the raw value in.
+
+    Args:
+        kill_switch: The kill switch's raw value, or ``None`` when unset.
+    """
+    return (kill_switch or "").strip().lower() in _OFF_VALUES
 
 
 class _WatchedProcess:
@@ -607,6 +613,7 @@ def arm_client_watchdog(
     grace_seconds: float = _GRACE_SECONDS,
     rearm_seconds: float = _REARM_POLL_SECONDS,
     orphan_confirmations: int = _ORPHAN_CONFIRMATIONS,
+    kill_switch: str | None = None,
 ) -> bool:
     """Arm the lifetime backstop; return whether a watchdog thread started.
 
@@ -633,15 +640,17 @@ def arm_client_watchdog(
             attempts while no anchor is held.
         orphan_confirmations: Windows only; consecutive unanchored polls
             required before the process reaps itself as an orphan.
+        kill_switch: The raw ``VAULTSPEC_STDIO_WATCHDOG`` value, or ``None``
+            when unset; an off value skips arming.
 
     Returns:
         ``True`` when a watchdog thread armed, ``False`` when arming was
         disabled or failed open and the server retains EOF-only shutdown.
     """
-    if watchdog_disabled():
+    if watchdog_disabled(kill_switch):
         logger.info(
-            "watchdog: disabled via %s; stdin EOF is the only exit path",
-            STDIO_WATCHDOG_ENV,
+            "watchdog: disabled via VAULTSPEC_STDIO_WATCHDOG; "
+            "stdin EOF is the only exit path"
         )
         return False
 

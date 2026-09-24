@@ -5,20 +5,23 @@ An MCPServer's tool definitions are serialized into every LLM
 request  - keeping them compact is a hard requirement.
 
 The budget is the concern here; the ``test_tool_surface`` module covers what
-the same ten tools do end-to-end and the annotation matrix they declare.
+the same twelve tools do end-to-end and the annotation matrix they declare.
 """
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from vaultspec_core.config import reset_config
 from vaultspec_core.core.types import init_paths
 from vaultspec_core.mcp_server.app import create_server
+from vaultspec_core.search.tests.reply_budget import ENVELOPE_BYTES_PER_TOKEN
 from vaultspec_core.vaultcore.models import DocType
+
+from .conftest import EXPECTED_TOOLS
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -29,50 +32,33 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
-#: Aggregate ceiling for the full ten-tool wire surface, in characters.
+#: Each tool's ceiling, in wire characters: description, input schema and
+#: output schema serialised as the protocol sends them.
 #:
-#: This is a **ratchet, not a target**. The measured surface is 43,919 chars
-#: (~5.4K tokens at the 3.46 chars/token measured for this codebase's JSON),
-#: and every one of those tokens is re-sent on every turn of every
-#: conversation before any work happens. The ceiling sits just above the
-#: current measurement so the surface cannot grow, and it is meant to be
-#: *lowered* as the envelope campaign lands - never raised.
-#:
-#: Doctrine target is 5K tokens (~17,300 chars); the surface now sits just
-#: above it. What remains is structure, not prose. Getting here was mostly a
-#: matter of not shipping developer documentation to the model: Pydantic
-#: lifts each result model's full docstring - ``Attributes:`` blocks and
-#: reST markup included - into ``output_schema.description``, and the tool
-#: descriptions carry ``Returns:``/``Raises:`` prose plus a ``ctx``
-#: parameter that appears in no input schema.
-#:
-#: Raised once, by the size of the tenth tool, when ``log`` (the execution
-#: ledger writer) joined the surface: one verb per artifact was the decision,
-#: and a ledger row logged through ``invoke`` would cost a host confirmation
-#: on every Step. Measured at 20,0xx chars with ``log`` at ~1.1K.
-MAX_TOOL_DEFINITION_CHARS = 20_200
-
-#: Aggregate ceiling for the read-only surface (four tools), same rules.
-#: Measured at 9,194 chars.
-MAX_READ_ONLY_TOOL_DEFINITION_CHARS = 9_500
-
-# Maximum number of tools: the tiered surface is eight hot tools plus the
-# discover/invoke gateway; growth beyond that needs a deliberate decision.
-MAX_TOOL_COUNT = 10
-
-# Exact expected tool surface.
-EXPECTED_TOOLS = {
-    "check",
-    "create",
-    "discover",
-    "edit",
-    "find",
-    "invoke",
-    "log",
-    "plan_edit",
-    "plan_progress",
-    "status",
+#: Each tool owns its budget, and budgets move down as work lands, never up. A
+#: new tool, or growth in one, changes its own entry, where review sees it.
+#: The surface ceilings are the sums below, not numbers of their own. Doctrine
+#: target for the whole surface: 5,000 tokens, about 17,300 characters.
+TOOL_BUDGETS: dict[str, int] = {
+    "status": 3_470,
+    "search": 2_860,
+    "crossref": 2_550,
+    "find": 2_370,
+    "create": 1_690,
+    "invoke": 1_610,
+    "plan_edit": 1_590,
+    "plan_progress": 1_520,
+    "edit": 1_510,
+    "discover": 1_450,
+    "check": 1_300,
+    "log": 1_210,
 }
+
+# Maximum number of tools: the tiered surface is ten hot tools plus the
+# discover/invoke gateway; growth beyond that needs a deliberate decision.
+# Raised from 10 by exactly one, for ``search``, the ninth hot tool, and from
+# 11 by exactly one, for ``crossref``, the tenth.
+MAX_TOOL_COUNT = 12
 
 
 # ---------------------------------------------------------------------------
@@ -111,21 +97,36 @@ def _serialize_tool_definition(tool: MCPTool) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _init_workspace(root: Path) -> None:
+    """Lay out the minimal workspace a server registers its tools against."""
+    reset_config()
+    for dt in DocType:
+        (root / ".vault" / dt.value).mkdir(parents=True)
+    for subdir in ("templates", "agents", "rules", "skills"):
+        (root / ".vaultspec" / subdir).mkdir(parents=True)
+    init_paths(root)
+
+
 @pytest.fixture()
 def mcp_server(tmp_path: Path) -> Generator[MCPServer[None]]:
-    """Create a minimal workspace and build the MCP server."""
+    """Create a minimal workspace and build the full MCP server."""
+    _init_workspace(tmp_path)
+    yield create_server()
     reset_config()
 
-    for dt in DocType:
-        (tmp_path / ".vault" / dt.value).mkdir(parents=True)
 
-    for subdir in ("templates", "agents", "rules", "skills"):
-        (tmp_path / ".vaultspec" / subdir).mkdir(parents=True)
+@pytest.fixture(params=[False, True], ids=["full", "read-only"])
+def surface(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> Generator[MCPServer[None]]:
+    """Build the server on each surface: all twelve tools, and read-only's six.
 
-    init_paths(tmp_path)
-
-    yield create_server()
-
+    Read-only registers a subset, and ``check`` without its repair argument,
+    so a change that bloats a shared result model surfaces there at a
+    different ratio than on the full surface.
+    """
+    _init_workspace(tmp_path)
+    yield create_server(read_only=cast("bool", request.param))
     reset_config()
 
 
@@ -171,12 +172,13 @@ def _tool_component_sizes(tool: MCPTool) -> tuple[int, int, int]:
 
 
 def _budget_failure_report(tools: list[MCPTool], total: int, ceiling: int) -> str:
-    """Build the diagnostic shown when a surface exceeds its ceiling."""
+    """Build the diagnostic shown when a surface or a tool exceeds its budget."""
     rows = sorted(
         (
             (
                 tool.name,
                 len(_serialize_tool_definition(tool)),
+                TOOL_BUDGETS.get(tool.name, 0),
                 *_tool_component_sizes(tool),
             )
             for tool in tools
@@ -185,62 +187,67 @@ def _budget_failure_report(tools: list[MCPTool], total: int, ceiling: int) -> st
         reverse=True,
     )
     breakdown = "\n".join(
-        f"  {name:16s} {size:6,}  (desc {desc:,} / in {sin:,} / out {sout:,})"
-        for name, size, desc, sin, sout in rows
+        f"  {name:16s} {size:6,} of {budget:6,}"
+        f"  (desc {desc:,} / in {sin:,} / out {sout:,})"
+        for name, size, budget, desc, sin, sout in rows
     )
-    desc_total = sum(row[2] for row in rows)
-    out_total = sum(row[4] for row in rows)
+    desc_total = sum(row[3] for row in rows)
+    out_total = sum(row[5] for row in rows)
+    tokens = total / ENVELOPE_BYTES_PER_TOKEN
     return (
-        f"Aggregate tool definition size ({total:,} chars, "
-        f"~{total / 3.46:,.0f} tokens) exceeds budget of {ceiling:,} chars.\n"
+        f"Tool definitions total {total:,} chars (~{tokens:,.0f} tokens) "
+        f"against a surface budget of {ceiling:,} chars.\n"
         f"This surface is re-sent on EVERY turn of every conversation.\n"
-        f"Per-tool breakdown (largest first):\n{breakdown}\n"
+        f"Per-tool size against budget (largest first):\n{breakdown}\n"
         f"Descriptions total {desc_total:,} chars; output schemas total "
         f"{out_total:,} chars.\n"
-        "Raising the ceiling is not the fix - it is a ratchet. Trim prose "
-        "the model cannot act on."
+        "Raising a budget is not the fix - budgets move down. Trim what the "
+        "model cannot act on; a new tool or deliberate growth changes its own "
+        "entry in TOOL_BUDGETS."
     )
 
 
-async def test_tool_definitions_within_context_budget(
-    mcp_server: MCPServer[None],
-) -> None:
-    """Aggregate serialized tool definitions must stay under the char budget."""
-    tools = await mcp_server.list_tools()
-    total = sum(len(_serialize_tool_definition(tool)) for tool in tools)
-
-    if total > MAX_TOOL_DEFINITION_CHARS:
-        pytest.fail(_budget_failure_report(tools, total, MAX_TOOL_DEFINITION_CHARS))
+async def test_every_tool_has_a_budget(mcp_server: MCPServer[None]) -> None:
+    """A registered tool without its own budget entry is ungoverned."""
+    names = {tool.name for tool in await mcp_server.list_tools()}
+    missing = sorted(names - TOOL_BUDGETS.keys())
+    assert not missing, f"Tools without an entry in TOOL_BUDGETS: {missing}"
 
 
-async def test_read_only_tool_definitions_within_context_budget(
-    tmp_path: Path,
-) -> None:
-    """The read-only surface has its own ceiling and its own regressions.
+async def test_every_budget_names_a_tool(mcp_server: MCPServer[None]) -> None:
+    """A budget for a tool that does not exist inflates the surface ceiling."""
+    names = {tool.name for tool in await mcp_server.list_tools()}
+    stale = sorted(TOOL_BUDGETS.keys() - names)
+    assert not stale, f"TOOL_BUDGETS entries for tools that do not exist: {stale}"
 
-    Read-only registers four of the ten tools, so a change that bloats a
-    shared result model surfaces here at a different ratio than on the full
-    surface. Guarding only the full surface let this one drift furthest -
-    it was the least covered of the two.
-    """
-    reset_config()
-    for dt in DocType:
-        (tmp_path / ".vault" / dt.value).mkdir(parents=True)
-    for subdir in ("templates", "agents", "rules", "skills"):
-        (tmp_path / ".vaultspec" / subdir).mkdir(parents=True)
-    init_paths(tmp_path)
 
-    try:
-        tools = await create_server(read_only=True).list_tools()
-        total = sum(len(_serialize_tool_definition(tool)) for tool in tools)
-        if total > MAX_READ_ONLY_TOOL_DEFINITION_CHARS:
-            pytest.fail(
-                _budget_failure_report(
-                    tools, total, MAX_READ_ONLY_TOOL_DEFINITION_CHARS
-                )
+async def test_each_tool_within_its_budget(surface: MCPServer[None]) -> None:
+    """Every tool stays under its own ceiling, named with its components."""
+    tools = await surface.list_tools()
+    over: list[str] = []
+    for tool in tools:
+        size = len(_serialize_tool_definition(tool))
+        budget = TOOL_BUDGETS.get(tool.name, 0)
+        if size > budget:
+            desc, sin, sout = _tool_component_sizes(tool)
+            over.append(
+                f"{tool.name}: {size:,} chars against its budget of {budget:,} "
+                f"(desc {desc:,} / in {sin:,} / out {sout:,})"
             )
-    finally:
-        reset_config()
+    if over:
+        total = sum(len(_serialize_tool_definition(tool)) for tool in tools)
+        ceiling = sum(TOOL_BUDGETS.get(tool.name, 0) for tool in tools)
+        report = _budget_failure_report(tools, total, ceiling)
+        pytest.fail("\n".join([*over, report]))
+
+
+async def test_surface_within_its_budget(surface: MCPServer[None]) -> None:
+    """The surface stays under the sum of its tools' budgets."""
+    tools = await surface.list_tools()
+    total = sum(len(_serialize_tool_definition(tool)) for tool in tools)
+    ceiling = sum(TOOL_BUDGETS.get(tool.name, 0) for tool in tools)
+    if total > ceiling:
+        pytest.fail(_budget_failure_report(tools, total, ceiling))
 
 
 async def test_no_duplicate_tool_names(mcp_server: MCPServer[None]) -> None:

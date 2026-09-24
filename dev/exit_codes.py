@@ -17,7 +17,8 @@ Verb classes, keyed to CONSEQUENCE:
     GATES. Read-only. A finding is a verdict and fails the build.
 ``fix``
     MUTATES. Exits :data:`OK` on success whether or not it changed anything.
-    Under :data:`FIX_STRICT_ENV` (set by CI) a fix that HAD to change
+    Under ``VAULTSPEC_FIX_STRICT`` (set by CI; declared in
+    :mod:`dev.environment`) a fix that HAD to change
     something exits :data:`DRIFT`, because in CI a repairable defect is an
     uncommitted repair.
 ``test``
@@ -58,7 +59,7 @@ INIT_STALE = 3
 INIT_STEP_FAILED = 4
 
 #: Managed content drifted from its generated form. Emitted by `fix` under
-#: :data:`FIX_STRICT_ENV`, and by `init` when the lockfile and environment
+#: ``VAULTSPEC_FIX_STRICT``, and by `init` when the lockfile and environment
 #: disagree (L6).
 DRIFT = 5
 
@@ -100,12 +101,6 @@ FINDINGS_CODES = frozenset({FAILED})
 #: pytest's status for "no tests were collected", mapped onto
 #: :data:`NOTHING_SELECTED` so an empty lane cannot read as a pass.
 PYTEST_NO_TESTS_COLLECTED = 5
-
-#: Set by CI. Makes `fix` report :data:`DRIFT` when it had to change something.
-FIX_STRICT_ENV = "VAULTSPEC_FIX_STRICT"
-
-#: Set by a lane that is legitimately allowed to collect nothing.
-ALLOW_EMPTY_ENV = "VAULTSPEC_ALLOW_EMPTY_SELECTION"
 
 
 def advisory_result(code: int, findings: Container[int] = FINDINGS_CODES) -> int:

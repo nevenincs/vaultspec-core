@@ -14,17 +14,25 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
 from .models import DocumentMetadata
 
 __all__ = [
+    "FrontmatterSplit",
+    "RelatedBlock",
+    "RelatedEntry",
     "SafeLoader",
     "parse_frontmatter",
     "parse_vault_metadata",
+    "related_block",
+    "render_block_list",
+    "render_scalar",
+    "rerender_frontmatter",
     "split_frontmatter",
 ]
 
@@ -128,43 +136,159 @@ except ImportError:
     _yaml_load = _simple_yaml_load
 
 
-#: The frontmatter fence: a leading ``---`` line, the YAML block, a closing
-#: ``---`` line, and everything after it.
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
+#: A line break: ``\r\n``, a lone ``\r``, or ``\n``. A ``\r`` counts alone
+#: only when no ``\n`` follows it, so a CRLF pair is never read as two
+#: breaks.
+_BREAK = r"(?:\r\n|\r(?!\n)|\n)"
+_LINE_BREAK_RE = re.compile(_BREAK)
+
+#: An opening fence line: ``---``, trailing spaces or tabs, and a line break.
+_OPENING_FENCE_RE = re.compile(rf"---[ \t]*(?:{_BREAK}|\Z)")
+
+#: The frontmatter block from its opening fence line: the YAML runs to the
+#: first closing ``---`` line, and the match ends after that line's break.
+#: The break before the closing fence is ``\n`` or a lone ``\r``, so under
+#: CRLF the YAML text keeps its final ``\r``.
+_FRONTMATTER_RE = re.compile(
+    rf"---[ \t]*{_BREAK}(?P<yaml>.*?)(?P<close>\n|\r(?!\n))---[ \t]*(?:{_BREAK}|\Z)",
+    re.DOTALL,
+)
+
+#: Whitespace indenting a line, which an opening fence may carry.
+_LINE_INDENT_RE = re.compile(r"[^\S\r\n]*")
 
 
-def split_frontmatter(content: str) -> tuple[str | None, str]:
+@dataclass(frozen=True)
+class FrontmatterSplit:
+    """A document divided at its frontmatter, with the body's position in it.
+
+    Offsets and line numbers index the text exactly as it was passed in, and
+    a line ends at ``\\r\\n``, a lone ``\\r``, or ``\\n``. For text read the
+    way the vault graph reads it (``\\r\\n`` and ``\\r`` normalised to
+    ``\\n``), ``body_line`` is the body's line in the file.
+
+    Attributes:
+        yaml_block: The YAML between the fences, without the line break that
+            ends its last line, or ``None`` when the text carries no
+            parseable frontmatter.
+        body: The body: every line from the first non-blank line after the
+            frontmatter (or of the text, when there is none), each line kept
+            whole. A leading byte-order mark is never part of it.
+        frontmatter_end: Offset just past the closing fence line, its line
+            ending included; ``0`` without frontmatter. A body edit replaces
+            everything from here on, so the frontmatter bytes, a byte-order
+            mark included, survive it exactly.
+        body_start: Offset where the body begins; ``body`` is the text from
+            here to the end.
+        body_line: The 1-based line on which the body begins; the text's
+            lines from this one on are the body.
+        frontmatter_start: Offset of the opening fence's ``---``, so the text
+            before it (a byte-order mark, blank lines, indentation) can be
+            kept when the frontmatter is rebuilt; ``0`` without frontmatter.
+        yaml_start: Offset of the first line after the opening fence line;
+            ``0`` without frontmatter.
+        yaml_end: Offset of the closing fence line, so the text between
+            ``yaml_start`` and ``yaml_end`` is the YAML lines with every line
+            break intact: the span an in-place frontmatter edit rewrites.
+            ``0`` without frontmatter.
+        at_start: Whether the frontmatter exists and its opening fence is the
+            text's first line, after at most a byte-order mark. Writers that
+            stamp or fingerprint a document require this position, so a
+            document with anything before its fence is left alone.
+        unclosed: Whether an opening fence line starts the text's content but
+            no closing fence follows it.
+    """
+
+    yaml_block: str | None
+    body: str
+    frontmatter_end: int
+    body_start: int
+    body_line: int
+    frontmatter_start: int = 0
+    yaml_start: int = 0
+    yaml_end: int = 0
+    at_start: bool = False
+    unclosed: bool = False
+
+
+def _first_content_line(text: str, pos: int) -> int:
+    """Return the offset of the first line at or after *pos* holding content.
+
+    Args:
+        text: The text to scan.
+        pos: An offset at the start of a line, or just past a byte-order mark.
+
+    Returns:
+        The offset of that line's start, or ``len(text)`` when every
+        remaining line is blank.
+    """
+    while pos < len(text):
+        brk = _LINE_BREAK_RE.search(text, pos)
+        end = len(text) if brk is None else brk.start()
+        if text[pos:end].strip():
+            return pos
+        pos = len(text) if brk is None else brk.end()
+    return len(text)
+
+
+def split_frontmatter(content: str) -> FrontmatterSplit:
     """Split *content* into its YAML frontmatter block and its body.
 
-    The single definition of where a document's body begins. Both parsers
-    below and the graph cache's body reconstruction call it, so a cached body
-    cannot drift from a parsed one: the cache stores each document's raw text
-    and derives the body through this function rather than storing a second
-    copy of it.
+    The single definition of where a document's frontmatter ends and its body
+    begins. The parsers below, the graph cache's body reconstruction, and the
+    body editors all call it, so a cached body cannot drift from a parsed one
+    and an edit replaces exactly the part a parse calls the body.
 
-    A leading UTF-8 BOM (U+FEFF) is dropped before the fence is looked for. It
-    is not whitespace, so ``str.lstrip`` leaves it in front of the ``---`` and
-    a perfectly valid BOM-prefixed document would parse as having no
-    frontmatter, silently losing its tags.
+    A leading UTF-8 BOM (U+FEFF) is skipped before the fence is looked for. It
+    is not whitespace, and a perfectly valid BOM-prefixed document must not
+    parse as having no frontmatter, silently losing its tags. Blank lines
+    before the opening fence and between the closing fence and the body are
+    skipped too; the body's first line is kept whole, so its position is a
+    line of the source.
+
+    The frontmatter is the lines between an opening ``---`` line and the
+    first closing ``---`` line after it, each fence line allowing trailing
+    spaces or tabs.
 
     Args:
         content: Raw markdown text, optionally beginning with ``---`` fenced
             YAML frontmatter.
 
     Returns:
-        ``(yaml_block, body)``. *yaml_block* is ``None`` when the document
-        carries no parseable frontmatter, in which case *body* is the whole
-        BOM- and whitespace-stripped content.
+        The :class:`FrontmatterSplit`.
     """
-    if content.startswith("\ufeff"):
-        content = content[1:]
-    content = content.lstrip()
-    if not content.startswith("---"):
-        return None, content
-    match = _FRONTMATTER_RE.match(content)
-    if not match:
-        return None, content
-    return match.group(1), match.group(2)
+    bom = 1 if content.startswith("\ufeff") else 0
+    start = _first_content_line(content, bom)
+    indent = _LINE_INDENT_RE.match(content, start)
+    fence = indent.end() if indent is not None else start
+    opened = _OPENING_FENCE_RE.match(content, fence) is not None
+    match = _FRONTMATTER_RE.match(content, fence) if opened else None
+    if match is None:
+        return FrontmatterSplit(
+            yaml_block=None,
+            body=content[start:],
+            frontmatter_end=0,
+            body_start=start,
+            body_line=_line_number(content, start),
+            unclosed=opened,
+        )
+    body_start = _first_content_line(content, match.end())
+    return FrontmatterSplit(
+        yaml_block=match.group("yaml"),
+        body=content[body_start:],
+        frontmatter_end=match.end(),
+        body_start=body_start,
+        body_line=_line_number(content, body_start),
+        frontmatter_start=fence,
+        yaml_start=match.start("yaml"),
+        yaml_end=match.end("close"),
+        at_start=fence == bom,
+    )
+
+
+def _line_number(text: str, offset: int) -> int:
+    """Return the 1-based line of *offset*, counting every kind of line break."""
+    return len(_LINE_BREAK_RE.findall(text, 0, offset)) + 1
 
 
 def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
@@ -186,7 +310,8 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     # place and the ``---`` fence check would fail - silently classifying a
     # perfectly valid BOM-prefixed document as having no frontmatter. That,
     # and where the body begins, is :func:`split_frontmatter`'s job.
-    yaml_block, body = split_frontmatter(content)
+    split = split_frontmatter(content)
+    yaml_block, body = split.yaml_block, split.body
     frontmatter: dict[str, Any] = {}
     if yaml_block is None:
         return frontmatter, body
@@ -234,7 +359,8 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
     # whitespace, so ``str.lstrip`` would leave it in front of the ``---`` fence
     # and the document would parse as having no metadata - silently dropping its
     # tags and making it invisible to every feature scan and check.
-    yaml_content, body = split_frontmatter(content)
+    split = split_frontmatter(content)
+    yaml_content, body = split.yaml_block, split.body
     metadata = DocumentMetadata()
     if yaml_content is None:
         return metadata, body
@@ -303,3 +429,215 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
                 metadata.promoted_to.append(val)
 
     return metadata, body
+
+
+#: Keys :func:`rerender_frontmatter` writes from the metadata model. ``feature``
+#: is modelled into ``tags``, so it is known but never written back.
+_MODELLED_KEYS = frozenset(
+    {
+        "tags",
+        "date",
+        "related",
+        "feature",
+        "supersedes",
+        "superseded_by",
+        "derived_from",
+        "promoted_to",
+        "archived",
+    }
+)
+
+#: The CLI-owned stamps, written either from the model or carried verbatim.
+_STAMP_KEYS = frozenset({"modified", "body_schema", "body_hash"})
+
+
+def render_block_list(key: str, values: Sequence[str], quote: str) -> list[str]:
+    """Render *key* as a YAML block list with each item wrapped in *quote*.
+
+    Args:
+        key: The frontmatter key.
+        values: The list items, in order.
+        quote: The quote character wrapped around each item.
+
+    Returns:
+        The key line and one ``  - `` line per item, or no lines for an
+        empty list, so an empty field is left out of the frontmatter.
+    """
+    if not values:
+        return []
+    return [f"{key}:", *(f"  - {quote}{value}{quote}" for value in values)]
+
+
+def render_scalar(key: str, value: str | None) -> list[str]:
+    """Render *key* as a single-quoted scalar line.
+
+    Args:
+        key: The frontmatter key.
+        value: The scalar value.
+
+    Returns:
+        The one line, or no lines for an empty value.
+    """
+    return [f"{key}: '{value}'"] if value else []
+
+
+def _unmodelled_lines(yaml_block: str, known: frozenset[str]) -> list[str]:
+    """Return the verbatim lines of every top-level key outside *known*.
+
+    A key's lines are its key line, its list items, and any further
+    non-blank continuation line; a blank line ends it.
+    """
+    kept: list[str] = []
+    in_unknown = False
+    for line in yaml_block.split("\n"):
+        stripped = line.strip()
+        if ":" in stripped and not stripped.startswith("-"):
+            in_unknown = stripped.split(":", 1)[0].strip() not in known
+            if in_unknown:
+                kept.append(line)
+            continue
+        if stripped.startswith("-"):
+            if in_unknown:
+                kept.append(line)
+            continue
+        if in_unknown and stripped:
+            kept.append(line)
+        in_unknown = False
+    return kept
+
+
+def rerender_frontmatter(
+    content: str,
+    metadata: DocumentMetadata,
+    *,
+    render_stamps: bool,
+    quote_date: bool,
+    tag_lines: Sequence[str] | None = None,
+) -> str | None:
+    """Return *content* with its frontmatter rebuilt from *metadata*.
+
+    The modelled fields are written in canonical order - ``tags``, ``date``,
+    the stamps when rendered, ``related``, ``supersedes``, ``superseded_by``,
+    ``derived_from``, ``promoted_to``, ``archived`` - followed verbatim by
+    every key the model does not carry, in their original order. The text
+    before the opening fence and the body are kept; the frontmatter is
+    joined with ``\\n``, so *content* should be ``\\n``-normalised.
+
+    Args:
+        content: The full document text.
+        metadata: The (possibly mutated) metadata to write.
+        render_stamps: Write ``modified``, ``body_schema`` and ``body_hash``
+            from *metadata* after ``date``; otherwise carry their original
+            lines verbatim with the other unmodelled keys.
+        quote_date: Write the date single-quoted rather than bare.
+        tag_lines: Lines to write for ``tags`` in place of rendering
+            ``metadata.tags``.
+
+    Returns:
+        The rebuilt document, or ``None`` when *content* has no frontmatter.
+    """
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
+        return None
+    date = metadata.date
+    lines = [
+        "---",
+        *(
+            tag_lines
+            if tag_lines is not None
+            else render_block_list("tags", metadata.tags, '"')
+        ),
+        *([f"date: '{date}'" if quote_date else f"date: {date}"] if date else []),
+    ]
+    if render_stamps:
+        lines += render_scalar("modified", metadata.modified)
+        lines += render_scalar("body_schema", metadata.body_schema)
+        lines += render_scalar("body_hash", metadata.body_hash)
+    lines += [
+        *render_block_list("related", metadata.related, '"'),
+        *render_block_list("supersedes", metadata.supersedes, "'"),
+        *render_scalar("superseded_by", metadata.superseded_by),
+        *render_block_list("derived_from", metadata.derived_from, "'"),
+        *render_block_list("promoted_to", metadata.promoted_to, "'"),
+        *render_scalar("archived", metadata.archived),
+    ]
+    known = _MODELLED_KEYS | _STAMP_KEYS if render_stamps else _MODELLED_KEYS
+    lines += _unmodelled_lines(split.yaml_block, known)
+    lines.append("---")
+    if split.body:
+        lines.append(split.body)
+    return content[: split.frontmatter_start] + "\n".join(lines)
+
+
+#: A ``related:`` list entry: the text before its wiki-link target, the
+#: target (anchor and alias included), and the rest of the line.
+_RELATED_ENTRY_RE = re.compile(r"""^(\s*-\s*["']?\[\[)(.+?)(\]\]["']?.*)$""")
+
+
+@dataclass(frozen=True)
+class RelatedEntry:
+    """One wiki-link entry of the ``related:`` list, located for rewriting.
+
+    Attributes:
+        index: The entry's index among the YAML lines scanned.
+        prefix: The line up to the link target, ``[[`` included.
+        target: The link target, with any ``#anchor`` or ``|alias``.
+        suffix: The rest of the line from ``]]`` on, so ``prefix + target +
+            suffix`` is the line.
+    """
+
+    index: int
+    prefix: str
+    target: str
+    suffix: str
+
+
+@dataclass(frozen=True)
+class RelatedBlock:
+    """The ``related:`` key of a frontmatter and its wiki-link entries.
+
+    Attributes:
+        key_index: The index of the ``related:`` key line, or ``None`` when
+            the frontmatter has no such key.
+        inline: The value written on the key line itself, stripped (``[]``
+            or a flow sequence), or ``""`` for a block list.
+        entries: The block list's wiki-link entries, in order.
+    """
+
+    key_index: int | None
+    inline: str
+    entries: tuple[RelatedEntry, ...]
+
+
+def related_block(lines: Sequence[str]) -> RelatedBlock:
+    """Locate the ``related:`` key and its list entries.
+
+    The key may be indented. Its list runs to the next line that starts at
+    the margin with anything but a ``-`` item; blank lines, indented lines
+    and ``-`` items at the margin all belong to it.
+
+    Args:
+        lines: The frontmatter's YAML lines, without line endings.
+
+    Returns:
+        The :class:`RelatedBlock`. A repeated key reopens the list, and the
+        key reported is the last one.
+    """
+    key_index: int | None = None
+    inline = ""
+    in_list = False
+    entries: list[RelatedEntry] = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("related:"):
+            key_index = index
+            inline = stripped[len("related:") :].strip()
+            in_list = True
+            continue
+        if stripped and not line.startswith((" ", "\t", "-")):
+            in_list = False
+        match = _RELATED_ENTRY_RE.match(line) if in_list else None
+        if match is not None:
+            prefix, target, suffix = match.groups()
+            entries.append(RelatedEntry(index, prefix, target, suffix))
+    return RelatedBlock(key_index=key_index, inline=inline, entries=tuple(entries))

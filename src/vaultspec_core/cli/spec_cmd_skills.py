@@ -175,9 +175,10 @@ def cmd_skills_edit(
     Editor resolution order:
       1. Command-line --editor flag
       2. Project-local config (vaultspec-core config set editor <value>)
-      3. $VISUAL environment variable
-      4. $EDITOR environment variable
-      5. Fallback to 'vi'
+      3. $VAULTSPEC_EDITOR environment variable
+      4. $VISUAL environment variable
+      5. $EDITOR environment variable
+      6. Fallback to 'vi'
 
     If no working editor is resolved, the command exits with code 2.
     """

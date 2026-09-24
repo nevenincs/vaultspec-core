@@ -251,6 +251,7 @@ def find_managed_block(
 ) -> tuple[int, int] | None:
     """Find the start and end byte offsets of a managed block."""
 
+
 def upsert_managed_block(
     content: str,
     block_type: str,
@@ -259,12 +260,14 @@ def upsert_managed_block(
 ) -> str:
     """Insert or replace a managed block in file content."""
 
+
 def strip_managed_block(
     content: str,
     block_type: str,
     comment_prefix: str = "",
 ) -> str:
     """Remove a managed block from file content."""
+
 
 def has_managed_block(
     content: str,

@@ -1,0 +1,478 @@
+"""Tests for ``vaultspec-core vault search``.
+
+The command-line tests drive the real Typer application against a real
+workspace on disk, with the credential chosen through the process environment
+the runner passes. None of them reaches the network: without a key the
+search sends nothing, a filter that excludes every record ends the search
+before a client exists, and a key no HTTP header can carry is refused before
+any connection opens. The ranking itself is covered by the search package's
+own tests.
+
+The rendering tests build real outcomes from the search package's own types
+and check what each surface carries: the excerpts as the search bounded them,
+the truncation markers, the verdict, the window, the keys a caller can derive
+or already supplied, and the size of the worst-case ``--json`` reply.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import json
+from typing import TYPE_CHECKING, Any
+
+import pytest
+from typer.testing import CliRunner
+
+from vaultspec_core.cli import app
+from vaultspec_core.cli.rendering import TRUNCATE_MARKER
+from vaultspec_core.cli.vault_search_cmd import _json_text, _outcome_lines
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
+from vaultspec_core.core.discovery_guidance import LIST_VAULT
+from vaultspec_core.core.windowing import apply_window
+from vaultspec_core.search import (
+    DEFAULT_RESULTS,
+    MAX_QUERY_CHARS,
+    MAX_RESULTS,
+    PREMISE_CONFLICT_THRESHOLD,
+    SEARCHABLE_TYPES,
+    Excerpt,
+    NextStepKind,
+    SearchHit,
+    SearchOutcome,
+    SearchStatus,
+    SearchUsage,
+    SearchVerdict,
+    outcome_fields,
+)
+from vaultspec_core.search.tests.reply_budget import (
+    DISCOVERY_BUDGET,
+    ENVELOPE_BYTES_PER_TOKEN,
+    REPLY_CEILING,
+    WORST_SHAPES,
+    worst_case_ranking,
+)
+from vaultspec_core.vaultcore.models import DocType
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from typer.testing import Result
+
+pytestmark = [pytest.mark.integration]
+
+#: A key that no HTTP header can carry, so the search refuses it before any
+#: connection opens.
+_UNSENDABLE_KEY = "not a sendable key"
+
+
+def _workspace(root: Path) -> Path:
+    """Build a workspace holding one ADR of feature ``widget``."""
+    (root / ".vaultspec").mkdir(parents=True)
+    adr = root / ".vault" / "adr" / "2026-02-20-widget-adr.md"
+    adr.parent.mkdir(parents=True)
+    adr.write_text(
+        "---\n"
+        "tags:\n"
+        "  - '#adr'\n"
+        "  - '#widget'\n"
+        "date: '2026-02-20'\n"
+        "related: []\n"
+        "---\n"
+        "\n"
+        "# widget adr\n"
+        "\n"
+        "Widgets are stored in the vault.\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def _search(root: Path, *args: str, key: str = "") -> Result:
+    """Run ``vault search`` against *root* with *key* as the only credential.
+
+    ``NO_COLOR`` alone leaves bold and dim codes in the output of a console
+    forced to act as a terminal (``FORCE_COLOR`` set, as CI sets it); a dumb
+    terminal emits none, so the assertions read plain text everywhere.
+    """
+    runner = CliRunner(
+        env={
+            "NO_COLOR": "1",
+            "TERM": "dumb",
+            "COLUMNS": "200",
+            VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: key,
+        }
+    )
+    return runner.invoke(app, ["-t", str(root), "vault", "search", *args])
+
+
+class TestNotConfigured:
+    def test_human_output_names_the_variable_and_the_next_step(
+        self, tmp_path: Path
+    ) -> None:
+        result = _search(_workspace(tmp_path), "why are widgets stored?")
+
+        assert result.exit_code == 0, result.output
+        assert "not configured" in result.stdout
+        assert VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in result.stdout
+        assert f"`{LIST_VAULT}`" in result.stdout
+
+    def test_json_envelope_is_skipped_with_the_next_step(self, tmp_path: Path) -> None:
+        result = _search(_workspace(tmp_path), "why are widgets stored?", "--json")
+
+        assert result.exit_code == 0, result.output
+        envelope = json.loads(result.stdout)
+        assert envelope["schema"] == "vaultspec.vault.search.v1"
+        assert envelope["status"] == "skipped"
+        data = envelope["data"]
+        assert data["status"] == SearchStatus.NOT_CONFIGURED
+        assert data["answered"] is False
+        assert data["hits"] == []
+        assert data["next_step"] == {
+            "kind": NextStepKind.LISTING.value,
+            "types": sorted(SEARCHABLE_TYPES),
+            "command": LIST_VAULT,
+        }
+        assert VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in data["remediation"]
+        # Nothing was ranked, so there is no page or verdict to describe.
+        assert "total" not in data
+        assert "verdict" not in data
+
+
+class TestInputValidation:
+    def test_blank_query_is_a_usage_error(self, tmp_path: Path) -> None:
+        result = _search(_workspace(tmp_path), "   ")
+
+        assert result.exit_code == 2
+        assert "QUERY" in result.output
+        assert "blank" in result.output
+
+    def test_overlong_query_is_a_usage_error(self, tmp_path: Path) -> None:
+        result = _search(_workspace(tmp_path), "q" * (MAX_QUERY_CHARS + 1))
+
+        assert result.exit_code == 2
+        assert str(MAX_QUERY_CHARS) in result.output
+
+    def test_longest_query_is_accepted(self, tmp_path: Path) -> None:
+        result = _search(_workspace(tmp_path), "q" * MAX_QUERY_CHARS)
+
+        assert result.exit_code == 0, result.output
+
+    @pytest.mark.parametrize("limit", [0, MAX_RESULTS + 1])
+    def test_limit_outside_the_page_ceiling_is_a_usage_error(
+        self, tmp_path: Path, limit: int
+    ) -> None:
+        result = _search(_workspace(tmp_path), "question", "--limit", str(limit))
+
+        assert result.exit_code == 2
+        assert "--limit" in result.output
+
+    @pytest.mark.parametrize("limit", [1, MAX_RESULTS])
+    def test_limit_at_either_bound_is_accepted(
+        self, tmp_path: Path, limit: int
+    ) -> None:
+        result = _search(_workspace(tmp_path), "question", "--limit", str(limit))
+
+        assert result.exit_code == 0, result.output
+
+
+class TestTypeFilter:
+    def test_generated_indexes_are_not_a_searchable_type(self, tmp_path: Path) -> None:
+        result = _search(_workspace(tmp_path), "question", "--type", "index")
+
+        assert result.exit_code == 2
+        assert "--type" in result.output
+        assert "index" in result.output
+
+    def test_unknown_type_is_refused(self, tmp_path: Path) -> None:
+        result = _search(_workspace(tmp_path), "question", "--type", "memo")
+
+        assert result.exit_code == 2
+        assert "memo" in result.output
+
+    def test_several_searchable_types_are_accepted(self, tmp_path: Path) -> None:
+        result = _search(
+            _workspace(tmp_path), "question", "--type", "adr", "--type", "exec"
+        )
+
+        assert result.exit_code == 0, result.output
+
+
+class TestConfiguredWithoutSending:
+    def test_filters_that_exclude_every_record_answer_empty(
+        self, tmp_path: Path
+    ) -> None:
+        result = _search(
+            _workspace(tmp_path),
+            "why are widgets stored?",
+            "--feature",
+            "no-such-feature",
+            "--json",
+            key=_UNSENDABLE_KEY,
+        )
+
+        assert result.exit_code == 0, result.output
+        envelope = json.loads(result.stdout)
+        assert envelope["status"] == "unchanged"
+        assert envelope["data"] == {
+            "status": "ok",
+            "answered": False,
+            "verdict": SearchVerdict.NOTHING_ANSWERS.value,
+            "hits": [],
+            "returned": 0,
+            "total": 0,
+            "truncated": False,
+        }
+        assert _UNSENDABLE_KEY not in result.output
+
+    def test_empty_answer_says_nothing_answers(self, tmp_path: Path) -> None:
+        result = _search(
+            _workspace(tmp_path),
+            "why are widgets stored?",
+            "--type",
+            "plan",
+            key=_UNSENDABLE_KEY,
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "nothing in the vault answers this" in result.stdout
+        assert "0 hits" in result.stdout
+
+    def test_unusable_key_fails_without_printing_it(self, tmp_path: Path) -> None:
+        result = _search(
+            _workspace(tmp_path),
+            "why are widgets stored?",
+            "--json",
+            key=_UNSENDABLE_KEY,
+        )
+
+        assert result.exit_code == 1
+        envelope = json.loads(result.stdout)
+        assert envelope["status"] == "failed"
+        assert envelope["data"]["status"] == SearchStatus.UNAVAILABLE
+        assert envelope["data"]["reason"] == "credential_rejected"
+        assert envelope["data"]["next_step"]["kind"] == NextStepKind.LISTING.value
+        assert (
+            VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name in envelope["data"]["remediation"]
+        )
+        assert _UNSENDABLE_KEY not in result.output
+
+    def test_unusable_key_human_output_names_the_reason(self, tmp_path: Path) -> None:
+        result = _search(
+            _workspace(tmp_path), "why are widgets stored?", key=_UNSENDABLE_KEY
+        )
+
+        assert result.exit_code == 1
+        assert "unavailable (credential_rejected)" in result.stdout
+        assert _UNSENDABLE_KEY not in result.output
+
+
+# ---------------------------------------------------------------------------
+# Rendering of a ranked page
+# ---------------------------------------------------------------------------
+
+#: The leading lines the search kept of a longer block, as it hands them over.
+_KEPT = "\n".join(f"line {n:03d} of the answering passage" for n in range(20))
+
+
+def _hit(
+    rank: int,
+    *,
+    premise_conflict: float = 0.0,
+    excerpt: Excerpt | None = None,
+    supporting: Excerpt | None = None,
+) -> SearchHit:
+    return SearchHit(
+        name=f"2026-02-2{rank}-widget-adr",
+        path=f".vault/adr/2026-02-2{rank}-widget-adr.md",
+        doc_type=DocType.ADR,
+        feature="widget",
+        date=f"2026-02-2{rank}",
+        title=f"widget adr {rank}",
+        score=1.0 - rank / 10,
+        answers=0.9,
+        premise_conflict=premise_conflict,
+        excerpt=excerpt,
+        supporting=supporting,
+        blob_hash="0" * 40,
+    )
+
+
+def _page(*, answered: bool = True, unscored: int | None = None) -> SearchOutcome:
+    """Two shown hits of three ranked; the first has a cut and a whole excerpt."""
+    ranked = [
+        _hit(
+            1,
+            premise_conflict=PREMISE_CONFLICT_THRESHOLD,
+            excerpt=Excerpt("Decision > Storage", 12, 31, _KEPT, truncated=True),
+            supporting=Excerpt("Consequences", 95, 95, "Widgets persist."),
+        ),
+        _hit(2, premise_conflict=PREMISE_CONFLICT_THRESHOLD - 0.01),
+        _hit(3),
+    ]
+    hits, window = apply_window(ranked, limit=2, pageable=False)
+    usage = (
+        None
+        if unscored is None
+        else SearchUsage("jev-1.13.0", 16, 41_250, 1_235, unscored)
+    )
+    return SearchOutcome(
+        status=SearchStatus.OK,
+        query="where are widgets stored?",
+        answered=answered,
+        hits=tuple(hits),
+        window=window,
+        usage=usage,
+    )
+
+
+def _page_json() -> dict[str, Any]:
+    """The page's ``data`` as a JSON consumer receives it."""
+    return json.loads(json.dumps(outcome_fields(_page())))
+
+
+class TestJsonPage:
+    def test_excerpts_travel_as_the_search_bounded_them(self) -> None:
+        first = _page_json()["hits"][0]
+
+        assert first["excerpt"] == {
+            "section": "Decision > Storage",
+            "line_start": 12,
+            "line_end": 31,
+            "text": _KEPT,
+            "truncated": True,
+        }
+        assert first["supporting"] == {
+            "section": "Consequences",
+            "line_start": 95,
+            "line_end": 95,
+            "text": "Widgets persist.",
+            "truncated": False,
+        }
+
+    def test_hits_carry_the_mcp_tool_keys_and_rounding(self) -> None:
+        precise = dataclasses.replace(
+            _hit(1), score=0.912345, answers=0.876543, premise_conflict=0.012345
+        )
+        outcome = dataclasses.replace(_page(), hits=(precise,))
+        hit = json.loads(json.dumps(outcome_fields(outcome)))["hits"][0]
+
+        assert hit["type"] == DocType.ADR.value
+        assert "doc_type" not in hit
+        assert (hit["score"], hit["answers"], hit["premise_conflict"]) == (
+            0.912,
+            0.877,
+            0.012,
+        )
+
+    def test_derivable_and_echoed_values_are_left_out(self) -> None:
+        data = _page_json()
+        hits = data["hits"]
+
+        assert "query" not in data
+        assert all("name" not in hit for hit in hits)
+        # A hit whose passage was not located has no excerpt key, not a null.
+        assert "excerpt" not in hits[1]
+        assert "supporting" not in hits[1]
+
+    def test_window_reports_total_and_truncation_without_an_offset(self) -> None:
+        data = _page_json()
+
+        assert (data["returned"], data["total"], data["truncated"]) == (2, 3, True)
+        assert "next_offset" not in data
+
+
+class TestHumanPage:
+    def test_verdict_leads_and_hit_header_locates_the_passage(self) -> None:
+        texts = [line.text for line in _outcome_lines(_page())]
+
+        assert texts[0] == "answered"
+        assert texts[1] == (
+            "1 2026-02-21-widget-adr adr "
+            ".vault/adr/2026-02-21-widget-adr.md:12-31 Decision > Storage"
+        )
+
+    def test_premise_note_marks_only_hits_at_the_threshold(self) -> None:
+        lines = _outcome_lines(_page())
+        notes = [line for line in lines if line.glyph == "!"]
+
+        assert len(notes) == 1
+        assert "may contradict an assumption" in notes[0].text
+        first_hit = next(
+            i for i, line in enumerate(lines) if line.text.startswith("1 ")
+        )
+        assert lines[first_hit + 1] is notes[0]
+
+    def test_a_cut_passage_ends_with_the_truncation_marker(self) -> None:
+        texts = [line.text for line in _outcome_lines(_page())]
+
+        also = next(i for i, text in enumerate(texts) if text.startswith("also "))
+        assert texts[also - 2 : also] == [_KEPT.splitlines()[-1], TRUNCATE_MARKER]
+        assert texts[also + 1] == "Widgets persist."
+        # The whole supporting passage carries no marker.
+        assert TRUNCATE_MARKER not in texts[also + 1 :]
+
+    def test_page_ends_with_count_and_what_was_withheld(self) -> None:
+        texts = [line.text for line in _outcome_lines(_page())]
+
+        assert texts[-2] == "2 hits"
+        assert "1 more hits" in texts[-1]
+        assert "--offset" not in texts[-1]
+
+    def test_nothing_answers_only_when_every_record_was_read(self) -> None:
+        texts = [line.text for line in _outcome_lines(_page(answered=False))]
+
+        assert texts[0] == "nothing in the vault answers this"
+
+    def test_unscored_records_withhold_the_verdict_and_are_counted(self) -> None:
+        texts = [
+            line.text for line in _outcome_lines(_page(answered=False, unscored=2))
+        ]
+
+        assert "nothing in the vault answers this" not in texts
+        assert texts[0] == "no record that was read answers this"
+        assert texts[1] == "2 records the provider would not read in full"
+
+    def test_an_answer_still_reports_what_went_unscored(self) -> None:
+        texts = [line.text for line in _outcome_lines(_page(unscored=1))]
+
+        assert texts[:2] == [
+            "answered",
+            "1 record the provider would not read in full",
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Size of the --json reply
+# ---------------------------------------------------------------------------
+
+
+def _json_tokens(shape: str, limit: int) -> float:
+    ranking = worst_case_ranking(shape)
+    hits, window = apply_window(ranking, limit=limit, pageable=False)
+    outcome = SearchOutcome(
+        status=SearchStatus.OK,
+        query="where are widgets stored?",
+        answered=False,
+        hits=tuple(hits),
+        window=window,
+        usage=SearchUsage("jev-1.13.0", 16, 41_250, 1_235, 99),
+    )
+    text = _json_text(outcome)
+    assert len(json.loads(text)["data"]["hits"]) == limit
+    return len(text.encode("utf-8")) / ENVELOPE_BYTES_PER_TOKEN
+
+
+class TestJsonReplySize:
+    @pytest.mark.parametrize("shape", list(WORST_SHAPES))
+    def test_a_default_worst_case_reply_fits_the_discovery_budget(
+        self, shape: str
+    ) -> None:
+        tokens = _json_tokens(shape, DEFAULT_RESULTS)
+
+        assert tokens <= DISCOVERY_BUDGET, f"{shape}: {tokens:,.0f} tokens"
+
+    @pytest.mark.parametrize("shape", list(WORST_SHAPES))
+    def test_a_full_worst_case_reply_fits_the_reply_ceiling(self, shape: str) -> None:
+        tokens = _json_tokens(shape, MAX_RESULTS)
+
+        assert tokens <= REPLY_CEILING, f"{shape}: {tokens:,.0f} tokens"

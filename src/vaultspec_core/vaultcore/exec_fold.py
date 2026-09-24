@@ -37,12 +37,14 @@ from typing import TYPE_CHECKING
 from .exec_ledger import (
     LEDGER_SUFFIX,
     MIGRATED_OP,
+    backtick_cells,
     format_note,
     format_row,
     ledger_step_ids,
     note_lines,
     parse_ledger_rows,
 )
+from .markdown import find_section
 from .trash import TrashWriter
 
 if TYPE_CHECKING:
@@ -63,18 +65,6 @@ __all__ = [
     "removals_of",
     "scope_paths",
 ]
-
-#: A backtick-quoted cell inside a ``## Scope`` list item.
-_CELL_RE = re.compile(r"`([^`]*)`")
-
-#: The ``## Scope`` section, up to the next level-two heading.
-_SCOPE_RE = re.compile(
-    r"^##[ \t]+Scope[ \t]*$(?P<body>.*?)(?=^##[ \t]+|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
-
-#: A ``## Changes`` heading marks the body-v2 shape.
-_CHANGES_HEADING_RE = re.compile(r"^##[ \t]+Changes[ \t]*$", re.MULTILINE)
 
 #: A canonical leaf Step identifier, used to order rows numerically.
 _STEP_NUM_RE = re.compile(r"^S(\d+)$")
@@ -179,11 +169,11 @@ def scope_paths(body: str) -> tuple[str, ...]:
         dropped. Empty when the record declares no Scope section or the
         section lists no backticked cell.
     """
-    match = _SCOPE_RE.search(body)
-    if match is None:
+    section = find_section(body, "Scope")
+    if section is None:
         return ()
     seen: dict[str, None] = {}
-    for cell in _CELL_RE.findall(match.group("body")):
+    for cell in backtick_cells(section.body):
         value = cell.strip()
         if value:
             seen.setdefault(value, None)
@@ -212,7 +202,8 @@ def _recover(step_id: str, body: str) -> tuple[list[str], list[str], set[str]]:
     paths: set[str] = set()
     has_change_row = False
 
-    if _CHANGES_HEADING_RE.search(body):
+    # A ``## Changes`` heading marks the body-v2 shape.
+    if find_section(body, "Changes") is not None:
         for row in parse_ledger_rows(body):
             if row.op is not None:
                 rows.append(format_row(step_id, row.op, *row.paths))

@@ -263,6 +263,7 @@ in-memory client session tests:
 from mcp.shared.memory import create_connected_server_and_client_session
 from mcp.client.session import ClientSession
 
+
 @pytest.fixture
 async def client_session() -> AsyncGenerator[ClientSession, None]:
     """In-memory MCP client connected to the vaultspec server."""

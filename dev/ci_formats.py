@@ -23,22 +23,22 @@ the mapping is tested without running any of the tools.
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
+
+from dev import environment
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-#: Names a directory for report artifacts, and enables machine-readable output.
-REPORTS_ENV = "VAULTSPEC_CI_REPORTS"
 
-#: Set by the Actions runner. Annotations are only meaningful under it.
-ANNOTATIONS_ENV = "GITHUB_ACTIONS"
+def annotating(env: Mapping[str, str] | None = None) -> bool:
+    """Whether findings should be emitted as GitHub workflow annotations.
 
-
-def annotating(env: Mapping[str, str]) -> bool:
-    """Whether findings should be emitted as GitHub workflow annotations."""
-    return env.get(ANNOTATIONS_ENV, "").strip().lower() == "true"
+    Args:
+        env: The environment to read; defaults to the process's own.
+    """
+    raw = environment.value(environment.GITHUB_ACTIONS, env) or ""
+    return raw.strip().lower() == "true"
 
 
 def augment(argv: Sequence[str], env: Mapping[str, str] | None = None) -> list[str]:
@@ -52,8 +52,7 @@ def augment(argv: Sequence[str], env: Mapping[str, str] | None = None) -> list[s
         The command to run - unchanged whenever annotations are not enabled, or
         the caller already chose an output format.
     """
-    environment = os.environ if env is None else env
-    if not argv or not annotating(environment):
+    if not argv or not annotating(env):
         return list(argv)
 
     flags = " ".join(argv)

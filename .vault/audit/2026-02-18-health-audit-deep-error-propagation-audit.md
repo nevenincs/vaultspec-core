@@ -106,7 +106,6 @@ A task stuck in `WORKING` or `INPUT_REQUIRED` is never added to `self._expiry` a
 therefore never evicted.
 
 ```python
-
 # task_engine.py lines 343-347 (update_status)
 
 if is_terminal(status):
@@ -174,8 +173,8 @@ ______________________________________________________________________
 ### 3a. `graceful_cancel()` swallows all exceptions
 
 ```python
-
 # client.py lines 443-447
+
 
 async def graceful_cancel(self) -> None:
     """Send ACP session/cancel notification before termination."""
@@ -197,7 +196,6 @@ does not exercise the actual ACP cancel path.
 ### 3b. `terminal_output()` returns empty string for unknown terminal
 
 ```python
-
 # client.py lines 353-357
 
 terminal = self._terminals.get(terminal_id)
@@ -218,8 +216,8 @@ unit tests).
 ### 3c. `_reader()` task in `create_terminal()` swallows `asyncio.CancelledError`
 
 ```python
-
 # client.py lines 327-337
+
 
 async def _reader() -> None:
     assert proc.stdout is not None
@@ -252,7 +250,6 @@ ______________________________________________________________________
 ### 4a. Streaming exception converts to `stop_reason="refusal"` — misleading
 
 ```python
-
 # claude_bridge.py lines 429-445
 
 try:
@@ -302,7 +299,6 @@ disconnected mid-stream) looks like a model refusal.
 ### 4c. `new_session()` connect failure leaves `_sessions` partially populated
 
 ```python
-
 # claude_bridge.py lines 372-398
 
 options = self._build_options(cwd, sdk_mcp, sandbox_cb)
@@ -339,13 +335,11 @@ failures are entirely silent.
 Checking the hooks invocation sites:
 
 ```python
-
 # Typical invocation pattern (from vault.py / cli.py — callers of trigger()):
 
 trigger(hooks, "vault.document.created", {"path": str(path)})
 
 # Return value discarded
-
 ```
 
 Even if callers DO check results, there is no mechanism to propagate a hook failure
@@ -382,8 +376,8 @@ ______________________________________________________________________
 ### 6a. `get_engine()` singleton left in broken state on lazy-property failure
 
 ```python
-
 # api.py lines 81-102
+
 
 def get_engine(root_dir: pathlib.Path) -> VaultRAG:
     global _engine
@@ -393,6 +387,7 @@ def get_engine(root_dir: pathlib.Path) -> VaultRAG:
         _engine = VaultRAG(root_dir)  # Singleton assigned HERE
         try:
             from rag.embeddings import _require_cuda
+
             _require_cuda()
         except ImportError:
             pass
@@ -428,7 +423,6 @@ requires CUDA), but the broken-singleton-on-second-call scenario is not tested.
 ### 6b. `get_document()` silently swallows lancedb OSError
 
 ```python
-
 # api.py lines 167-177
 
 try:
@@ -459,13 +453,11 @@ ______________________________________________________________________
 ### 7a. `pool.map()` propagates first worker exception but silently skips others
 
 ```python
-
 # indexer.py lines 138-142 (full_index)
 
 with ThreadPoolExecutor() as pool:
     results = pool.map(lambda p: prepare_document(p, self.root_dir), paths)
     for doc in results:
-
         if doc is not None:
             docs.append(doc)
 ```
@@ -473,7 +465,6 @@ with ThreadPoolExecutor() as pool:
 `prepare_document()` has its own `try/except`:
 
 ```python
-
 # indexer.py lines 68-72
 
 try:
@@ -506,7 +497,6 @@ catches per-worker exceptions.
 ### 7b. Full re-index OSError is caught but partially completes
 
 ```python
-
 # indexer.py lines 165-170
 
 try:
@@ -534,8 +524,8 @@ ______________________________________________________________________
 ### 8a. `_poll_agent_files()` exceptions kill the poller silently
 
 ```python
-
 # server.py lines 343-347
+
 
 async def _poll_agent_files() -> None:
     while True:
@@ -582,7 +572,6 @@ level, continuing the loop rather than letting the exception kill the task.
 ### 8b. `asyncio.create_task()` for `_run_in_background` — uncaught exceptions
 
 ```python
-
 # server.py lines 523-524
 
 bg_task = asyncio.create_task(_run_in_background())

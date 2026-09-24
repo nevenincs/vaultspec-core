@@ -10,6 +10,7 @@ import pytest
 
 from vaultspec_core.config import (
     CONFIG_REGISTRY,
+    ConfigVariable,
     VaultSpecConfig,
     get_config,
     parse_csv_list,
@@ -17,6 +18,7 @@ from vaultspec_core.config import (
     parse_int_or_none,
     reset_config,
 )
+from vaultspec_core.config.config import _SENTINEL, _parse_raw
 
 pytestmark = [pytest.mark.unit]
 
@@ -176,7 +178,78 @@ def test_registry_coverage():
     """Ensure all fields in the dataclass are represented in the registry."""
     from dataclasses import fields
 
-    registry_attrs = {var.attr_name for var in CONFIG_REGISTRY}
+    registry_attrs = {
+        var.attr_name for var in CONFIG_REGISTRY if var.attr_name is not None
+    }
     config_attrs = {f.name for f in fields(VaultSpecConfig)}
 
     assert registry_attrs == config_attrs
+
+
+class TestSecretVariables:
+    """A secret variable's value never reaches a repr or a log line."""
+
+    SECRET = "ts-config-81c0e5d7f2a9"
+
+    def test_hosted_search_key_is_the_only_secret(self) -> None:
+        secrets = {var.env_name for var in CONFIG_REGISTRY if var.secret}
+
+        assert secrets == {"VAULTSPEC_CORE_TYPESAFE_API_KEY"}
+
+    def test_secret_field_is_excluded_from_repr(self) -> None:
+        cfg = VaultSpecConfig(typesafe_api_key=self.SECRET)
+
+        assert cfg.typesafe_api_key == self.SECRET
+        assert self.SECRET not in repr(cfg)
+        assert VaultSpecConfig().typesafe_api_key is None
+
+    def test_unparseable_secret_is_redacted_from_the_log(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        var = ConfigVariable(
+            env_name="VAULTSPEC_EXAMPLE_SECRET",
+            attr_name="example_secret",
+            var_type=int,
+            default=None,
+            description="A numeric secret, to drive the conversion failure.",
+            secret=True,
+        )
+        caplog.set_level(logging.DEBUG, logger="vaultspec_core.config.config")
+
+        assert _parse_raw(var, self.SECRET, var.env_name) is _SENTINEL
+        assert "example_secret=<redacted>" in caplog.text
+        assert self.SECRET not in caplog.text
+
+    def test_out_of_range_secret_is_redacted_from_the_log(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        var = ConfigVariable(
+            env_name="VAULTSPEC_EXAMPLE_SECRET",
+            attr_name="example_secret",
+            var_type=int,
+            default=None,
+            description="A numeric secret, to drive the range checks.",
+            secret=True,
+            min_value=10**12,
+        )
+        caplog.set_level(logging.DEBUG, logger="vaultspec_core.config.config")
+
+        assert _parse_raw(var, "987654321", var.env_name) is _SENTINEL
+        assert "below minimum" in caplog.text
+        assert "987654321" not in caplog.text
+
+    def test_non_secret_values_are_still_quoted(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        var = ConfigVariable(
+            env_name="VAULTSPEC_EXAMPLE_SIZE",
+            attr_name="example_size",
+            var_type=int,
+            default=None,
+            description="A plain numeric variable.",
+            min_value=10**12,
+        )
+        caplog.set_level(logging.DEBUG, logger="vaultspec_core.config.config")
+
+        assert _parse_raw(var, "987654321", var.env_name) is _SENTINEL
+        assert "example_size=987654321" in caplog.text

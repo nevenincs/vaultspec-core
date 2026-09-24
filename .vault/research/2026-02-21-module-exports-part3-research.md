@@ -270,7 +270,9 @@ None at runtime. `from mcp.server.fastmcp import FastMCP` is under
 ### 5D. Proposed `__init__.py` re-exports
 
 ```python
-from vaultspec.mcp_tools.framework_tools import register_tools as register_framework_tools
+from vaultspec.mcp_tools.framework_tools import (
+    register_tools as register_framework_tools,
+)
 from vaultspec.mcp_tools.team_tools import register_tools as register_team_tools
 from vaultspec.mcp_tools.vault_tools import register_tools as register_vault_tools
 

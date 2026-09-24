@@ -43,6 +43,12 @@ on:
         description: Git ref to validate
         required: true
         type: string
+    # A called workflow sees only the secrets its caller passes, so the live
+    # hosted-search tests would otherwise run keyless in a release.
+    secrets:
+      VAULTSPEC_CORE_TYPESAFE_API_KEY:
+        description: TypeSafe API key for the live hosted-search tests
+        required: true
   workflow_dispatch:
     inputs:
       ref:
@@ -198,6 +204,14 @@ jobs:
       - name: Run broad test suite
         if: always()
         run: just test-broad
+
+      # Fails rather than passing when the secret is absent, so a keyless run
+      # can never read as a working provider.
+      - name: Run hosted search against the live API
+        if: always()
+        env:
+          VAULTSPEC_CORE_TYPESAFE_API_KEY: ${{ secrets.VAULTSPEC_CORE_TYPESAFE_API_KEY }}
+        run: just test-typesafe
 
       - name: Bootstrap framework
         if: always()

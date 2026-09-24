@@ -133,7 +133,7 @@ def restore_graph(payload: cache.GraphCachePayload) -> RestoredGraph:
         node_path = nodes[key].path
         if node_path is not None:
             raw_texts[node_path] = (raw, crlf)
-        nodes[key].body = split_frontmatter(raw)[1] if raw else ""
+        nodes[key].body = split_frontmatter(raw).body if raw else ""
         # Phantoms are excluded from the stem index to match fresh-build
         # semantics: the file rebuild only indexes real nodes in passes 1a/1b;
         # phantoms are added later in pass 2 and never entered there.

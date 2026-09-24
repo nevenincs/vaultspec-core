@@ -9,14 +9,14 @@ plan resolution is authored here.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from ...core.types import get_context as _get_ctx
-from ..envelope import LeanModel, compact_result
+from ..envelope import LeanResult, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ __all__ = ["LogResult", "register_exec_tools"]
 _ExecToolContext = Context[None, Any]
 
 
-class LogResult(LeanModel):
+class LogResult(LeanResult):
     """The result of one ``log`` call.
 
     Attributes:
@@ -53,15 +53,12 @@ class LogResult(LeanModel):
 
 def _log_summary(payload: object) -> str:
     """One-line summary of a :class:`LogResult` for the compact envelope."""
-    if not isinstance(payload, dict):
-        return str(payload)
-    data = cast("dict[str, Any]", payload)
+    if not isinstance(payload, LogResult):
+        return type(payload).__name__
     verb = (
-        "created"
-        if data.get("created")
-        else ("logged" if data.get("changed") else "unchanged")
+        "created" if payload.created else ("logged" if payload.changed else "unchanged")
     )
-    return f"{verb}: {data.get('step')} -> {data.get('path')} ({data.get('rows')} rows)"
+    return f"{verb}: {payload.step} -> {payload.path} ({payload.rows} rows)"
 
 
 def register_exec_tools(mcp: MCPServer[None]) -> None:
@@ -90,22 +87,22 @@ def register_exec_tools(mcp: MCPServer[None]) -> None:
         plan: str,
         step: str,
         rows: list[str] | None = None,
-        verify: str | None = None,
+        verify: list[str] | None = None,
         by: str | None = None,
         notes: list[str] | None = None,
     ) -> LogResult:
         """Append one Step's rows to its plan's execution ledger.
 
-        Creates the ledger on first use; re-logging a row is idempotent.
+        Creates the ledger on first use; re-logging is idempotent.
 
         Args:
             ctx: The MCP request context (unused).
             feature: Feature tag.
             plan: The parent plan's stem.
-            step: Step id (``S01``) or display path (``P01.S01``).
+            step: ``S01`` or display path ``P01.S01``.
             rows: One ``OP:path`` per path touched: ``A:`` added, ``M:``
                 modified, ``D:`` deleted, ``R:old->new`` renamed.
-            verify: A check that ran, as ``<command>=pass|fail``.
+            verify: One ``<command>=pass|fail`` per check run.
             by: The persona that closed the Step.
             notes: Exception notes only.
         """
@@ -125,7 +122,7 @@ def register_exec_tools(mcp: MCPServer[None]) -> None:
                 plan_stem=plan,
                 step=step,
                 rows=tuple(parse_row_spec(spec) for spec in rows or []),
-                verify=parse_verify_spec(verify) if verify else None,
+                verify=tuple(parse_verify_spec(spec) for spec in verify or []),
                 by=by,
                 notes=tuple(notes or []),
             )

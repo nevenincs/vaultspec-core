@@ -38,7 +38,7 @@ Skills and personas apply these contracts.
 
 Discover governing decisions before changing code or vault records, at every horizon.
 Discovery is reading and investigation; it does not itself require a persisted record.
-Search across features as well as listing ADRs for the current feature.
+Search and list decisions across features as the `vaultspec-discovery` rule says.
 
 Assess decision coverage separately from planning need:
 

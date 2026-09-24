@@ -9,9 +9,11 @@ Validates every document against DocumentMetadata.validate() rules:
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
+from ..parser import parse_vault_metadata, rerender_frontmatter, split_frontmatter
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -26,24 +28,6 @@ if TYPE_CHECKING:
     from ..models import DocType, DocumentMetadata
 
 __all__ = ["check_frontmatter"]
-
-
-_KNOWN_KEYS = frozenset(
-    {
-        "tags",
-        "date",
-        "modified",
-        "body_schema",
-        "body_hash",
-        "related",
-        "feature",
-        "supersedes",
-        "superseded_by",
-        "derived_from",
-        "promoted_to",
-        "archived",
-    }
-)
 
 
 def _read_source_text(doc_path: Path) -> tuple[str, str] | None:
@@ -112,83 +96,55 @@ def _existing_tag_lines(yaml_block: str) -> list[str]:
     return lines
 
 
-def _unknown_key_lines(yaml_block: str) -> list[str]:
-    """Return the verbatim lines of every key outside :data:`_KNOWN_KEYS`."""
-    lines: list[str] = []
-    in_unknown_key = False
-    for line in yaml_block.split("\n"):
-        stripped = line.strip()
-        if ":" in stripped and not stripped.startswith("-"):
-            in_unknown_key = stripped.split(":", 1)[0].strip() not in _KNOWN_KEYS
-        elif not stripped.startswith("-"):
-            if in_unknown_key and stripped:
-                lines.append(line)
-            in_unknown_key = False
-            continue
-        if in_unknown_key:
-            lines.append(line)
-    return lines
+def _repair_frontmatter(
+    content: str, doc_type: DocType | None
+) -> tuple[str, list[str]] | None:
+    """Return *content* with its frontmatter repaired, and the fixes applied.
 
+    Normalizes tag ``#`` prefixes (or builds tags from a bare ``feature:``)
+    and trims the date to ``YYYY-MM-DD``, then re-renders the frontmatter in
+    canonical field order.
 
-def _render_frontmatter_lines(
-    metadata: DocumentMetadata,
-    new_tags: list[str],
-    date_val: str | None,
-    yaml_block: str,
-    *,
-    tags_changed: bool,
-) -> list[str]:
-    """Rebuild the frontmatter block in canonical field order."""
-    lines = ["---"]
-    if new_tags:
-        lines.append("tags:")
-        lines.extend(f'  - "{tag}"' for tag in new_tags)
-    elif not tags_changed:
-        lines.extend(_existing_tag_lines(yaml_block))
+    Args:
+        content: The ``\\n``-normalised document text.
+        doc_type: The document's type, which supplies its directory tag.
 
-    if date_val:
-        lines.append(f"date: {date_val}")
-    elif metadata.date:
-        lines.append(f"date: {metadata.date}")
+    Returns:
+        ``(repaired_content, fixes)``, or ``None`` when the document has no
+        frontmatter or needs no fix.
+    """
+    split = split_frontmatter(content)
+    if split.yaml_block is None:
+        return None
+    metadata, _ = parse_vault_metadata(content)
+    fixes: list[str] = []
 
-    if metadata.modified:
-        lines.append(f"modified: '{metadata.modified}'")
+    # Fix 1 and 2: normalize tag prefixes, or construct tags from feature:
+    new_tags, tags_changed, tag_fix = _normalized_tags(
+        metadata, split.yaml_block, doc_type
+    )
+    if tag_fix:
+        fixes.append(tag_fix)
 
-    if metadata.body_schema:
-        lines.append(f"body_schema: '{metadata.body_schema}'")
+    # Fix 3: Date format normalization
+    date_val, date_fixed = _normalized_date(metadata.date)
+    if date_fixed:
+        fixes.append("normalized date format")
 
-    # Carried through verbatim: the canonical rebuild only reorders and
-    # re-quotes frontmatter, so the body this fingerprint attests is
-    # untouched and dropping the field would silently retract a valid
-    # attestation.
-    if metadata.body_hash:
-        lines.append(f"body_hash: '{metadata.body_hash}'")
+    if not fixes:
+        return None
 
-    if metadata.related:
-        lines.append("related:")
-        lines.extend(f'  - "{link}"' for link in metadata.related)
-
-    if metadata.supersedes:
-        lines.append("supersedes:")
-        lines.extend(f"  - '{stem}'" for stem in metadata.supersedes)
-
-    if metadata.superseded_by:
-        lines.append(f"superseded_by: '{metadata.superseded_by}'")
-
-    if metadata.derived_from:
-        lines.append("derived_from:")
-        lines.extend(f"  - '{stem}'" for stem in metadata.derived_from)
-
-    if metadata.promoted_to:
-        lines.append("promoted_to:")
-        lines.extend(f"  - '{rule}'" for rule in metadata.promoted_to)
-
-    if metadata.archived:
-        lines.append(f"archived: '{metadata.archived}'")
-
-    lines.extend(_unknown_key_lines(yaml_block))
-    lines.append("---")
-    return lines
+    # With no tags to write and none constructed, the tags lines already in
+    # the frontmatter are kept as they are.
+    keep_tag_lines = not new_tags and not tags_changed
+    rendered = rerender_frontmatter(
+        content,
+        replace(metadata, tags=new_tags, date=date_val or metadata.date),
+        render_stamps=True,
+        quote_date=False,
+        tag_lines=_existing_tag_lines(split.yaml_block) if keep_tag_lines else None,
+    )
+    return (rendered, fixes) if rendered is not None else None
 
 
 def _fix_frontmatter(doc_path: Path, root_dir: Path) -> str | None:
@@ -227,41 +183,10 @@ def _fix_frontmatter_locked(doc_path: Path, root_dir: Path) -> str | None:
         return None
     content, source_newline = source
 
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", content.lstrip(), re.DOTALL)
-    if not match:
+    repaired = _repair_frontmatter(content, get_doc_type(doc_path, root_dir))
+    if repaired is None:
         return None
-
-    yaml_block = match.group(1)
-    body = match.group(2)
-    leading_whitespace = content[: len(content) - len(content.lstrip())]
-    fixes_applied: list[str] = []
-
-    # Parse current state
-    from ..parser import parse_vault_metadata
-
-    metadata, _ = parse_vault_metadata(content)
-    doc_type = get_doc_type(doc_path, root_dir)
-
-    # Fix 1 and 2: normalize tag prefixes, or construct tags from feature:
-    new_tags, tags_changed, tag_fix = _normalized_tags(metadata, yaml_block, doc_type)
-    if tag_fix:
-        fixes_applied.append(tag_fix)
-
-    # Fix 3: Date format normalization
-    date_val, date_fixed = _normalized_date(metadata.date)
-    if date_fixed:
-        fixes_applied.append("normalized date format")
-
-    if not fixes_applied:
-        return None
-
-    lines = _render_frontmatter_lines(
-        metadata, new_tags, date_val, yaml_block, tags_changed=tags_changed
-    )
-    if body:
-        lines.append(body)
-
-    rendered = leading_whitespace + "\n".join(lines)
+    rendered, fixes_applied = repaired
     # Restore the source file's newline convention. Internal LFs that
     # came from the body group also need promoting so the file does
     # not end up with mixed endings. ``atomic_write`` writes bytes
@@ -305,7 +230,6 @@ def check_frontmatter(
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
         check name ``"frontmatter"``.
     """
-    from ..parser import parse_vault_metadata
     from ..scanner import get_doc_type
 
     result = CheckResult(check_name="frontmatter", supports_fix=True)

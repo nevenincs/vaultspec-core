@@ -1,10 +1,11 @@
 """Shared Typer app instances for the ``vaultspec-core vault`` command family.
 
 Defines :data:`vault_app`, the parent Typer group for ``vaultspec-core vault``,
-and its sub-apps (:data:`feature_app`, :data:`check_app`, :data:`sanitize_app`,
-:data:`rule_app`, :data:`adr_app`). Split out from
-:mod:`vaultspec_core.cli.vault_cmd` so the per-verb command modules can import
-and mount onto these apps without a circular import back through
+its sub-apps (:data:`feature_app`, :data:`check_app`, :data:`sanitize_app`,
+:data:`rule_app`, :data:`adr_app`), and the record-filter options the family's
+verbs share (:data:`FeatureFilterOption`, :data:`DateFilterOption`). Split out
+from :mod:`vaultspec_core.cli.vault_cmd` so the per-verb command modules can
+import and mount onto these apps without a circular import back through
 :mod:`vaultspec_core.cli.vault_cmd`, which re-exports them as the public
 surface.
 
@@ -34,11 +35,11 @@ Those four mounts could be moved here to retire all three markers - the target
 modules have no import edge back, and appending them after the ``adr`` mount
 would preserve the group order exactly. They are not, because this module is a
 leaf of the CLI import graph: it imports :mod:`vaultspec_core.cli._app` and
-nothing else, which is what lets every command module import it without any
-possibility of a cycle. Importing four command families here would make it the
-package's heaviest importer and put the module that every command module
-depends on downstream of them - the shape that produced the cycle this module
-exists to remove. That layering is worth more than three suppressions ruff
+nothing else from the CLI, which is what lets every command module import it
+without any possibility of a cycle. Importing four command families here would
+make it the package's heaviest importer and put the module that every command
+module depends on downstream of them - the shape that produced the cycle this
+module exists to remove. That layering is worth more than three suppressions ruff
 itself considers legitimate.
 
 Note this is an argument about the import *graph*, not about what a process
@@ -48,9 +49,15 @@ module in this package already builds the whole CLI.
 
 from __future__ import annotations
 
+from typing import Annotated
+
+import typer
+
 from vaultspec_core.cli._app import make_app
 
 __all__ = [
+    "DateFilterOption",
+    "FeatureFilterOption",
     "adr_app",
     "check_app",
     "feature_app",
@@ -93,3 +100,16 @@ adr_app = make_app(
     no_args_is_help=True,
 )
 vault_app.add_typer(adr_app, name="adr")
+
+# Every vault verb that narrows its records by feature or by date takes the same
+# option. A verb that declared its own copy could drift from its siblings in
+# flag, short form or help text, and the handbook and the generated reference
+# would then document one filter as several options.
+
+FeatureFilterOption = Annotated[
+    str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
+]
+
+DateFilterOption = Annotated[
+    str | None, typer.Option("--date", help="Filter by date (YYYY-MM-DD)")
+]

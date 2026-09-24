@@ -252,7 +252,6 @@ The current design defines 5 entry points:
 The unified `vaultspec` CLI already routes to all four namespaces:
 
 ```python
-
 # __main__.py
 
 NAMESPACES = {

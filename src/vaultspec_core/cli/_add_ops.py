@@ -356,14 +356,12 @@ def parse_row_specs(
     return tuple(parsed)
 
 
-def parse_verify(console: Console, spec: str | None) -> tuple[str, str] | None:
-    """Validate the ``--verify`` spec, refusing a result other than pass or fail."""
+def parse_verify(console: Console, specs: Sequence[str]) -> tuple[tuple[str, str], ...]:
+    """Validate each ``--verify`` spec, refusing a result other than pass or fail."""
     from vaultspec_core.vaultcore.exec_log import ExecLogError, parse_verify_spec
 
-    if spec is None:
-        return None
     try:
-        return parse_verify_spec(spec)
+        return tuple(parse_verify_spec(spec) for spec in specs)
     except ExecLogError as exc:
         console.print(f"[red]Error:[/red] {exc}.")
         raise typer.Exit(code=1) from None
@@ -377,7 +375,7 @@ def log_ledger_rows(
     plan_stem: str,
     step: str,
     rows: Sequence[tuple[str, tuple[str, ...]]],
-    verify: tuple[str, str] | None = None,
+    verify: tuple[tuple[str, str], ...] = (),
     by: str | None = None,
     notes: Sequence[str] = (),
     dry_run: bool,
@@ -392,7 +390,7 @@ def log_ledger_rows(
         plan_stem: Stem of the parent plan the ledger records.
         step: Canonical Step identifier or display path being logged.
         rows: Parsed ``(op, paths)`` pairs from :func:`parse_row_specs`.
-        verify: ``(command, result)`` for the ``verify:`` row, if any.
+        verify: ``(command, result)`` per check, one ``verify:`` row each.
         by: Persona for the ``by:`` row, if any.
         notes: Exception notes, one ``## Notes`` line each.
         dry_run: Resolve and report the target without writing.

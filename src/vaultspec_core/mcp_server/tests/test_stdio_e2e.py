@@ -20,96 +20,21 @@ the suite.
 
 from __future__ import annotations
 
-import asyncio
-import os
-import shutil
-import sys
-import tempfile
-from contextlib import asynccontextmanager
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from mcp.types import CallToolResult, TextContent
+from mcp.types import TextContent
 
-from vaultspec_core.config import reset_config
-from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
-#: The ten tools the redesigned surface must advertise over the wire.
-_EXPECTED_TOOLS = frozenset(
-    {
-        "status",
-        "find",
-        "create",
-        "edit",
-        "plan_progress",
-        "plan_edit",
-        "log",
-        "check",
-        "discover",
-        "invoke",
-    }
+from .conftest import (
+    EXPECTED_TOOLS,
+    READ_ONLY_TOOLS,
+    data_of,
+    run_in_fresh_workspace,
+    stdio_session,
 )
 
-_READ_ONLY_TOOLS = frozenset({"status", "find", "check", "discover"})
-
-#: Overall client-session ceiling. Deliberately below the 60s ``invoke``
-#: subprocess timeout so a stdin-inheritance regression trips this bound and
-#: fails fast rather than hanging CI to the per-call ceiling.
-_SESSION_TIMEOUT = 45.0
-
-
-@asynccontextmanager
-async def _server_errlog() -> AsyncGenerator[TextIO]:
-    """Yield a stderr for the server subprocess that has a real file descriptor.
-
-    ``stdio_client`` defaults ``errlog`` to ``sys.stderr`` and hands it to
-    ``subprocess``, which needs a descriptor to inherit. Under pytest's
-    sys-level capture - which is what xdist workers run - ``sys.stderr`` is a
-    Python object with no ``fileno()``, and the spawn dies with
-    ``io.UnsupportedOperation`` before the server ever starts. The failure
-    looks like a transport bug and is really the harness.
-
-    ``sys.__stderr__`` is the interpreter's own stderr and keeps its
-    descriptor whatever the capture mode, so the server's diagnostics still
-    reach the terminal and the CI log. It is ``None`` only where the
-    interpreter was started without one, and there the diagnostics have
-    nowhere to go anyway.
-
-    Async purely so it composes into the ``async with`` that opens the
-    transport; nothing here awaits.
-    """
-    if sys.__stderr__ is not None:
-        yield sys.__stderr__
-        return
-    with Path(os.devnull).open("w", encoding="utf-8") as sink:
-        yield sink
-
-
-def _unwrap(result: CallToolResult) -> Any:
-    """Return a ``call_tool`` result's structured payload, error-checked.
-
-    Asserts the call did not surface a protocol error, then returns the
-    structured content, unwrapping MCPServer's ``{"result": ...}`` envelope when
-    present (mirroring the in-memory suite's ``data_of`` helper).
-    """
-    error_texts = [c.text for c in result.content if isinstance(c, TextContent)]
-    assert not result.is_error, f"tool returned error: {error_texts}"
-    sc = result.structured_content
-    if isinstance(sc, dict):
-        # MCPServer's envelope is a JSON object; cast narrows away the
-        # Unknown key/value types isinstance leaves on an ``Any``-typed
-        # field.
-        obj = cast("dict[str, Any]", sc)
-        if list(obj.keys()) == ["result"]:
-            return obj["result"]
-        return obj
-    return sc
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 async def _drive_session(project: Path) -> None:
@@ -117,35 +42,24 @@ async def _drive_session(project: Path) -> None:
 
     Spawns ``python -m vaultspec_core.mcp_server.app`` as a child, rooted at a
     real installed vault, and exercises: the ``initialize`` handshake, the
-    ten-tool ``list_tools`` surface with output schemas, a structured ``status``
+    twelve-tool ``list_tools`` surface with output schemas, a structured ``status``
     call, the load-bearing ``invoke`` of a real long-tail verb, and denylist
     rejection - all over the actual JSON-RPC-on-stdio transport.
     """
-    params = StdioServerParameters(
-        command=sys.executable,
-        args=["-m", "vaultspec_core.mcp_server.app"],
-        cwd=str(project),
-        env={**os.environ, "VAULTSPEC_TARGET_DIR": str(project)},
-    )
-
-    async with (
-        _server_errlog() as errlog,
-        stdio_client(params, errlog=errlog) as (read, write),
-        ClientSession(read, write) as session,
-    ):
+    async with stdio_session(project) as session:
         init_result = await session.initialize()
         assert init_result.server_info.name == "vaultspec-core-mcp"
 
         listed = await session.list_tools()
         names = {tool.name for tool in listed.tools}
-        assert names == _EXPECTED_TOOLS, names
+        assert names == EXPECTED_TOOLS, names
         for tool in listed.tools:
             assert tool.output_schema is not None, (
                 f"{tool.name} advertises no outputSchema over the wire"
             )
 
         # status: read-only orientation returns structured content.
-        status_payload = _unwrap(await session.call_tool("status", {}))
+        status_payload = data_of(await session.call_tool("status", {}))
         assert isinstance(status_payload, dict)
         # Both tools declare an object output schema (asserted above), so
         # their structured payload is always a JSON object at runtime; cast
@@ -158,7 +72,7 @@ async def _drive_session(project: Path) -> None:
         # stdin=DEVNULL in the invoke subprocess the child inherits the live
         # transport pipe and blocks, so this call never returns and the 45s
         # session ceiling trips instead of ``ok`` coming back.
-        invoke_payload = _unwrap(
+        invoke_payload = data_of(
             await session.call_tool("invoke", {"verb": "vault list"})
         )
         assert isinstance(invoke_payload, dict)
@@ -178,25 +92,14 @@ async def _drive_session(project: Path) -> None:
 
 async def _drive_read_only_session(project: Path) -> None:
     """Launch the real read-only server and prove its wire-visible surface."""
-    params = StdioServerParameters(
-        command=sys.executable,
-        args=["-m", "vaultspec_core.mcp_server.app", "--read-only"],
-        cwd=str(project),
-        env={**os.environ, "VAULTSPEC_TARGET_DIR": str(project)},
-    )
-
-    async with (
-        _server_errlog() as errlog,
-        stdio_client(params, errlog=errlog) as (read, write),
-        ClientSession(read, write) as session,
-    ):
+    async with stdio_session(project, "--read-only") as session:
         await session.initialize()
         listed = await session.list_tools()
         by_name = {tool.name: tool for tool in listed.tools}
-        assert set(by_name) == _READ_ONLY_TOOLS, by_name
+        assert set(by_name) == READ_ONLY_TOOLS, by_name
         assert "fix" not in by_name["check"].input_schema.get("properties", {})
 
-        checked = _unwrap(await session.call_tool("check", {}))
+        checked = data_of(await session.call_tool("check", {}))
         assert isinstance(checked, dict)
         check_dict = cast("dict[str, Any]", checked)
         assert check_dict["fixed"] is False
@@ -219,34 +122,10 @@ def test_mcp_stdio_end_to_end_invoke_does_not_inherit_transport_stdin() -> None:
     the Proactor loop the stdio transport requires) so the test needs no async
     plugin marker and fails fast on the hard timeout.
     """
-    reset_config()
-    project = Path(tempfile.mkdtemp(prefix="vsc-mcp-e2e-")).resolve()
-    try:
-        WorkspaceFactory(project).install()
-
-        async def _runner() -> None:
-            await asyncio.wait_for(_drive_session(project), timeout=_SESSION_TIMEOUT)
-
-        asyncio.run(_runner())
-    finally:
-        reset_config()
-        shutil.rmtree(project, ignore_errors=True)
+    run_in_fresh_workspace(_drive_session, prefix="vsc-mcp-e2e-")
 
 
 @pytest.mark.integration
 def test_mcp_stdio_read_only_launch_omits_mutation_tools() -> None:
     """The real ``--read-only`` launch exposes only non-mutating tools."""
-    reset_config()
-    project = Path(tempfile.mkdtemp(prefix="vsc-mcp-read-only-")).resolve()
-    try:
-        WorkspaceFactory(project).install()
-
-        async def _runner() -> None:
-            await asyncio.wait_for(
-                _drive_read_only_session(project), timeout=_SESSION_TIMEOUT
-            )
-
-        asyncio.run(_runner())
-    finally:
-        reset_config()
-        shutil.rmtree(project, ignore_errors=True)
+    run_in_fresh_workspace(_drive_read_only_session, prefix="vsc-mcp-read-only-")

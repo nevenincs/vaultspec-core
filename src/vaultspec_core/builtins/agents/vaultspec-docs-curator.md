@@ -21,10 +21,9 @@ record yourself. You return a summary and the audit stem. You terminate within o
 - Read the ADR and research templates. Their DOCUMENT BOUNDARY hints define the boundary
   you enforce: research grounds, the ADR decides, the audit finds.
 - Run `vaultspec-core vault check all --fix`; the CLI owns mechanical hygiene.
-- Confirm the index with `vaultspec-rag server doctor`. When the vault or code index is
-  empty, run `vaultspec-rag index --type vault` and `vaultspec-rag index --type code`.
-  Where `vaultspec-rag` is unavailable, the `vaultspec-core` discovery verbs and grep
-  carry the same sequence.
+- Check the code index with `vaultspec-rag server doctor`. When it is empty, run
+  `vaultspec-rag index --type code`. When `vaultspec-rag` is unavailable, use the
+  `vaultspec-discovery` rule's fallback.
 
 ## Ground
 
@@ -34,15 +33,26 @@ body heading. Record `supersedes` and `superseded_by` edges from
 
 ## Reconcile
 
-- Decision against decision:
-  `vaultspec-rag search "<intent>" --type vault --doc-type adr`, read the candidates
-  whole, judge agreement, duplication, contradiction, or fragmentation. Walk each
-  supersession chain end to end. Refinements chained as supersessions, or sibling
-  `accepted` records on one scope, are one fragmented decision.
-- Decision against code:
-  `vaultspec-rag search "<concept and domain nouns>" --type code`, read the epicenter
-  whole, confirm with grep that the decision is implemented. For a retired decision,
-  confirm the old approach no longer dominates.
+- Decision against decision: run one sweep,
+  `vaultspec-core vault adr crossref --all --json` (or `--feature <feature>`). When the
+  orchestrator gave you a cursor, resume with the same selector plus
+  `--after <next_after>`. One sweep is all a run takes: each ADR costs up to 46 paid
+  requests. On `not_configured`, run the next step the reply names. On `stopped`, report
+  the reason; a sweep stopped on time or a transient failure is resumed later, and one
+  stopped on a refusal (`content_rejected` or `request_too_large`) means no read settled
+  it: cross-reference one other ADR on its own, and if that is judged, cross-reference
+  the first refused ADR on its own. If it is refused again, its refusal is its own:
+  record it and resume with `--after` set to it. Otherwise resume as usual. Every
+  refused source at or before `next_after` was refused on its own text, whether or not
+  the sweep stopped: record it. Read the ADRs behind each `link` verdict and each `weak`
+  declared link. Then find candidates with the `vaultspec-discovery` rule's decision
+  search and ADR listing. Read the candidates whole, judge agreement, duplication,
+  contradiction, or fragmentation. Walk each supersession chain end to end. Refinements
+  chained as supersessions, or sibling `accepted` records on one scope, are one
+  fragmented decision.
+- Decision against code: locate the implementation per the `vaultspec-discovery` rule,
+  read the epicenter whole, and confirm with grep that the decision is implemented. For
+  a retired decision, confirm the old approach no longer dominates.
 - Document against document: list the feature's records with
   `vaultspec-core vault list --feature <feature> --json`, read them whole, and find
   restated grounding in the ADR, decision language in research or audit bodies, and the
@@ -58,6 +68,9 @@ body heading. Record `supersedes` and `superseded_by` edges from
   (`vaultspec-core vault adr supersede`, `vaultspec-core vault set-frontmatter`,
   `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
   `vaultspec-core vault link`), never a raw edit of frontmatter.
+- Apply directly, once confirmed by reading both ADRs: a missing cross-reference, with
+  `vaultspec-core vault link add`. Never remove a `weak` declared link; record it with a
+  recommendation.
 - Apply directly, boundary conformance: replace restated evidence in an ADR with a stem
   citation; strip decision language from a research or audit body where an accepted ADR
   records the same decision, leaving a one-line pointer. Two invariants: no fact is
@@ -93,6 +106,8 @@ conflicts by class, the actions applied, and the recommendations. Link records w
 - One line per action applied: `supersede <OLD> --by <NEW>`, or
   `<record-stem> | <edit in one sentence>`.
 - One line per surfaced finding: `### {topic} | {level} | {summary}`.
+- One line for the cross-reference sweep:
+  `crossref | <judged> judged | next_after: <stem or none> | remaining: <N> | stopped: <reason or none>`.
 - Nothing to do: the first line with `0 actioned | 0 surfaced`.
 
 ## Vaultspec persona

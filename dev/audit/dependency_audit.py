@@ -40,9 +40,10 @@ Output
 ------
 A human summary on stdout always. ``--json`` writes the machine-readable report
 to stdout instead; when ``VAULTSPEC_CI_REPORTS`` names a directory the same
-report is additionally written to ``<dir>/dependency-audit.json``. With the
-variable unset nothing is written anywhere, which preserves cadrumo's
-deliberate zero-artifact posture.
+report is additionally written to ``<dir>/dependency-audit.json``. The
+harness reads that variable and passes it as ``--reports-dir``, so this file
+never reads the environment itself. With the variable unset nothing is written
+anywhere, which preserves cadrumo's deliberate zero-artifact posture.
 
 Self-test
 ---------
@@ -58,7 +59,6 @@ import argparse
 import datetime as _dt
 import http.client
 import json
-import os
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -656,25 +656,20 @@ def render(report: Report) -> str:
     return "\n".join(lines)
 
 
-def write_artifact(report: Report, destination: str | None = None) -> Path | None:
+def write_artifact(report: Report, destination: str = "") -> Path | None:
     """Write the JSON report when a destination directory is named.
 
     Args:
         report: The audit result to serialise.
-        destination: Where to write. ``None`` -- the default, and what
-            :func:`main` passes -- reads ``VAULTSPEC_CI_REPORTS``. An empty
-            string means "nowhere", which is exactly what an unset variable
-            amounts to. The parameter exists so a caller (a test included) can
-            state the destination as a real value rather than reaching into
-            the process environment behind the function's back.
+        destination: Where to write, as ``--reports-dir`` names it. An empty
+            string -- the default -- means "nowhere", which is exactly what an
+            unset ``VAULTSPEC_CI_REPORTS`` amounts to.
 
     Returns:
         The path written, or ``None`` when no destination was named. With
         ``VAULTSPEC_CI_REPORTS`` unset nothing is written anywhere: cadrumo
         adopts the whole standard and simply never sets it.
     """
-    if destination is None:
-        destination = os.environ.get("VAULTSPEC_CI_REPORTS", "")
     if not destination:
         return None
     directory = Path(destination)
@@ -716,6 +711,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ECOSYSTEM:NAME:VERSION",
         help="inject one coordinate; used to prove the gate can fail",
     )
+    parser.add_argument(
+        "--reports-dir",
+        default="",
+        metavar="DIR",
+        help="also write the JSON report into DIR (the harness passes "
+        "VAULTSPEC_CI_REPORTS here); empty writes nothing",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -738,7 +740,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: dependency audit could not complete: {error}", file=sys.stderr)
         return EXIT_BROKEN
 
-    artifact = write_artifact(report)
+    artifact = write_artifact(report, args.reports_dir)
     if args.json:
         print(json.dumps(report.as_dict(), indent=2))
     else:

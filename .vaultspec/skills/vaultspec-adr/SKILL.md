@@ -11,8 +11,14 @@ the work, including across features; return its stem without drafting a duplicat
 
 ## Steps
 
-- Discover governing decisions across features and read them whole, then their evidence.
-  Classify the need as unchanged reuse, amendment, supersession, or a distinct decision.
+- Check coverage per the `vaultspec-discovery` rule: search for the decision, then list
+  the ADRs across features. No covering record in the listing, together with a "nothing
+  in the vault answers this" (`nothing_answers`) verdict, shows the decision is new.
+  When search gives no such verdict (it declined or failed, or replied "no record that
+  was read answers this", `none_read_answers`), the ADR listing plus a targeted grep of
+  `.vault/adr/` decide coverage. That is the rule's `.vault/` grep, narrowed to
+  decisions. Read covering decisions whole, then their evidence. Classify the need as
+  unchanged reuse, amendment, supersession, or a distinct decision.
 - Confirm sufficient Research, Reference, or Audit evidence. Gather missing evidence
   through `vaultspec-research` for option research or `vaultspec-code-research` for code
   patterns. Do not copy an adequate Audit into a new Research merely for its type.

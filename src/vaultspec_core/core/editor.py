@@ -49,7 +49,8 @@ Non-interactive callers
 
 Launching an editor presupposes a terminal in front of a human. When the MCP
 gateway spawns the CLI it marks the child process through
-:data:`GATEWAY_ENV_MARKER`, and :func:`spawn_editor` refuses outright: no
+:data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`, and
+:func:`spawn_editor` refuses outright: no
 editor value from any source is honoured for such a call. The marker travels
 in the child's environment, which is composed by the gateway itself, so a
 caller supplying tool arguments has no channel through which to clear it.
@@ -71,7 +72,6 @@ if TYPE_CHECKING:
 
 __all__ = [
     "EDITOR_PROGRAM_ALLOWLIST",
-    "GATEWAY_ENV_MARKER",
     "EditorTrust",
     "EditorValidationError",
     "assert_interactive_editing_allowed",
@@ -84,13 +84,6 @@ __all__ = [
 #: docstring: ``"untrusted"`` values are additionally screened against
 #: :data:`EDITOR_PROGRAM_ALLOWLIST`.
 EditorTrust = Literal["trusted", "untrusted"]
-
-#: Environment variable the MCP gateway sets on every CLI subprocess it spawns,
-#: so the child can tell a tool-call invocation from a terminal one. Presence
-#: with any non-empty value means "not a terminal"; the value itself carries no
-#: meaning. The gateway composes the child environment, so a caller passing
-#: tool arguments cannot set, clear, or forge this.
-GATEWAY_ENV_MARKER = "VAULTSPEC_MCP_GATEWAY_INVOCATION"
 
 #: Characters no legitimate editor command contains and that a command
 #: processor would give meaning to. The editor is always spawned as an argv
@@ -373,7 +366,11 @@ def assert_interactive_editing_allowed() -> None:
     """Refuse to open an editor for a non-interactive, tool-originated call.
 
     The MCP gateway marks every CLI subprocess it spawns (see
-    :data:`GATEWAY_ENV_MARKER`). Such a call has no terminal, so an interactive
+    :data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`). Presence
+    with any non-empty value means "not a terminal"; the value itself carries
+    no meaning. The gateway composes the child environment, so a caller passing
+    tool arguments cannot set, clear, or forge it. Such a call has no terminal,
+    so an interactive
     edit could never complete anyway; refusing here means that even if some
     future path let an editor value through the gateway's own flag screening,
     the value would still never reach :func:`subprocess.run`.
@@ -382,7 +379,9 @@ def assert_interactive_editing_allowed() -> None:
         EditorValidationError: When the gateway marker is present in the
             environment.
     """
-    if os.environ.get(GATEWAY_ENV_MARKER):
+    from ..config import VAULTSPEC_MCP_GATEWAY_INVOCATION, env_value
+
+    if env_value(VAULTSPEC_MCP_GATEWAY_INVOCATION):
         msg = (
             "Interactive editing is not available for this invocation. The "
             "command was started by the MCP gateway, which has no terminal "

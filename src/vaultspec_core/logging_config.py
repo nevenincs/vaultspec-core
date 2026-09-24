@@ -12,7 +12,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -83,7 +82,10 @@ def configure_logging(
             resolved_level = level
     else:
         # Fallback to environment or default
-        env_level = os.environ.get("VAULTSPEC_LOG_LEVEL", "INFO").upper()
+        from .config import VAULTSPEC_LOG_LEVEL, env_value
+
+        raw = env_value(VAULTSPEC_LOG_LEVEL)
+        env_level = (VAULTSPEC_LOG_LEVEL.default if raw is None else raw).upper()
         resolved_level = getattr(logging, env_level, logging.INFO)
 
     # 2. Configure root logger

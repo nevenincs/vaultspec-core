@@ -25,8 +25,10 @@ A typo fix can proceed directly. A multi-session cleanup within settled design c
 can need a plan but no new ADR. Changing a persisted data format needs a decision even
 if the implementation is short. File count alone does not determine the route.
 
-Search for existing decisions across features, not only under the current tag. Reuse
-applicable evidence and accepted ADRs instead of creating equivalent records.
+Search for existing decisions across features, not only under the current tag, and list
+the ADRs as well: a search can miss a lower-ranked record. Reuse applicable evidence and
+accepted ADRs instead of creating equivalent records. See
+[Find a feature's documents](#find-a-features-documents) for the search routes.
 
 <p id="how-a-feature-flows-into-the-vault"></p>
 
@@ -92,12 +94,30 @@ vaultspec-core vault list --feature search-api
 See the [list reference](CLI.md#vaultspec-core-vault-list) for type filters and
 pagination.
 
-For semantic search, [install RAG](https://github.com/nevenincs/vaultspec-rag#install)
-and [index your project](https://github.com/nevenincs/vaultspec-rag#use-it) first. RAG
-is a separate package; Core doesn't install it.
+To ask the vault a question, use `vaultspec-core vault search` (MCP: `search`). It
+returns the passage that answers, with its line range, and says when nothing in the
+vault answers. It needs a TypeSafe key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` and sends
+vault text to the TypeSafe API:
 
 ```bash
-vaultspec-rag search "full-text ranking and tokenizer" --type vault
+vaultspec-core vault search "why do pages use opaque cursors" --feature search-api
+```
+
+When no key is set, or the hosted service fails, the reply returns no partial results
+and names the next step instead: a vaultspec-rag vault search over the requested record
+types when the workspace provisions RAG, otherwise `vaultspec-core vault list` (MCP:
+`find`) and grep over `.vault/`. Listing, the feature
+[graph](CLI.md#vaultspec-core-vault-graph), and grep always work. See the
+[`vaultspec-core vault search` reference](CLI.md#vaultspec-core-vault-search) and the
+[`search` tool](MCP.md#search) for the reply fields.
+
+To search code by meaning,
+[install RAG](https://github.com/nevenincs/vaultspec-rag#install) and
+[index your project](https://github.com/nevenincs/vaultspec-rag#use-it) first. RAG is a
+separate package; Core doesn't install it. Hosted vault search doesn't search code.
+
+```bash
+vaultspec-rag search "full-text ranking and tokenizer" --type code
 ```
 
 ## Find and amend an ADR

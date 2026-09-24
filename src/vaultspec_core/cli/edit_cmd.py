@@ -474,6 +474,7 @@ def _execute_rename(
     """
 
     from vaultspec_core.config import get_config
+    from vaultspec_core.core.helpers import advisory_lock
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.vaultcore.blob_hash import git_blob_oid
     from vaultspec_core.vaultcore.checks._base import CheckResult
@@ -495,9 +496,18 @@ def _execute_rename(
     try:
         old_path = resolve_document_path(ref, root_dir)
         old_stem = old_path.stem
+        old_lock = document_lock_target(old_path, root_dir)
+        # As in `execute_edit`, only a real rename materialises the lock
+        # directory; a preview locks only when it already exists.
+        if not dry_run:
+            old_lock.parent.mkdir(parents=True, exist_ok=True)
 
-        # Cursory pre-checks, before any mutation.
-        enforce_blob_hash(old_path, expected_blob_hash)
+        # Cursory pre-checks, before any mutation. The document is read under
+        # its own lock because an edit replaces it while holding that lock,
+        # and on Windows an open that races the replace is refused outright.
+        with advisory_lock(old_lock):
+            enforce_blob_hash(old_path, expected_blob_hash)
+            old_blob = git_blob_oid(old_path.read_bytes())
         _validate_target_stem(new_stem)
 
         if new_stem == old_stem:
@@ -525,8 +535,6 @@ def _execute_rename(
                     "collision": True,
                 },
             )
-
-        old_blob = git_blob_oid(old_path.read_bytes())
 
         if dry_run:
             # The graph-derived incoming-ref list is a preview-only count here;
@@ -627,8 +635,11 @@ def _execute_rename(
             # lock: the cursory pre-check above ran before either was
             # acquired, so a concurrent writer could have changed the
             # document in that window without either caller noticing. This
-            # is the authoritative check.
+            # is the authoritative check. The reported hash is taken here too,
+            # so it names the bytes this rename moves even when an edit landed
+            # between the pre-check and the lock acquisition.
             enforce_blob_hash(old_path, expected_blob_hash)
+            old_blob = git_blob_oid(old_path.read_bytes())
             tx.snapshot(iter_snapshot_docs(docs_dir))
             if not tx.rename(old_path, new_path):
                 raise _EditError(

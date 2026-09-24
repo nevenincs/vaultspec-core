@@ -26,8 +26,12 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .markdown import HTML_COMMENT_RE, INLINE_CODE_RE, find_section
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from .markdown import Section
 
 __all__ = [
     "BY_LABEL",
@@ -38,6 +42,7 @@ __all__ = [
     "StepEvidence",
     "append_notes",
     "append_rows",
+    "backtick_cells",
     "format_note",
     "format_row",
     "is_ledger_stem",
@@ -77,27 +82,28 @@ _ROW_RE = re.compile(r"^[ \t]*[-*][ \t]+(?P<cells>.+?)[ \t]*$")
 #: A backtick-quoted cell.
 _CELL_RE = re.compile(r"`([^`]*)`")
 
-#: The ``## Changes`` section, up to the next level-two heading.
-_CHANGES_RE = re.compile(
-    r"^##[ \t]+Changes[ \t]*$(?P<body>.*?)(?=^##[ \t]+|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
+#: The section every mechanical row lives in.
+_CHANGES = "Changes"
 
-#: The ``## Notes`` section, up to the next level-two heading.
-_NOTES_RE = re.compile(
-    r"^##[ \t]+Notes[ \t]*$(?P<body>.*?)(?=^##[ \t]+|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
+#: The section exception notes live in.
+_NOTES = "Notes"
 
 #: A note line: ``- `S01` free text``.
 _NOTE_RE = re.compile(
     r"^[ \t]*[-*][ \t]+`(?P<step>S\d{1,4})`[ \t]*(?P<text>.*?)[ \t]*$"
 )
 
-#: An HTML comment: template guidance for a reader, never a row. Stripped
-#: before any section is parsed so an example inside a hint block cannot
-#: register a Step as covered.
-_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+#: Characters mdformat rewrites in plain inline text: it escapes each where
+#: it could open emphasis, a link, raw HTML, a code span, a character
+#: reference or a strikethrough, and the backslash that is an escape itself.
+_MARKDOWN_SIGNIFICANT = frozenset("\\*_[]<&~`")
+
+#: One word of a note: a run of non-space characters and code spans, a span
+#: kept whole even when it holds a space.
+_NOTE_WORD_RE = re.compile(rf"(?:{INLINE_CODE_RE.pattern}|\S)+", re.DOTALL)
+
+#: A run of backticks inside a code span's content.
+_BACKTICK_RUN_RE = re.compile(r"`+")
 
 
 @dataclass(frozen=True)
@@ -143,10 +149,20 @@ def is_ledger_stem(stem: str) -> bool:
     return stem.endswith(LEDGER_SUFFIX)
 
 
-def _changes_body(body: str) -> str | None:
-    """Return the ``## Changes`` section text, comments stripped, or ``None``."""
-    match = _CHANGES_RE.search(body)
-    return _COMMENT_RE.sub("", match.group("body")) if match else None
+def backtick_cells(text: str) -> list[str]:
+    """Return the contents of every backtick-quoted cell in *text*, in order."""
+    return _CELL_RE.findall(text)
+
+
+def _section_rows(body: str, title: str) -> str | None:
+    """Return a section's text with comments stripped, or ``None`` when absent.
+
+    Comments are template guidance for a reader, never rows: stripping them
+    before parsing keeps an example inside a hint block from registering a
+    Step as covered.
+    """
+    section = find_section(body, title)
+    return HTML_COMMENT_RE.sub("", section.body) if section is not None else None
 
 
 def parse_ledger_rows(body: str) -> tuple[LedgerRow, ...]:
@@ -164,7 +180,7 @@ def parse_ledger_rows(body: str) -> tuple[LedgerRow, ...]:
     Returns:
         The parsed rows in document order.
     """
-    section = _changes_body(body)
+    section = _section_rows(body, _CHANGES)
     if section is None:
         return ()
 
@@ -173,7 +189,7 @@ def parse_ledger_rows(body: str) -> tuple[LedgerRow, ...]:
         row_match = _ROW_RE.match(line)
         if row_match is None:
             continue
-        cells = _CELL_RE.findall(row_match.group("cells"))
+        cells = backtick_cells(row_match.group("cells"))
         if not cells:
             continue
 
@@ -278,8 +294,60 @@ def format_row(step_id: str, op: str, *paths: str) -> str:
 
 
 def format_note(step_id: str, text: str) -> str:
-    """Render one ``## Notes`` line for *step_id*."""
-    return f"- `{step_id}` {' '.join(text.split())}"
+    """Render one ``## Notes`` line for *step_id*.
+
+    Whitespace collapses to single spaces, and the line reads back as the
+    text was written without any hand escaping. A word holding a character
+    markdown would take as syntax - the ``_`` of a private module's path, a
+    ``*``, a ``<`` - is set as inline code, as the ledger sets every path in
+    its rows; code spans the text already has are kept. Every span is
+    written in mdformat's own form, so the line passes the markdown check
+    and rendering an already rendered note changes nothing.
+
+    Args:
+        step_id: The Step the note belongs to.
+        text: The note, as plain text with optional code spans.
+
+    Returns:
+        The note line, without a trailing newline.
+    """
+    words = _NOTE_WORD_RE.finditer(" ".join(text.split()))
+    return f"- `{step_id}` {' '.join(_inert_word(m.group()) for m in words)}"
+
+
+def _inert_word(word: str) -> str:
+    """Render one note word so markdown reads it back as written."""
+    if _MARKDOWN_SIGNIFICANT.isdisjoint(INLINE_CODE_RE.sub("", word)):
+        return INLINE_CODE_RE.sub(lambda span: _code_span(_span_content(span)), word)
+    return _code_span(INLINE_CODE_RE.sub(_span_content, word))
+
+
+def _span_content(span: re.Match[str]) -> str:
+    """Return a matched code span's content as CommonMark reads it.
+
+    One space is stripped from each end when both ends have one and the
+    content is not all spaces: that pair only pads the span.
+    """
+    content = span.group(2)
+    if content.startswith(" ") and content.endswith(" ") and content.strip():
+        return content[1:-1]
+    return content
+
+
+def _code_span(content: str) -> str:
+    """Write *content* as a code span in the form mdformat writes one.
+
+    The fence is one backtick longer than the longest run inside, padded by
+    a space on each side when there is a run, so the content's own backticks
+    neither close the span nor merge with its fence.
+    """
+    longest = max(map(len, _BACKTICK_RUN_RE.findall(content)), default=0)
+    if longest:
+        fence = "`" * (longest + 1)
+        return f"{fence} {content} {fence}"
+    if content.startswith(" ") and content.endswith(" ") and content.strip():
+        return f"` {content} `"
+    return f"`{content}`"
 
 
 def note_lines(body: str) -> tuple[tuple[str | None, str], ...]:
@@ -289,11 +357,11 @@ def note_lines(body: str) -> tuple[tuple[str | None, str], ...]:
     yields ``None`` with its text, so a per-Step record's free prose can be
     re-keyed by the fold.
     """
-    match = _NOTES_RE.search(body)
-    if match is None:
+    section = _section_rows(body, _NOTES)
+    if section is None:
         return ()
     notes: list[tuple[str | None, str]] = []
-    for line in _COMMENT_RE.sub("", match.group("body")).splitlines():
+    for line in section.splitlines():
         if not line.strip():
             continue
         keyed = _NOTE_RE.match(line)
@@ -326,11 +394,11 @@ def append_rows(body: str, rows: Sequence[str]) -> str:
         ValueError: If *body* declares no ``## Changes`` section, which means
             the document is not a ledger and appending would invent one.
     """
-    match = _CHANGES_RE.search(body)
-    if match is None:
+    section = find_section(body, _CHANGES)
+    if section is None:
         message = "document has no '## Changes' section to append to"
         raise ValueError(message)
-    return _append_to_section(body, match, rows)
+    return _append_to_section(body, section, rows)
 
 
 def append_notes(body: str, lines: Sequence[str]) -> str:
@@ -349,25 +417,33 @@ def append_notes(body: str, lines: Sequence[str]) -> str:
     """
     if not lines:
         return body
-    match = _NOTES_RE.search(body)
-    if match is None:
+    section = find_section(body, _NOTES)
+    if section is None:
         trimmed = body.rstrip("\n")
-        return f"{trimmed}\n\n## Notes\n\n{chr(10).join(lines)}\n"
-    return _append_to_section(body, match, lines)
+        return f"{trimmed}\n\n## {_NOTES}\n\n{chr(10).join(lines)}\n"
+    return _append_to_section(body, section, lines)
 
 
-def _append_to_section(body: str, match: re.Match[str], rows: Sequence[str]) -> str:
-    """Append the not-yet-present *rows* to the matched section body."""
-    section = match.group("body")
-    existing = {line.strip() for line in section.splitlines() if line.strip()}
+def _append_to_section(body: str, section: Section, rows: Sequence[str]) -> str:
+    """Append the not-yet-present *rows* to *section* of *body*."""
+    existing = {line.strip() for line in section.body.splitlines() if line.strip()}
     fresh = [row for row in rows if row.strip() not in existing]
     if not fresh:
         return body
 
-    # Rebuild the section with exactly one blank line before the appended
-    # rows and one after, so repeated appends cannot accumulate whitespace.
-    kept = section.rstrip("\n")
-    if not kept.endswith("\n") and kept:
-        kept += "\n"
-    updated = f"{kept}{chr(10).join(fresh)}\n\n"
-    return body[: match.start("body")] + updated + body[match.end("body") :]
+    # Rebuild the section in the layout the markdown hygiene check accepts,
+    # so an append never leaves the ledger needing a fix: one blank line
+    # under the heading, one before the rows when they start a list rather
+    # than extend one, and one before the next section, or a single newline
+    # when the section ends the document. Repeated appends therefore cannot
+    # accumulate whitespace either.
+    head = body[: section.start]
+    if not head.endswith("\n"):
+        head += "\n"
+    kept = section.body.strip("\n")
+    if kept:
+        extends_list = _ROW_RE.match(kept.rsplit("\n", 1)[-1]) is not None
+        kept += "\n" if extends_list else "\n\n"
+    tail = body[section.end :]
+    ending = "\n\n" if tail else "\n"
+    return f"{head}\n{kept}{chr(10).join(fresh)}{ending}{tail}"

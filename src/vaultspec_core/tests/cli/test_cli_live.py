@@ -30,6 +30,13 @@ if TYPE_CHECKING:
 
 pytestmark = [pytest.mark.integration]
 
+#: Wall-clock bound on one ``python -m vaultspec_core`` child. It catches a
+#: hung child, not a slow one: a correct run takes about a second, and a
+#: loaded machine stretches the interpreter start by tens of seconds. Kept
+#: under the per-test ``timeout`` in ``pyproject.toml`` with room for the
+#: several children one test spawns.
+_CHILD_HANG_GUARD_SECONDS = 120
+
 
 @pytest.fixture(scope="module")
 def cli() -> CliRunner:
@@ -371,7 +378,7 @@ class TestSync:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=30,
+            timeout=_CHILD_HANG_GUARD_SECONDS,
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert synced.exists(), "sync did not regenerate file at --target"
@@ -447,7 +454,7 @@ class TestSync:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=30,
+                timeout=_CHILD_HANG_GUARD_SECONDS,
             )
 
         # Approve BOTH workspaces' hooks. Approving only the target's would
@@ -543,7 +550,7 @@ class TestSync:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=30,
+            timeout=_CHILD_HANG_GUARD_SECONDS,
         )
         assert result.returncode == 0, result.stdout + result.stderr
 
@@ -1239,7 +1246,7 @@ class TestTargetPropagation:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=30,
+            timeout=_CHILD_HANG_GUARD_SECONDS,
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert synced.exists(), "sync did not write to --target"

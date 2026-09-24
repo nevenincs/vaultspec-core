@@ -17,19 +17,20 @@ configuration.
 
 ## Entry points
 
-| Command | Purpose | | ------------------------------------------------ |
---------------------------------------------------- | | `vaultspec-core` | Workspace
-management, vault operations, sync. | | `vaultspec-core-mcp` | Console script launching
-the stdio MCP server. | | `uv run --no-sync python -m vaultspec_core.mcp_server.app` |
-Module invocation of the MCP server (Windows-safe, never syncs). |
+| Command                                                    | Purpose                                                          |
+| ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| `vaultspec-core`                                           | Workspace management, vault operations, sync.                    |
+| `vaultspec-core-mcp`                                       | Console script launching the stdio MCP server.                   |
+| `uv run --no-sync python -m vaultspec_core.mcp_server.app` | Module invocation of the MCP server (Windows-safe, never syncs). |
 
 ## Global options
 
-| Option | Short | Default | Description | | -------------- | ----- | ------- |
--------------------------------------------------- | | `--target DIR` | `-t` | cwd |
-Target workspace directory. Overrides the env var. | | `--debug` | `-d` | off | Enable
-DEBUG-level logging (top-level only). | | `--version` | `-V` | - | Print version and
-exit (top-level only). | | `--help` | - | - | Show help for any command or group. |
+| Option         | Short | Default | Description                                        |
+| -------------- | ----- | ------- | -------------------------------------------------- |
+| `--target DIR` | `-t`  | cwd     | Target workspace directory. Overrides the env var. |
+| `--debug`      | `-d`  | off     | Enable DEBUG-level logging (top-level only).       |
+| `--version`    | `-V`  | -       | Print version and exit (top-level only).           |
+| `--help`       | -     | -       | Show help for any command or group.                |
 
 `--target` is accepted by workspace commands and by every `vaultspec-core vault`,
 `vaultspec-core spec`, and `vaultspec-core migrations` subcommand. `--json` is
@@ -45,8 +46,17 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.4`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.2.4`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core vault search`
+
+MCP tools:
+
+- `search`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -77,6 +87,8 @@ hand-edit between the markers.
   round-trip).
 - `vaultspec-core vault rename` - Rename a document's file and re-point incoming related
   references.
+- `vaultspec-core vault search` - Ask the vault a question and read the passages that
+  answer it.
 - `vaultspec-core vault add` - Create a new .vault/ document from a template.
 - `vaultspec-core vault stats` - Show vault statistics and metrics.
 - `vaultspec-core vault list` - List vault documents, optionally filtered by type.
@@ -381,14 +393,14 @@ Deploy the framework into the target directory.
 `PROVIDER` (default `all`): `all`, `core`, `claude`, `gemini`, `antigravity`, `codex`.
 `core` installs `.vaultspec/` only.
 
-| Option | Default | Description | | ----------- | ------- |
----------------------------------------- | | `--upgrade` | off | Re-sync builtins
-without re-scaffolding. | | `--dry-run` | off | Preview without writing. | | `--force` |
-off | Overwrite an existing installation. | | `--skip` | `[]` | Skip a component
-(repeatable). | | `--mode` | auto | Provisioning mode: `tool` (uvx), `dependency`
-(project venv, ships in built distributions), or `dev` (default dev group, renders like
-dependency but does not ship); auto-detected from pyproject.toml. | | `--json` | off |
-Emit machine-readable output. |
+| Option      | Default | Description                                                                                                                                                                                             |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--upgrade` | off     | Re-sync builtins without re-scaffolding.                                                                                                                                                                |
+| `--dry-run` | off     | Preview without writing.                                                                                                                                                                                |
+| `--force`   | off     | Overwrite an existing installation.                                                                                                                                                                     |
+| `--skip`    | `[]`    | Skip a component (repeatable).                                                                                                                                                                          |
+| `--mode`    | auto    | Provisioning mode: `tool` (uvx), `dependency` (project venv, ships in built distributions), or `dev` (default dev group, renders like dependency but does not ship); auto-detected from pyproject.toml. |
+| `--json`    | off     | Emit machine-readable output.                                                                                                                                                                           |
 
 ### vaultspec-core uninstall
 
@@ -396,11 +408,13 @@ Remove the framework from the target directory.
 
 `PROVIDER` (default `all`): `all`, `core`, `claude`, `gemini`, `antigravity`, `codex`.
 
-| Option | Default | Description | | ---------------- | ------- |
----------------------------------- | | `--remove-vault` | off | Also remove `.vault/`. |
-| `--dry-run` | off | Preview without deleting. | | `--force` | off | Required to
-execute (destructive). | | `--skip` | `[]` | Skip a component (repeatable). | | `--json`
-| off | Emit machine-readable output. |
+| Option           | Default | Description                        |
+| ---------------- | ------- | ---------------------------------- |
+| `--remove-vault` | off     | Also remove `.vault/`.             |
+| `--dry-run`      | off     | Preview without deleting.          |
+| `--force`        | off     | Required to execute (destructive). |
+| `--skip`         | `[]`    | Skip a component (repeatable).     |
+| `--json`         | off     | Emit machine-readable output.      |
 
 ### vaultspec-core sync
 
@@ -409,11 +423,12 @@ Authoritative complete sync from `.vaultspec/` to enrolled provider outputs.
 `PROVIDER` (default `all`): `all`, `claude`, `gemini`, `antigravity`, `codex`. `core` is
 not a valid sync target.
 
-| Option | Default | Description | | ----------- | ------- |
---------------------------------------------------- | | `--dry-run` | off | Preview
-changes without writing. | | `--force` | off | Prune stale files; overwrite
-user-authored content. | | `--skip` | `[]` | Skip a component (repeatable). | | `--json`
-| off | Emit machine-readable output. |
+| Option      | Default | Description                                         |
+| ----------- | ------- | --------------------------------------------------- |
+| `--dry-run` | off     | Preview changes without writing.                    |
+| `--force`   | off     | Prune stale files; overwrite user-authored content. |
+| `--skip`    | `[]`    | Skip a component (repeatable).                      |
+| `--json`    | off     | Emit machine-readable output.                       |
 
 ### vaultspec-core doctor
 
@@ -440,18 +455,19 @@ Create a `.vault/` document from a template.
 `DOC_TYPE`: `adr`, `audit`, `plan`, `reference`, `research`. `exec` is refused:
 execution is logged with `vaultspec-core vault exec log`.
 
-| Option | Short | Default | Description | | --------------- | ----- | ------- |
--------------------------------------------------------------------- | | `--feature TAG`
-| `-f` | None | Feature tag (kebab-case). | | `--date DATE` | - | today | Override date
-(ISO 8601). | | `--title TITLE` | - | None | Document title. | | `--topic TOPIC` | - |
-None | Narrative filename infix (kebab-case) producing
-`{date}-{feature}-{topic}-{type}.md`; adr, audit, reference, and research only. | |
-`--related DOC` | `-r` | None | Related document(s). Repeatable. | | `--tags TAG` | - |
-None | Additional freeform tags. Repeatable. | | `--force` | - | off | Overwrite an
-existing document. | | `--dry-run` | - | off | Preview without writing. | | `--json` | -
-| off | Emit machine-readable output. | | `--no-hints` | - | off | Suppress next-step
-advisory hints. | | `--tier TIER` | - | `L1` | Plan tier (`L1`..`L4`). Ignored for
-non-plan document types. |
+| Option          | Short | Default | Description                                                                                                                     |
+| --------------- | ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `--feature TAG` | `-f`  | None    | Feature tag (kebab-case).                                                                                                       |
+| `--date DATE`   | -     | today   | Override date (ISO 8601).                                                                                                       |
+| `--title TITLE` | -     | None    | Document title.                                                                                                                 |
+| `--topic TOPIC` | -     | None    | Narrative filename infix (kebab-case) producing `{date}-{feature}-{topic}-{type}.md`; adr, audit, reference, and research only. |
+| `--related DOC` | `-r`  | None    | Related document(s). Repeatable.                                                                                                |
+| `--tags TAG`    | -     | None    | Additional freeform tags. Repeatable.                                                                                           |
+| `--force`       | -     | off     | Overwrite an existing document.                                                                                                 |
+| `--dry-run`     | -     | off     | Preview without writing.                                                                                                        |
+| `--json`        | -     | off     | Emit machine-readable output.                                                                                                   |
+| `--no-hints`    | -     | off     | Suppress next-step advisory hints.                                                                                              |
+| `--tier TIER`   | -     | `L1`    | Plan tier (`L1`..`L4`). Ignored for non-plan document types.                                                                    |
 
 ### vaultspec-core vault exec log
 
@@ -460,17 +476,17 @@ ledger on first use. Append-only and idempotent; concurrent appends serialise on
 docs-domain lock and the managed `.gitattributes` block declares `merge=union` on
 ledgers.
 
-| Option           | Default | Description                                                                         |
-| ---------------- | ------- | ----------------------------------------------------------------------------------- |
-| `--feature TAG`  | None    | Feature tag, with or without `#`. Required.                                         |
-| `--related STEM` | None    | Parent plan stem. Required.                                                         |
-| `--step ID`      | None    | Canonical Step id or display path. Required.                                        |
-| `--row SPEC`     | None    | `A:path`, `M:path`, `D:path`, or `R:old->new`; repeatable.                          |
-| `--verify SPEC`  | None    | A check that ran, `<command>=pass` or `<command>=fail`; written as a `verify:` row. |
-| `--by PERSONA`   | None    | The persona that closed the Step; written as a `by:` row.                           |
-| `--note TEXT`    | None    | Exception note under the Step id in `## Notes`; repeatable.                         |
-| `--dry-run`      | off     | Resolve the ledger without writing.                                                 |
-| `--json`         | off     | Emit machine-readable output.                                                       |
+| Option           | Default | Description                                                                                                   |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `--feature TAG`  | None    | Feature tag, with or without `#`. Required.                                                                   |
+| `--related STEM` | None    | Parent plan stem. Required.                                                                                   |
+| `--step ID`      | None    | Canonical Step id or display path. Required.                                                                  |
+| `--row SPEC`     | None    | `A:path`, `M:path`, `D:path`, or `R:old->new`; repeatable.                                                    |
+| `--verify SPEC`  | None    | A check that ran, `<command>=pass` or `<command>=fail`, repeatable; each is written as its own `verify:` row. |
+| `--by PERSONA`   | None    | The persona that closed the Step; written as a `by:` row.                                                     |
+| `--note TEXT`    | None    | Exception note under the Step id in `## Notes`; repeatable.                                                   |
+| `--dry-run`      | off     | Resolve the ledger without writing.                                                                           |
+| `--json`         | off     | Emit machine-readable output.                                                                                 |
 
 ### vaultspec-core vault edit
 
@@ -530,13 +546,14 @@ list. A feature handle traces every plan under the feature. Advisory hints point
 judging conformance. Use `vaultspec-core vault check` to audit and
 `vaultspec-core spec doctor` for framework health.
 
-| Option | Short | Default | Description | | ---------------- | ----- | ------- |
-------------------------------------------------- | | `--limit N` | - | `10` | Recently
-modified documents to show, per type. | | `--since N` | - | None | Show documents
-modified within the last N days. | | `--paths` | - | off | Show each referenced
-document's path (targeted). | | `--verbose-exec` | - | off | List ledgers instead of
-collapsing them per feature.| | `--json` | - | off | Emit machine-readable output. | |
-`--no-hints` | - | off | Suppress next-step advisory hints. |
+| Option           | Short | Default | Description                                          |
+| ---------------- | ----- | ------- | ---------------------------------------------------- |
+| `--limit N`      | -     | `10`    | Recently modified documents to show, per type.       |
+| `--since N`      | -     | None    | Show documents modified within the last N days.      |
+| `--paths`        | -     | off     | Show each referenced document's path (targeted).     |
+| `--verbose-exec` | -     | off     | List ledgers instead of collapsing them per feature. |
+| `--json`         | -     | off     | Emit machine-readable output.                        |
+| `--no-hints`     | -     | off     | Suppress next-step advisory hints.                   |
 
 `--limit` and `--since` apply only in rollup mode; in targeted mode they are accepted
 but have no effect. `--limit` and `--since` are mutually exclusive in rollup mode:
@@ -548,44 +565,83 @@ operation). The `data` payload carries `plans_in_flight`, `recent_documents`,
 `active_features`, and `hints` under stable keys. Schema bumps follow the standard
 version integer convention.
 
+The rollup's Discovery section and `data.hosted_search` (`configured`, `source`:
+`environment` or `dotenv`) report whether hosted vault search is configured;
+`data.companion` reports the semantic-search companion. Both are configuration, not
+liveness.
+
+### vaultspec-core vault search
+
+Signature: `vaultspec-core vault search [OPTIONS] QUERY`. Rank vault records against a
+plain-language question with hosted search and quote each record's answering passage
+with its `path:first-last` line range, after a verdict (`answered`,
+`nothing in the vault answers this`, or `no record that was read answers this` when
+records went unscored). Requires `VAULTSPEC_CORE_TYPESAFE_API_KEY`; without it nothing
+is sent, and the reply is `not_configured` with the search to run instead: a
+`vaultspec-rag` vault search over the requested types when rag is provisioned, else
+`vaultspec-core vault list` (MCP: `find`) and grep.
+
+| Option          | Short | Default | Description                                                                        |
+| --------------- | ----- | ------- | ---------------------------------------------------------------------------------- |
+| `--type TYPE`   | -     | all     | Record type (`adr`, `audit`, `exec`, `plan`, `reference`, `research`). Repeatable. |
+| `--feature TAG` | `-f`  | None    | Filter by feature tag.                                                             |
+| `--date DATE`   | -     | None    | Filter by exact date.                                                              |
+| `--limit N`     | -     | `4`     | Ranked records to return, `1`..`11`; no offset.                                    |
+| `--json`        | -     | off     | Emit `vaultspec.vault.search.v1`.                                                  |
+
+`--json` `data` is the MCP `search` result: `status` (`ok`, `not_configured`,
+`unavailable`), `answered`, and `hits`, each with `path`, `type`, `feature`, `date`,
+`title`, `score`, `answers`, `premise_conflict`, `blob_hash`, an `excerpt` of `section`,
+`line_start`, `line_end`, `text`, `truncated`, and a `supporting` excerpt when the
+answer spans two passages. An `ok` reply adds `verdict` (`answered`, `nothing_answers`,
+`none_read_answers`) and the window fields `returned`, `total`, `truncated`. A reply
+that did not rank adds `next_step` (`kind` `rag_search` or `listing`, `types`,
+`command`), the `remediation` sentence, and, when `unavailable`, its `reason`. `usage`
+is present whenever a request was sent.
+
 ### vaultspec-core vault list
 
 List vault documents. `DOC_TYPE` filters by type.
 
-| Option | Short | Default | Description | | --------------- | ----- | ------- |
------------------------------ | | `--feature TAG` | `-f` | None | Filter by feature tag.
-| | `--date DATE` | - | None | Filter by date. | | `--json` | - | off | Emit
-machine-readable output. | | `--limit N` | - | 50 | Maximum documents to return. | |
-`--offset N` | - | 0 | Documents to skip, for paging. |
+| Option          | Short | Default | Description                    |
+| --------------- | ----- | ------- | ------------------------------ |
+| `--feature TAG` | `-f`  | None    | Filter by feature tag.         |
+| `--date DATE`   | -     | None    | Filter by date.                |
+| `--json`        | -     | off     | Emit machine-readable output.  |
+| `--limit N`     | -     | 50      | Maximum documents to return.   |
+| `--offset N`    | -     | 0       | Documents to skip, for paging. |
 
 ### vaultspec-core vault stats
 
 Show vault statistics and document counts.
 
-| Option | Short | Default | Description | | --------------- | ----- | ------- |
---------------------------------------- | | `--feature TAG` | `-f` | None | Filter by
-feature tag. | | `--date DATE` | - | None | Filter by date. | | `--type TYPE` | - | None
-| Filter by document type. | | `--invalid` | - | off | Show only documents with invalid
-links. | | `--orphaned` | - | off | Show only orphaned documents. | | `--json` | - | off
-| Emit machine-readable output. |
+| Option          | Short | Default | Description                             |
+| --------------- | ----- | ------- | --------------------------------------- |
+| `--feature TAG` | `-f`  | None    | Filter by feature tag.                  |
+| `--date DATE`   | -     | None    | Filter by date.                         |
+| `--type TYPE`   | -     | None    | Filter by document type.                |
+| `--invalid`     | -     | off     | Show only documents with invalid links. |
+| `--orphaned`    | -     | off     | Show only orphaned documents.           |
+| `--json`        | -     | off     | Emit machine-readable output.           |
 
 ### vaultspec-core vault graph
 
 Signature: `vaultspec-core vault graph [OPTIONS]`. Hierarchical dependency tree grouped
 by feature and type.
 
-| Option | Short | Default | Description | | ------------------------ | ----- | -------
-| ------------------------------------------------- | | `--feature TAG` | `-f` | None |
-Scope to a single feature. | | `--json` | - | off | Output as networkx node-link JSON. |
-| `--metrics` | `-m` | off | Show aggregate graph metrics. | | `--ascii` | - | off |
-Render ASCII topology. | | `--body` | - | off | Include document body in JSON output. |
-| `--node STEM` | - | None | Scope JSON to a node's local (ego) neighbourhood. | |
-`--depth N` | - | 1 | Ego-graph radius in hops; only used with --node. | |
-`--derived/--no-derived` | - | off | Include the derived relatedness edge set in JSON;
-it is a computed similarity ranking, not vault state. | | `--derived-limit N` | - | None
-| Maximum derived edges to return. | | `--derived-offset N` | - | 0 | Derived edges to
-skip, for paging. | | `--ref REF` | - | None | Read the corpus from this git ref via the
-object database, with no working-tree checkout. |
+| Option                   | Short | Default | Description                                                                                             |
+| ------------------------ | ----- | ------- | ------------------------------------------------------------------------------------------------------- |
+| `--feature TAG`          | `-f`  | None    | Scope to a single feature.                                                                              |
+| `--json`                 | -     | off     | Output as networkx node-link JSON.                                                                      |
+| `--metrics`              | `-m`  | off     | Show aggregate graph metrics.                                                                           |
+| `--ascii`                | -     | off     | Render ASCII topology.                                                                                  |
+| `--body`                 | -     | off     | Include document body in JSON output.                                                                   |
+| `--node STEM`            | -     | None    | Scope JSON to a node's local (ego) neighbourhood.                                                       |
+| `--depth N`              | -     | 1       | Ego-graph radius in hops; only used with --node.                                                        |
+| `--derived/--no-derived` | -     | off     | Include the derived relatedness edge set in JSON; it is a computed similarity ranking, not vault state. |
+| `--derived-limit N`      | -     | None    | Maximum derived edges to return.                                                                        |
+| `--derived-offset N`     | -     | 0       | Derived edges to skip, for paging.                                                                      |
+| `--ref REF`              | -     | None    | Read the corpus from this git ref via the object database, with no working-tree checkout.               |
 
 The `--json` payload (schema `vaultspec.vault.graph.v2`) carries typed weighted explicit
 edges (`kind`, `multiplicity`, `weight`), node-size hints (`pagerank`, `in_degree`), and
@@ -599,12 +655,13 @@ Operator repair pipeline for `.vault/` content. Broader than
 `vaultspec-core vault check all --fix`: owns generated index refresh, post-fix graph
 rebuild, and final delta reporting.
 
-| Option | Short | Default | Description | | ---------------------------- | ----- |
-------- | --------------------------------------- | | `--dry-run` | - | off | Preview
-repair actions without writing. | | `--include-index/--no-index` | - | on | Refresh
-generated feature indexes. | | `--feature TAG` | `-f` | None | Scope repair and index
-refresh. | | `--verbose` | `-v` | off | Show INFO-level diagnostics. | | `--json` | - |
-off | Emit machine-readable payloads. |
+| Option                       | Short | Default | Description                             |
+| ---------------------------- | ----- | ------- | --------------------------------------- |
+| `--dry-run`                  | -     | off     | Preview repair actions without writing. |
+| `--include-index/--no-index` | -     | on      | Refresh generated feature indexes.      |
+| `--feature TAG`              | `-f`  | None    | Scope repair and index refresh.         |
+| `--verbose`                  | `-v`  | off     | Show INFO-level diagnostics.            |
+| `--json`                     | -     | off     | Emit machine-readable payloads.         |
 
 Phases: `preflight`, `check`, `fix`, `index`, `postcheck`, `summary`.
 
@@ -612,31 +669,35 @@ Phases: `preflight`, `check`, `fix`, `index`, `postcheck`, `summary`.
 
 Strip generated template annotations from `.vault/` documents.
 
-| Option | Short | Default | Description | | --------------- | ----- | ------- |
------------------------------------ | | `--feature TAG` | `-f` | None | Sanitize
-documents for one feature. | | `--dry-run` | - | off | Preview annotation removals. | |
-`--verbose` | `-v` | off | Show stripped files. | | `--json` | - | off | Emit
-machine-readable payloads. |
+| Option          | Short | Default | Description                         |
+| --------------- | ----- | ------- | ----------------------------------- |
+| `--feature TAG` | `-f`  | None    | Sanitize documents for one feature. |
+| `--dry-run`     | -     | off     | Preview annotation removals.        |
+| `--verbose`     | `-v`  | off     | Show stripped files.                |
+| `--json`        | -     | off     | Emit machine-readable payloads.     |
 
 ### vaultspec-core vault feature list
 
 List feature tags in the vault.
 
-| Option | Default | Description | | ------------- | ------- |
------------------------------------------- | | `--date DATE` | None | Filter by date. |
-| `--orphaned` | off | Show only features with no incoming links. | | `--type TYPE` |
-None | Filter by document type. | | `--stale-days N` | None | Show only features whose
-latest activity is older than N days. | | `--json` | off | Emit machine-readable output.
-| | `--limit N` | - | 50 | Maximum features to return. | | `--offset N` | - | 0 |
-Features to skip, for paging. |
+| Option           | Default | Description                                                    |
+| ---------------- | ------- | -------------------------------------------------------------- |
+| `--date DATE`    | None    | Filter by date.                                                |
+| `--orphaned`     | off     | Show only features with no incoming links.                     |
+| `--type TYPE`    | None    | Filter by document type.                                       |
+| `--stale-days N` | None    | Show only features whose latest activity is older than N days. |
+| `--json`         | off     | Emit machine-readable output.                                  |
+| `--limit N`      | 50      | Maximum features to return.                                    |
+| `--offset N`     | 0       | Features to skip, for paging.                                  |
 
 ### vaultspec-core vault feature index
 
 Generate or update `<feature>.index.md` files in `.vault/index/`.
 
-| Option | Short | Default | Description | | --------------- | ----- | ------- |
--------------------------------------- | | `--feature TAG` | `-f` | None | Generate
-index for a specific feature. | | `--json` | - | off | Emit machine-readable output. |
+| Option          | Short | Default | Description                            |
+| --------------- | ----- | ------- | -------------------------------------- |
+| `--feature TAG` | `-f`  | None    | Generate index for a specific feature. |
+| `--json`        | -     | off     | Emit machine-readable output.          |
 
 ### vaultspec-core vault feature archive
 
@@ -788,26 +849,27 @@ management.
 Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, vault
 content, and configuration files.
 
-| Option | Short | Default | Description | | ---------------- | ----- | ------- |
---------------------------- | | `--target DIR` | `-t` | cwd | Diagnose another
-directory. | | `--json` | - | off | Emit the diagnosis as JSON. | | `--gate-errors` | -
-| off | Fold the warning exit (1) to 0 so only errors (exit 2) fail; used by the
-`spec-check` pre-commit hook so expected provider-mirror lag does not deadlock commits.
-|
+| Option          | Short | Default | Description                                                                                                                                                      |
+| --------------- | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--target DIR`  | `-t`  | cwd     | Diagnose another directory.                                                                                                                                      |
+| `--json`        | -     | off     | Emit the diagnosis as JSON.                                                                                                                                      |
+| `--gate-errors` | -     | off     | Fold the warning exit (1) to 0 so only errors (exit 2) fail; used by the `spec-check` pre-commit hook so expected provider-mirror lag does not deadlock commits. |
 
 ### vaultspec-core spec rules
 
 The `vaultspec-core spec rules`, `vaultspec-core spec skills`, and
 `vaultspec-core spec agents` groups share an identical CRUD subcommand shape:
 
-| Subcommand | Signature | Description | | ---------- |
----------------------------------- | --------------------------------- | | `list` | - |
-List all resources. | | `add` | `NAME [--force] [--dry-run]` | Create a resource. | |
-`show` | `NAME` | Print resource content to stdout. | | `edit` | `NAME [--editor CMD]` |
-Open in the resolved editor. | | `remove` | `NAME [--yes` / `-y` / `--force]` | Delete a
-resource (prompts). | | `rename` | `OLD_NAME NEW_NAME` | Rename a resource. | | `sync` |
-`[PROVIDER] [--dry-run] [--force]` | Resource-scoped sync. | | `restore` | `FILENAME` |
-Restore to snapshotted original. |
+| Subcommand | Signature                          | Description                       |
+| ---------- | ---------------------------------- | --------------------------------- |
+| `list`     | -                                  | List all resources.               |
+| `add`      | `NAME [--force] [--dry-run]`       | Create a resource.                |
+| `show`     | `NAME`                             | Print resource content to stdout. |
+| `edit`     | `NAME [--editor CMD]`              | Open in the resolved editor.      |
+| `remove`   | `NAME [--yes` / `-y` / `--force]`  | Delete a resource (prompts).      |
+| `rename`   | `OLD_NAME NEW_NAME`                | Rename a resource.                |
+| `sync`     | `[PROVIDER] [--dry-run] [--force]` | Resource-scoped sync.             |
+| `restore`  | `FILENAME`                         | Restore to snapshotted original.  |
 
 Body-content flags on `add` vary by resource: `vaultspec-core spec rules add` takes
 `--body TEXT`; `vaultspec-core spec skills add` takes `--description TEXT` and
@@ -908,31 +970,32 @@ order and bumps the manifest version.
 
 ## Exit codes
 
-| Command | Codes | | ---------------------------------- |
------------------------------------------------------- | | `vaultspec-core vault check`
-| `0` clean, `1` errors found. | | `vaultspec-core vault plan check` | `0` clean, `1` at
-least one ERROR-severity finding. | | `vaultspec-core spec doctor` | `0` all ok, `1`
-warnings, `2` errors (`--gate-errors` folds `1` to `0`). | |
-`vaultspec-core spec mcps status` | `0` config status ok, `1` otherwise. | |
-`vaultspec-core migrations status` | `0` up to date or no manifest, `1` migrations
-pending. | | `vaultspec-core migrations run` | `0` success (including no-op), `1` a
-migration failed. |
+| Command                            | Codes                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `vaultspec-core vault check`       | `0` clean, `1` errors found.                                                                    |
+| `vaultspec-core vault plan check`  | `0` clean, `1` at least one ERROR-severity finding.                                             |
+| `vaultspec-core spec doctor`       | `0` all ok, `1` warnings, `2` errors (`--gate-errors` folds `1` to `0`).                        |
+| `vaultspec-core spec mcps status`  | `0` config status ok, `1` otherwise.                                                            |
+| `vaultspec-core migrations status` | `0` up to date or no manifest, `1` migrations pending.                                          |
+| `vaultspec-core migrations run`    | `0` success (including no-op), `1` a migration failed.                                          |
+| `vaultspec-core vault search`      | `0` searched, or not configured (`skipped`); `1` configured but unavailable; `2` invalid input. |
 
 ## Environment variables
 
 All prefixed `VAULTSPEC_`. Env vars override defaults but are overridden by `--target`.
 
-| Variable | Type | Default | Description | | --------------------------------- | ---- |
------------- | ------------------------------------ | | `VAULTSPEC_TARGET_DIR` | path |
-cwd | Root workspace directory. | | `VAULTSPEC_DOCS_DIR` | str | `.vault` | Vault
-directory name. | | `VAULTSPEC_FRAMEWORK_DIR` | str | `.vaultspec` | Framework directory
-name. | | `VAULTSPEC_CLAUDE_DIR` | str | `.claude` | Claude tool directory name. | |
-`VAULTSPEC_GEMINI_DIR` | str | `.gemini` | Gemini tool directory name. | |
-`VAULTSPEC_ANTIGRAVITY_DIR` | str | `.agents` | Antigravity directory name. | |
-`VAULTSPEC_IO_BUFFER_SIZE` | int | `8192` | I/O read buffer size in bytes. | |
-`VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int | `1000000` | Subprocess stdout capture limit. |
-| `VAULTSPEC_LOCK_TIMEOUT_SECONDS` | float | `120.0` | Advisory-lock acquisition budget
-in seconds, both layers combined. | | `VAULTSPEC_LOG_LEVEL` | str | `INFO` | Root log
-level for the CLI. | | `VAULTSPEC_EDITOR` | str | `zed -w` | Editor command for resource
-editing. | | `VAULTSPEC_STDIO_WATCHDOG` | str | on | MCP server lifetime watchdog;
-`0`/`false`/`off`/`no` disables it (EOF-only exit). |
+| Variable                          | Type   | Default      | Description                                                                                                                                                                                 |
+| --------------------------------- | ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`            | path   | cwd          | Root workspace directory.                                                                                                                                                                   |
+| `VAULTSPEC_DOCS_DIR`              | str    | `.vault`     | Vault directory name.                                                                                                                                                                       |
+| `VAULTSPEC_FRAMEWORK_DIR`         | str    | `.vaultspec` | Framework directory name.                                                                                                                                                                   |
+| `VAULTSPEC_CLAUDE_DIR`            | str    | `.claude`    | Claude tool directory name.                                                                                                                                                                 |
+| `VAULTSPEC_GEMINI_DIR`            | str    | `.gemini`    | Gemini tool directory name.                                                                                                                                                                 |
+| `VAULTSPEC_ANTIGRAVITY_DIR`       | str    | `.agents`    | Antigravity directory name.                                                                                                                                                                 |
+| `VAULTSPEC_IO_BUFFER_SIZE`        | int    | `8192`       | I/O read buffer size in bytes.                                                                                                                                                              |
+| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int    | `1000000`    | Subprocess stdout capture limit.                                                                                                                                                            |
+| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`  | float  | `120.0`      | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                          |
+| `VAULTSPEC_LOG_LEVEL`             | str    | `INFO`       | Root log level for the CLI.                                                                                                                                                                 |
+| `VAULTSPEC_EDITOR`                | str    | `zed -w`     | Editor command for resource editing.                                                                                                                                                        |
+| `VAULTSPEC_CORE_TYPESAFE_API_KEY` | secret | unset        | Enables hosted vault search; read from the environment, else the workspace `.env` when core runs from the workspace's own environment in `dependency` or `dev` install mode. Never printed. |
+| `VAULTSPEC_STDIO_WATCHDOG`        | str    | on           | MCP server lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit).                                                                                                           |

@@ -114,6 +114,51 @@ async def test_edit_section_not_found(vault_root: Path) -> None:
         assert item["error"]["section_not_found"] is True
 
 
+_FENCED_SECTION_BODY = (
+    "# Fenced\n\n## Alpha\n\n```bash\n# ===== banner\n## Inside\necho hi\n```\n\n"
+    "Tail of alpha.\n\n## Beta\n\nBeta prose."
+)
+
+
+async def test_edit_heading_lines_in_code_do_not_bound_a_section(
+    vault_root: Path,
+) -> None:
+    """A ``#`` line inside fenced code neither ends nor addresses a section."""
+    mcp = create_server()
+    async with Client(mcp) as client:
+        await _create_adr(client, "fence-feat")
+        adr = next((vault_root / ".vault" / "adr").glob("*-fence-feat-adr.md"))
+        payload = await _edit(
+            client,
+            [
+                {
+                    "target": adr.stem,
+                    "operation": "set_body",
+                    "content": _FENCED_SECTION_BODY,
+                },
+                {
+                    "target": adr.stem,
+                    "operation": "append_section",
+                    "section": "## Alpha",
+                    "content": "Appended to alpha.",
+                },
+                {
+                    "target": adr.stem,
+                    "operation": "replace_section",
+                    "section": "## Inside",
+                    "content": "irrelevant",
+                },
+            ],
+        )
+        _body, appended, fenced_target = payload["items"]
+        assert appended["status"] == "updated"
+        text = adr.read_text(encoding="utf-8")
+        assert text.index("```\n\nTail of alpha.") < text.index("Appended to alpha.")
+        assert text.index("Appended to alpha.") < text.index("## Beta")
+        assert fenced_target["status"] == "failed"
+        assert fenced_target["error"]["section_not_found"] is True
+
+
 async def test_edit_intra_batch_same_document_hash_on_first_op_only(
     vault_root: Path,
 ) -> None:

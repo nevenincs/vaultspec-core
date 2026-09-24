@@ -33,7 +33,11 @@ import typer
 
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
-from vaultspec_core.cli.vault_cmd_app import check_app, sanitize_app
+from vaultspec_core.cli.vault_cmd_app import (
+    FeatureFilterOption,
+    check_app,
+    sanitize_app,
+)
 from vaultspec_core.core.windowing import windowed_section
 from vaultspec_core.vaultcore.checks._base import DIAGNOSTIC_RENDER_CAP
 
@@ -191,9 +195,7 @@ def cmd_check_all(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -283,9 +285,7 @@ def cmd_check_body_links(
         bool,
         typer.Option("--fix", help="Convert body wiki-links to code spans"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -317,9 +317,7 @@ def cmd_check_body_links(
 
 @check_app.command("exec-mapping")
 def cmd_check_exec_mapping(
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -350,9 +348,7 @@ def cmd_check_exec_mapping(
 
 @check_app.command("body-sections")
 def cmd_check_body_sections(
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -387,9 +383,7 @@ def cmd_check_annotations(
         bool,
         typer.Option("--fix", help="Strip generated template annotations"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -420,9 +414,7 @@ def cmd_check_markdown(
         bool,
         typer.Option("--fix", help="Repair markdown hygiene issues"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -450,9 +442,7 @@ newline)."""
 
 @check_app.command("placeholders")
 def cmd_check_placeholders(
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -488,9 +478,7 @@ def cmd_check_dangling(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -525,9 +513,7 @@ def cmd_check_orphans(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -561,9 +547,7 @@ def cmd_check_frontmatter(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -599,9 +583,7 @@ def cmd_check_modified_stamp(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -637,9 +619,7 @@ def cmd_check_links(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -675,9 +655,7 @@ def cmd_check_features(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -712,9 +690,7 @@ def cmd_check_references(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -749,9 +725,7 @@ def cmd_check_schema(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -784,9 +758,7 @@ def cmd_check_adr_status(
         bool,
         typer.Option("--fix", help="Apply safe auto-corrections to vault content"),
     ] = False,
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show INFO-level diagnostics")
     ] = False,
@@ -1030,9 +1002,7 @@ def cmd_check_foreign(
 
 @sanitize_app.command("annotations")
 def cmd_sanitize_annotations(
-    feature: Annotated[
-        str | None, typer.Option("--feature", "-f", help="Filter by feature tag")
-    ] = None,
+    feature: FeatureFilterOption = None,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview annotation stripping")
     ] = False,

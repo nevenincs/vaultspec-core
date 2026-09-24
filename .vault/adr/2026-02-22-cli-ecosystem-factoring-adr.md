@@ -93,11 +93,12 @@ To prevent breakage for any external consumers or scripts that import
 `vaultspec_core.core`, a compatibility shim can be maintained:
 
 ```python
-
 # src/vaultspec_core/core/__init__.py (deprecated shim)
 
 """Deprecated: use vaultspec_core.config instead."""
+
 import warnings
+
 warnings.warn(
     "vaultspec_core.core is deprecated, use vaultspec_core.config",
     DeprecationWarning,
@@ -237,7 +238,6 @@ other and can execute in parallel. Phases 3 and 4 depend on Phase 1.
 **Import change pattern (all 36 files):**
 
 ```python
-
 # Before:
 
 from vaultspec_core.core import WorkspaceLayout, resolve_workspace
@@ -252,7 +252,11 @@ from vaultspec_core.config import WorkspaceLayout, resolve_workspace
 from vaultspec_core.config import get_config
 from vaultspec_core.config import reset_config
 from vaultspec_core.config.config import VaultSpecConfig, CONFIG_REGISTRY
-from vaultspec_core.config.workspace import LayoutMode, WorkspaceError, resolve_workspace
+from vaultspec_core.config.workspace import (
+    LayoutMode,
+    WorkspaceError,
+    resolve_workspace,
+)
 ```
 
 ### Phase 2: Extract shared CLI foundation (`vaultspec_core.cli_common`)

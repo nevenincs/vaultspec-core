@@ -22,13 +22,15 @@ from pathlib import Path
 
 import pytest
 
+from dev.environment import (
+    VAULTSPEC_ALLOW_EMPTY_SELECTION,
+    VAULTSPEC_FIX_STRICT,
+)
 from dev.exit_codes import (
     ADVISORY_BROKEN,
-    ALLOW_EMPTY_ENV,
     DRIFT,
     FAILED,
     FINDINGS_CODES,
-    FIX_STRICT_ENV,
     INIT_HOST_TOOL_MISSING,
     INIT_LOCKED,
     INIT_STALE,
@@ -198,8 +200,8 @@ def test_the_init_codes_match_the_agreed_allocation() -> None:
 
 
 def test_the_environment_switches_are_named_once() -> None:
-    assert FIX_STRICT_ENV == "VAULTSPEC_FIX_STRICT"
-    assert ALLOW_EMPTY_ENV == "VAULTSPEC_ALLOW_EMPTY_SELECTION"
+    assert VAULTSPEC_FIX_STRICT.name == "VAULTSPEC_FIX_STRICT"
+    assert VAULTSPEC_ALLOW_EMPTY_SELECTION.name == "VAULTSPEC_ALLOW_EMPTY_SELECTION"
 
 
 # --- 2. no hand-rolled swallows in any justfile -------------------------------

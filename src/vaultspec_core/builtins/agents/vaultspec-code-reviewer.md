@@ -17,6 +17,8 @@ within one run.
 
 - Read the plan's scope and coverage assessment and any governing ADRs. List changed
   files from the plan's ledger.
+- Find the decisions that govern the changed scope per the `vaultspec-discovery` rule.
+  Note any the plan does not link.
 - Locate callers per the `vaultspec-discovery` rule. Read each changed file whole.
 - Run the project's tests, lint, and type checks.
 - Trace complete affected workflows across interfaces. For framework changes, assess
@@ -38,6 +40,8 @@ within one run.
 - Compliance: governing decision constraints are respected; decision-free work stays
   within the plan's assessed scope.
 - Drift: anything the plan did not ask for.
+- Coverage: an accepted ADR governs the changed scope but the plan's `related:` does not
+  link it. `high` when the work breaks its constraints; `medium` otherwise.
 - Boundary: any mention of the vault, a plan or ADR identifier, a Step id, or a harness
   path in source, tests, configuration, or user docs is `high`. Commit trailers are the
   only sanctioned link.

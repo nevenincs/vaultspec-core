@@ -32,6 +32,8 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from ..search import tokenize
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -322,7 +324,7 @@ class CommandCatalog:
             Up to *limit* ``(score, entry)`` pairs sorted by descending score
             then ascending verb string.
         """
-        tokens = _tokenize(query)
+        tokens = tokenize(query)
         scored: list[tuple[float, CatalogEntry]] = []
         for entry in self.entries.values():
             score = _score_entry(entry, query, tokens)
@@ -330,11 +332,6 @@ class CommandCatalog:
                 scored.append((score, entry))
         scored.sort(key=lambda pair: (-pair[0], pair[1].verb))
         return scored[:limit]
-
-
-def _tokenize(text: str) -> list[str]:
-    """Split *text* into lowercased alphanumeric tokens for ranking."""
-    return [tok for tok in re.split(r"[^a-z0-9]+", text.lower()) if tok]
 
 
 def _score_entry(entry: CatalogEntry, query: str, tokens: list[str]) -> float:
@@ -354,8 +351,8 @@ def _score_entry(entry: CatalogEntry, query: str, tokens: list[str]) -> float:
     """
     if not tokens:
         return 0.0
-    verb_segments = set(_tokenize(entry.verb))
-    description_tokens = set(_tokenize(entry.description))
+    verb_segments = set(tokenize(entry.verb))
+    description_tokens = set(tokenize(entry.description))
     score = 0.0
     for token in tokens:
         if token in verb_segments:

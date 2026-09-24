@@ -20,8 +20,11 @@ Four fields make a bounded contract, and all four are required (a fifth,
     back than matched" once ``offset`` is non-zero, and it is the first
     that a caller can act on.
 ``next_offset``
-    Where to resume, or ``None`` at the end. Paging is not optional: a cap
-    with no way past it converts a saturation failure into a workflow one.
+    Where to resume, or ``None`` at the end. A cap with no way past it
+    converts a saturation failure into a workflow one, so every window has
+    one: a listing resumes by offset, and a ranking computed per request -
+    whose whole result fits under its ceiling - is reached whole by raising
+    the limit instead, so its window is not pageable and names no offset.
 
 It lives in the shared core rather than under the CLI because bounding a
 return is a property of the domain, not of one presentation: the repair
@@ -42,7 +45,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-__all__ = ["Window", "apply_window", "elision_line", "windowed_section"]
+__all__ = [
+    "Window",
+    "apply_window",
+    "clip_lines",
+    "clip_text",
+    "elision_line",
+    "windowed_section",
+]
 
 #: Rows returned when a caller names no limit. Chosen to sit inside the
 #: listing budget for a row of typical width rather than to be a round
@@ -63,11 +73,16 @@ class Window:
         total: Rows that matched before the cap was applied.
         returned: Rows actually carried by this response.
         offset: Index of the first returned row within the full result.
+        pageable: Whether a caller can resume past this window. A ranking
+            computed per request - a search's judged shortlist - cannot be
+            resumed by offset without recomputing it, so its window reports
+            the total and the truncation marker but no resume point.
     """
 
     total: int
     returned: int
     offset: int = 0
+    pageable: bool = True
 
     @property
     def truncated(self) -> bool:
@@ -76,9 +91,13 @@ class Window:
 
     @property
     def next_offset(self) -> int | None:
-        """The offset that resumes after this window, or ``None`` at the end."""
+        """The offset that resumes after this window.
+
+        ``None`` at the end, and always ``None`` for a window that is not
+        pageable.
+        """
         nxt = self.offset + self.returned
-        return nxt if nxt < self.total else None
+        return nxt if self.pageable and nxt < self.total else None
 
     def as_fields(self) -> dict[str, object]:
         """Render the window as envelope keys.
@@ -133,6 +152,7 @@ def apply_window[T](
     *,
     limit: int | None = None,
     offset: int = 0,
+    pageable: bool = True,
 ) -> tuple[list[T], Window]:
     """Cut *rows* to a bounded window and describe what was cut.
 
@@ -146,6 +166,8 @@ def apply_window[T](
             values above :data:`MAX_LIMIT` are clamped down.
         offset: Rows to skip, for resuming a previous window. Negative
             offsets are treated as zero.
+        pageable: ``False`` for a result the caller cannot resume by offset;
+            see :attr:`Window.pageable`.
 
     Returns:
         The bounded rows and the :class:`Window` describing them.
@@ -154,7 +176,9 @@ def apply_window[T](
     start = max(0, offset)
     end = start + _resolve_limit(limit)
     window_rows = list(rows[start:end])
-    return window_rows, Window(total=total, returned=len(window_rows), offset=start)
+    return window_rows, Window(
+        total=total, returned=len(window_rows), offset=start, pageable=pageable
+    )
 
 
 def windowed_section[T](
@@ -200,7 +224,98 @@ def elision_line(window: Window, noun: str) -> str | None:
     if not window.truncated:
         return None
     hidden = window.total - (window.offset + window.returned)
+    if not window.pageable:
+        return f"... {hidden:,} more {noun} ({window.total:,} total; raise the limit)"
     return (
         f"... {hidden:,} more {noun} "
         f"({window.total:,} total; --offset {window.next_offset} for the next page)"
     )
+
+
+def _encoded(text: str, limit: int) -> bytes:
+    """Return *text* as UTF-8, refusing a limit no text can be clipped to.
+
+    Raises:
+        ValueError: If *limit* is not positive.
+    """
+    if limit < 1:
+        raise ValueError(f"clip limit must be positive, got {limit}")
+    return text.encode("utf-8")
+
+
+def _code_point_end(encoded: bytes, limit: int) -> int:
+    """Return the largest cut at or below *limit* that splits no code point.
+
+    *encoded* is longer than *limit*, so the byte at *limit* exists. A byte of
+    the form ``10xxxxxx`` continues the code point before it; the cut steps
+    back past those to the byte that starts the code point.
+    """
+    end = limit
+    while end > 0 and encoded[end] & 0xC0 == 0x80:
+        end -= 1
+    return end
+
+
+def clip_text(text: str, limit: int) -> str:
+    """Return the leading slice of *text* that fits in *limit* UTF-8 bytes.
+
+    The text-shaped counterpart of :func:`apply_window`: a surface that carries
+    document text bounds it the same way on every surface. The bound is in
+    encoded bytes because reply budgets are: a character bound lets text in a
+    multi-byte script cost three or four times what the same count of ASCII
+    does. The cut never splits a code point. It falls on a line boundary when
+    one lies in the second half of the budget, so a clipped passage does not
+    end mid-word and read as corrupted content; without one, the cut is at the
+    last whole code point within the limit. Whether text was dropped is
+    ``len(result) < len(text)``, which the caller reports as its truncation
+    marker.
+
+    Args:
+        text: The full text.
+        limit: Maximum UTF-8 bytes to keep; must be positive.
+
+    Returns:
+        *text* unchanged when it fits, otherwise its clipped leading slice.
+
+    Raises:
+        ValueError: If *limit* is not positive.
+    """
+    encoded = _encoded(text, limit)
+    if len(encoded) <= limit:
+        return text
+    end = _code_point_end(encoded, limit)
+    newline = encoded.rfind(b"\n", 0, end)
+    if newline > limit // 2:
+        end = newline
+    return encoded[:end].decode("utf-8")
+
+
+def clip_lines(text: str, limit: int) -> str:
+    """Return the leading whole lines of *text* that fit in *limit* UTF-8 bytes.
+
+    The verbatim counterpart of :func:`clip_text`, for text a caller addresses
+    by line number: the result is a run of whole lines of *text*, so a caller
+    that reports the line the text starts on can report the line it now ends
+    on. One exception keeps the result from being empty: a first line longer
+    than the whole budget is cut the way :func:`clip_text` cuts, at the last
+    whole code point within the limit, and the result is then a prefix of that
+    one line.
+
+    Args:
+        text: The full text, lines separated by ``\\n``.
+        limit: Maximum UTF-8 bytes to keep; must be positive.
+
+    Returns:
+        *text* unchanged when it fits, otherwise its leading whole lines, or
+        the leading part of its first line when that line alone exceeds the
+        limit.
+
+    Raises:
+        ValueError: If *limit* is not positive.
+    """
+    encoded = _encoded(text, limit)
+    if len(encoded) <= limit:
+        return text
+    newline = encoded.rfind(b"\n", 0, limit + 1)
+    end = newline if newline != -1 else _code_point_end(encoded, limit)
+    return encoded[:end].decode("utf-8")

@@ -114,30 +114,33 @@ from pathlib import Path
 
 class LayoutMode(Enum):
     """How VaultSpec was invoked and where paths point."""
-    STANDALONE = "standalone"   # Classic: all paths at one root (incl. container mode)
-    EXPLICIT = "explicit"       # Paths provided via env vars (embedded deployment)
+
+    STANDALONE = "standalone"  # Classic: all paths at one root (incl. container mode)
+    EXPLICIT = "explicit"  # Paths provided via env vars (embedded deployment)
 
 
 @dataclass(frozen=True)
 class GitInfo:
     """Discovered git repository metadata."""
-    git_dir: Path              # Actual .git directory (resolved from pointer)
-    repo_root: Path            # Root of the git repository
-    is_worktree: bool          # True if linked worktree (not main working tree)
-    is_bare: bool              # True if bare repository (.gt)
-    worktree_root: Path | None # This worktree's root, if is_worktree
+
+    git_dir: Path  # Actual .git directory (resolved from pointer)
+    repo_root: Path  # Root of the git repository
+    is_worktree: bool  # True if linked worktree (not main working tree)
+    is_bare: bool  # True if bare repository (.gt)
+    worktree_root: Path | None  # This worktree's root, if is_worktree
     container_root: Path | None  # Container root, if container/worktree mode
 
 
 @dataclass(frozen=True)
 class WorkspaceLayout:
     """Fully resolved, validated workspace paths."""
-    content_root: Path         # Where rules/, agents/, skills/, system/ live
-    output_root: Path          # Where .claude/, .gemini/, .agent/ are written
-    vault_root: Path           # Where .vault/ documentation lives
-    framework_root: Path       # Where framework Python code lives (lib/, scripts/)
-    mode: LayoutMode           # Detected layout mode
-    git: GitInfo | None        # Git context, if detected
+
+    content_root: Path  # Where rules/, agents/, skills/, system/ live
+    output_root: Path  # Where .claude/, .gemini/, .agent/ are written
+    vault_root: Path  # Where .vault/ documentation lives
+    framework_root: Path  # Where framework Python code lives (lib/, scripts/)
+    mode: LayoutMode  # Detected layout mode
+    git: GitInfo | None  # Git context, if detected
 ```
 
 #### Git Detection
@@ -165,11 +168,11 @@ Key implementation details:
 ```python
 def resolve_workspace(
     *,
-    root_override: Path | None = None,       # --root / VAULTSPEC_ROOT_DIR
-    content_override: Path | None = None,     # --content-dir / VAULTSPEC_CONTENT_DIR
-    framework_dir_name: str = ".vaultspec",   # VAULTSPEC_FRAMEWORK_DIR
-    framework_root: Path | None = None,       # Structurally known; passed from _paths.py
-    cwd: Path | None = None,                  # For testing; defaults to Path.cwd()
+    root_override: Path | None = None,  # --root / VAULTSPEC_ROOT_DIR
+    content_override: Path | None = None,  # --content-dir / VAULTSPEC_CONTENT_DIR
+    framework_dir_name: str = ".vaultspec",  # VAULTSPEC_FRAMEWORK_DIR
+    framework_root: Path | None = None,  # Structurally known; passed from _paths.py
+    cwd: Path | None = None,  # For testing; defaults to Path.cwd()
 ) -> WorkspaceLayout:
     """Resolve the complete workspace layout from overrides, git, and structure.
 
@@ -238,7 +241,6 @@ Every resolved `WorkspaceLayout` is validated:
 **`core/config.py`** — One new field + registry entry:
 
 ```python
-
 # In VaultSpecConfig:
 
 content_dir: Path | None = None
@@ -272,8 +274,8 @@ from pathlib import Path
 # This is WHERE THE PYTHON CODE LIVES — not where content lives.
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
-_LIB_DIR = _SCRIPTS_DIR.parent              # .vaultspec/lib/
-_FRAMEWORK_ROOT = _LIB_DIR.parent           # .vaultspec/
+_LIB_DIR = _SCRIPTS_DIR.parent  # .vaultspec/lib/
+_FRAMEWORK_ROOT = _LIB_DIR.parent  # .vaultspec/
 LIB_SRC_DIR = _LIB_DIR / "src"
 
 if str(LIB_SRC_DIR) not in sys.path:
@@ -283,9 +285,11 @@ if str(LIB_SRC_DIR) not in sys.path:
 
 from core.workspace import resolve_workspace
 
+
 def _env_path(name: str) -> Path | None:
     raw = os.environ.get(name)
     return Path(raw) if raw else None
+
 
 _layout = resolve_workspace(
     root_override=_env_path("VAULTSPEC_ROOT_DIR"),
@@ -340,7 +344,9 @@ written to `output_root`.
 
 ```python
 parser.add_argument(
-    "--content-dir", type=Path, default=None,
+    "--content-dir",
+    type=Path,
+    default=None,
     help="Content source directory (rules, agents, skills)",
 )
 ```

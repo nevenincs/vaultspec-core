@@ -3,12 +3,14 @@ tags:
   - '#adr'
   - '#mcp-read-only'
 date: '2026-08-01'
-modified: '2026-08-01'
+modified: '2026-09-23'
 body_schema: 'body-v1'
-body_hash: 'sha256:f5a250e46d94c03f90ec08e0fb2aaf8a2daec0ed488dfccfe0b2c18bbc38a8a1'
+body_hash: 'sha256:b58c20c06eb46cda287c975f5f0414394d3436f2e550da56d50710fed141b046'
 related:
   - "[[2026-08-01-mcp-read-only-research]]"
   - "[[2026-07-09-mcp-tool-schema-adr]]"
+  - '[[2026-09-23-typesafe-search-adr]]'
+  - '[[2026-09-23-adr-crossref-adr]]'
 ---
 
 # `mcp-read-only` adr: `read-only MCP launch mode` | (**status:** `accepted`)
@@ -42,6 +44,10 @@ Orchestrated agents need the vault orientation surface without receiving any mut
 ## Implementation
 
 The launch parser accepts `--read-only` and passes its value to server construction. Tool registration selects a positive restricted registration set when enabled and preserves the normal set otherwise. The restricted `check` registration exposes validation only, while normal mode retains the existing repair-capable signature. Real MCP-session tests inspect advertised tool names and schemas in both modes, ensuring default parity and preventing new write tools from entering the restricted catalog accidentally.
+
+**Amendment note, 2026-09-23**: `2026-09-23-typesafe-search-adr` adds `search` to the restricted allowlist. It mutates nothing locally; when a hosted-search credential is configured it sends vault text to the TypeSafe API, and the presence of the credential is the consent for that data flow.
+
+**Amendment note, 2026-09-23, ADR cross-referencing**: `2026-09-23-adr-crossref-adr` adds `crossref` to the restricted allowlist in a one-ADR, judge-only form: the read-only registration takes a single `ref`, has no `apply`, and the read-only server rejects any other argument rather than letting the SDK ignore it, as it rejects `fix` on `check`. It mutates nothing locally; with a hosted-search credential configured it sends ADR text to the TypeSafe API under the same consent as `search`.
 
 ## Rationale
 

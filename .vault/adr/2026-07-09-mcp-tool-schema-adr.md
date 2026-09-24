@@ -5,10 +5,12 @@ tags:
 date: '2026-07-09'
 related:
   - "[[2026-07-09-mcp-tool-schema-research]]"
+  - '[[2026-09-23-typesafe-search-adr]]'
+  - '[[2026-09-23-adr-crossref-adr]]'
 supersedes:
   - '2026-02-22-mcp-consolidation-adr'
-modified: '2026-09-19'
-body_hash: 'sha256:86336bcdab18f35ac632821bcff3c0197478fcd779d479d987970e5f04787d23'
+modified: '2026-09-23'
+body_hash: 'sha256:c665390d613e45b5717d5563537491fb66a2df6aeecea7ed8122bc5e12524aaa'
 ---
 
 # `mcp-tool-schema` adr: tiered hot-tool surface with a stateless discover/invoke gateway | (**status:** `accepted`)
@@ -70,6 +72,10 @@ The redesigned surface is nine first-class tools, replacing and extending the cu
 - `invoke` - the gateway executor: run a cataloged verb by path with a JSON argument object; after validating the verb path and arguments against the parsed inventory (and the static denylist), it executes the installed `vaultspec-core` binary as an argv-list subprocess (never a shell), injecting `--target` from the server root and passing `--json` where the verb supports structured output, and returns parsed JSON or captured stdout with stderr folded into the error payload; destructive-annotated at the tool level since the long tail includes mutating verbs. In-process dispatch was rejected for the long tail because the ~115 remaining verbs are Typer-coupled (they render envelopes, print, and raise `typer.Exit`) and making all of them callable outside Typer is unbounded plumbing for low-frequency verbs; subprocessing the binary is uniform, drift-free (the binary is the single source of truth), and process-isolated, and the low call frequency absorbs the spawn latency the hot in-process tools never pay.
 
 The catalog module parses the generated command-inventory markers at server start, applies the static denylist, and backs both gateway tools from one in-memory structure. Error handling migrates to protocol `isError` for whole-call failures with per-item success arrays inside batch results. All tools declare output schemas and return structured content; all handlers keep the copied-context isolation wrapper. The registry definition, console script, and package location are unchanged.
+
+**Amendment note, 2026-09-23**: `2026-09-23-typesafe-search-adr` adds a first-class, read-only `search` tool: ranked vault records with verbatim excerpts, always registered, returning a typed `not_configured` outcome when no hosted-search credential is set. The single-digits-plus-gateway rule of this record still holds.
+
+**Amendment note, 2026-09-23, ADR cross-referencing**: `2026-09-23-adr-crossref-adr` adds `crossref` as the tenth hot tool: the ADRs one decision should link, judged within fixed request, time and reply ceilings, always registered, returning a typed `not_configured` outcome when no hosted-search credential is set. The hot-tool ceiling of this record becomes ten tools plus the two gateway tools. This replaces the Constraint that the advertised first-class tool count stays in single digits plus gateway, and the first amendment note's statement that that rule still holds. `crossref` is non-read-only, non-destructive, idempotent and open-world on the full surface, since it can write `related:` links.
 
 ## Rationale
 

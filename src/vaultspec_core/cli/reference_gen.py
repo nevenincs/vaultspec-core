@@ -48,7 +48,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Collection
     from pathlib import Path
 
     import typer
@@ -554,6 +554,38 @@ def _replace_region(text: str, region: ManagedRegion, body: str) -> str:
     return f"{before}\n\n{body}\n\n{after}"
 
 
+#: The mdformat parser extension that reads a pipe table as a table. Without
+#: it mdformat reads the table as a paragraph and wraps its rows into one run
+#: of text at the wrap width.
+TABLE_EXTENSION = "gfm"
+
+
+class MarkdownFormatterError(RuntimeError):
+    """Raised when the formatter the reference is normalised with cannot read it."""
+
+
+def require_table_extension(installed: Collection[str]) -> None:
+    """Refuse to normalise without the parser extension that reads tables.
+
+    mdformat enables whatever parser extensions are installed and silently
+    reads anything it has no extension for as prose, so a missing table
+    extension does not fail: it rewrites every table as a wrapped paragraph.
+
+    Args:
+        installed: The names of the installed mdformat parser extensions.
+
+    Raises:
+        MarkdownFormatterError: If :data:`TABLE_EXTENSION` is not installed.
+    """
+    if TABLE_EXTENSION not in installed:
+        msg = (
+            f"mdformat has no {TABLE_EXTENSION!r} parser extension in this "
+            "environment, so it would wrap every table into a paragraph; "
+            "install mdformat-gfm (the project's dev dependencies) and rerun"
+        )
+        raise MarkdownFormatterError(msg)
+
+
 def _mdformat_normalise(text: str) -> str:
     """Normalise rendered reference text to the project's mdformat layout.
 
@@ -570,11 +602,24 @@ def _mdformat_normalise(text: str) -> str:
     purpose: only the CLI reads the project ``.mdformat.toml``, and the two
     surfaces escape and wrap a handful of edge cases differently. Shelling out to
     the same command the hooks run guarantees byte-for-byte agreement with them.
+
+    The table extension is required up front: mdformat without it does not
+    fail, it wraps every option table into a paragraph.
+
+    Raises:
+        MarkdownFormatterError: If mdformat cannot read tables here.
     """
     import subprocess
     import sys
+    from importlib.metadata import entry_points
     from pathlib import Path
 
+    require_table_extension(
+        {
+            extension.name
+            for extension in entry_points(group="mdformat.parser_extension")
+        }
+    )
     repo_root = Path(__file__).resolve().parents[3]
     result = subprocess.run(
         [sys.executable, "-m", "mdformat", "--wrap", "88", "-"],

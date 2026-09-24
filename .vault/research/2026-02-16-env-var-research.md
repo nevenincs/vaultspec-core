@@ -285,14 +285,10 @@ self._field = (
 ### Pattern 2: Comma-Separated List Parsing (3 variables)
 
 ```python
-
 # With membership check and stripping
 
 [
-    t.strip()
-    for t in os.environ["VS_VAR"].split(",")
-    if t.strip()
-
+    t.strip() for t in os.environ["VS_VAR"].split(",") if t.strip()
 ] if "VS_VAR" in os.environ else []
 ```
 
@@ -304,15 +300,9 @@ self._field = (
 
 ```python
 try:
-    self._field = (
-        int(os.environ["VS_VAR"])
-
-        if "VS_VAR" in os.environ
-        else None
-    )
+    self._field = int(os.environ["VS_VAR"]) if "VS_VAR" in os.environ else None
 except ValueError:
     self._field = None
-
 ```
 
 **Variables**: VS_MAX_TURNS (int), VS_BUDGET_USD (float)
@@ -320,7 +310,6 @@ except ValueError:
 ### Pattern 4: Simple Env Get (4 variables)
 
 ```python
-
 root_str = os.environ.get("VS_MCP_ROOT_DIR")
 if not root_str:
     raise RuntimeError(...)

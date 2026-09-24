@@ -33,6 +33,7 @@ import os
 import sys
 from typing import TYPE_CHECKING
 
+from dev import environment
 from dev.exit_codes import (
     DRIFT,
     FAILED,
@@ -48,14 +49,6 @@ from dev.exit_codes import (
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
-
-#: Set to any non-empty value to stream every step and echo every command, as
-#: the harness did unconditionally before this module existed. The escape hatch
-#: for watching a long step work rather than waiting for its verdict.
-VERBOSE_ENV = "VAULTSPEC_VERBOSE"
-
-#: The community standard for suppressing colour; honoured whatever its value.
-NO_COLOR_ENV = "NO_COLOR"
 
 #: Width the step label is padded to. Fixed rather than measured because rows
 #: print as each step COMPLETES - a width derived from the whole target would
@@ -92,9 +85,13 @@ _RESET = "\033[0m"
 
 
 def verbose(env: Mapping[str, str] | None = None) -> bool:
-    """Whether every step should stream and echo its command."""
-    environment = os.environ if env is None else env
-    return bool(environment.get(VERBOSE_ENV, "").strip())
+    """Whether every step should stream and echo its command.
+
+    ``VAULTSPEC_VERBOSE`` set to any non-blank value is the escape hatch for
+    watching a long step work rather than waiting for its verdict.
+    """
+    raw = environment.value(environment.VAULTSPEC_VERBOSE, env) or ""
+    return bool(raw.strip())
 
 
 def colouring() -> bool:
@@ -104,7 +101,7 @@ def colouring() -> bool:
     ones is the fastest read of an eleven-dimension aggregate - so it is on at
     a terminal and off everywhere its escapes would become literal text.
     """
-    return sys.stdout.isatty() and not os.environ.get(NO_COLOR_ENV, "")
+    return sys.stdout.isatty() and not environment.value(environment.NO_COLOR)
 
 
 def status_word(code: int) -> str:

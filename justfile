@@ -368,6 +368,11 @@ test-vault-repair:
 test-benchmark:
     {{dev}} test benchmark
 
+# Run the hosted-search tests against the live TypeSafe API; needs the key exported.
+[group('test')]
+test-typesafe:
+    {{dev}} test typesafe
+
 # Run the harness lane.
 [group('test')]
 test-harness:

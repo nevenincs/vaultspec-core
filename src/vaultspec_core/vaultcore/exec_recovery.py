@@ -21,7 +21,7 @@ from ..plan.commands.step_ops import find_step
 from ..plan.parser import Plan, parse_plan
 from .checks.exec_mapping import link_stem
 from .models import refresh_modified_stamp, vault_today
-from .parser import parse_vault_metadata
+from .parser import parse_vault_metadata, split_frontmatter
 from .rename_engine import assert_within, docs_lock_target
 from .rename_ops import split_keepends
 
@@ -336,15 +336,14 @@ def _remove_step_id(path: Path) -> None:
 
 def _frontmatter_and_body(text: str) -> tuple[str, str]:
     """Split the leading YAML fence without normalizing its bytes."""
-    lines = text.splitlines(keepends=True)
-    if not lines or lines[0].lstrip("\ufeff").rstrip("\r\n") != "---":
+    split = split_frontmatter(text)
+    if split.unclosed:
+        raise ExecRecoveryError(
+            "Execution record has an unclosed YAML frontmatter fence."
+        )
+    if not split.at_start:
         raise ExecRecoveryError("Execution record has no leading YAML frontmatter.")
-    offset = len(lines[0])
-    for line in lines[1:]:
-        offset += len(line)
-        if line.rstrip("\r\n") == "---":
-            return text[:offset], text[offset:]
-    raise ExecRecoveryError("Execution record has an unclosed YAML frontmatter fence.")
+    return text[: split.frontmatter_end], text[split.frontmatter_end :]
 
 
 def _edit_frontmatter_step_id(text: str, step_id: str | None) -> str | None:

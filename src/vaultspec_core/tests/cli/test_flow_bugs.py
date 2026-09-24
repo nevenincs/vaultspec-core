@@ -1107,37 +1107,35 @@ class TestStructureRenameUpdatesRefs:
         assert '"[[alpha]]"' not in written
         assert result.fixed_count == 1
 
-    def test_rewrite_warns_on_frontmatter_budget_overflow(self, tmp_path: Path) -> None:
-        """Frontmatter exceeding the line budget must surface a WARNING."""
+    def test_rewrite_warns_on_unclosed_frontmatter_linking_a_renamed_doc(
+        self, tmp_path: Path
+    ) -> None:
+        """A never-closed fence is skipped with a WARNING, the file untouched."""
         from vaultspec_core.vaultcore.checks._base import (
             CheckResult,
             Severity,
         )
-        from vaultspec_core.vaultcore.rename_ops import (
-            _FRONTMATTER_LINE_BUDGET,
-            rewrite_incoming_refs,
-        )
+        from vaultspec_core.vaultcore.rename_ops import rewrite_incoming_refs
 
         vault = tmp_path / ".vault"
         adr_dir = vault / "adr"
         adr_dir.mkdir(parents=True)
-        # Build a pathological doc: opening fence, then enough filler lines
-        # to overflow the budget before the scanner could reach the
-        # related: block or the closing fence.
-        filler_lines = ["filler: value" for _ in range(_FRONTMATTER_LINE_BUDGET + 20)]
-        pathological = adr_dir / "2026-03-02-budget-adr.md"
+        pathological = adr_dir / "2026-03-02-unclosed-adr.md"
         pathological.write_text(
-            "---\n" + "\n".join(filler_lines) + "\n",
+            "---\ntags:\n  - '#adr'\nrelated:\n  - '[[alpha]]'\n\n# Body\n",
             encoding="utf-8",
         )
+        before = pathological.read_bytes()
 
         result = CheckResult(check_name="structure", supports_fix=True)
         rewrite_incoming_refs(tmp_path, [("alpha", "beta")], result)
 
         warnings = [d for d in result.diagnostics if d.severity == Severity.WARNING]
-        assert any("Frontmatter exceeds" in d.message for d in warnings), (
-            f"expected budget WARNING, saw {[d.message for d in warnings]!r}"
+        assert any("never closes" in d.message for d in warnings), (
+            f"expected unclosed-fence WARNING, saw {[d.message for d in warnings]!r}"
         )
+        assert result.fixed_count == 0
+        assert pathological.read_bytes() == before
 
     def test_rewrite_preserves_anchor_and_alias_suffixes(self, tmp_path: Path) -> None:
         """Wiki-links with ``#anchor`` or ``|alias`` must rewrite the stem

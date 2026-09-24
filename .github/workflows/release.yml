@@ -54,6 +54,8 @@ jobs:
       pull-requests: write
     with:
       ref: ${{ inputs.tag }}
+    secrets:
+      VAULTSPEC_CORE_TYPESAFE_API_KEY: ${{ secrets.VAULTSPEC_CORE_TYPESAFE_API_KEY }}
 
   # Reached only when the gate passed: a job's default condition is the
   # success of everything it needs, and a called workflow's result is its

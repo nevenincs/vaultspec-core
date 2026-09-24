@@ -5,6 +5,15 @@ Centralizes typed defaults, ``VAULTSPEC_*`` env-var parsing, and the
 :class:`ConfigVariable`, :data:`CONFIG_REGISTRY`, :func:`get_config`,
 :func:`reset_config`, and three parse helpers. Consumed by every module
 that reads workspace settings; re-exported via :mod:`vaultspec_core.config`.
+
+The registry is total: every environment variable the product reads or sets
+is declared in it exactly once, including the external conventions it honours
+(``CI``, ``NO_COLOR``, ``VISUAL`` ...) and the internal marker it sets for its
+own child processes. This module is the only place the process environment is
+touched. Settings that load once become :class:`VaultSpecConfig` fields;
+variables whose meaning is decided where they are used are read at call time
+through :func:`env_value`, and child processes get their environment from
+:func:`child_environment`. Both take registry entries, never names.
 """
 
 from __future__ import annotations
@@ -13,17 +22,40 @@ import logging
 import os
 import threading
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Final
 
 from ..core.enums import DirName
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "CI",
+    "CLAUDE_CONFIG_DIR",
+    "CODEX_HOME",
+    "COLUMNS",
     "CONFIG_REGISTRY",
+    "EDITOR",
+    "NO_COLOR",
+    "VAULTSPEC_CORE_TYPESAFE_API_KEY",
+    "VAULTSPEC_EDITOR",
+    "VAULTSPEC_JSON_PRETTY",
+    "VAULTSPEC_LOG_LEVEL",
+    "VAULTSPEC_MCP_GATEWAY_INVOCATION",
+    "VAULTSPEC_NON_INTERACTIVE",
+    "VAULTSPEC_NO_HINTS",
+    "VAULTSPEC_STDIO_WATCHDOG",
+    "VAULTSPEC_TARGET_DIR",
+    "VISUAL",
     "ConfigVariable",
+    "VariableScope",
     "VaultSpecConfig",
+    "child_environment",
+    "env_value",
     "get_config",
     "parse_csv_list",
     "parse_float_or_none",
@@ -101,6 +133,12 @@ class VaultSpecConfig:
             :func:`~vaultspec_core.core.helpers.advisory_lock` acquisition may
             spend waiting before it reports a timeout instead of blocking on.
         editor: Default editor command for creating rules/skills.
+        typesafe_api_key: The hosted vault search credential, or ``None``.
+            A secret: it is excluded from ``repr`` and redacted from every
+            configuration log line. Hosted search resolves it through
+            :func:`~vaultspec_core.config.credential.resolve_credential`,
+            which also consults the workspace ``.env`` in dependency and dev
+            install modes.
     """
 
     # -- Root ------------------------------------------------------------------
@@ -125,6 +163,9 @@ class VaultSpecConfig:
 
     # -- Editor ----------------------------------------------------------------
     editor: str = "zed -w"
+
+    # -- Vault search ----------------------------------------------------------
+    typesafe_api_key: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_environment(
@@ -153,6 +194,10 @@ class VaultSpecConfig:
         kwargs: dict[str, Any] = {}
 
         for var in CONFIG_REGISTRY:
+            # Variables read at call time are not configuration fields.
+            if var.attr_name is None:
+                continue
+
             # 1. Explicit override
             if var.attr_name in overrides:
                 kwargs[var.attr_name] = overrides[var.attr_name]
@@ -246,6 +291,19 @@ def _convert_raw_value(var: ConfigVariable, raw: str) -> tuple[Any, bool]:
     return converter(raw), skip_validation
 
 
+#: What a log line shows in place of a secret variable's value.
+_REDACTED = "<redacted>"
+
+
+def _shown(var: ConfigVariable, value: object) -> str:
+    """Render *value* for a log line, withholding it when *var* is secret.
+
+    A rejected secret is still a secret: the line that says a credential was
+    malformed must not be the line that leaks it.
+    """
+    return _REDACTED if var.secret else repr(value)
+
+
 def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool:
     """Validate an already-converted *value* against *var*'s constraints.
 
@@ -261,9 +319,9 @@ def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool
     """
     if var.options is not None and value not in var.options:
         logger.error(
-            "%s=%r is not one of %s (source: %s); using default",
+            "%s=%s is not one of %s (source: %s); using default",
             var.attr_name,
-            value,
+            _shown(var, value),
             var.options,
             source,
         )
@@ -275,9 +333,9 @@ def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool
         and value < var.min_value
     ):
         logger.error(
-            "%s=%r is below minimum %s (source: %s); using default",
+            "%s=%s is below minimum %s (source: %s); using default",
             var.attr_name,
-            value,
+            _shown(var, value),
             var.min_value,
             source,
         )
@@ -289,9 +347,9 @@ def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool
         and value > var.max_value
     ):
         logger.error(
-            "%s=%r exceeds maximum %s (source: %s); using default",
+            "%s=%s exceeds maximum %s (source: %s); using default",
             var.attr_name,
-            value,
+            _shown(var, value),
             var.max_value,
             source,
         )
@@ -317,21 +375,23 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
     try:
         value, skip_validation = _convert_raw_value(var, raw)
     except (ValueError, TypeError) as exc:
+        # A converter's own message and traceback quote the input verbatim,
+        # so a secret's failure is reported without either.
         logger.error(
-            "Failed to parse %s=%r (source: %s): %s; using default",
+            "Failed to parse %s=%s (source: %s): %s; using default",
             var.attr_name,
-            raw,
+            _shown(var, raw),
             source,
-            exc,
-            exc_info=True,
+            _REDACTED if var.secret else exc,
+            exc_info=not var.secret,
         )
         return _SENTINEL
 
     if var.var_type in (_OptionalInt, _OptionalFloat) and value is None:
         logger.error(
-            "Could not parse %s=%r as %s (source: %s); using default",
+            "Could not parse %s=%s as %s (source: %s); using default",
             var.attr_name,
-            raw,
+            _shown(var, raw),
             "int" if var.var_type is _OptionalInt else "float",
             source,
         )
@@ -342,16 +402,41 @@ def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
     return _SENTINEL
 
 
-@dataclass
-class ConfigVariable:
-    """Metadata for one configurable variable.
-
-    Used by :meth:`VaultSpecConfig.from_environment` to drive env-var
-    resolution, parsing, and validation.
+class VariableScope(StrEnum):
+    """Who owns an environment variable the product reads or sets.
 
     Attributes:
-        env_name: The ``VAULTSPEC_*`` environment variable name.
-        attr_name: The corresponding attribute name on ``VaultSpecConfig``.
+        PRODUCT: A ``VAULTSPEC_*`` setting an operator sets to configure
+            vaultspec-core.
+        INTERNAL: A ``VAULTSPEC_*`` marker vaultspec-core sets on its own
+            child processes. Documented, but not an operator setting.
+        EXTERNAL: A convention another tool or standard owns, which
+            vaultspec-core honours. Not held to the ``VAULTSPEC_`` prefix.
+    """
+
+    PRODUCT = "product"
+    INTERNAL = "internal"
+    EXTERNAL = "external"
+
+
+#: The prefix every variable vaultspec-core owns carries.
+_OWNED_PREFIX: Final = "VAULTSPEC_"
+
+
+@dataclass
+class ConfigVariable:
+    """Metadata for one environment variable the product reads or sets.
+
+    Used by :meth:`VaultSpecConfig.from_environment` to drive env-var
+    resolution, parsing, and validation, and by :func:`env_value` and
+    :func:`child_environment` for variables read or set at call time.
+
+    Attributes:
+        env_name: The environment variable name; ``VAULTSPEC_*`` unless the
+            scope is :attr:`VariableScope.EXTERNAL`.
+        attr_name: The corresponding attribute name on ``VaultSpecConfig``,
+            or ``None`` for a variable read at call time through
+            :func:`env_value` rather than loaded into the configuration.
         var_type: The target Python type for parsing (e.g. ``int``, ``Path``).
         default: The default value when neither override nor env var is set.
         description: Human-readable description of the variable's purpose.
@@ -359,10 +444,23 @@ class ConfigVariable:
         options: Allowed string values; ``None`` means no restriction.
         min_value: Minimum numeric value (inclusive); ``None`` means no minimum.
         max_value: Maximum numeric value (inclusive); ``None`` means no maximum.
+        secret: If ``True``, the value is a credential: every log line that
+            would quote it shows a redaction marker instead, and surfaces
+            report only whether it is set.
+        scope: Who owns the variable; see :class:`VariableScope`.
+        workspace_dotenv: If ``True``, a workspace-root ``.env`` may supply
+            the value when the workspace runs core from its own environment
+            (see :mod:`vaultspec_core.config.credential`). Only a secret may
+            be so marked: the file is repository content, and it supplies
+            credentials, never settings.
+
+    Raises:
+        ValueError: If the name's prefix does not match the scope, or a
+            non-secret variable is marked ``workspace_dotenv``.
     """
 
     env_name: str
-    attr_name: str
+    attr_name: str | None
     var_type: type
     default: Any
     description: str
@@ -370,18 +468,217 @@ class ConfigVariable:
     options: list[str] | None = None
     min_value: float | None = None
     max_value: float | None = None
+    secret: bool = False
+    scope: VariableScope = VariableScope.PRODUCT
+    workspace_dotenv: bool = False
+
+    def __post_init__(self) -> None:
+        owned = self.scope is not VariableScope.EXTERNAL
+        if owned != self.env_name.startswith(_OWNED_PREFIX):
+            requirement = "must" if owned else "must not"
+            raise ValueError(
+                f"{self.env_name}: a {self.scope.value} variable {requirement} "
+                f"start with {_OWNED_PREFIX}"
+            )
+        if self.workspace_dotenv and not self.secret:
+            raise ValueError(
+                f"{self.env_name}: only a secret may be read from a workspace .env"
+            )
+
+
+# -- Entries call sites name -----------------------------------------------------
+# Each is one registry entry, bound to a name so the code that reads or sets it
+# can hand it to env_value() or child_environment(), or name it in a message.
+# How a raw value is interpreted (presence, one exact token, a set of off
+# values) stays with the code that uses it.
+
+VAULTSPEC_TARGET_DIR: Final = ConfigVariable(
+    env_name="VAULTSPEC_TARGET_DIR",
+    attr_name="target_dir",
+    var_type=Path,
+    default=None,
+    description="The root directory for the workspace (where .vault/ and "
+    ".vaultspec/ live).",
+)
+
+VAULTSPEC_EDITOR: Final = ConfigVariable(
+    env_name="VAULTSPEC_EDITOR",
+    attr_name="editor",
+    var_type=str,
+    default="zed -w",
+    description=(
+        "Editor command. Interactive creation of a rule, skill, agent or "
+        "trigger opens it, or zed -w when unset. The edit verbs consult it "
+        "after the --editor flag and the project config key, before VISUAL "
+        "and EDITOR."
+    ),
+)
+
+VAULTSPEC_CORE_TYPESAFE_API_KEY: Final = ConfigVariable(
+    env_name="VAULTSPEC_CORE_TYPESAFE_API_KEY",
+    attr_name="typesafe_api_key",
+    var_type=str,
+    default=None,
+    description=(
+        "TypeSafe API key that enables hosted vault search. Read from the "
+        "process environment first. A workspace-root .env supplies it only "
+        "when vaultspec-core runs from the workspace's own environment (its "
+        "project virtual environment) in dependency or dev mode, never for "
+        "a globally installed tool. Unset or blank means hosted search is "
+        "not configured."
+    ),
+    secret=True,
+    workspace_dotenv=True,
+)
+
+VAULTSPEC_LOG_LEVEL: Final = ConfigVariable(
+    env_name="VAULTSPEC_LOG_LEVEL",
+    attr_name=None,
+    var_type=str,
+    default="INFO",
+    description=(
+        "Root log level when no --debug, --quiet or explicit level is given, "
+        "for example DEBUG, INFO or WARNING. An unknown name means INFO."
+    ),
+)
+
+VAULTSPEC_JSON_PRETTY: Final = ConfigVariable(
+    env_name="VAULTSPEC_JSON_PRETTY",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description=(
+        "Indents --json output. Any value other than 0, false, no, off or "
+        "blank turns it on; unset, the envelope is one compact line."
+    ),
+)
+
+VAULTSPEC_NO_HINTS: Final = ConfigVariable(
+    env_name="VAULTSPEC_NO_HINTS",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description=(
+        "Set to 1 to drop the Next actions block commands print after their "
+        "report; equivalent to --no-hints. Only the exact value 1 counts."
+    ),
+)
+
+VAULTSPEC_NON_INTERACTIVE: Final = ConfigVariable(
+    env_name="VAULTSPEC_NON_INTERACTIVE",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description=(
+        "Set to any value, even blank, to declare that no operator is "
+        "watching, as CI does: repository triggers awaiting approval are "
+        "skipped instead of prompted for."
+    ),
+)
+
+VAULTSPEC_STDIO_WATCHDOG: Final = ConfigVariable(
+    env_name="VAULTSPEC_STDIO_WATCHDOG",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description=(
+        "Lifetime watchdog of the MCP server, on by default. 0, false, off or "
+        "no disables it, leaving stdin EOF as the only exit path."
+    ),
+)
+
+VAULTSPEC_MCP_GATEWAY_INVOCATION: Final = ConfigVariable(
+    env_name="VAULTSPEC_MCP_GATEWAY_INVOCATION",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description=(
+        "Set by the MCP invoke gateway on every CLI process it spawns. Any "
+        "non-empty value marks the process as having no terminal, so it "
+        "refuses to open an editor. Not an operator setting."
+    ),
+    scope=VariableScope.INTERNAL,
+)
+
+CI: Final = ConfigVariable(
+    env_name="CI",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description=(
+        "Set to any value, even blank, by CI systems: repository triggers "
+        "awaiting approval are skipped instead of prompted for."
+    ),
+    scope=VariableScope.EXTERNAL,
+)
+
+NO_COLOR: Final = ConfigVariable(
+    env_name="NO_COLOR",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="Set to any value, even blank, to disable colour in console output.",
+    scope=VariableScope.EXTERNAL,
+)
+
+COLUMNS: Final = ConfigVariable(
+    env_name="COLUMNS",
+    attr_name=None,
+    var_type=int,
+    default=None,
+    description=(
+        "Console width. When set, the console library honours it; when unset, "
+        "the width is queried from the terminal once at startup."
+    ),
+    scope=VariableScope.EXTERNAL,
+)
+
+VISUAL: Final = ConfigVariable(
+    env_name="VISUAL",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="Editor command the edit verbs consult after VAULTSPEC_EDITOR.",
+    scope=VariableScope.EXTERNAL,
+)
+
+EDITOR: Final = ConfigVariable(
+    env_name="EDITOR",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="Editor command the edit verbs consult after VISUAL.",
+    scope=VariableScope.EXTERNAL,
+)
+
+CLAUDE_CONFIG_DIR: Final = ConfigVariable(
+    env_name="CLAUDE_CONFIG_DIR",
+    attr_name=None,
+    var_type=Path,
+    default=None,
+    description=(
+        "Claude Code's configuration home, whose .claude.json holds user-scope "
+        "MCP servers. Unset means the home directory."
+    ),
+    scope=VariableScope.EXTERNAL,
+)
+
+CODEX_HOME: Final = ConfigVariable(
+    env_name="CODEX_HOME",
+    attr_name=None,
+    var_type=Path,
+    default=None,
+    description=(
+        "Codex's home, whose config.toml holds user-scope MCP servers. Unset "
+        "means ~/.codex."
+    ),
+    scope=VariableScope.EXTERNAL,
+)
 
 
 CONFIG_REGISTRY: list[ConfigVariable] = [
     # -- Root ------------------------------------------------------------------
-    ConfigVariable(
-        env_name="VAULTSPEC_TARGET_DIR",
-        attr_name="target_dir",
-        var_type=Path,
-        default=None,
-        description="The root directory for the workspace (where .vault/ and "
-        ".vaultspec/ live).",
-    ),
+    VAULTSPEC_TARGET_DIR,
     # -- Storage ---------------------------------------------------------------
     ConfigVariable(
         env_name="VAULTSPEC_DOCS_DIR",
@@ -460,17 +757,83 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
         min_value=0.0,
     ),
     # -- Editor ----------------------------------------------------------------
-    ConfigVariable(
-        env_name="VAULTSPEC_EDITOR",
-        attr_name="editor",
-        var_type=str,
-        # Honour the standard $VISUAL / $EDITOR convention before the
-        # built-in fallback, so an operator's existing editor choice is
-        # respected without a vaultspec-specific variable.
-        default=os.environ.get("VISUAL") or os.environ.get("EDITOR") or "zed -w",
-        description="Default editor command for creating rules/skills.",
-    ),
+    VAULTSPEC_EDITOR,
+    VISUAL,
+    EDITOR,
+    # -- Vault search ----------------------------------------------------------
+    VAULTSPEC_CORE_TYPESAFE_API_KEY,
+    # -- CLI output ------------------------------------------------------------
+    VAULTSPEC_LOG_LEVEL,
+    VAULTSPEC_JSON_PRETTY,
+    VAULTSPEC_NO_HINTS,
+    NO_COLOR,
+    COLUMNS,
+    # -- Unattended runs -------------------------------------------------------
+    VAULTSPEC_NON_INTERACTIVE,
+    CI,
+    # -- MCP server ------------------------------------------------------------
+    VAULTSPEC_STDIO_WATCHDOG,
+    VAULTSPEC_MCP_GATEWAY_INVOCATION,
+    # -- Provider homes --------------------------------------------------------
+    CLAUDE_CONFIG_DIR,
+    CODEX_HOME,
 ]
+
+
+#: Identities of the registered entries, so the accessors below refuse a
+#: variable that was built somewhere else instead of declared here.
+_REGISTERED: Final = frozenset(id(var) for var in CONFIG_REGISTRY)
+
+
+def _registered(var: ConfigVariable) -> ConfigVariable:
+    """Return *var*, refusing one that is not a :data:`CONFIG_REGISTRY` entry."""
+    if id(var) not in _REGISTERED:
+        raise ValueError(f"{var.env_name} is not declared in CONFIG_REGISTRY")
+    return var
+
+
+def env_value(
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
+) -> str | None:
+    """Return the raw value of registered variable *var*, read now.
+
+    For variables whose meaning is decided where they are used - presence
+    alone, one exact token, a set of off values - and which must track the
+    environment at call time rather than when the configuration loaded.
+
+    Args:
+        var: A :data:`CONFIG_REGISTRY` entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        The value as set, which may be blank, or ``None`` when unset.
+
+    Raises:
+        ValueError: If *var* is not a registry entry.
+    """
+    env = os.environ if environ is None else environ
+    return env.get(_registered(var).env_name)
+
+
+def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str]:
+    """Build a child process's environment: this one's, plus *assignments*.
+
+    Assignments are applied after the copy, so an inherited value never
+    overrides one set here.
+
+    Args:
+        *assignments: ``(variable, value)`` pairs of registry entries to set.
+
+    Returns:
+        A fresh mapping the caller may hand to :mod:`subprocess`.
+
+    Raises:
+        ValueError: If a variable is not a registry entry.
+    """
+    env = dict(os.environ)
+    for var, value in assignments:
+        env[_registered(var).env_name] = value
+    return env
 
 
 _cached_config: VaultSpecConfig | None = None

@@ -12,11 +12,11 @@ CI both decide pass or fail from what these functions return.
 
 from __future__ import annotations
 
-import os
 import sys
 
 import pytest
 
+from dev.environment import child_environment
 from dev.runner import TOOL_MISSING, Cmd, ToolOrDocker, run, run_tool_or_docker, uv_run
 
 pytestmark = pytest.mark.unit
@@ -46,14 +46,18 @@ def test_run_overlays_env_onto_the_inherited_environment() -> None:
     ``UTF8`` in :mod:`dev.toolchain` relies on both halves: complexipy needs
     ``PYTHONIOENCODING`` added, and it needs ``PATH`` to survive.
     """
-    assert PROBE not in os.environ, f"{PROBE} must not be set before the overlay"
+    assert PROBE not in child_environment(), (
+        f"{PROBE} must not be set before the overlay"
+    )
     probe = (
         "import os, sys; "
         f"sys.exit(0 if os.environ.get({PROBE!r}) == 'overlaid' "
         "and os.environ.get('PATH') else 1)"
     )
     assert run((sys.executable, "-c", probe), {PROBE: "overlaid"}).code == 0
-    assert PROBE not in os.environ, "the overlay must not leak into this process"
+    assert PROBE not in child_environment(), (
+        "the overlay must not leak into this process"
+    )
 
 
 def test_run_returns_tool_missing_for_an_absent_executable() -> None:

@@ -44,8 +44,8 @@ The comment acknowledges this is superseded by `_get_docs_dir()`. A search of th
 def supported_models(self) -> list[str]:
     return self.models.ALL
 
-def get_model_capability(self, model: str) -> CapabilityLevel:
-    ...
+
+def get_model_capability(self, model: str) -> CapabilityLevel: ...
 ```
 
 A search of `lib/src/` shows these methods are called only from tests (`test_providers.py`), never from production code. `prepare_process()` in both `ClaudeProvider` and `GeminiProvider` uses `get_best_model_for_capability()` (which IS production-used), but `supported_models` and `get_model_capability` are test-only utilities promoted to the ABC surface. This inflates the public API contract without production justification.
@@ -99,7 +99,6 @@ ______________________________________________________________________
 Two different escaping strategies exist in the same file:
 
 ```python
-
 # _sanitize_filter_value (line 42): proper SQL double-quoting escape
 
 sanitized = value.replace("'", "''")

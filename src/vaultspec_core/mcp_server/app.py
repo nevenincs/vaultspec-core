@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
+    from mcp.types import Tool
 
 from mcp.server.extension import Extension
 from mcp.server.mcpserver import MCPServer
@@ -26,21 +27,29 @@ from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 from vaultspec_core import __version__
 from vaultspec_core.cli._app import MCP_PROG_NAME, make_app
 
+from .envelope import lean_tool_schema
 from .tools import (
+    register_crossref_tools,
     register_document_tools,
     register_exec_tools,
     register_gateway_tools,
     register_orientation_tools,
     register_plan_tools,
+    register_search_tools,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class _ReadOnlyCheckGuard(Extension):
-    """Reject repair arguments that the SDK would otherwise ignore."""
+class _ReadOnlyArgumentGuard(Extension):
+    """Reject write arguments that the SDK would otherwise ignore.
 
-    identifier = "io.vaultspec/read-only-check"
+    The read-only ``check`` takes no ``fix`` and the read-only ``crossref``
+    takes one ``ref``; the SDK drops an undeclared argument silently, which
+    would let a caller believe a repair or a link write ran.
+    """
+
+    identifier = "io.vaultspec/read-only-arguments"
 
     @override
     async def intercept_tool_call(
@@ -49,17 +58,50 @@ class _ReadOnlyCheckGuard(Extension):
         ctx: ServerRequestContext[Any, Any],
         call_next: CallNext,
     ) -> HandlerResult:
-        if params.name == "check" and "fix" in (params.arguments or {}):
+        arguments = params.arguments or {}
+        refused: str | None = None
+        if params.name == "check" and "fix" in arguments:
+            refused = "read-only check does not accept the 'fix' argument"
+        elif params.name == "crossref" and set(arguments) - {"ref"}:
+            refused = "read-only crossref judges one 'ref' and writes nothing"
+        if refused is not None:
             return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text="read-only check does not accept the 'fix' argument",
-                    )
-                ],
+                content=[TextContent(type="text", text=refused)],
                 is_error=True,
             )
         return await call_next(ctx)
+
+
+class _LeanToolServer(MCPServer[None]):
+    """An ``MCPServer`` whose tool list publishes leaned schemas.
+
+    The SDK builds each tool's input schema from the function signature and
+    wraps a ``list`` result in an output model of its own; neither passes a
+    hook this project's models declare. ``tools/list`` is answered from
+    :meth:`list_tools`, so leaning the schemas here changes what every client,
+    and every test that lists tools, reads - and nothing else: arguments are
+    still validated by the SDK's argument model and results by the declared
+    output model.
+    """
+
+    @override
+    async def list_tools(self) -> list[Tool]:
+        """List the registered tools with :func:`lean_tool_schema` applied.
+
+        Returns:
+            The published tools.
+        """
+        return [
+            tool.model_copy(
+                update={
+                    "input_schema": lean_tool_schema(tool.input_schema),
+                    "output_schema": None
+                    if tool.output_schema is None
+                    else lean_tool_schema(tool.output_schema),
+                }
+            )
+            for tool in await super().list_tools()
+        ]
 
 
 def _build_instructions(*, read_only: bool) -> str:
@@ -79,19 +121,25 @@ def _build_instructions(*, read_only: bool) -> str:
             "Vaultspec-core MCP server in read-only mode (tool-schema version "
             f"{__version__}). It exposes only 'status' (project orientation and "
             "grounding traces), 'find' (document and feature discovery with blob "
-            "hashes and resource links), 'check' (vault health validation without "
-            "repair), and 'discover' (read-only search of the verb catalog). "
-            "Mutation tools and the invocation gateway are deliberately absent."
+            "hashes and resource links), 'search' (ranked vault records with the "
+            "passage that answers a question), 'crossref' (the ADRs one decision "
+            "should link, judged within fixed bounds), 'check' (vault health "
+            "validation without repair), and 'discover' (read-only search of the verb "
+            "catalog). Mutation tools and the invocation gateway are deliberately "
+            "absent."
         )
 
     return (
         "Vaultspec-core MCP server (tool-schema version "
         f"{__version__}). These tools cover the vaultspec workflow. Hot path: "
         "'status' (project orientation and grounding traces), 'find' (document "
-        "and feature discovery with blob hashes and resource links), 'create' "
-        "(batch document scaffolding from templates), 'edit' (batch body-prose "
-        "editing with optimistic-concurrency guards), 'plan_progress' (mark "
-        "plan steps checked/unchecked), 'plan_edit' (add/insert/edit/remove "
+        "and feature discovery with blob hashes and resource links), 'search' "
+        "(ranked vault records with the passage that answers a question), "
+        "'crossref' (the ADRs a decision should link, judged within fixed "
+        "bounds, optionally written), 'create' (batch document scaffolding "
+        "from templates), 'edit' (batch body-prose editing with "
+        "optimistic-concurrency guards), 'plan_progress' "
+        "(mark plan steps checked/unchecked), 'plan_edit' (add/insert/edit/remove "
         "plan steps), 'log' (append a Step's rows to its plan's execution "
         "ledger), and 'check' (vault health checks with optional fix). "
         "Long tail: 'discover' searches the full verb catalog and returns "
@@ -130,17 +178,19 @@ def create_server(*, read_only: bool = False) -> MCPServer[None]:
     Returns:
         Configured :class:`~mcp.server.mcpserver.MCPServer` ready to serve.
     """
-    mcp = MCPServer(
+    mcp = _LeanToolServer(
         name="vaultspec-core-mcp",
         instructions=_build_instructions(read_only=read_only),
         lifespan=_lifespan,
-        extensions=[_ReadOnlyCheckGuard()] if read_only else None,
+        extensions=[_ReadOnlyArgumentGuard()] if read_only else None,
     )
 
     # The restricted mode is a positive allowlist: only non-mutating handlers
     # are registered, so no write-capable tool reaches the advertised catalog.
     register_document_tools(mcp, include_mutations=not read_only)
     register_orientation_tools(mcp, include_fix=not read_only)
+    register_search_tools(mcp)
+    register_crossref_tools(mcp, include_apply=not read_only)
     if not read_only:
         register_plan_tools(mcp)
         register_exec_tools(mcp)
@@ -200,9 +250,12 @@ def _serve(
     # inherited pipe handles, so anchor shutdown to the client process itself
     # (pipe creator primary, ancestor chain fallback, POSIX reparent poll).
     # Fails open to EOF-only behavior when it cannot arm.
+    from ..config import VAULTSPEC_STDIO_WATCHDOG, env_value
     from .watchdog import arm_client_watchdog
 
-    if arm_client_watchdog(parent_pid=parent_pid):
+    if arm_client_watchdog(
+        parent_pid=parent_pid, kill_switch=env_value(VAULTSPEC_STDIO_WATCHDOG)
+    ):
         logger.debug("Client watchdog armed")
     else:
         logger.debug("Client watchdog not armed; relying on stdin EOF")

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 __all__ = ["vault_root"]
 
-pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
+pytestmark = [pytest.mark.unit]
 
 #: The verbs this advisory closes. Each one either writes a hook, runs one,
 #: approves one, or fires the event that runs them.

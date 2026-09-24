@@ -90,47 +90,53 @@ members rather than ~32,000.
 ```python
 class FrameworkSignal(StrEnum):
     MISSING = "missing"
-    CORRUPTED = "corrupted"       # dir exists, manifest absent or malformed
+    CORRUPTED = "corrupted"  # dir exists, manifest absent or malformed
     PRESENT = "present"
+
 
 class ProviderDirSignal(StrEnum):
     MISSING = "missing"
-    EMPTY = "empty"               # scaffolded, never synced
-    PARTIAL = "partial"           # some expected files missing
-    COMPLETE = "complete"         # all expected files present
-    MIXED = "mixed"               # has non-vaultspec user content
+    EMPTY = "empty"  # scaffolded, never synced
+    PARTIAL = "partial"  # some expected files missing
+    COMPLETE = "complete"  # all expected files present
+    MIXED = "mixed"  # has non-vaultspec user content
+
 
 class ManifestEntrySignal(StrEnum):
-    COHERENT = "coherent"         # manifest and filesystem agree
-    ORPHANED = "orphaned"         # in manifest, directory missing
-    UNTRACKED = "untracked"       # directory exists, not in manifest
+    COHERENT = "coherent"  # manifest and filesystem agree
+    ORPHANED = "orphaned"  # in manifest, directory missing
+    UNTRACKED = "untracked"  # directory exists, not in manifest
     NOT_INSTALLED = "not_installed"
 
+
 class ContentSignal(StrEnum):
-    CLEAN = "clean"               # file matches source transform
-    DIVERGED = "diverged"         # file differs from expected content
-    STALE = "stale"               # destination file has no source
-    MISSING = "missing"           # source exists, no destination
+    CLEAN = "clean"  # file matches source transform
+    DIVERGED = "diverged"  # file differs from expected content
+    STALE = "stale"  # destination file has no source
+    MISSING = "missing"  # source exists, no destination
+
 
 class BuiltinVersionSignal(StrEnum):
-    CURRENT = "current"           # matches snapshot
-    MODIFIED = "modified"         # user edited builtin
-    DELETED = "deleted"           # builtin removed, snapshot exists
-    NO_SNAPSHOTS = "no_snapshots" # pre-version install, no baseline
+    CURRENT = "current"  # matches snapshot
+    MODIFIED = "modified"  # user edited builtin
+    DELETED = "deleted"  # builtin removed, snapshot exists
+    NO_SNAPSHOTS = "no_snapshots"  # pre-version install, no baseline
+
 
 class ConfigSignal(StrEnum):
-    OK = "ok"                     # present, well-formed, has AUTO-GENERATED marker
-    MISSING = "missing"           # config file absent
-    FOREIGN = "foreign"           # config exists, no AUTO-GENERATED marker (user-authored)
-    PARTIAL_MCP = "partial_mcp"   # .mcp.json missing vaultspec-core entry
-    USER_MCP = "user_mcp"         # .mcp.json has extra user entries
+    OK = "ok"  # present, well-formed, has AUTO-GENERATED marker
+    MISSING = "missing"  # config file absent
+    FOREIGN = "foreign"  # config exists, no AUTO-GENERATED marker (user-authored)
+    PARTIAL_MCP = "partial_mcp"  # .mcp.json missing vaultspec-core entry
+    USER_MCP = "user_mcp"  # .mcp.json has extra user entries
+
 
 class GitignoreSignal(StrEnum):
     NO_FILE = "no_file"
-    NO_ENTRIES = "no_entries"     # file exists, no managed block
-    PARTIAL = "partial"           # managed block exists, entries stale
-    COMPLETE = "complete"         # managed block exists, all entries present
-    CORRUPTED = "corrupted"       # only one marker found (orphaned)
+    NO_ENTRIES = "no_entries"  # file exists, no managed block
+    PARTIAL = "partial"  # managed block exists, entries stale
+    COMPLETE = "complete"  # managed block exists, all entries present
+    CORRUPTED = "corrupted"  # only one marker found (orphaned)
 ```
 
 ### Resolution actions (enum, not bare string)
@@ -220,6 +226,7 @@ class ProviderDiagnosis:
     manifest_entry: ManifestEntrySignal
     content: dict[str, ContentSignal]
     config: ConfigSignal
+
 
 @dataclass
 class WorkspaceDiagnosis:

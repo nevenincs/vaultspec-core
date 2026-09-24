@@ -359,6 +359,7 @@ def rule_promote(
         refresh_modified_stamp,
         vault_today,
     )
+    from ..vaultcore.parser import rerender_frontmatter
     from .exceptions import ResourceExistsError, ResourceNotFoundError, VaultSpecError
 
     # 1. Locate the originating audit document
@@ -423,82 +424,13 @@ derived_from:
         meta.promoted_to.append(new_rule_ref)
 
     # Rebuild the audit's frontmatter to update promoted_to, preserving rest
-    match = re.match(
-        r"^---\s*\n(.*?)\n---\s*\n?(.*)$", normalized_content.lstrip(), re.DOTALL
+    rendered_audit = rerender_frontmatter(
+        normalized_content, meta, render_stamps=False, quote_date=True
     )
-    if not match:
+    if rendered_audit is None:
         raise VaultSpecError(
             f"Could not parse frontmatter of audit file '{audit_file}'."
         )
-
-    yaml_block = match.group(1)
-    audit_body = match.group(2)
-    leading_whitespace = normalized_content[
-        : len(normalized_content) - len(normalized_content.lstrip())
-    ]
-
-    # Rebuild frontmatter keys
-    lines = ["---"]
-    if meta.tags:
-        lines.append("tags:")
-        for tag in meta.tags:
-            lines.append(f'  - "{tag}"')
-    if meta.date:
-        lines.append(f"date: '{meta.date}'")
-    if meta.related:
-        lines.append("related:")
-        for link in meta.related:
-            lines.append(f'  - "{link}"')
-    if meta.supersedes:
-        lines.append("supersedes:")
-        for stem in meta.supersedes:
-            lines.append(f"  - '{stem}'")
-    if meta.superseded_by:
-        lines.append(f"superseded_by: '{meta.superseded_by}'")
-    if meta.derived_from:
-        lines.append("derived_from:")
-        for stem in meta.derived_from:
-            lines.append(f"  - '{stem}'")
-    if meta.promoted_to:
-        lines.append("promoted_to:")
-        for rule in meta.promoted_to:
-            lines.append(f"  - '{rule}'")
-    if meta.archived:
-        lines.append(f"archived: '{meta.archived}'")
-
-    # Preserve any unknown keys
-    known_keys = {
-        "tags",
-        "date",
-        "related",
-        "feature",
-        "supersedes",
-        "superseded_by",
-        "derived_from",
-        "promoted_to",
-        "archived",
-    }
-    in_unknown_key = False
-    for line in yaml_block.split("\n"):
-        stripped = line.strip()
-        if ":" in stripped and not stripped.startswith("-"):
-            key = stripped.split(":", 1)[0].strip()
-            in_unknown_key = key not in known_keys
-            if in_unknown_key:
-                lines.append(line)
-        elif stripped.startswith("-"):
-            if in_unknown_key:
-                lines.append(line)
-        else:
-            if in_unknown_key and stripped:
-                lines.append(line)
-            in_unknown_key = False
-
-    lines.append("---")
-    if audit_body:
-        lines.append(audit_body)
-
-    rendered_audit = leading_whitespace + "\n".join(lines)
     final_audit_content = (
         rendered_audit
         if source_newline == "\n"

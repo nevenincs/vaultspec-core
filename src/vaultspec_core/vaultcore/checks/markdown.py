@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
+from ..markdown import LineRole, line_roles
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -69,18 +70,6 @@ class MarkdownStats:
         return ", ".join(parts) if parts else "no markdown issues"
 
 
-def _is_fence(line: str) -> bool:
-    """Return ``True`` if *line* opens or closes a fenced code block.
-
-    Called once per line of every document, so the cheap character tests come
-    before the ``lstrip`` allocation: a fence needs a backtick or a tilde, and
-    most lines have neither.
-    """
-    if "`" not in line and "~" not in line:
-        return False
-    return line.lstrip().startswith(("```", "~~~"))
-
-
 def apply_markdown_hygiene(content: str) -> tuple[str, MarkdownStats]:
     """Apply the markdown hygiene lints to LF-normalised *content*.
 
@@ -102,14 +91,10 @@ def apply_markdown_hygiene(content: str) -> tuple[str, MarkdownStats]:
     # Tag each line with whether it sits strictly inside a fenced block. The
     # fence open/close markers themselves are treated as outside the fence
     # (they are never blank and their trailing whitespace is safe to strip).
-    rows: list[tuple[str, bool]] = []
-    in_fence = False
-    for line in lines:
-        if _is_fence(line):
-            rows.append((line, False))
-            in_fence = not in_fence
-        else:
-            rows.append((line, in_fence))
+    rows = [
+        (line, role is LineRole.CODE)
+        for line, role in zip(lines, line_roles(lines), strict=True)
+    ]
 
     # MD009: strip trailing whitespace outside fences.
     stripped_rows: list[tuple[str, bool]] = []

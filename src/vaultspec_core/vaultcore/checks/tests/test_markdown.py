@@ -62,6 +62,49 @@ class TestApplyMarkdownHygiene:
         assert stats.trailing_whitespace == 0
         assert stats.blank_runs == 0
 
+    def test_nested_fence_sample_stays_inside_the_outer_fence(self):
+        # The inner ``` lines cannot close a four-backtick fence, and an info
+        # string never closes one, so the sample's whitespace is untouched.
+        body = "````md\n```python\nx = 1   \n\n\ny = 2\n```\n````\n"
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body
+        assert stats.total == 0
+
+    def test_fence_nested_in_a_list_item_is_protected(self):
+        # The fence sits five spaces in, under the inner item's content
+        # column, so it is code and its whitespace is left alone; the
+        # trailing space on the prose line outside it is still stripped.
+        body = (
+            "1. Outer step\n"
+            "   - Inner step \n"
+            "\n"
+            "     ```bash\n"
+            "     echo a   \n"
+            "\n"
+            "\n"
+            "     echo b\n"
+            "     ```\n"
+        )
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body.replace("Inner step \n", "Inner step\n")
+        assert (stats.trailing_whitespace, stats.blank_runs) == (1, 0)
+
+    def test_fence_under_an_item_holding_a_comment_is_protected(self):
+        # The comment's closing line at column 0 is comment text, not a line
+        # that closes the item, so the fence under the item keeps its code.
+        body = "- item <!--\nnote\n-->\n    ```\n    x   \n\n\n    y\n    ```\n"
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body
+        assert stats.total == 0
+
+    def test_fence_after_a_stray_backtick_is_protected(self):
+        # A lone backtick in prose cannot pair across the fence line, so the
+        # fence's whitespace stays as written.
+        body = "A stray ` backtick.\n\n```\n  x  \n\n\n```\n"
+        cleaned, stats = apply_markdown_hygiene(body)
+        assert cleaned == body
+        assert stats.total == 0
+
     def test_idempotent(self):
         once, _ = apply_markdown_hygiene("a   \n\n\n\nb\n\n\n")
         twice, stats = apply_markdown_hygiene(once)

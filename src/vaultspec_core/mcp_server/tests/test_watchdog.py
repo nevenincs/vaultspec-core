@@ -35,36 +35,21 @@ if TYPE_CHECKING:
     from pathlib import Path
     from typing import IO
 
+from vaultspec_core.config import VAULTSPEC_STDIO_WATCHDOG
 from vaultspec_core.mcp_server.watchdog import (
     _POSIX_POLL_SECONDS,
-    STDIO_WATCHDOG_ENV,
     arm_client_watchdog,
     resolve_stdin_client_pid,
     watchdog_disabled,
 )
+
+from .conftest import EXPECTED_TOOLS
 
 pytestmark = pytest.mark.unit
 
 _RESOLVER_SNIPPET = (
     "from vaultspec_core.mcp_server.watchdog import resolve_stdin_client_pid;"
     "print(resolve_stdin_client_pid(), flush=True)"
-)
-
-#: The ten tools the served surface must advertise; a lifecycle test only
-#: counts once the spawned server has proven it serves exactly these.
-_EXPECTED_TOOLS = frozenset(
-    {
-        "status",
-        "find",
-        "create",
-        "edit",
-        "plan_progress",
-        "plan_edit",
-        "log",
-        "check",
-        "discover",
-        "invoke",
-    }
 )
 
 _POLL_MARGIN_SECONDS = 5.0
@@ -78,7 +63,7 @@ def _assert_server_serves(stdin_pipe: IO[bytes], stdout_pipe: IO[bytes]) -> None
     Drives the real newline-delimited JSON-RPC exchange over the given
     binary pipes: ``initialize`` must identify the server,
     ``notifications/initialized`` completes the handshake, and
-    ``tools/list`` must return exactly the ten-tool surface. Liveness
+    ``tools/list`` must return exactly the full tool surface. Liveness
     alone is never the pass criterion for a running MCP service.
     """
 
@@ -114,7 +99,7 @@ def _assert_server_serves(stdin_pipe: IO[bytes], stdout_pipe: IO[bytes]) -> None
     send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     tools_result = recv(2)
     names = {tool["name"] for tool in tools_result["tools"]}
-    assert names == _EXPECTED_TOOLS, names
+    assert names == EXPECTED_TOOLS, names
 
 
 def _wait_for_pid_exit(pid: int, timeout: float) -> bool:
@@ -240,39 +225,42 @@ def test_non_pipe_stdin_arms_ancestor_fallback(tmp_path: Path) -> None:
     assert proc.stdout.strip() == "None True"
 
 
-def test_kill_switch_disables_arming_in_process() -> None:
-    """The env kill switch declines arming before any anchor is touched.
+@pytest.mark.parametrize("value", ["0", "false", " OFF ", "no"])
+def test_kill_switch_disables_arming_in_process(value: str) -> None:
+    """An off value declines arming before any anchor is touched.
 
-    Exercised in-process with a real environment mutation (restored in
-    ``finally``) so no watchdog thread is ever spawned inside the test
-    runner.
+    Exercised in-process with the value injected, so no watchdog thread is
+    ever spawned inside the test runner.
     """
-    previous = os.environ.get(STDIO_WATCHDOG_ENV)
-    os.environ[STDIO_WATCHDOG_ENV] = "off"
-    try:
-        assert watchdog_disabled() is True
-        assert arm_client_watchdog() is False
-    finally:
-        if previous is None:
-            del os.environ[STDIO_WATCHDOG_ENV]
-        else:
-            os.environ[STDIO_WATCHDOG_ENV] = previous
+    assert watchdog_disabled(value) is True
+    assert arm_client_watchdog(kill_switch=value) is False
+
+
+@pytest.mark.parametrize("value", [None, "", "1", "on"])
+def test_kill_switch_is_off_unless_set_to_an_off_value(value: str | None) -> None:
+    assert watchdog_disabled(value) is False
 
 
 def test_kill_switch_disables_arming_in_worker() -> None:
-    """A worker launched with the kill switch set stays alive and unarmed."""
+    """A worker launched with the kill switch set stays alive and unarmed.
+
+    The worker reads the switch the way the server entry point does, through
+    the configuration layer, so the environment variable is what disarms it.
+    """
     worker_code = textwrap.dedent(
         """
         import time
+        from vaultspec_core.config import VAULTSPEC_STDIO_WATCHDOG, env_value
         from vaultspec_core.mcp_server.watchdog import arm_client_watchdog
-        print(f"armed={arm_client_watchdog()}", flush=True)
+        armed = arm_client_watchdog(kill_switch=env_value(VAULTSPEC_STDIO_WATCHDOG))
+        print(f"armed={armed}", flush=True)
         time.sleep(2)
         print("still-alive", flush=True)
         """
     )
     proc = subprocess.run(
         [sys.executable, "-c", worker_code],
-        env={**os.environ, STDIO_WATCHDOG_ENV: "0"},
+        env={**os.environ, VAULTSPEC_STDIO_WATCHDOG.env_name: "0"},
         capture_output=True,
         text=True,
         timeout=60,
@@ -282,6 +270,7 @@ def test_kill_switch_disables_arming_in_worker() -> None:
     assert "still-alive" in proc.stdout
 
 
+@pytest.mark.serial
 def test_armed_worker_exits_when_dead_client_pid_signals() -> None:
     """Arming against an already-exited client exits the worker immediately.
 
@@ -420,7 +409,7 @@ def test_real_server_exits_when_client_dies_despite_leaked_pipe(
         serving_line = client.stdout.readline().strip()
         assert serving_line.startswith("SERVING name=vaultspec-core-mcp "), serving_line
         served_tools = set(serving_line.split("tools=", 1)[1].split(","))
-        assert served_tools == _EXPECTED_TOOLS, served_tools
+        assert served_tools == EXPECTED_TOOLS, served_tools
 
         client.kill()
         client.wait(timeout=60)
@@ -990,7 +979,7 @@ def test_real_server_parent_pid_flag_reaps_on_override_death(
     )
     try:
         # Functional floor: prove the server serves MCP over its own pipes
-        # (handshake identifies it; tools/list is the exact ten-tool
+        # (handshake identifies it; tools/list is the exact full-tool
         # surface) before the override-death lifecycle assertion counts.
         assert server.stdin is not None
         assert server.stdout is not None

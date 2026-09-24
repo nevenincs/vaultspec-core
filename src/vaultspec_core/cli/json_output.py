@@ -32,21 +32,22 @@ hand; nothing in the agent path sets it.
 
 from __future__ import annotations
 
-import os
 from typing import Any
+
+from ..config import VAULTSPEC_JSON_PRETTY, env_value
 
 __all__ = ["json_format_kwargs", "pretty_enabled"]
 
 #: Compact separators: no space after ``,`` or ``:``. ``json.dumps`` defaults
 #: to ``", "`` and ``": "``, which adds two bytes per field on top of the
-#: indentation itself.
-_COMPACT: dict[str, Any] = {"separators": (",", ":")}
+#: indentation itself. Non-ASCII text is written as UTF-8 rather than
+#: ``\uXXXX`` escapes, which cost six bytes per character (twelve for an
+#: emoji) against the reply budgets; the entry point already makes stdout
+#: UTF-8 (``console.py``), so the raw form is always writable.
+_COMPACT: dict[str, Any] = {"separators": (",", ":"), "ensure_ascii": False}
 
 #: Indented form, for a human reading a payload directly.
-_PRETTY: dict[str, Any] = {"indent": 2}
-
-#: Environment variable that restores indentation.
-_PRETTY_ENV = "VAULTSPEC_JSON_PRETTY"
+_PRETTY: dict[str, Any] = {"indent": 2, "ensure_ascii": False}
 
 _FALSEY = frozenset({"", "0", "false", "no", "off"})
 
@@ -60,7 +61,8 @@ def pretty_enabled() -> bool:
     Returns:
         ``True`` when the environment opts into indentation.
     """
-    return os.environ.get(_PRETTY_ENV, "").strip().lower() not in _FALSEY
+    raw = env_value(VAULTSPEC_JSON_PRETTY) or ""
+    return raw.strip().lower() not in _FALSEY
 
 
 def json_format_kwargs() -> dict[str, Any]:

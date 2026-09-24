@@ -33,14 +33,6 @@ CONTRACT_VERSION: Final = 1
 #: that `node` restores.
 PHASES: Final[tuple[str, ...]] = ("python", "node", "tools")
 
-#: The environment variable that turns on the NDJSON event stream, so the
-#: justfile recipes can stay argument-free and a caller can still ask for
-#: machine-readable output.
-JSON_ENV: Final = "VAULTSPEC_INIT_JSON"
-
-#: The environment variable that forces a full run, ignoring the stamp.
-FORCE_ENV: Final = "VAULTSPEC_INIT_FORCE"
-
 #: Statuses a phase or a run can end in. Deliberately NOT named ``OK``: the
 #: exit-code contract already owns that name for the integer 0, and a module
 #: importing both would silently mix a status string into an exit code.

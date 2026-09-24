@@ -146,6 +146,17 @@ class TestBodySections:
         assert len(warnings) == 1
         assert "empty" in warnings[0].message
 
+    def test_heading_inside_fenced_code_is_not_a_section(self, tmp_path: Path) -> None:
+        _skeleton(tmp_path)
+        sample = "```markdown\n## Summary\n\nQuoted example prose.\n```"
+        _write_doc(
+            tmp_path, "reference", "2026-02-04-feat-reference", {"Appendix": sample}
+        )
+        result = _run(tmp_path)
+        warnings = [d for d in result.diagnostics if "Summary" in d.message]
+        assert len(warnings) == 1
+        assert "Missing required section" in warnings[0].message
+
     def test_extra_author_section_tolerated(self, tmp_path: Path) -> None:
         _skeleton(tmp_path)
         sections = _contents("reference")

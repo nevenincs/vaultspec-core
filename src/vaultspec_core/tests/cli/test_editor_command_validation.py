@@ -28,9 +28,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vaultspec_core.cli import app
+from vaultspec_core.config import VAULTSPEC_MCP_GATEWAY_INVOCATION
 from vaultspec_core.core.editor import (
     EDITOR_PROGRAM_ALLOWLIST,
-    GATEWAY_ENV_MARKER,
     EditorValidationError,
     editor_program_name,
     validate_editor_command,
@@ -104,7 +104,12 @@ def _clean_env(bindir: Path) -> dict[str, str]:
     if sys.platform == "win32":
         path = path + os.pathsep + os.environ.get("PATH", "")
     env = {"PATH": path}
-    for name in ("EDITOR", "VISUAL", "VAULTSPEC_EDITOR", GATEWAY_ENV_MARKER):
+    for name in (
+        "EDITOR",
+        "VISUAL",
+        "VAULTSPEC_EDITOR",
+        VAULTSPEC_MCP_GATEWAY_INVOCATION.env_name,
+    ):
         env[name] = ""
     return env
 
@@ -476,7 +481,7 @@ class TestNonInteractiveInvocation:
 
         env = _clean_env(bindir)
         env["EDITOR"] = "nano"
-        env[GATEWAY_ENV_MARKER] = "1"
+        env[VAULTSPEC_MCP_GATEWAY_INVOCATION.env_name] = "1"
         result = runner.invoke(
             app,
             [

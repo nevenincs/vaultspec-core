@@ -19,6 +19,12 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from ..markdown import (
+    HTML_COMMENT_RE,
+    INLINE_CODE_RE,
+    line_roles,
+    parse_atx_heading,
+)
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -73,29 +79,6 @@ KNOWN_PLACEHOLDERS = frozenset(
     }
 )
 
-# Fenced code blocks (``` or ~~~, three or more of either character, with an
-# optional info string) carry literal brace usage (JSON, shell, config) that
-# is not template residue. Stripping them requires matching CommonMark fence
-# semantics rather than a fixed-length literal: a closing fence must reuse the
-# same character and be at least as long as the opening run, and a fence left
-# unclosed at end of document consumes the remainder of the document (a
-# document cannot "escape" a fence by ending inside one). See
-# ``_strip_code_fences`` for the scanner that enforces this.
-_FENCE_OPEN_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})(.*)$")
-_FENCE_CLOSE_RE = re.compile(r"^\s{0,3}(`+|~+)\s*$")
-
-# HTML comments (<!-- ... -->): placeholders here are template guidance and
-# are removed by the annotations checker; strip them to avoid double-reporting.
-_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-
-# Inline code spans, including multi-backtick spans that themselves contain
-# single backticks (the ``# `{feature}` plan`` heading is documented in prose
-# as ``# `{feature}` plan``). The backreference matches the same run length.
-_INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1", re.DOTALL)
-
-# ATX headings (#, up to 3 leading spaces of indent, 1-6 hashes).
-_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s")
-
 
 def is_template_placeholder(token: str) -> bool:
     """Return ``True`` if *token* is residue from a shipped template.
@@ -118,56 +101,13 @@ def is_template_placeholder(token: str) -> bool:
     return inner in KNOWN_PLACEHOLDERS
 
 
-def _strip_code_fences(body: str) -> str:
-    """Remove fenced code blocks, honouring CommonMark fence-close rules.
-
-    A fence opens on a line of three or more backticks or tildes. It closes on
-    the next line built from the same character, run at least as long as the
-    opening run; anything shorter, of the other character, or not a bare fence
-    line does not close it. A fence with no matching close consumes every
-    remaining line - a document cannot end "inside" an open fence and have the
-    tail treated as prose.
-
-    Args:
-        body: Document body text (everything after the frontmatter).
-
-    Returns:
-        Body text with fenced code blocks (open, content, and close lines)
-        removed.
-    """
-    lines = body.split("\n")
-    kept: list[str] = []
-    i = 0
-    total = len(lines)
-    while i < total:
-        open_match = _FENCE_OPEN_RE.match(lines[i])
-        if open_match is None:
-            kept.append(lines[i])
-            i += 1
-            continue
-
-        fence_char = open_match.group(1)[0]
-        fence_len = len(open_match.group(1))
-        j = i + 1
-        while j < total:
-            close_match = _FENCE_CLOSE_RE.match(lines[j])
-            if (
-                close_match is not None
-                and close_match.group(1)[0] == fence_char
-                and len(close_match.group(1)) >= fence_len
-            ):
-                break
-            j += 1
-        # j is the closing line index, or total if the fence never closes -
-        # either way everything through j is fenced and dropped.
-        i = j + 1
-    return "\n".join(kept)
-
-
 def _strip_non_prose(body: str) -> str:
     """Remove non-prose regions that legitimately contain ``{...}`` braces.
 
-    Fenced code blocks and HTML comments are removed wholesale. Inline code
+    Fenced code blocks carry literal brace usage (JSON, shell, config) that is
+    not template residue, so they are removed wholesale, delimiters included;
+    a fence left unclosed consumes the rest of the body. HTML comments are
+    removed wholesale too. Inline code
     spans are stripped only on non-heading lines: a placeholder wrapped in
     backticks in body prose is documentation (an f-string field, a literal
     ``#{feature}`` tag form), not residue. The one place a real placeholder is
@@ -180,14 +120,21 @@ def _strip_non_prose(body: str) -> str:
     Returns:
         Body text with non-prose brace regions removed.
     """
-    stripped = _strip_code_fences(body)
-    stripped = _HTML_COMMENT_RE.sub("", stripped)
+    lines = body.split("\n")
+    stripped = "\n".join(
+        line
+        for line, role in zip(lines, line_roles(lines), strict=True)
+        if not role.fenced
+    )
+    # Placeholders in comments are template guidance the annotations checker
+    # removes; stripping them here avoids reporting them twice.
+    stripped = HTML_COMMENT_RE.sub("", stripped)
     out_lines: list[str] = []
     for line in stripped.split("\n"):
-        if _HEADING_RE.match(line):
+        if parse_atx_heading(line) is not None:
             out_lines.append(line)
         else:
-            out_lines.append(_INLINE_CODE_RE.sub("", line))
+            out_lines.append(INLINE_CODE_RE.sub("", line))
     return "\n".join(out_lines)
 
 

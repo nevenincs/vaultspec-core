@@ -24,7 +24,9 @@ from vaultspec_core.cli import app
 from vaultspec_core.cli.reference_gen import (
     MANAGED_FILES,
     MANAGED_REGIONS,
+    TABLE_EXTENSION,
     ManagedRegion,
+    MarkdownFormatterError,
     ReferenceMarkerError,
     begin_marker,
     bundled_reference_path,
@@ -34,6 +36,7 @@ from vaultspec_core.cli.reference_gen import (
     generate,
     generate_all,
     render_reference,
+    require_table_extension,
 )
 
 if TYPE_CHECKING:
@@ -135,6 +138,61 @@ def test_render_reference_is_idempotent(tmp_path: Path) -> None:
     once = render_reference(bundled_reference_path().read_text(encoding="utf-8"), app)
     twice = render_reference(once, app)
     assert once == twice
+
+
+_OPTION_TABLE = (
+    "| Option | Short | Default | Description |\n"
+    "| --- | --- | --- | --- |\n"
+    "| `--limit N` | - | `4` | Ranked records to return, from `1` to `11`, with no "
+    "offset to page past them. |\n"
+)
+
+
+def test_a_rendered_option_table_stays_a_table() -> None:
+    """A table wider than the wrap width keeps one row per line."""
+    region = MANAGED_REGIONS[0]
+    fixture = (
+        f"# heading\n\n{_OPTION_TABLE}\n"
+        f"{begin_marker(region.region_id)}\n\n{end_marker(region.region_id)}\n"
+    )
+
+    rendered = render_reference(fixture, app, regions=(region,))
+
+    rows = [line for line in rendered.splitlines() if line.startswith("|")]
+    assert len(rows) == 3, rendered
+    assert all(row.endswith("|") for row in rows), rendered
+
+
+def test_no_reference_table_is_wrapped_into_prose() -> None:
+    """Every paragraph that opens as a table row is a table, row by row.
+
+    A table the formatter read as prose comes back as one paragraph whose
+    rows run together across wrapped lines.
+    """
+    offenders: list[tuple[str, str]] = []
+    for managed in MANAGED_FILES:
+        path = managed.path_factory()
+        if managed.optional and not path.is_file():
+            continue
+        for block in path.read_text(encoding="utf-8").split("\n\n"):
+            lines = block.strip().splitlines()
+            if (
+                lines
+                and lines[0].startswith("| ")
+                and not all(
+                    line.startswith("|") and line.endswith("|") for line in lines
+                )
+            ):
+                offenders.append((path.name, lines[0][:60]))
+    assert not offenders, f"tables wrapped into prose: {offenders}"
+
+
+def test_normalising_without_the_table_extension_is_refused() -> None:
+    """Without the table extension the formatter would wrap every table."""
+    with pytest.raises(MarkdownFormatterError, match=TABLE_EXTENSION):
+        require_table_extension({"frontmatter", "gfm_alerts"})
+
+    require_table_extension({"frontmatter", TABLE_EXTENSION})
 
 
 def test_check_detects_corrupted_managed_region(tmp_path: Path) -> None:

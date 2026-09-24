@@ -10,12 +10,20 @@ clean and with findings (with and without ``fix``).
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from mcp import Client
 
+from vaultspec_core.config import HostedSearchConfig
+from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
 from vaultspec_core.mcp_server.app import create_server
+from vaultspec_core.search import (
+    DiscoveryCapability,
+    discovery_capability,
+    discovery_fields,
+)
 from vaultspec_core.vaultcore.blob_hash import git_blob_oid
 
 from .conftest import data_of
@@ -23,7 +31,7 @@ from .conftest import data_of
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
+pytestmark = [pytest.mark.unit]
 
 
 async def _create(client: Client, documents: list[dict[str, Any]]) -> Any:
@@ -92,6 +100,59 @@ async def test_status_rollup_lists_features_and_version(vault_root: Path) -> Non
         assert "rollupfeat" in names
         # Orientation carries no blob hashes.
         assert "blob_hash" not in payload
+
+
+async def test_status_rollup_carries_the_backend_discovery_record(
+    vault_root: Path,
+) -> None:
+    """The rollup's discovery keys are the search package's one projection."""
+    mcp = create_server()
+    async with Client(mcp) as client:
+        payload = data_of(await client.call_tool("status", {}))
+
+    expected = discovery_fields(discovery_capability(vault_root))
+    # Key presence, not ``get``: an omitted key and a null one must not match.
+    names = {"hosted_search", "companion"}
+    discovery = {key: payload[key] for key in names & payload.keys()}
+    assert discovery == json.loads(json.dumps(expected))
+    assert payload["companion"]["package"] == RAG_DISTRIBUTION_NAME
+
+
+def test_a_failed_companion_probe_omits_the_key_on_both_surfaces() -> None:
+    """Both surfaces spread one projection, and it drops the key, never nulls it."""
+    failed = DiscoveryCapability(
+        hosted_search=HostedSearchConfig(configured=False, source=None),
+        companion=None,
+    )
+
+    fields = discovery_fields(failed)
+
+    assert "companion" not in fields
+    assert fields["hosted_search"] == {"configured": False, "source": None}
+
+
+async def test_status_schema_omits_null_only_where_the_wire_does(
+    vault_root: Path,
+) -> None:
+    """An omitted key publishes no null branch; a key sent as null keeps one."""
+    _ = vault_root
+    tools = {tool.name: tool for tool in await create_server().list_tools()}
+    schema = tools["status"].output_schema
+    assert schema is not None
+
+    properties = schema["properties"]
+    # Absent outside rollup mode, never null.
+    companion = properties["companion"]
+    assert "anyOf" not in companion
+    assert companion["type"] == "object"
+    assert "null" not in json.dumps(properties["target"])
+    # Always present, null when the plan has no open step.
+    line = properties["plans_in_flight"]["items"]
+    assert "next_open_step" in line["required"]
+    assert line["properties"]["next_open_step"] == {"type": ["string", "null"]}
+    # A dataclass field that may be null keeps null among its values.
+    mode = companion["properties"]["mode"]
+    assert None in mode["enum"]
 
 
 async def test_status_trace_targets_a_feature(vault_root: Path) -> None:

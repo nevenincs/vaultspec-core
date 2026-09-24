@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from contextlib import ExitStack
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..config import get_config
@@ -14,6 +15,8 @@ from ..vaultcore import (
     refresh_modified_stamp,
     vault_today,
 )
+from ..vaultcore.markdown import iter_headings
+from ..vaultcore.parser import rerender_frontmatter, split_frontmatter
 from . import types as _t
 from .enums import AdrStatus
 from .exceptions import ResourceNotFoundError, VaultSpecError
@@ -21,104 +24,99 @@ from .helpers import atomic_write
 
 logger = logging.getLogger(__name__)
 
-#: Frontmatter keys ``adr_supersede`` understands and rebuilds explicitly; any other
-#: key in an ADR's frontmatter block is preserved verbatim, in place, by
-#: :func:`_preserve_unknown_frontmatter_keys`.
-_KNOWN_ADR_FRONTMATTER_KEYS = frozenset(
-    {
-        "tags",
-        "date",
-        "related",
-        "feature",
-        "supersedes",
-        "superseded_by",
-        "derived_from",
-        "promoted_to",
-        "archived",
-    }
-)
-
-_ADR_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
-_ADR_STATUS_HEADING_RE = re.compile(
-    r"^(#\s+.*\|\s+\(\*\*status:\*\*\s+`?)([^`)]+)(`?\)\s*)$"
+#: The status marker that ends an ADR's H1, ``| (**status:** `accepted`)``,
+#: with the backtick quoting optional so a bare token is still read (and can
+#: be reported and repaired) rather than mistaken for no status at all.
+_ADR_STATUS_MARKER_RE = re.compile(
+    r"\|\s+\(\*\*status:\*\*\s+(?P<open>`?)(?P<token>[^`)]+?)(?P<close>`?)\)\s*$"
 )
 
 
-def _preserve_unknown_frontmatter_keys(yaml_block: str) -> list[str]:
-    """Return the raw lines of frontmatter keys not covered by known ADR fields.
+@dataclass(frozen=True)
+class AdrStatusMarker:
+    """The status token on an ADR's title heading, located for reading or rewriting.
+
+    Attributes:
+        line: The title heading's 1-based line within the scanned body.
+        token: The raw status token, stripped, not yet validated against
+            :class:`~vaultspec_core.core.enums.AdrStatus`.
+        quoted: Whether the token is wrapped in backticks on both sides.
+        start: Column where the token begins, opening backtick included.
+        end: Column after the token ends, closing backtick included.
+    """
+
+    line: int
+    token: str
+    quoted: bool
+    start: int
+    end: int
+
+    def rewrite(self, heading_line: str, token: str, *, quoted: bool) -> str:
+        """Return *heading_line* with this marker's token replaced by *token*."""
+        value = f"`{token}`" if quoted else token
+        return heading_line[: self.start] + value + heading_line[self.end :]
+
+
+def adr_status_marker(body: str) -> AdrStatusMarker | None:
+    """Locate the status marker on the first H1 of an ADR *body*.
+
+    Decision authority lives on the title line alone: a title without a
+    marker means "no parseable status", never a deferral to some later
+    heading - an example H1 in a code sample included - that happens to
+    carry one.
 
     Args:
-        yaml_block: The original YAML frontmatter block (without the ``---``
-            fences).
+        body: The ADR body, without frontmatter.
 
     Returns:
-        The lines belonging to unrecognized top-level keys, verbatim, so the
-        frontmatter rebuild in :func:`_rewrite_adr_frontmatter` can append them
-        unchanged.
+        The marker, or ``None`` when the body has no H1 or its first H1
+        carries no status marker.
     """
-    preserved: list[str] = []
-    in_unknown_key = False
-    for line in yaml_block.split("\n"):
-        stripped = line.strip()
-        if ":" in stripped and not stripped.startswith("-"):
-            key = stripped.split(":", 1)[0].strip()
-            in_unknown_key = key not in _KNOWN_ADR_FRONTMATTER_KEYS
-            if in_unknown_key:
-                preserved.append(line)
-            continue
-        if stripped.startswith("-"):
-            if in_unknown_key:
-                preserved.append(line)
-            continue
-        if in_unknown_key and stripped:
-            preserved.append(line)
-        in_unknown_key = False
-    return preserved
+    title = next((h for h in iter_headings(body) if h.level == 1), None)
+    if title is None:
+        return None
+    heading_line = body.split("\n")[title.line - 1]
+    match = _ADR_STATUS_MARKER_RE.search(heading_line)
+    if match is None:
+        return None
+    return AdrStatusMarker(
+        line=title.line,
+        token=match.group("token").strip(),
+        quoted=bool(match.group("open")) and bool(match.group("close")),
+        start=match.start("open"),
+        end=match.end("close"),
+    )
 
 
-def _rebuild_frontmatter_lines(meta: DocumentMetadata, yaml_block: str) -> list[str]:
-    """Rebuild an ADR's frontmatter lines from its known metadata fields.
+def rewrite_adr_status(
+    document: str, token: str, *, quoted: bool | None = None
+) -> str | None:
+    """Return the full ADR *document* with its status token replaced.
+
+    Every byte outside the token is preserved, frontmatter included.
 
     Args:
-        meta: The parsed (and possibly mutated) document metadata.
-        yaml_block: The original YAML frontmatter block, used to recover any
-            keys not modeled by :class:`DocumentMetadata`.
+        document: The full ADR text, frontmatter included, ``\\n`` line
+            endings.
+        token: The status value to write.
+        quoted: Whether to wrap *token* in backticks; ``None`` keeps the
+            existing marker's quoting.
 
     Returns:
-        The rebuilt frontmatter lines, opening ``---`` fence included and
-        closing fence omitted (the caller appends body content before closing
-        the block).
+        The rewritten document, or ``None`` when its body carries no status
+        marker to rewrite.
     """
-    fm_lines = ["---"]
-    if meta.tags:
-        fm_lines.append("tags:")
-        for tag in meta.tags:
-            fm_lines.append(f'  - "{tag}"')
-    if meta.date:
-        fm_lines.append(f"date: '{meta.date}'")
-    if meta.related:
-        fm_lines.append("related:")
-        for link in meta.related:
-            fm_lines.append(f'  - "{link}"')
-    if meta.supersedes:
-        fm_lines.append("supersedes:")
-        for stem in meta.supersedes:
-            fm_lines.append(f"  - '{stem}'")
-    if meta.superseded_by:
-        fm_lines.append(f"superseded_by: '{meta.superseded_by}'")
-    if meta.derived_from:
-        fm_lines.append("derived_from:")
-        for stem in meta.derived_from:
-            fm_lines.append(f"  - '{stem}'")
-    if meta.promoted_to:
-        fm_lines.append("promoted_to:")
-        for rule in meta.promoted_to:
-            fm_lines.append(f"  - '{rule}'")
-    if meta.archived:
-        fm_lines.append(f"archived: '{meta.archived}'")
-
-    fm_lines.extend(_preserve_unknown_frontmatter_keys(yaml_block))
-    return fm_lines
+    split = split_frontmatter(document)
+    marker = adr_status_marker(split.body)
+    if marker is None:
+        return None
+    lines = split.body.split("\n")
+    lines[marker.line - 1] = marker.rewrite(
+        lines[marker.line - 1],
+        token,
+        quoted=marker.quoted if quoted is None else quoted,
+    )
+    return document[: split.body_start] + "\n".join(lines)
 
 
 def _rewrite_adr_frontmatter(
@@ -137,40 +135,12 @@ def _rewrite_adr_frontmatter(
     Raises:
         VaultSpecError: If ``normalized`` has no parseable frontmatter block.
     """
-    match = _ADR_FRONTMATTER_RE.match(normalized.lstrip())
-    if not match:
+    rendered = rerender_frontmatter(
+        normalized, meta, render_stamps=False, quote_date=True
+    )
+    if rendered is None:
         raise VaultSpecError(f"Could not parse frontmatter of ADR '{source_file}'.")
-    yaml_block, body_content = match.group(1), match.group(2)
-    leading = normalized[: len(normalized) - len(normalized.lstrip())]
-
-    fm_lines = _rebuild_frontmatter_lines(meta, yaml_block)
-    fm_lines.append("---")
-    if body_content:
-        fm_lines.append(body_content)
-
-    return leading + "\n".join(fm_lines)
-
-
-def _supersede_status_heading(normalized: str) -> str:
-    """Rewrite the first ADR H1 status token to ``superseded``.
-
-    Args:
-        normalized: The document text, normalized to ``\\n`` line endings.
-
-    Returns:
-        The document text with its status token rewritten, or unchanged if no
-        H1 heading matches the expected ``|  (**status:** \\`...\\`)`` shape.
-    """
-    lines_list = normalized.split("\n")
-    for i, line in enumerate(lines_list):
-        if not line.startswith("# "):
-            continue
-        match = _ADR_STATUS_HEADING_RE.match(line)
-        if not match:
-            continue
-        lines_list[i] = f"{match.group(1)}{AdrStatus.SUPERSEDED.value}{match.group(3)}"
-        break
-    return "\n".join(lines_list)
+    return rendered
 
 
 def adr_supersede(
@@ -260,7 +230,9 @@ def _apply_supersession(
     old_meta, _ = parse_vault_metadata(old_normalized)
     old_meta.superseded_by = new_stem
 
-    old_normalized_body = _supersede_status_heading(old_normalized)
+    old_normalized_body = (
+        rewrite_adr_status(old_normalized, AdrStatus.SUPERSEDED.value) or old_normalized
+    )
     final_old_content = _rewrite_adr_frontmatter(
         old_normalized_body, old_meta, old_file
     )
@@ -295,11 +267,8 @@ def _apply_supersession(
 
 def adr_status_from_body(body: str) -> AdrStatus | None:
     """Read decision authority from the first H1, never a later example heading."""
-    for line in body.splitlines():
-        if line.startswith("# "):
-            match = _ADR_STATUS_HEADING_RE.match(line)
-            return AdrStatus.from_token(match.group(2).strip()) if match else None
-    return None
+    marker = adr_status_marker(body)
+    return AdrStatus.from_token(marker.token) if marker is not None else None
 
 
 def _reject_ancestor_cycle(

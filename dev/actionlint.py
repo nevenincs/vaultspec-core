@@ -42,7 +42,6 @@ installed to install something.
 from __future__ import annotations
 
 import hashlib
-import os
 import platform
 import shutil
 import subprocess
@@ -52,6 +51,8 @@ import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
+
+from dev import environment
 
 VERSION = "1.7.12"
 
@@ -119,7 +120,7 @@ def _cache_root() -> Path:
     keep a job out of system locations still hold; the project's own `.venv`
     sibling otherwise, which a `just build-clean` already reclaims.
     """
-    runner_tool_cache = os.environ.get("RUNNER_TOOL_CACHE")
+    runner_tool_cache = environment.value(environment.RUNNER_TOOL_CACHE)
     if runner_tool_cache:
         return Path(runner_tool_cache) / "actionlint" / VERSION
     return Path.cwd() / ".venv" / "tools" / "actionlint" / VERSION

@@ -19,7 +19,12 @@ from vaultspec_core.core.exceptions import VaultSpecError
 
 from .models import DocType
 
-__all__ = ["resolve_related_inputs", "validate_feature_dependencies"]
+__all__ = [
+    "document_index",
+    "resolve_reference",
+    "resolve_related_inputs",
+    "validate_feature_dependencies",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +58,35 @@ def _build_stem_index(root_dir: Path) -> dict[str, Path]:
     for doc_path in scan_vault(root_dir):
         index[doc_path.stem.lower()] = doc_path
     return index
+
+
+def document_index(root_dir: Path) -> dict[str, Path]:
+    """Map the lowercase stem of every vault document to its path.
+
+    Built once and passed to :func:`resolve_reference` when one operation
+    resolves several references.
+
+    Args:
+        root_dir: Project root containing the docs directory.
+
+    Returns:
+        Lowercase stem to absolute path.
+    """
+    return _build_stem_index(root_dir)
+
+
+def resolve_reference(raw: str, root_dir: Path, index: dict[str, Path]) -> str | None:
+    """Resolve one document reference against *index*.
+
+    Args:
+        raw: A stem, filename, path or ``[[wiki-link]]``.
+        root_dir: Project root, the base for relative paths.
+        index: The mapping :func:`document_index` built.
+
+    Returns:
+        The document's canonical stem, or ``None`` when no document matches.
+    """
+    return _resolve_single(raw, root_dir, index)
 
 
 def resolve_related_inputs(

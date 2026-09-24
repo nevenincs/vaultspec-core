@@ -26,6 +26,11 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
+from vaultspec_core.core.diagnosis.collectors_companion import (
+    RAG_DISTRIBUTION_NAME,
+    CompanionSignal,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -1000,3 +1005,86 @@ class TestFeaturePlanAggregation:
             if "cracked" in line
         )
         assert "1 unreadable plan" in row
+
+
+class TestHostedSearchRow:
+    """The rollup reports hosted-search configuration, never the key itself."""
+
+    _KEY = "status-row-key-value"
+
+    @staticmethod
+    def _run_with_key(root: Path, key: str, *args: str):
+        # NO_COLOR alone keeps bold and dim codes when FORCE_COLOR makes the
+        # console act as a terminal, as CI does; a dumb terminal emits none.
+        runner = CliRunner(
+            env={
+                "NO_COLOR": "1",
+                "TERM": "dumb",
+                "COLUMNS": "200",
+                VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: key,
+            }
+        )
+        return runner.invoke(app, ["-t", str(root), "status", *args])
+
+    def test_unconfigured_row_names_the_variable(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = self._run_with_key(tmp_path, "")
+
+        assert result.exit_code == 0, result.output
+        discovery = result.stdout.split("Discovery")[1]
+        name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+        assert f"hosted search not configured - {name} unset" in discovery
+
+    def test_an_absent_companion_states_provisioning_only(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = self._run_with_key(tmp_path, "")
+
+        assert result.exit_code == 0, result.output
+        rows = result.stdout.split("Discovery")[1].strip().splitlines()
+        companion = next(row for row in rows if RAG_DISTRIBUTION_NAME in row)
+        # Where to look instead is the search reply's to name, not status's.
+        assert companion.strip() == f"{RAG_DISTRIBUTION_NAME} not provisioned"
+
+    def test_configured_row_names_the_source_not_the_key(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        result = self._run_with_key(tmp_path, self._KEY)
+
+        assert result.exit_code == 0, result.output
+        discovery = result.stdout.split("Discovery")[1]
+        assert "hosted search configured  source: environment" in discovery
+        assert self._KEY not in result.output
+
+    def test_json_key_reports_configuration_and_source(self, tmp_path: Path) -> None:
+        _build_vault(tmp_path)
+
+        unset = json.loads(self._run_with_key(tmp_path, "", "--json").stdout)
+        result = self._run_with_key(tmp_path, self._KEY, "--json")
+        configured = json.loads(result.stdout)
+
+        assert unset["data"]["hosted_search"] == {"configured": False, "source": None}
+        assert configured["data"]["hosted_search"] == {
+            "configured": True,
+            "source": "environment",
+        }
+        assert self._KEY not in result.output
+
+    def test_json_reports_the_companion_as_the_workspace_provisions_it(
+        self, tmp_path: Path
+    ) -> None:
+        _build_vault(tmp_path)
+
+        absent = json.loads(self._run_with_key(tmp_path, "", "--json").stdout)
+        servers: dict[str, dict[str, object]] = {
+            RAG_DISTRIBUTION_NAME: {"command": "uvx", "args": []}
+        }
+        (tmp_path / ".mcp.json").write_text(
+            json.dumps({"mcpServers": servers}), encoding="utf-8"
+        )
+        provisioned = json.loads(self._run_with_key(tmp_path, "", "--json").stdout)
+
+        assert absent["data"]["companion"]["signal"] == CompanionSignal.ABSENT
+        assert provisioned["data"]["companion"]["package"] == RAG_DISTRIBUTION_NAME
+        assert provisioned["data"]["companion"]["signal"] != CompanionSignal.ABSENT

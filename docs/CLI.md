@@ -124,6 +124,13 @@ of that release; it is never hand-maintained.
 Commands:
 
 - `vaultspec-core commit-gate`
+- `vaultspec-core vault adr crossref`
+- `vaultspec-core vault search`
+
+MCP tools:
+
+- `crossref`
+- `search`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -155,6 +162,8 @@ full options.
   round-trip).
 - `vaultspec-core vault rename` - Rename a document's file and re-point incoming related
   references.
+- `vaultspec-core vault search` - Ask the vault a question and read the passages that
+  answer it.
 - `vaultspec-core vault add` - Create a new .vault/ document from a template.
 - `vaultspec-core vault stats` - Show vault statistics and metrics.
 - `vaultspec-core vault list` - List vault documents, optionally filtered by type.
@@ -227,6 +236,8 @@ full options.
 
 #### Adr
 
+- `vaultspec-core vault adr crossref` - Find the ADRs a decision should cross-reference,
+  within fixed bounds.
 - `vaultspec-core vault adr supersede` - Supersede an old ADR with a new ADR.
 
 #### Plan
@@ -892,6 +903,16 @@ active features; and vault totals. Outcome semantics: always `unchanged` (read-o
 verb). Advisory hints point at the targeted form and at `vaultspec-core spec doctor` for
 framework health.
 
+The rollup's Discovery section says which vault search to reach for. First it says
+whether hosted vault search (`vaultspec-core vault search`) is configured and whether
+the key came from the `environment` or the workspace `dotenv`. It then shows whether the
+`vaultspec-rag` companion is provisioned, which decides the next step a declined vault
+search names. Both lines report configuration, not liveness: a configured key can still
+be rejected when a search runs, and a provisioned companion can still be down. Under
+`--json` they are `data.hosted_search` (`configured`, `source`) and `data.companion`
+(`package`, `signal`, `mode`, `version`, `floor`, `health_authority`; the key is absent
+when the probe failed).
+
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace - a plan-line header, then each step (display path, checkbox state, a
 cursor on the next open step) mapped to its evidence: `ledger N rows` plus the last
@@ -992,6 +1013,115 @@ Show vault statistics and document counts.
 
   ```bash
   vaultspec-core vault stats --invalid --orphaned
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault search
+
+```bash
+vaultspec-core vault search [OPTIONS] QUERY
+```
+
+Ask the vault a question in plain language and read the passages that answer it. Hosted
+search ranks the vault's records against the question and quotes, for each ranked
+record, the passage that answers it with its line range. It reads the vault from disk on
+every search, so there is no index to build or refresh. The same search backs the MCP
+`search` tool.
+
+Hosted search is enabled by a TypeSafe key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
+[environment variables](#environment-variables)). Every search sends the question and
+vault text to the TypeSafe API. Without a key the command sends nothing and reports
+`not configured`. When a configured search fails, it reports `unavailable` with the
+reason and returns no partial ranking. Either way it prints one sentence: why hosted
+search did not rank, then the search to run instead. That is a `vaultspec-rag` vault
+search over the requested record types when the workspace provisions `vaultspec-rag`,
+otherwise `vaultspec-core vault list` (MCP: `find`), with the type when one was
+requested, and grep of `.vault/`. Provisioning is read from the workspace configuration;
+core never calls `vaultspec-rag`. Hosted search covers the vault only; code search is
+`vaultspec-rag`'s. `vaultspec-core status` shows whether a key is configured and where
+it came from. The key itself never appears in any output.
+
+Output starts with a verdict: `answered`, or `nothing in the vault answers this`. When
+the provider would not read some records in full, the verdict reads
+`no record that was read answers this` instead, and the next line gives the number of
+those records. The ranked records follow, best first. Each record line gives its rank,
+record name, type, `path:first-last` line range, and the section the passage sits under.
+The passage follows: at most 700 bytes of whole lines, with `...` marking a passage that
+goes on past the line range shown. A second passage (`also ...`, 300 bytes) appears when
+the answer spans two. A `!` note flags a record that may contradict an assumption in the
+question. The page ends with the hit count and, when the ranking holds more records than
+were shown, the number withheld.
+
+#### Arguments
+
+- `QUERY` - The question to ask, in plain language. Must not be blank; at most 2,000
+  characters.
+
+#### Options
+
+- `--type TYPE` - Search only records of this type: `adr`, `audit`, `exec`, `plan`,
+  `reference`, or `research`. Repeat the flag to search several types. Generated feature
+  indexes are never searched. By default every type is searched.
+- `--feature TAG` (`-f`) - Search only this feature's records.
+- `--date DATE` - Search only records with this exact date (`YYYY-MM-DD`).
+- `--limit N` (default `4`) - Maximum ranked records to return, from `1` to `11`. The
+  most a search ranks is 11, so `--limit 11` returns the whole ranking. There is no
+  `--offset`.
+- `--json` (default off) - Emit machine-readable output (`vaultspec.vault.search.v1`).
+
+The type, feature, and date filters are applied before anything is sent: a record they
+exclude never leaves the machine.
+
+Under `--json`, `data` carries the same fields as the MCP `search` result. `data.status`
+is `ok`, `not_configured`, or `unavailable`, and every reply carries `answered` and the
+`hits`. An `ok` reply adds `verdict` (`answered`, `nothing_answers`, or
+`none_read_answers`, the three verdicts above) and the window fields `returned`,
+`total`, and `truncated`. Each hit carries: `path`, `type`, `feature`, `date`, `title`,
+`score`, `answers` (the probability that the record states the answer),
+`premise_conflict`, each score to three decimal places, `blob_hash`, and an `excerpt`
+with `section`, `line_start`, `line_end`, `text`, and `truncated`. `line_end` is the
+last line `text` holds, and `truncated` marks a passage that goes on past it. A
+`supporting` excerpt is present only when the answer spans two passages. The
+`not_configured` and `unavailable` replies carry a `next_step` (`kind` `rag_search` or
+`listing`, the `types` it covers, and the `command` to run, where `<intent>` stands for
+your question and the `--feature` and `--date` filters are kept when the search had
+them) and a `remediation` sentence that words it, and `unavailable` also carries its
+`reason`: `credential_rejected`, `content_rejected`, `rate_limited`, `transport`,
+`deadline`, `invalid_response`, or `request_too_large`. `usage` reports the requests,
+tokens, and time a search spent, and `unscored`, the number of records the provider
+would not read in full. `answered` is `false` for the whole vault only when `unscored`
+is `0`. The JSON carries non-ASCII text as UTF-8 rather than `\u` escapes.
+
+Exit codes:
+
+- `0` - The search ran (envelope `status` `unchanged`), whether or not anything answers.
+  Also `0` when hosted search is not configured (envelope `status` `skipped`). That is
+  the default state without a key, and the reply is the search to run instead, not a
+  failure.
+- `1` - Hosted search is configured but did not finish (envelope `status` `failed`), or
+  the workspace cannot be read.
+- `2` - Invalid input: a blank or overlong `QUERY`, an unsearchable `--type`, or a
+  `--limit` outside `1..11`. Nothing is read or sent.
+
+#### Examples
+
+- **Ask why a decision was taken**:
+
+  ```bash
+  vaultspec-core vault search "why does core never call vaultspec-rag"
+  ```
+
+- **Search only one feature's decisions and read the whole ranking**:
+
+  ```bash
+  vaultspec-core vault search "which variable enrols hosted search" --type adr --feature hosted-search --limit 11
+  ```
+
+- **Script against the verdict and the excerpts**:
+
+  ```bash
+  vaultspec-core vault search "what is the default page size" --json
   ```
 
 ______________________________________________________________________
@@ -1399,8 +1529,8 @@ branches appending different Steps merge without a conflict.
 - `--step STEP` - Required canonical Step identifier or display path being logged.
 - `--row SPEC` - Row to append, repeatable. `A:path` added, `M:path` modified, `D:path`
   deleted, `R:old->new` renamed. The verb never infers an operation from disk state.
-- `--verify SPEC` - A check that ran, as `<command>=pass` or `<command>=fail`; written
-  as a `verify:` row.
+- `--verify SPEC` - A check that ran, as `<command>=pass` or `<command>=fail`,
+  repeatable; each is written as its own `verify:` row.
 - `--by PERSONA` - The persona that closed the Step; written as a `by:` row.
 - `--note TEXT` - Exception note, repeatable; written as a `## Notes` line under the
   Step id, the section created on first use.
@@ -1481,6 +1611,117 @@ Supersede an old ADR with a new ADR.
 
   ```bash
   vaultspec-core vault adr supersede 2026-05-17-old-adr-stem --by 2026-05-26-new-adr-stem
+  ```
+
+______________________________________________________________________
+
+### vaultspec-core vault adr crossref
+
+```bash
+vaultspec-core vault adr crossref [OPTIONS] [REFS]...
+```
+
+Find the ADRs a decision should cross-reference. Each source ADR is judged against every
+other ADR in the vault, and the reply lists the ones it should link and the links it
+already declares that were judged weak. With `--apply`, the new links are written into
+the source's `related:` field. The same backend serves the MCP `crossref` tool.
+
+The judgment runs in three stages, each with a fixed ceiling, so a run's cost does not
+grow with the size of the vault:
+
+- Every other ADR is ranked by code alone: the code identifiers the two decisions share
+  (module and file paths, CLI verbs, configuration variables) and the overlap between
+  the source's decision text and each candidate's feature, title, and opening line.
+  Nothing is sent.
+- The best 192 candidates are put to hosted search as Choice questions of at most 32
+  options each.
+- The best 32 of the combined ranking, plus up to 8 declared links outside them, are
+  judged in pairs.
+
+A source costs at most 46 requests and 60 seconds. A sweep takes at most 50 sources, or
+52 when it must settle a refusal, and 300 seconds, and the vault may hold at most 5,000
+ADRs.
+
+Cross-referencing uses the hosted-search key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
+[environment variables](#environment-variables)) and sends ADR text to the TypeSafe API.
+Without a key it sends nothing, reports that it is not configured, and names the search
+to run instead: the `vaultspec-rag` search when rag is provisioned, the ADR listing
+otherwise.
+
+Output lists each source, then its verdicts. A `link` verdict means the source should
+link that ADR; it is marked `new`, `declared`, or `written`. A `weak` verdict is a link
+the source already declares, judged below the threshold. Weak links are listed for a
+reader to check and are never removed. Each verdict also carries an advisory relation:
+`supersedes`, `refines`, `depends_on`, `conflicts`, `shared_artifact`, `topic_only`, or
+`unrelated`. It tells an author which pairs to read in full; it does not decide
+anything.
+
+#### Arguments
+
+- `REFS` - ADRs to cross-reference: a stem, filename, path, or `[[wiki-link]]`. One ADR
+  is judged on its own; several make a sweep.
+
+#### Options
+
+- `--feature TAG` (`-f`) - Sweep this feature's ADRs.
+- `--all` (default off) - Sweep every ADR that still governs. Superseded and rejected
+  ADRs are skipped unless named.
+- `--isolated` (default off) - Sweep only ADRs that link no other ADR. Combines with
+  `--feature` to narrow further; `--all` stands alone.
+- `--after STEM` - Resume a sweep after this ADR: the `next_after` a previous sweep
+  reported, with the same selector. Sweeps run in stem order and store no state. An ADR
+  the provider refuses to read is held open while the sweep judges on, past its source
+  limit by up to two more ADRs if it must: a later ADR the provider reads shows the
+  refusal was that ADR's own, and the sweep moves past both. A refusal no read settles,
+  three refusals in a row, or any other failure stops the sweep with `stopped` set and
+  the cursor before the first refusal still open, so resuming retries from there.
+- `--max-sources N` (default `10`) - Most ADRs one sweep judges, from `1` to `50`.
+- `--apply` (default off) - Write each new `link` verdict into the source's `related:`,
+  as each source finishes, without reading them first. Nothing is removed, and no
+  candidate is written to. To add only the links you have read and confirmed, run
+  without `--apply` and use `vaultspec-core vault link add`.
+- `--json` (default off) - Emit machine-readable output
+  (`vaultspec.vault.adr.crossref.v1`).
+- `--target` (`-t`) - Target directory (defaults to current working directory).
+
+Under `--json`, `data.sources` holds one entry per source judged, with its `status`
+(`ok`, `not_configured`, or `unavailable`), its `verdicts` (`stem`, `kind`, `score`,
+`relation`, `status`, `declared`, and `applied` when written), and the counts `links`,
+`written`, and `verdicts_total`. A reply carries at most 80 verdict rows; a source whose
+rows were cut has `truncated` set. A source also carries `unjudged_declared` when some
+declared links were beyond the judged ceiling, `write_failed` for links `--apply` could
+not write, and, when it was not judged, its `reason`, `next_step`, and `remediation`.
+`data` also carries the totals `judged`, `links`, and `written`, the number of sources
+`remaining`, `next_after` when sources remain and one was processed (without it, a
+resume starts from the beginning), `stopped` when a sweep ended early, and `usage` when
+anything was sent.
+
+Exit codes:
+
+- `0` - Every source taken was judged (envelope `status` `unchanged`, or `updated` when
+  `--apply` wrote links), or hosted search is not configured (envelope `status`
+  `skipped`).
+- `1` - A link `--apply` judged could not be written, or hosted search is configured but
+  a source could not be judged (envelope `status` `failed`). The reply says where to
+  resume.
+- `2` - Invalid input: no source or sweep option, a `REFS` entry or `--after` value that
+  is not an ADR of this vault, `REFS` combined with `--feature`, `--isolated`, or
+  `--all`, `--all` combined with `--feature` or `--isolated`, an empty `--feature`, a
+  vault with more than 5,000 ADRs, or `--max-sources` outside `1..50`.
+
+#### Examples
+
+- **Check a newly drafted ADR before presenting it**:
+
+  ```bash
+  vaultspec-core vault adr crossref 2026-05-26-new-adr-stem
+  ```
+
+- **Review the ADRs that link nothing yet, ten at a time**:
+
+  ```bash
+  vaultspec-core vault adr crossref --isolated
+  vaultspec-core vault adr crossref --isolated --after 2026-05-17-last-judged-adr-stem
   ```
 
 ______________________________________________________________________
@@ -2214,8 +2455,8 @@ reported as warnings and are not modified.
 - `--target DIR` (`-t`, default cwd) - Diagnose a directory other than the current one.
 - `--json` (default off) - Emit the diagnosis as JSON.
 - `--gate-errors` (default off) - Exit `0` on warnings and fail (exit `2`) only on
-  errors. Intended for CI and other automation gates, where warning-level
-  provider-mirror lag is an expected steady state that must not fail the run.
+  errors. Intended for the pre-commit gate, where warning-level provider-mirror lag is
+  an expected steady state that must not block a commit.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
 
@@ -2258,7 +2499,7 @@ vaultspec-core spec agents [OPTIONS] COMMAND [ARGS]...
   scaffold from a named template instead of an empty body.
 - `show NAME` - Print resource content to stdout.
 - `edit NAME [--editor EDITOR]` - Open in configured editor. Resolution order: --editor
-  flag, local config, VISUAL, EDITOR, vi. See
+  flag, local config, VAULTSPEC_EDITOR, VISUAL, EDITOR, vi. See
   [which editors are accepted](#which-editors-are-accepted).
 - `remove NAME [--yes|--force]` (`-y`) - Delete a resource. Prompts unless confirmed.
 - `rename OLD_NAME NEW_NAME` - Rename a resource.
@@ -3166,7 +3407,8 @@ ______________________________________________________________________
 
 ## Environment variables
 
-All variables are prefixed `VAULTSPEC_`. Environment variables override defaults but are
+vaultspec-core owns the `VAULTSPEC_` variables below and honours a few external
+conventions, listed after them. Environment variables override defaults but are
 overridden by the `--target` flag.
 
 - `VAULTSPEC_TARGET_DIR` (path, default cwd) - Root workspace directory (where `.vault/`
@@ -3188,18 +3430,14 @@ overridden by the `--target` flag.
   of blocking indefinitely. Covers the in-process and cross-process layers combined.
   Raise it if a large corpus or a slow network volume makes legitimate contention exceed
   the budget.
-- `VAULTSPEC_LOCK_TIMEOUT_SECONDS` (float, default `120.0`) - Total seconds a single
-  advisory-lock acquisition may wait before failing with a diagnosable timeout instead
-  of blocking indefinitely. Covers the in-process and cross-process layers combined.
-  Raise it if a large corpus or a slow network volume makes legitimate contention exceed
-  the budget.
 - `VAULTSPEC_LOG_LEVEL` (str, default `INFO`) - Root log level for the CLI, for example
   `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.
-- `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command for
-  `vaultspec-core spec {rules|skills|agents} edit`. Overridden by the project-local
-  config `editor` value, and the `--editor` flag. Resolved in order: `--editor` flag,
-  project config, `$VISUAL`, `$EDITOR`/`VAULTSPEC_EDITOR`, `vi`. Unlike the flag and the
-  config key, an editor named here is not restricted to the recognised set; see
+- `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command. The edit verbs
+  (`vaultspec-core spec {rules|skills|agents} edit`) resolve in order: `--editor` flag,
+  project config `editor`, `VAULTSPEC_EDITOR`, `VISUAL`, `EDITOR`, `vi`. Interactive
+  creation of a rule, skill, agent, or trigger opens `VAULTSPEC_EDITOR`, or `zed -w`
+  when it is unset. Unlike the flag and the config key, an editor named in the
+  environment is not restricted to the recognised set; see
   [which editors are accepted](#which-editors-are-accepted).
 - `VAULTSPEC_JSON_PRETTY` (str, unset by default) - Indents `--json` output. Any value
   other than `0`, `false`, `no`, `off`, or the empty string turns it on; without it the
@@ -3207,10 +3445,37 @@ overridden by the `--target` flag.
 - `VAULTSPEC_NO_HINTS` (str, unset by default) - Set to `1` to drop the `Next actions`
   block the commands print after their report. Equivalent to `--no-hints`. Only the
   exact value `1` counts; anything else leaves the hints in place.
+- `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key that
+  enables hosted vault search (`vaultspec-core vault search` and the MCP `search` tool).
+  It is read from the process environment. It is read from the workspace-root `.env`
+  only when it is absent from the environment, core runs from the workspace's own
+  environment (its Python interpreter lives inside the workspace, as a project virtual
+  environment does), and the workspace declares the `dependency` or `dev` install mode.
+  Only this one variable is read from that file. A globally installed core (a uv tool, a
+  pipx install, or a release binary) never reads the workspace `.env`. The generic
+  `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
+  `vaultspec-core status` reports only whether one is configured and from which source.
+- `VAULTSPEC_NON_INTERACTIVE` (presence, unset by default) - Set to any value, even
+  blank, to declare that no operator is watching, as CI does. Repository triggers that
+  await approval are then skipped instead of prompted for.
 - `VAULTSPEC_STDIO_WATCHDOG` (str, default on) - Lifetime watchdog for the MCP server.
   Set it to `0`, `false`, `off`, or `no` to disable it, which leaves the server to exit
   on stdin EOF alone. Read by `vaultspec-core-mcp` rather than by the CLI; see the
   [MCP reference](./MCP.md).
+
+vaultspec-core also honours these external variables. It does not own them.
+
+- `CI` (presence) - Set by CI systems. Same effect as `VAULTSPEC_NON_INTERACTIVE`.
+- `NO_COLOR` (presence) - Set to any value, even blank, to disable colour in console
+  output.
+- `COLUMNS` (int) - Console width. When unset, the width is read from the terminal once
+  at startup.
+- `VISUAL`, `EDITOR` (str) - Editor commands the edit verbs consult after
+  `VAULTSPEC_EDITOR`, in that order.
+- `CLAUDE_CONFIG_DIR` (path, default home directory) - Claude Code's configuration home,
+  whose `.claude.json` holds user-scope MCP servers.
+- `CODEX_HOME` (path, default `~/.codex`) - Codex's home, whose `config.toml` holds
+  user-scope MCP servers.
 
 ## See also
 

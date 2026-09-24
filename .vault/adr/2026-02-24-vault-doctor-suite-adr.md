@@ -100,9 +100,9 @@ error. The default mode is always safe — no writes without `--fix`.
 ```python
 @dataclass
 class DoctorCheck:
-    name: str                  # e.g. "exec-plan-chain"
-    category: CheckCategory    # LINKS | CHAIN | DRIFT | COVERAGE | STRUCTURE
-    severity: Severity         # ERROR | WARNING | INFO
+    name: str  # e.g. "exec-plan-chain"
+    category: CheckCategory  # LINKS | CHAIN | DRIFT | COVERAGE | STRUCTURE
+    severity: Severity  # ERROR | WARNING | INFO
     fixable: bool
     run: Callable[[Path, list[Path] | None], list[DoctorResult]]
     fix: Callable[[Path, bool], list[DoctorResult]] | None  # dry_run param
@@ -118,7 +118,7 @@ still build the full graph but filter results to input paths.
 @dataclass
 class DoctorResult:
     path: Path
-    check: str          # check name
+    check: str  # check name
     severity: Severity  # ERROR | WARNING | INFO
     message: str
     fix_available: bool

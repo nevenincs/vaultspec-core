@@ -258,6 +258,29 @@ class TestDryRun:
         for path, original in before.items():
             assert after[path] == original, f"dry-run mutated {path.name}"
 
+    @pytest.mark.parametrize(
+        "links",
+        [
+            # A duplicate entry is rewritten once; the second is dropped.
+            [f"{DATE}-widget-engine-research"] * 2,
+            # A ``.md`` link names the same document and is rewritten.
+            [f"{DATE}-widget-engine-research.md"],
+        ],
+    )
+    def test_dry_run_related_count_matches_the_applied_rename(
+        self, tmp_path: Path, links: list[str]
+    ):
+        self._build(tmp_path)
+        authored_doc(tmp_path, "reference", "other-topic", related=links)
+
+        plan = rename_feature(tmp_path, "widget-engine", "gadget-engine", dry_run=True)
+        applied = rename_feature(tmp_path, "widget-engine", "gadget-engine")
+
+        # adr -> research, plan -> adr, and one rewrite in the other document;
+        # the old feature index is deleted before the cascade, not rewritten.
+        assert plan["related_rewrites"] == 3
+        assert applied["related_rewrites"] == 3
+
 
 # ---------------------------------------------------------------------------
 # S15 - happy-path multi-surface rewrite

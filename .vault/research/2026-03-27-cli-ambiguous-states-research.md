@@ -375,6 +375,7 @@ class FrameworkSignal(StrEnum):
     CORRUPTED = "corrupted"
     PRESENT = "present"
 
+
 class ProviderDirSignal(StrEnum):
     MISSING = "missing"
     EMPTY = "empty"
@@ -382,11 +383,13 @@ class ProviderDirSignal(StrEnum):
     COMPLETE = "complete"
     MIXED = "mixed"  # has non-vaultspec content
 
+
 class ManifestEntrySignal(StrEnum):
     COHERENT = "coherent"
-    ORPHANED = "orphaned"        # in manifest, dir missing
-    UNTRACKED = "untracked"      # dir exists, not in manifest
+    ORPHANED = "orphaned"  # in manifest, dir missing
+    UNTRACKED = "untracked"  # dir exists, not in manifest
     NOT_INSTALLED = "not_installed"
+
 
 class ContentSignal(StrEnum):
     CLEAN = "clean"
@@ -394,11 +397,13 @@ class ContentSignal(StrEnum):
     STALE = "stale"
     MISSING = "missing"
 
+
 class BuiltinVersionSignal(StrEnum):
     CURRENT = "current"
     MODIFIED = "modified"
     DELETED = "deleted"
     NO_SNAPSHOTS = "no_snapshots"
+
 
 class GitignoreSignal(StrEnum):
     NO_FILE = "no_file"

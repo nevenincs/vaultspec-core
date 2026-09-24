@@ -34,7 +34,7 @@ from ....graph import VaultGraph
 from ...body_hash import document_body_digest
 from ...models import vault_today
 from .._base import CheckDiagnostic, CheckResult, Severity
-from ..modified_stamp import check_modified_stamp
+from ..modified_stamp import check_modified_stamp, write_stamp
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -193,6 +193,26 @@ class TestMissingStamp:
 
         assert result.fixed_count == 1
         assert "modified: '2026-03-15'" in doc.read_text(encoding="utf-8")
+
+
+class TestWriteStamp:
+    def test_bare_cr_line_endings_are_stamped(self, tmp_path: Path):
+        """A document ending its lines in a bare CR is stamped like any other.
+
+        The stamp goes through the shared stamper, which reads every line
+        ending the frontmatter splitter does. A stamper that knew only LF
+        declined such a document, so its finding could never be fixed.
+        """
+        doc = tmp_path / "2026-02-08-alpha-adr.md"
+        doc.write_bytes(b"---\rtags:\r  - '#adr'\rdate: '2026-02-08'\r---\r\r# A\r")
+
+        assert write_stamp(doc, "2026-02-09", root_dir=None) is True
+
+        text = doc.read_bytes().decode("utf-8")
+        assert "\n" not in text
+        assert "date: '2026-02-08'\rmodified: '2026-02-09'\rbody_hash: 'sha256:" in (
+            text
+        )
 
 
 class TestNonCanonical:

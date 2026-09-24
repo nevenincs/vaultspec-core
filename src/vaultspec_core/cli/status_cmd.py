@@ -21,15 +21,16 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
 
 if TYPE_CHECKING:
-    from pathlib import Path
     from typing import Any
 
     import typer as _typer
     from rich.console import Console
 
+    from vaultspec_core.config import HostedSearchConfig
     from vaultspec_core.core.diagnosis.collectors_companion import (
         CompanionCapability,
     )
+    from vaultspec_core.search import DiscoveryCapability
     from vaultspec_core.vaultcore.orientation import (
         GroundingTrace,
         PlanInFlight,
@@ -122,6 +123,7 @@ def cmd_status(
     from vaultspec_core.console import get_console
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.graph import VaultGraph
+    from vaultspec_core.search import discovery_capability
     from vaultspec_core.vaultcore.orientation import (
         TargetResolutionError,
         compute_rollup,
@@ -158,7 +160,7 @@ def cmd_status(
         rollup,
         json_output=json_output,
         no_hints=no_hints,
-        companion=_safe_companion(root_dir),
+        discovery=discovery_capability(root_dir),
     )
 
 
@@ -238,24 +240,6 @@ def _plan_cells(plan: PlanInFlight) -> list[str]:
     return cells
 
 
-def _safe_companion(root_dir: Path) -> CompanionCapability | None:
-    """Probe the semantic-search companion for the orientation surface.
-
-    Whether semantic search is available here is orientation data: it decides
-    which discovery move an agent should reach for first. Swallowing a failure
-    is right for the same reason the doctor's guard is - status must never fail
-    because the newest collector on it did.
-    """
-    from vaultspec_core.core.diagnosis.collectors_companion import (
-        collect_companion_capability,
-    )
-
-    try:
-        return collect_companion_capability(root_dir)
-    except Exception:
-        return None
-
-
 def _companion_line(cap: CompanionCapability) -> str:
     """Render the one-line orientation summary for *cap*.
 
@@ -265,10 +249,7 @@ def _companion_line(cap: CompanionCapability) -> str:
     from vaultspec_core.core.diagnosis.collectors_companion import CompanionSignal
 
     if cap.signal is CompanionSignal.ABSENT:
-        return (
-            f"  [dim]{cap.package} not provisioned - "
-            f"use find and grep for discovery[/dim]"
-        )
+        return f"  [dim]{cap.package} not provisioned[/dim]"
     version = f" {cap.version}" if cap.version else ""
     floor_note = (
         f"  [yellow]below advisory floor {cap.floor}[/yellow]"
@@ -281,14 +262,36 @@ def _companion_line(cap: CompanionCapability) -> str:
     )
 
 
-def _rollup_payload(
-    rollup: Rollup, companion: CompanionCapability | None = None
-) -> dict[str, Any]:
-    """Shape a :class:`Rollup` into the JSON envelope's data mapping."""
+def _hosted_search_line(config: HostedSearchConfig) -> str:
+    """Render the one-line orientation summary for hosted vault search.
+
+    States configuration only: a configured key can still be rejected, and
+    that surfaces on the search itself, not here.
+    """
+    from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
+
+    if config.configured and config.source is not None:
+        return (
+            f"  [green]hosted search configured[/green]  "
+            f"[dim]source: {config.source.value}[/dim]"
+        )
+    name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+    return f"  [dim]hosted search not configured - {name} unset[/dim]"
+
+
+def _rollup_payload(rollup: Rollup, discovery: DiscoveryCapability) -> dict[str, Any]:
+    """Shape a :class:`Rollup` into the JSON envelope's data mapping.
+
+    The discovery fields are the search package's projection of what the
+    workspace is configured for, the same keys the MCP ``status`` tool
+    carries.
+    """
     import dataclasses
 
+    from vaultspec_core.search import discovery_fields
+
     return {
-        "companion": dataclasses.asdict(companion) if companion else None,
+        **discovery_fields(discovery),
         "active_features": [dataclasses.asdict(f) for f in rollup.active_features],
         "active_features_total": rollup.active_features_total,
         "active_features_truncated": (
@@ -315,7 +318,7 @@ def _emit_status_rollup(
     *,
     json_output: bool,
     no_hints: bool,
-    companion: CompanionCapability | None = None,
+    discovery: DiscoveryCapability,
 ) -> None:
     """Render the vault-wide rollup as text or JSON."""
     if json_output:
@@ -329,7 +332,7 @@ def _emit_status_rollup(
         envelope = json_envelope(
             "vault.status",
             "unchanged",
-            _rollup_payload(rollup, companion),
+            _rollup_payload(rollup, discovery),
             hints={"next_steps": hints} if hints is not None else None,
         )
         typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
@@ -411,10 +414,11 @@ def _emit_status_rollup(
     else:
         console.print("  [dim]none[/dim]")
 
-    if companion is not None:
-        console.print()
-        console.print("[bold]Discovery[/bold]")
-        console.print(_companion_line(companion))
+    console.print()
+    console.print("[bold]Discovery[/bold]")
+    console.print(_hosted_search_line(discovery.hosted_search))
+    if discovery.companion is not None:
+        console.print(_companion_line(discovery.companion))
 
     totals = rollup.totals
     console.print()

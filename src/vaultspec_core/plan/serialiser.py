@@ -27,6 +27,8 @@ from vaultspec_core.plan.display_path import (
     wave_display_path,
 )
 from vaultspec_core.plan.frontmatter import Tier
+from vaultspec_core.plan.parser import LINK_RULES_OPEN
+from vaultspec_core.vaultcore.parser import render_block_list, render_scalar
 
 if TYPE_CHECKING:
     from vaultspec_core.plan.parser import Phase, Plan, Step, Wave
@@ -179,15 +181,13 @@ def _render_frontmatter(plan: Plan) -> str:
     from vaultspec_core.core.helpers import dump_yaml
 
     fm = plan.frontmatter
-    lines = ["---", "tags:"]
-    for tag in fm.tags:
-        lines.append(f"  - '{tag}'")
-    lines.append(f"date: '{fm.date}'")
-    lines.append(f"tier: {fm.tier.value}")
-    if fm.related:
-        lines.append("related:")
-        for entry in fm.related:
-            lines.append(f"  - '{entry}'")
+    lines = [
+        "---",
+        *render_block_list("tags", fm.tags, "'"),
+        *render_scalar("date", fm.date),
+        f"tier: {fm.tier.value}",
+        *render_block_list("related", fm.related, "'"),
+    ]
     if fm.extra:
         lines.extend(dump_yaml(fm.extra).splitlines())
     lines.append("---")
@@ -196,7 +196,7 @@ def _render_frontmatter(plan: Plan) -> str:
 
 def _render_link_rules_comment() -> str:
     lines = [
-        "<!-- LINK RULES:",
+        LINK_RULES_OPEN,
         "     - [[wiki-links]] are ONLY for .vault/ documents in the",
         "       related: field above.",
         "     - The related: field carries governing ADRs, if any.",

@@ -26,7 +26,7 @@ either way. Two further measures cover them. The flags in
 :data:`~vaultspec_core.mcp_server.catalog.BLOCKED_FLAGS` are refused whichever
 verb declares them and are withheld from the schemas ``discover`` returns; and
 every spawned child is marked through
-:data:`~vaultspec_core.core.editor.GATEWAY_ENV_MARKER`, so the CLI itself knows
+:data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`, so the CLI itself knows
 it has no terminal and declines to open an editor no matter which source the
 editor command came from.
 
@@ -44,7 +44,6 @@ from __future__ import annotations
 import functools
 import json
 import logging
-import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING, Any, cast
@@ -55,7 +54,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from ...core.editor import GATEWAY_ENV_MARKER
+from ...config import VAULTSPEC_MCP_GATEWAY_INVOCATION, child_environment
 from ...core.types import get_context as _get_ctx
 from ..catalog import (
     BLOCKED_FLAGS,
@@ -65,7 +64,7 @@ from ..catalog import (
     CommandCatalog,
     build_catalog,
 )
-from ..envelope import LeanModel, compact_result
+from ..envelope import LeanResult, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
@@ -92,7 +91,7 @@ _KILL_GRACE = 2.0
 # ---------------------------------------------------------------------------
 
 
-class FlagSchema(LeanModel):
+class FlagSchema(LeanResult):
     """One declared option of a discovered verb.
 
     Attributes:
@@ -106,7 +105,7 @@ class FlagSchema(LeanModel):
     help: str = ""
 
 
-class ArgumentSchema(LeanModel):
+class ArgumentSchema(LeanResult):
     """One declared positional argument of a discovered verb.
 
     Attributes:
@@ -121,7 +120,7 @@ class ArgumentSchema(LeanModel):
     variadic: bool = False
 
 
-class VerbSchema(LeanModel):
+class VerbSchema(LeanResult):
     """A ranked verb returned by ``discover`` with its full parameter schema.
 
     Attributes:
@@ -142,7 +141,7 @@ class VerbSchema(LeanModel):
     arguments: list[ArgumentSchema] = Field(default_factory=list)
 
 
-class DiscoverResult(LeanModel):
+class DiscoverResult(LeanResult):
     """The whole-call result of a ``discover`` invocation.
 
     Attributes:
@@ -161,7 +160,7 @@ class DiscoverResult(LeanModel):
 # ---------------------------------------------------------------------------
 
 
-class InvokeError(LeanModel):
+class InvokeError(LeanResult):
     """The structured failure payload of a verb that ran but did not succeed.
 
     Attributes:
@@ -179,7 +178,7 @@ class InvokeError(LeanModel):
     message: str
 
 
-class InvokeResult(LeanModel):
+class InvokeResult(LeanResult):
     """The whole-call result of an ``invoke`` invocation.
 
     A verb that runs and exits non-zero is a *successful* ``invoke`` reporting
@@ -438,7 +437,7 @@ def _child_environment() -> dict[str, str]:
     """Build the environment for an ``invoke`` subprocess.
 
     The server's own environment plus one marker,
-    :data:`~vaultspec_core.core.editor.GATEWAY_ENV_MARKER`, telling the child
+    :data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`, telling the child
     that it was started by a tool call rather than by a person at a terminal.
     The child refuses to launch an interactive editor when it sees the marker.
 
@@ -452,9 +451,7 @@ def _child_environment() -> dict[str, str]:
     Returns:
         The environment mapping to hand to the child process.
     """
-    env = dict(os.environ)
-    env[GATEWAY_ENV_MARKER] = "1"
-    return env
+    return child_environment((VAULTSPEC_MCP_GATEWAY_INVOCATION, "1"))
 
 
 # ---------------------------------------------------------------------------
@@ -662,8 +659,7 @@ def register_gateway_tools(
 
         Ranks every cataloged verb against ``query`` across its path and
         description and returns the best matches with their full parameter
-        schemas, so a verb's schema enters context only when the agent
-        deliberately fetches it. The returned verbs are exactly those
+        schemas. The returned verbs are exactly those
         addressable by ``invoke`` - the static denylist is already applied.
 
         Args:

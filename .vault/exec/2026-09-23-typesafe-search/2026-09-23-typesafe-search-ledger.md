@@ -1,0 +1,333 @@
+---
+tags:
+  - '#exec'
+  - '#typesafe-search'
+date: '2026-09-23'
+modified: '2026-09-24'
+body_schema: 'body-v2'
+body_hash: 'sha256:18f4fcad27c35a6084dfe58b9f2901c53842bc6db6cb45b79743363e5e345555'
+related:
+  - "[[2026-09-23-typesafe-search-plan]]"
+---
+
+# `typesafe-search` ledger
+
+## Changes
+
+- `S02` `A` `src/vaultspec_core/search/__init__.py`
+- `S02` `A` `src/vaultspec_core/search/_models.py`
+- `S02` `A` `src/vaultspec_core/search/_questions.py`
+- `S01` `A` `src/vaultspec_core/vaultcore/markdown.py`
+- `S01` `A` `src/vaultspec_core/vaultcore/tests/test_markdown.py`
+- `S01` `M` `src/vaultspec_core/core/tags.py`
+- `S01` `M` `src/vaultspec_core/core/adr.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/markdown.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/placeholders.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/annotations.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/body_sections.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/adr_status.py`
+- `S01` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S01` `M` `src/vaultspec_core/graph/algorithms.py`
+- `S01` `M` `src/vaultspec_core/graph/api.py`
+- `S01` `M` `src/vaultspec_core/mcp_server/tests/test_edit_tool.py`
+- `S01` `M` `src/vaultspec_core/tests/cli/test_tags.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/tests/test_adr_status.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/tests/test_body_sections.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/checks/tests/test_markdown.py`
+- `S03` `M` `src/vaultspec_core/config/config.py`
+- `S03` `A` `src/vaultspec_core/config/dotenv.py`
+- `S03` `M` `src/vaultspec_core/config/__init__.py`
+- `S03` `M` `src/vaultspec_core/config/tests/test_config.py`
+- `S03` `A` `src/vaultspec_core/config/tests/test_dotenv.py`
+- `S03` `A` `src/vaultspec_core/search/_credential.py`
+- `S03` `A` `src/vaultspec_core/search/tests/__init__.py`
+- `S03` `A` `src/vaultspec_core/search/tests/test_credential.py`
+- `S03` `M` `.env.example`
+- `S04` `A` `src/vaultspec_core/search/_transport.py`
+- `S04` `A` `src/vaultspec_core/search/tests/scripted_provider.py`
+- `S04` `A` `src/vaultspec_core/search/tests/test_transport.py`
+- `S03` `M` `src/vaultspec_core/search/__init__.py`
+- `S10` `M` `src/vaultspec_core/core/adr.py`
+- `S10` `M` `src/vaultspec_core/graph/cache.py`
+- `S10` `M` `src/vaultspec_core/graph/cache_io.py`
+- `S10` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S10` `M` `src/vaultspec_core/plan/checks/heading_level_check.py`
+- `S10` `M` `src/vaultspec_core/plan/checks/vocabulary_check.py`
+- `S10` `M` `src/vaultspec_core/plan/parser.py`
+- `S10` `M` `src/vaultspec_core/plan/row_contract.py`
+- `S10` `M` `src/vaultspec_core/tests/plan/test_checks.py`
+- `S10` `M` `src/vaultspec_core/tests/plan/test_parser.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/checks/annotations.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/checks/body_sections.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/checks/placeholders.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/edit_engine.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/exec_fold.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/exec_ledger.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/hydration.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/links.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/markdown.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/parser.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_core.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_exec_fold.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_exec_ledger.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_links.py`
+- `S10` `M` `src/vaultspec_core/vaultcore/tests/test_markdown.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/catalog.py`
+- `S05` `M` `src/vaultspec_core/search/__init__.py`
+- `S05` `M` `src/vaultspec_core/search/_models.py`
+- `S05` `M` `src/vaultspec_core/search/_questions.py`
+- `S05` `M` `src/vaultspec_core/search/_transport.py`
+- `S05` `M` `src/vaultspec_core/search/tests/scripted_provider.py`
+- `S05` `A` `src/vaultspec_core/search/_corpus.py`
+- `S05` `A` `src/vaultspec_core/search/_engine.py`
+- `S05` `A` `src/vaultspec_core/search/_lexical.py`
+- `S05` `A` `src/vaultspec_core/search/_service.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_corpus.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_engine.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_lexical.py`
+- `S05` `A` `src/vaultspec_core/search/tests/test_service.py`
+- `S06` `M` `src/vaultspec_core/core/windowing.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S06` `M` `src/vaultspec_core/tests/cli/test_windowing.py`
+- `S06` `M` `src/vaultspec_core/search/_models.py`
+- `S06` `M` `src/vaultspec_core/search/__init__.py`
+- `S09` `M` `pyproject.toml`
+- `S09` `M` `dev/toolchain.py`
+- `S09` `A` `src/vaultspec_core/search/tests/test_live.py`
+- `S09` `verify:` `tmp/typesafe-search-eval/run_product_eval.py` -> `pass`
+- `S06` `A` `src/vaultspec_core/search/_remediation.py`
+- `S06` `A` `src/vaultspec_core/search/tests/test_remediation.py`
+- `S06` `M` `src/vaultspec_core/search/_service.py`
+- `S07` `M` `src/vaultspec_core/search/_questions.py`
+- `S07` `M` `src/vaultspec_core/search/__init__.py`
+- `S06` `M` `src/vaultspec_core/search/_engine.py`
+- `S06` `M` `src/vaultspec_core/search/tests/test_service.py`
+- `S06` `A` `src/vaultspec_core/mcp_server/filters.py`
+- `S06` `A` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S06` `A` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/envelope.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/__init__.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/orientation.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/conftest.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_tool_surface.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_context_budget.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_stdio_e2e.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_watchdog.py`
+- `S06` `M` `docs/MCP.md`
+- `S06` `verify:` `pytest src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S11` `M` `src/vaultspec_core/core/adr.py`
+- `S11` `M` `src/vaultspec_core/core/rules.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/body_hash.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/checks/frontmatter.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/checks/structure.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/edit_engine.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/exec_recovery.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/hydration.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/models.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/parser.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/query_rename.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/related_surgery.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/rename_ops.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/tests/test_body_hash.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/tests/test_core.py`
+- `S11` `A` `src/vaultspec_core/vaultcore/tests/test_frontmatter_writers.py`
+- `S11` `M` `src/vaultspec_core/tests/cli/test_flow_bugs.py`
+- `S11` `verify:` `pytest vaultcore+checks+rename+flow_bugs targeted` -> `pass`
+- `S07` `A` `src/vaultspec_core/cli/vault_search_cmd.py`
+- `S07` `A` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S07` `M` `src/vaultspec_core/cli/status_cmd.py`
+- `S07` `M` `src/vaultspec_core/cli/vault_cmd.py`
+- `S07` `M` `src/vaultspec_core/cli/vault_cmd_app.py`
+- `S07` `M` `src/vaultspec_core/cli/vault_check_cmd.py`
+- `S07` `M` `src/vaultspec_core/tests/cli/test_vault_status.py`
+- `S07` `M` `docs/CLI.md`
+- `S07` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S07` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S07` `verify:` `pytest tests/cli/test_vault_search_cmd.py tests/cli/test_vault_status.py` -> `pass`
+- `S08` `M` `src/vaultspec_core/core/discovery_guidance.py`
+- `S08` `M` `src/vaultspec_core/tests/test_discovery_guidance.py`
+- `S08` `M` `src/vaultspec_core/builtins/agents/vaultspec-docs-curator.md`
+- `S08` `M` `src/vaultspec_core/builtins/rules/vaultspec-cli.builtin.md`
+- `S08` `M` `src/vaultspec_core/builtins/rules/vaultspec-discovery.builtin.md`
+- `S08` `M` `src/vaultspec_core/builtins/skills/vaultspec-code-research/SKILL.md`
+- `S08` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/SKILL.md`
+- `S08` `M` `src/vaultspec_core/builtins/skills/vaultspec-curate/references/reconciliation-playbook.md`
+- `S08` `verify:` `pytest tests/test_discovery_guidance.py` -> `pass`
+- `S07` `M` `docs/MCP.md`
+- `S07` `verify:` `pytest reference generated/surface/drift + handbook drift` -> `pass`
+- `S08` `M` `.vaultspec/agents/vaultspec-docs-curator.md`
+- `S08` `M` `.vaultspec/reference/cli.md`
+- `S08` `M` `.vaultspec/rules/vaultspec-cli.builtin.md`
+- `S08` `M` `.vaultspec/rules/vaultspec-discovery.builtin.md`
+- `S08` `M` `.vaultspec/skills/vaultspec-code-research/SKILL.md`
+- `S08` `M` `.vaultspec/skills/vaultspec-curate/SKILL.md`
+- `S08` `M` `.vaultspec/skills/vaultspec-curate/references/reconciliation-playbook.md`
+- `S12` `M` `src/vaultspec_core/core/adr.py`
+- `S12` `M` `src/vaultspec_core/core/rules.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/checks/frontmatter.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/parser.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/query_rename.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/related_surgery.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/rename_ops.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_core.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_rename_feature.py`
+- `S12` `A` `src/vaultspec_core/vaultcore/tests/test_frontmatter_render.py`
+- `S12` `verify:` `pytest targeted vaultcore/core` -> `pass`
+- `S03` `M` `src/vaultspec_core/search/_credential.py`
+- `S03` `M` `src/vaultspec_core/search/tests/test_credential.py`
+- `S03` `verify:` `pytest search/tests/test_credential.py` -> `pass`
+- `S05` `M` `docs/CLI.md`
+- `S05` `M` `docs/MCP.md`
+- `S05` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S05` `M` `src/vaultspec_core/cli/json_output.py`
+- `S05` `M` `src/vaultspec_core/cli/vault_search_cmd.py`
+- `S05` `M` `src/vaultspec_core/core/windowing.py`
+- `S05` `M` `src/vaultspec_core/graph/api.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/envelope.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/test_context_budget.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S05` `M` `src/vaultspec_core/search/_corpus.py`
+- `S05` `M` `src/vaultspec_core/search/_engine.py`
+- `S05` `M` `src/vaultspec_core/search/_remediation.py`
+- `S05` `M` `src/vaultspec_core/search/_service.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_corpus.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_engine.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_service.py`
+- `S05` `M` `src/vaultspec_core/search/tests/test_transport.py`
+- `S05` `M` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S05` `M` `src/vaultspec_core/tests/cli/test_vault_status.py`
+- `S05` `M` `src/vaultspec_core/tests/cli/test_windowing.py`
+- `S05` `A` `src/vaultspec_core/mcp_server/tests/test_tool_description.py`
+- `S05` `A` `src/vaultspec_core/search/tests/reply_budget.py`
+- `S05` `verify:` `pytest tests/cli` -> `pass`
+- `S01` `M` `src/vaultspec_core/vaultcore/markdown.py`
+- `S01` `M` `src/vaultspec_core/vaultcore/tests/test_markdown.py`
+- `S01` `verify:` `pytest vaultcore` -> `pass`
+- `S12` `M` `src/vaultspec_core/vaultcore/checks/modified_stamp.py`
+- `S12` `M` `src/vaultspec_core/plan/serialiser.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/checks/tests/test_modified_stamp.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_modified_stamp.py`
+- `S12` `M` `src/vaultspec_core/tests/plan/test_serialiser.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_body_hash.py`
+- `S12` `M` `src/vaultspec_core/vaultcore/tests/test_frontmatter_render.py`
+- `S12` `A` `src/vaultspec_core/vaultcore/tests/test_repository_corpus.py`
+- `S12` `verify:` `pytest -m repo test_repository_corpus` -> `pass`
+- `S07` `M` `src/vaultspec_core/cli/vault_feature_cmd.py`
+- `S07` `M` `src/vaultspec_core/tests/cli/test_feature_list_recency.py`
+- `S07` `verify:` `pytest test_feature_list_recency` -> `pass`
+- `S10` `M` `src/vaultspec_core/tests/cli/test_exec_ledger_cli.py`
+- `S10` `verify:` `pytest test_exec_ledger` -> `pass`
+- `S11` `M` `src/vaultspec_core/cli/edit_cmd.py`
+- `S11` `M` `src/vaultspec_core/vaultcore/tests/test_rename_concurrency.py`
+- `S11` `verify:` `rename-and-edit load test 40 serial runs` -> `pass`
+- `S05` `M` `.vault/research/2026-09-23-typesafe-search-research.md`
+- `S05` `verify:` `run_product_eval live: excerpt 19/21 dev, 12/18 held-out` -> `pass`
+- `S09` `M` `justfile`
+- `S09` `M` `.github/workflows/merge-gate.yml`
+- `S09` `M` `.github/workflows/release.yml`
+- `S09` `M` `.github/workflows/main-health.yml`
+- `S09` `M` `dev/guards/test_ci_check_shape.py`
+- `S09` `verify:` `just check-workflow` -> `pass`
+- `S06` `M` `docs/CLI.md`
+- `S06` `M` `src/vaultspec_core/cli/vault_search_cmd.py`
+- `S06` `M` `src/vaultspec_core/config/config.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S06` `M` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S06` `M` `src/vaultspec_core/search/tests/reply_budget.py`
+- `S06` `M` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S06` `A` `src/vaultspec_core/search/_wire.py`
+- `S06` `verify:` `pytest search, mcp search/context/surface, cli search, config` -> `pass`
+- `S01` `M` `src/vaultspec_core/search/_corpus.py`
+- `S01` `M` `src/vaultspec_core/search/_models.py`
+- `S01` `M` `src/vaultspec_core/search/tests/test_corpus.py`
+- `S01` `verify:` `pytest -m repo test_repository_corpus` -> `pass`
+- `S10` `M` `src/vaultspec_core/plan/serialiser.py`
+- `S10` `verify:` `pytest checks, plan` -> `pass`
+- `S09` `verify:` `basedpyright guard` -> `pass`
+- `S09` `M` `src/vaultspec_core/search/tests/test_live.py`
+- `S09` `verify:` `pytest -m typesafe test_live.py with the key only in the workspace .env` -> `pass`
+- `S13` `M` `src/vaultspec_core/cli/_trigger_trust.py`
+- `S13` `M` `src/vaultspec_core/cli/json_output.py`
+- `S13` `M` `src/vaultspec_core/cli/rendering_hints.py`
+- `S13` `M` `src/vaultspec_core/cli/status_cmd.py`
+- `S13` `M` `src/vaultspec_core/config/__init__.py`
+- `S13` `M` `src/vaultspec_core/config/config.py`
+- `S13` `M` `src/vaultspec_core/config/tests/test_config.py`
+- `S13` `M` `src/vaultspec_core/console.py`
+- `S13` `M` `src/vaultspec_core/core/editor.py`
+- `S13` `M` `src/vaultspec_core/core/local_config.py`
+- `S13` `M` `src/vaultspec_core/core/mcps_targets.py`
+- `S13` `M` `src/vaultspec_core/logging_config.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tests/test_watchdog.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tools/gateway.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/tools/orientation.py`
+- `S13` `M` `src/vaultspec_core/mcp_server/watchdog.py`
+- `S13` `M` `src/vaultspec_core/search/__init__.py`
+- `S13` `M` `src/vaultspec_core/search/_capability.py`
+- `S13` `D` `src/vaultspec_core/search/_credential.py`
+- `S13` `M` `src/vaultspec_core/search/_models.py`
+- `S13` `M` `src/vaultspec_core/search/_remediation.py`
+- `S13` `M` `src/vaultspec_core/search/_service.py`
+- `S13` `D` `src/vaultspec_core/search/tests/test_credential.py`
+- `S13` `M` `src/vaultspec_core/search/tests/test_live.py`
+- `S13` `M` `src/vaultspec_core/search/tests/test_remediation.py`
+- `S13` `M` `src/vaultspec_core/search/tests/test_service.py`
+- `S13` `M` `src/vaultspec_core/tests/cli/test_editor_command_validation.py`
+- `S13` `M` `src/vaultspec_core/tests/cli/test_vault_search_cmd.py`
+- `S13` `M` `src/vaultspec_core/tests/cli/test_vault_status.py`
+- `S13` `M` `src/vaultspec_core/triggers/engine.py`
+- `S13` `A` `src/vaultspec_core/config/credential.py`
+- `S13` `A` `src/vaultspec_core/config/tests/test_credential.py`
+- `S13` `A` `src/vaultspec_core/config/tests/test_environment.py`
+- `S13` `A` `src/vaultspec_core/search/tests/test_capability.py`
+- `S13` `verify:` `pytest config, search, cli status/search/editor, mcp orientation/search/watchdog` -> `pass`
+- `S14` `M` `.env.example`
+- `S14` `M` `dev/__init__.py`
+- `S14` `M` `dev/actionlint.py`
+- `S14` `M` `dev/audit/dependency_audit.py`
+- `S14` `M` `dev/audit/tests/test_dependency_audit_gate.py`
+- `S14` `M` `dev/binaries/build_pyapp.py`
+- `S14` `M` `dev/ci_formats.py`
+- `S14` `M` `dev/exit_codes.py`
+- `S14` `M` `dev/guards/test_ci_formats.py`
+- `S14` `M` `dev/guards/test_exit_code_contract.py`
+- `S14` `M` `dev/init/__init__.py`
+- `S14` `M` `dev/init/__main__.py`
+- `S14` `M` `dev/init/contract.py`
+- `S14` `M` `dev/reporting.py`
+- `S14` `M` `dev/runner.py`
+- `S14` `M` `dev/statistics/parsers/codex.py`
+- `S14` `M` `dev/tests/test_reporting.py`
+- `S14` `M` `dev/tests/test_runner.py`
+- `S14` `M` `dev/toolchain.py`
+- `S14` `A` `dev/environment.py`
+- `S14` `A` `dev/guards/test_environment_registry.py`
+- `S14` `verify:` `pytest dev -m not repo` -> `pass`
+- `S13` `M` `src/vaultspec_core/cli/spec_cmd_rules.py`
+- `S13` `M` `src/vaultspec_core/cli/spec_cmd_skills.py`
+- `S13` `M` `src/vaultspec_core/cli/spec_cmd_agents.py`
+- `S13` `verify:` `just framework-reference` -> `pass`
+- `S13` `verify:` `pytest test_watchdog.py -m serial` -> `pass`
+- `S15` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/envelope.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/filters.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/results.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_context_budget.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_log_tool.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_orientation_tools.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_result_schema_nulls.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_search_tool.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tests/test_tool_description.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/documents.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/exec.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/gateway.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/plan.py`
+- `S15` `M` `src/vaultspec_core/mcp_server/tools/search.py`
+- `S15` `A` `src/vaultspec_core/mcp_server/tests/test_lean_tool_schema.py`
+- `S15` `verify:` `pytest mcp_server tests` -> `pass`
+- `S15` `verify:` `measure_tools full surface 20345 chars` -> `pass`

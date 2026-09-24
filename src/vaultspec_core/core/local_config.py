@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import tomllib
 from pathlib import Path
@@ -231,29 +230,16 @@ def resolve_editor(
         ):
             return str(local_editor)
 
-    vaultspec_editor = os.environ.get("VAULTSPEC_EDITOR")
-    if vaultspec_editor:
-        sources_tried.append(f"$VAULTSPEC_EDITOR env var ({vaultspec_editor!r})")
-        if _accept_editor_candidate(
-            vaultspec_editor, "the $VAULTSPEC_EDITOR environment variable", "trusted"
-        ):
-            return vaultspec_editor
+    from ..config import EDITOR, VAULTSPEC_EDITOR, VISUAL, env_value
 
-    visual_env = os.environ.get("VISUAL")
-    if visual_env:
-        sources_tried.append(f"$VISUAL env var ({visual_env!r})")
-        if _accept_editor_candidate(
-            visual_env, "the $VISUAL environment variable", "trusted"
-        ):
-            return visual_env
-
-    editor_env = os.environ.get("EDITOR")
-    if editor_env:
-        sources_tried.append(f"$EDITOR env var ({editor_env!r})")
-        if _accept_editor_candidate(
-            editor_env, "the $EDITOR environment variable", "trusted"
-        ):
-            return editor_env
+    for var in (VAULTSPEC_EDITOR, VISUAL, EDITOR):
+        env_editor = env_value(var)
+        if env_editor:
+            sources_tried.append(f"${var.env_name} env var ({env_editor!r})")
+            if _accept_editor_candidate(
+                env_editor, f"the ${var.env_name} environment variable", "trusted"
+            ):
+                return env_editor
 
     sources_tried.append("fallback 'vi'")
     if shutil.which("vi"):
