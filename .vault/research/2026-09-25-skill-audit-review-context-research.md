@@ -5,7 +5,7 @@ tags:
 date: '2026-09-25'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:23caf0cb71c586e79f9646fdd08505525b7d119e6f91039c22c439af41b77916'
+body_hash: 'sha256:1fc670e2577da575bbb5c7d9420988dabec8ce7bca592dccae1b4d071ebe58b7'
 related:
   - "[[2026-09-25-skill-audit-code-review-audit]]"
   - "[[2026-09-23-typesafe-search-adr]]"
@@ -151,3 +151,11 @@ confirming the reported zero tool calls. The existing reference edits were prese
   price and free output-token pricing, read on 2026-09-25.
 - `https://developers.openai.com/codex/noninteractive`: structured CLI evaluation
   output, supplemented by the installed CLI's help.
+
+## Production command smoke
+
+On 2026-09-25 the implemented `review context` command was exercised against the historical factory fix at `0cadfc9b`, with its parent as base. Candidate locators were `src/vaultspec_core/mcp_server/app.py:75-104`, `src/vaultspec_core/mcp_server/app.py:166-199`, and `dev/smoke/smoke_check.py:98-105`. The registered key was supplied only in the child process environment; the production command used its normal credential resolver.
+
+The final payload returned the two factory passages in one request: 1,879 input tokens, 46 output tokens, 589.76 ms hosted time and 1,061.58 ms service time including local collection. An earlier wiring call included redundant content hashes in hosted state and used 2,109 input tokens; removing that unused metadata saved 230 input tokens on the same three candidates. Both live calls together used 3,988 input and 92 output tokens. The identical-input invocation with `--previous` reported `reused`, made zero requests and consumed zero hosted tokens. Clearing the process key, while supplying the same previous result, reported `not_configured`, made zero requests and restored discovery order. These smoke observations establish wiring and optionality, not a general latency or review-quality improvement.
+
+The focused production suite passed 71 tests covering real Git collection, committed versus dirty sources, private-path exclusion, bounded input, provider rejection and timeout, cache invalidation, the MCP gateway and generated CLI references. Initial discovery for this implementation used targeted local reads after the configured semantic search tool failed.

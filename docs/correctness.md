@@ -46,6 +46,26 @@ Replace `payment-retries` with your feature's tag. This creates a template, not 
 completed review. Record the reviewed scope and result even when no problems are found;
 append later reviews and resolutions to the same audit.
 
+## Select supporting context
+
+When discovery yields several possible callers, tests or decision passages, use
+`vaultspec-core review context` to select a bounded set of supporting evidence. Pass a
+review objective, the diff base, and repeated `--candidate path:start-end` locators. Add
+`--head REF` for a committed target; otherwise the command reads tracked working-tree
+changes, including staged changes. Untracked files are excluded.
+
+The configured `VAULTSPEC_CORE_TYPESAFE_API_KEY` opts into sending the objective,
+bounded diff and candidate passages to TypeSafe. Missing credentials, rejected keys,
+timeouts and service failures preserve discovery order. `--no-hosted` disables the
+request. The result reports selected passages, unselected locators, exclusions, hosted
+status and usage. `--previous FILE` reuses an identical selection judgment for up to one
+hour, provided a key remains enrolled; reuse does not assert current connectivity.
+
+Share one selection among reviewers. Keep the full diff and governing decisions in the
+review and expand context when necessary. Selection is optional and cannot establish a
+verdict, verification result or complete coverage. See the
+[command reference](CLI.md#vaultspec-core-review-context) for bounds and input rules.
+
 ## Share verification evidence
 
 Review starts with a defined diff base and target, including any uncommitted changes.

@@ -533,7 +533,7 @@ VAULTSPEC_CORE_TYPESAFE_API_KEY: Final = ConfigVariable(
     var_type=str,
     default=None,
     description=(
-        "TypeSafe API key that enables hosted vault search. Read from the "
+        "TypeSafe key for optional hosted search and context ranking. Read from the "
         "process environment first, then explicitly provisioned local settings. "
         "A workspace-root .env supplies it only "
         "when vaultspec-core runs from the workspace's own environment (its "

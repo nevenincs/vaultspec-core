@@ -15,6 +15,13 @@ skill terminates within one run and never modifies the codebase; fixes go back t
 - Establish the reviewed Steps, diff base and target (including uncommitted changes),
   governing constraints, and unresolved risks. Reuse supplied grounding and verification
   evidence; inspect the plan, relevant ADR sections, ledger, and code to fill gaps.
+- When discovery yields competing supporting passages, optionally use
+  `vaultspec-core review context OBJECTIVE --base REF --candidate path:start-end`
+  (repeat `--candidate`; add `--head REF` for a committed target). The tool checks
+  TypeSafe enrollment and falls back locally. Share one selection across reviewers;
+  `--previous FILE` reuses judgments only for unchanged inputs. Read the full diff and
+  governing decisions, expanding context where needed. Selection adds no review gate and
+  establishes no verification result.
 - Scaffold once per feature, `vaultspec-core vault add audit --feature {feature}` (or
   the `create` tool); every later review appends to it. A separate audit (`--topic`)
   only for a different purpose, such as curation, or when the user asks for one. Read

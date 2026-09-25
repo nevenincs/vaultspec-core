@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import subprocess
 import sys
 import time
 from typing import TYPE_CHECKING, Any
@@ -109,6 +110,47 @@ async def test_project_context_is_discoverable_and_invokable(vault_root: Path) -
     assert payload["data"]["schema"] == "vaultspec.project.context.v1"
     assert payload["data"]["data"]["hosted"]["status"] == "disabled"
     assert payload["data"]["data"]["returned"] <= 2
+
+
+async def test_review_context_accepts_repeated_locators_through_gateway(
+    vault_root: Path,
+) -> None:
+    for name in ("caller.py", "service.py"):
+        (vault_root / name).write_bytes(b"value = 1\n")
+    for arguments in (
+        ["init"],
+        ["config", "user.email", "test@example.invalid"],
+        ["config", "user.name", "Review test"],
+        ["add", "caller.py", "service.py"],
+        ["-c", "core.hooksPath=", "commit", "--no-gpg-sign", "-m", "Seed"],
+    ):
+        subprocess.run(
+            ["git", "-C", str(vault_root), *arguments],
+            check=True,
+            capture_output=True,
+        )
+    (vault_root / "service.py").write_bytes(b"value = 2\n")
+    async with Client(_gateway_server()) as client:
+        result = await client.call_tool(
+            "invoke",
+            {
+                "verb": "review context",
+                "positionals": ["caller contract"],
+                "arguments": {
+                    "base": "HEAD",
+                    "candidate": ["caller.py", "service.py"],
+                    "no-hosted": True,
+                    "limit": 1,
+                },
+            },
+        )
+    payload = data_of(result)
+    assert payload["ok"] is True
+    assert payload["data"]["schema"] == "vaultspec.review.context.v1"
+    data = payload["data"]["data"]
+    assert data["hosted"]["status"] == "disabled"
+    assert data["selected"][0]["locator"] == "caller.py:1-1"
+    assert data["unselected"][0]["locator"] == "service.py:1-1"
 
 
 async def test_invoke_unknown_verb_rejected_before_spawn(vault_root: Path) -> None:

@@ -18,7 +18,9 @@ records; report missing inputs within this run rather than waiting indefinitely.
   the plan, relevant decision sections, and ledger to resolve gaps. Use discovery for
   uncovered scope and note missing governing links.
 - Read changed behavior, affected callers, contracts, and tests. Read entire files when
-  needed to understand the affected behavior.
+  needed to understand the affected behavior. Reuse any supplied context selection; the
+  review skill's optional selector can help narrow competing supporting passages. Expand
+  omitted context when needed; ranking is not verification evidence.
 - Apply the review skill's verification evidence contract: inspect existing results and
   their applicability before running checks. Coordinate with the named owner of shared
   or expensive checks; continue analysis while they run. Additional checks need a

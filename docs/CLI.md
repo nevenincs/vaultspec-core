@@ -124,6 +124,7 @@ of that release; it is never hand-maintained.
 Commands:
 
 - `vaultspec-core project context`
+- `vaultspec-core review context`
 
 Flags on commands the release already has:
 
@@ -461,6 +462,11 @@ full options.
 
 - `vaultspec-core project context` - Read local work and optional GitHub state; propose
   a bounded attention order.
+
+### Review
+
+- `vaultspec-core review context` - Read a diff and explicit source locators; optionally
+  rank supporting passages.
 
 <!-- vaultspec:generated:end command-inventory -->
 
@@ -3497,6 +3503,54 @@ vaultspec-core project context "Finish the release and unblock active PRs" --no-
 vaultspec-core project context "Prioritize today's work" --repo owner/project --json
 ```
 
+## Review context
+
+### vaultspec-core review context
+
+```bash
+vaultspec-core review context "Preserve caller contracts" --base main --candidate src/caller.py:20-70 --candidate tests/test_service.py:1-80 --json
+```
+
+Select supporting passages from an explicit Git review scope. This command reads
+repository state without running checks or producing a review verdict. A configured
+`VAULTSPEC_CORE_TYPESAFE_API_KEY` opts into sending the objective, bounded diff and
+candidate passages to TypeSafe. Missing credentials, rejected keys, timeouts and service
+failures preserve the supplied discovery order.
+
+#### Arguments and options
+
+- `OBJECTIVE` - Review behavior or constraint, 1..1,000 UTF-8 bytes.
+- `--base REF` - Required base commit reference.
+- `--candidate PATH[:START-END]` - Required tracked, repository-relative locator; repeat
+  for 1..12 passages. A single line can use `PATH:LINE`.
+- `--head REF` - Read the target commit and its candidate content. Without this flag,
+  read tracked working-tree changes, including staged changes. Untracked files are
+  excluded and working-tree reads are not atomic.
+- `--limit INTEGER` - Return up to this many passages; default 3, range 1..6.
+- `--previous FILE` - Reuse identical-input judgments from a JSON result up to 128,000
+  bytes for at most one hour. A key must remain enrolled. Status `reused` does not claim
+  current service connectivity.
+- `--no-hosted` - Disable hosted selection even with a configured key.
+- `--target DIR` (`-t`, default cwd) - Git repository root.
+- `--json` - Return the `vaultspec.review.context.v1` envelope.
+
+Each candidate is at most 120 lines and 4,000 UTF-8 bytes from a file up to 1 MB. Larger
+passages need narrower locators. Collection has a shared 10-second budget; hosted
+selection makes one batch with a 15-second budget. A diff exceeding 24,000 bytes or
+involving environment/private-key paths disables hosted selection. Candidate environment
+stores, conventional key files, symlinks and paths outside the repository are excluded.
+These path protections are not general secret scanning.
+
+The result carries verbatim selected passages and hashes, unselected locators,
+exclusions, diff scope, hosted status, usage and a reusable judgment. Source text is not
+rewritten by the model. Candidate exclusions and hosted failure exit 0 with reasons;
+invalid input or an unavailable Git scope exits 2. The existing MCP `discover`/`invoke`
+gateway exposes the same command; repeatable candidate flags accept a JSON array.
+
+Keep the full diff and governing decisions in the review. Expand omitted context when
+needed, share selections across reviewers, and reuse applicable verification results.
+Ranking is optional supporting evidence, not proof of correctness or complete coverage.
+
 ## Environment variables
 
 vaultspec-core owns the `VAULTSPEC_` variables below and honours a few external
@@ -3537,8 +3591,8 @@ overridden by the `--target` flag.
 - `VAULTSPEC_NO_HINTS` (str, unset by default) - Set to `1` to drop the `Next actions`
   block the commands print after their report. Equivalent to `--no-hints`. Only the
   exact value `1` counts; anything else leaves the hints in place.
-- `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key that
-  enables hosted vault search (`vaultspec-core vault search` and the MCP `search` tool).
+- `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key for
+  hosted vault search, ADR wording checks and optional project/review context ranking.
   It is read from the process environment, then explicitly provisioned
   `.vaultspec/.env`. A blank in either source disables hosted features. The
   workspace-root `.env` is read only when both sources omit it, core runs from the
