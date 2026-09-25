@@ -628,9 +628,9 @@ GIT_INDEX_FILE: Final = ConfigVariable(
     var_type=str,
     default=None,
     description=(
-        "Set by git for every commit hook it runs. Next-step hints are "
-        "suppressed while it is set, because hook output is often acted on "
-        "without review."
+        "Set by git for every commit hook it runs. Next-step hints and "
+        "auto-fix suggestions are suppressed while it is set, because hook "
+        "output is often acted on without review."
     ),
     scope=VariableScope.EXTERNAL,
 )
