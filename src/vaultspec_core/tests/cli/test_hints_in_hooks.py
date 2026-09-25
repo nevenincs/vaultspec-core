@@ -16,8 +16,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from vaultspec_core.cli.rendering_hints import hints_suppressed
-
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -59,10 +57,11 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _check_all(root: Path) -> subprocess.CompletedProcess[str]:
+def _check_all(root: Path, **env: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "-m", "vaultspec_core", "vault", "check", "all"],
         cwd=root,
+        env={**os.environ, **env},
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -82,13 +81,12 @@ def broken_repo(factory: WorkspaceFactory) -> Path:
     return root
 
 
-def test_a_commit_hooks_git_index_file_suppresses_hints(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("VAULTSPEC_NO_HINTS", raising=False)
-    assert not hints_suppressed()
-    monkeypatch.setenv("GIT_INDEX_FILE", ".git/index")
-    assert hints_suppressed()
+def test_a_commit_hooks_git_index_file_suppresses_hints(broken_repo: Path) -> None:
+    result = _check_all(broken_repo, GIT_INDEX_FILE=".git/index")
+
+    assert result.returncode == 1, result.stdout
+    assert "Next action" not in result.stdout
+    assert "vault repair" not in result.stdout
 
 
 def test_a_failed_check_proposes_only_a_repair_preview(broken_repo: Path) -> None:
