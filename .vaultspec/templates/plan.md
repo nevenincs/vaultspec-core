@@ -164,6 +164,10 @@ templates. -->
      roadmap entry), the timeline horizon, and the teams or agents
      involved.
 
+     For user-requested coordination across the program and its tracker,
+     vaultspec-projectmanager owns that context and assignments; this
+     plan remains the home of implementation sequencing.
+
      ## Wave `W01` - ...
      ## Wave `W02` - ...
 

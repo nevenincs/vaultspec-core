@@ -161,9 +161,12 @@ the final review passing.
 ## Supporting skills and agents
 
 Use `vaultspec-curate` for semantic reconciliation, `vaultspec-documentation` for
-user-facing documents, `vaultspec-team` to supervise approved parallel assignments, and
-`vaultspec-projectmanager` for user-requested external project coordination. Supporting
-skills do not add decision or approval gates to already authorized work.
+user-facing documents, and `vaultspec-team` to supervise approved parallel assignments.
+Use `vaultspec-projectmanager` for explicitly requested coordination across active
+workstreams: epics and trackers, roadmaps, cross-worktree triage, or a multi-feature
+developer workday. It can coordinate local or remote state. Routine repository, branch,
+worktree, and single-PR tasks do not trigger it. Supporting skills do not add decision
+or approval gates to already authorized work.
 
 Personas live in `.vaultspec/agents/`. Their `tier:` (`LOW`, `STANDARD`, `HIGH`) selects
 difficulty, not plan hierarchy. Their `mode:` is discipline, not a sandbox: read-only

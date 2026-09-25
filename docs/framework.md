@@ -255,6 +255,25 @@ The audit distinguishes records inventoried, model-scored, and actually reviewed
 records incomplete coverage and continuation. Verification follows the affected scope;
 unrelated vault warnings do not require an open-ended cleanup before the audit finishes.
 
+## Coordinate several active workstreams
+
+Ask for `vaultspec-projectmanager` when you need a roadmap, cross-worktree triage,
+coordination of an epic and its project board, or a developer workday across several
+in-flight features. Routine branch comparisons, worktree operations, and single-PR tasks
+use the ordinary tools directly.
+
+The coordinator gathers relevant local and remote state, connects dependencies and
+ownership, and recommends an actionable sequence. Each assignment identifies its
+outcome, owner, target, prerequisites, and completion evidence. It updates the context
+affected by completed actions and preserves a compact handoff. GitHub access is needed
+only for the remote facts and actions that depend on it.
+
+Implementation plans remain the source of execution order and progress. At L4, the
+coordinator tracks the external association named in Epic intent alongside that plan.
+Priorities do not confer implementation or remote-action authority. Hosted vault search
+and ADR cross-referencing can supply governing context when configured; project
+coordination does not depend on them.
+
 ## Customize the policy
 
 Add a project rule with its instructions:

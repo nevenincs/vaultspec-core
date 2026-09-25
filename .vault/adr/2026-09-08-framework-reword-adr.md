@@ -5,10 +5,11 @@ tags:
 date: '2026-09-08'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:a53fe571131ee15189e968b5c79bbd3f01bd831e5b08baf4ad686f572d8c9112'
+body_hash: 'sha256:a2d557931a90273c1a4abf27cd743d0a5663939b1758c0c45ea8eb2857660299'
 related:
   - "[[2026-09-08-framework-reword-research]]"
   - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
+  - '[[2026-09-25-skill-audit-projectmanager-audit]]'
 ---
 
 # `framework-reword` adr: `proportional pipeline routing and decision coverage` | (**status:** `accepted`)
@@ -61,6 +62,19 @@ The always-on system owns routing, coverage, approval, and review policy. Record
 Use a plan when scope or progress must survive sessions or handoff, or coordination needs durable sequencing. File counts and parallel workers alone do not force a tier. L1 is a flat sequence of cohesive, verifiable revisions; add containers only when they clarify coordination and dependencies. Expected file creation and routine path corrections are not blockers. Parallel assignments may be Steps at L1 or containers at higher tiers, with isolated writes and coordinated shared metadata and commits.
 
 Formal review is for planned work: review the integrated changed behavior against the plan and its governing decisions at Phase close where Phases exist, plan close, and handoff. Coincident gates share a review. A Step closes on its verification. L1 requires no invented Phase. Review the complete affected workflow across rules, skills, personas, templates, and executable contracts, not each document as a separate approval gate. Planless review stays in the reply. In-scope corrective findings are covered by the approved work; findings requiring new scope or decisions are separately authorized.
+
+Project coordination is an explicitly requested aggregation of context across active
+workstreams: epics and trackers, roadmaps, cross-worktree triage, or a multi-feature
+workday. Local-only coordination is valid. Routine repository, branch, worktree and
+single-PR operations do not require the project-manager role. The coordinator owns
+priorities, assignments, tracker context and handoffs; implementation plans retain
+execution sequencing and authority. An L4 association supplies tracker context without
+making every Epic-intent operation a coordination task.
+
+**Amendment, 2026-09-25, project coordination:** Authorized by the user's specification
+of the project-manager skill's intended scope during the ongoing skill audit. Evidence:
+`2026-09-25-skill-audit-projectmanager-audit`. This refines role routing and ownership;
+it introduces no mandatory hosted service or project-triage backend.
 
 ## Rationale
 
