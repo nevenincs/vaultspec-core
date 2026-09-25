@@ -46,21 +46,19 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.4`. What follows is on this branch and not in that
+The latest published release is `0.2.5`. What follows is on this branch and not in that
 release, so it cannot be installed yet. This list is generated from the recorded surface
 of that release; it is never hand-maintained.
 
 Commands:
 
+- `vaultspec-core project context`
 - `vaultspec-core review context`
-- `vaultspec-core commit-gate`
-- `vaultspec-core vault adr crossref`
-- `vaultspec-core vault search`
 
-MCP tools:
+Flags on commands the release already has:
 
-- `crossref`
-- `search`
+- `vaultspec-core install` - `--env`, `--env-file`
+- `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
