@@ -141,3 +141,58 @@ def test_a_declined_workspaces_own_hook_config_is_not_per_machine(
     _git(root, "add", "-f", "--", ".pre-commit-config.yaml")
 
     assert check_staged_provider_artifacts(cwd=root) == []
+
+
+def test_provider_owned_files_core_never_generates_pass(
+    committed: WorkspaceFactory,
+) -> None:
+    """Claude Code's own project config under ``.claude/`` is team-shared.
+
+    ``.claude/settings.json`` and a ``SessionStart`` hook script are authored by
+    the team, not projected by Core, so a directory-wide match must not block
+    them.
+    """
+    root = committed.root
+    for path in (".claude/settings.json", ".claude/hooks/session-start.sh"):
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("{}\n", encoding="utf-8")
+        _git(root, "add", "-f", "--", path)
+
+    assert check_staged_provider_artifacts(cwd=root) == []
+
+
+def test_every_blocked_path_is_ignored_by_the_managed_block(
+    committed: WorkspaceFactory,
+) -> None:
+    """The guard never blocks a file the managed ``.gitignore`` lets through."""
+    root = committed.root
+    candidates = [
+        ".vaultspec/providers.json",
+        ".vaultspec/mcp-ownership.json",
+        ".vaultspec/stray.lock",
+        ".vaultspec/_snapshots/x.json",
+        ".vault/data/x.json",
+        ".gitignore.lock",
+        ".mcp.json.lock",
+        "CLAUDE.md",
+        ".mcp.json",
+        ".claude/rules/team.md",
+        ".claude/settings.json",
+    ]
+    for path in candidates:
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            target.write_text("{}", encoding="utf-8")
+        _git(root, "add", "-f", "--", path)
+
+    blocked = check_staged_provider_artifacts(cwd=root)
+    assert blocked
+    ignored = subprocess.run(
+        ["git", "-C", str(root), "check-ignore", "--no-index", "--", *blocked],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.splitlines()
+    assert sorted(ignored) == sorted(blocked)
