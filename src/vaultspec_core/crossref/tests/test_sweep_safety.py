@@ -55,7 +55,11 @@ def test_a_failure_in_any_job_cancels_the_jobs_not_yet_started() -> None:
                 time.sleep(1.0)
             if number == 1:
                 raise RuntimeError("the provider failed")
-            time.sleep(0.05)
+            # Long enough that the remaining jobs need several such waves on
+            # the pool to all start, so the main thread has this long after
+            # the failure to cancel them even on a loaded runner. At 0.05s the
+            # whole queue drained in ~0.2s and a slow wake-up flaked the test.
+            time.sleep(0.5)
             return number
 
         return run
