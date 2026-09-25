@@ -1614,10 +1614,10 @@ ______________________________________________________________________
 vaultspec-core vault adr crossref [OPTIONS] [REFS]...
 ```
 
-Find the ADRs a decision should cross-reference. Each source ADR is judged against every
-other ADR in the vault, and the reply lists the ones it should link and the links it
-already declares that were judged weak. With `--apply`, the new links are written into
-the source's `related:` field. The same backend serves the MCP `crossref` tool.
+Find the ADRs a decision should cross-reference. Every other ADR is ranked locally;
+hosted judgments evaluate a bounded shortlist. The reply lists suggested links and
+declared links judged weak. With `--apply`, the new links are written into the source's
+`related:` field. The same backend serves the MCP `crossref` tool.
 
 The judgment runs in three stages, each with a fixed ceiling, so a run's cost does not
 grow with the size of the vault:

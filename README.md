@@ -88,13 +88,19 @@ Open `.vault/` in [Obsidian](https://obsidian.md) to browse its linked documents
 optional [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package adds
 semantic search across the vault and your code.
 
-Hosted vault search is also optional. Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` and
-`vaultspec-core vault search` (MCP: `search`) answers questions about the vault with the
-passage that answers them. Every search sends vault text to the TypeSafe API. Without a
-key, everything else works. A vault search then names what to run instead: a
-vaultspec-rag vault search when the workspace provisions vaultspec-rag, otherwise
-`vaultspec-core vault list` and grep. Code search is always vaultspec-rag's job. See
-[`vaultspec-core vault search`](docs/CLI.md#vaultspec-core-vault-search).
+Hosted vault search and ADR cross-referencing are optional. Set
+`VAULTSPEC_CORE_TYPESAFE_API_KEY` to enable:
+
+- [`vaultspec-core vault search`](docs/CLI.md#vaultspec-core-vault-search) (MCP:
+  `search`): answers vault questions with a supporting passage.
+- [`vaultspec-core vault adr crossref`](docs/CLI.md#vaultspec-core-vault-adr-crossref)
+  (MCP: `crossref`): suggests related ADRs and flags possible conflicts for the author
+  to reconcile.
+
+These calls send vault text to the TypeSafe API. Without a key, they send nothing and
+name a discovery fallback: a vaultspec-rag vault search when the workspace provisions
+vaultspec-rag, otherwise `vaultspec-core vault list` and grep. The workflow can continue
+with that evidence. Code search is always vaultspec-rag's job.
 
 ## Support and license
 

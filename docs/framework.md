@@ -130,13 +130,33 @@ vaultspec-core vault list adr --feature search-api
 
 Omit `--feature` to inspect decisions recorded elsewhere in the project.
 
-For prose edits, follow [editing safely](syntax.md#editing-safely). Amend an existing
-ADR for refinements, narrower scope, or parameter changes. Keep the accepted content
-intact while presenting a proposed amendment separately; apply it after approval.
+Reuse an accepted ADR when it already covers the decision. Extend a section or amend
+that record for refinements, narrower scope, or parameter changes; create a separate ADR
+for a distinct costly decision. For prose edits, follow
+[editing safely](syntax.md#editing-safely). Keep the accepted content intact while
+presenting a proposed amendment separately; apply it after approval.
 
 If the direction reverses or the rationale no longer applies, create a replacement ADR.
 The replacement must be accepted before
 [superseding the old ADR](CLI.md#vaultspec-core-vault-adr-supersede).
+
+The ADR author proposes any necessary edits to conflicting older wording alongside the
+decision. Links alone do not reconcile contradictory rulings. Keep enough context to
+explain the decision and cite detailed evidence in its source record. Research gathers
+evidence; the ADR records the resulting commitment.
+
+With `VAULTSPEC_CORE_TYPESAFE_API_KEY` configured, the author uses
+[`crossref`](CLI.md#vaultspec-core-vault-adr-crossref) on the populated draft and reads
+the relevant full records before presenting it. Proposed amendments use `--body-file`
+(MCP: `body`) without replacing accepted text. Reuse judgments while the draft and
+relevant corpus remain unchanged. Results are advisory and report bounded coverage; they
+do not certify the absence of conflict. Without a key, use local discovery; a service
+failure names a fallback and does not block authoring.
+
+Acceptance establishes the decision's authority, not implementation completion.
+Implementation hypotheses can adapt within its binding commitments. If evidence
+invalidates a commitment or its rationale, propose an authorized revision; code
+divergence alone does not rewrite the ruling.
 
 Superseding doesn't revise plans or retarget their authorizing links. Review affected
 active plans and links, revise them where necessary, and establish decision coverage
@@ -179,6 +199,13 @@ See [plan commands](CLI.md#vaultspec-core-vault-plan) for arguments and examples
 After approving the plan, ask your agent to use `vaultspec-execute`. It starts from the
 next open Step. For each Step, it implements, runs relevant tests and checks, logs the
 changed files and verification results, marks the Step complete, and commits.
+
+Before adding code, the agent checks for an existing implementation it can reuse and
+follows the project's typing, lint, formatting, and style conventions. Verification
+covers the changed behavior and affected interfaces. Successful checks are repeated when
+changes, failures, or unresolved concerns justify another run; Step completion does not
+require a separate formal review. Workers verify their assigned scope, while the
+orchestrator coordinates shared checks and integrated review.
 
 To resume interrupted work, ask the agent to continue or specify a Step. Use
 [status](CLI.md#vaultspec-core-status) to check progress and the next open Step.

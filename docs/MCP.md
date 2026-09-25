@@ -503,10 +503,10 @@ Find the ADRs a decision should cross-reference, within fixed bounds. Not read-o
 can write links), non-destructive, idempotent, open-world. On a read-only server it is
 read-only and judges one ADR.
 
-`crossref` judges a source ADR against every other ADR in the vault and returns the ones
-it should link, plus the links it already declares that were judged weak. It is the same
-backend as `vaultspec-core vault adr crossref`, and it uses the hosted-search key and
-data flow described under [`search`](#search).
+`crossref` ranks every other ADR locally, judges a bounded shortlist, and returns
+suggested links and declared links judged weak. It is the same backend as
+`vaultspec-core vault adr crossref`, and it uses the hosted-search key and data flow
+described under [`search`](#search).
 
 | Parameter     | Type                   | Default | Description                                                                                  |
 | ------------- | ---------------------- | ------- | -------------------------------------------------------------------------------------------- |
