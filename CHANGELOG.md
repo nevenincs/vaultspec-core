@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.6](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.5...vaultspec-core-v0.2.6) (2026-09-25)
+
+
+### Bug Fixes
+
+* **checks:** drop auto-fix suggestions from check output inside a commit hook ([#558](https://github.com/nevenincs/vaultspec-core/issues/558)) ([76005e6](https://github.com/nevenincs/vaultspec-core/commit/76005e64bf1f0d9c8f8406058d151e71de82cabb))
+* commit-hook correctness batch ([#535](https://github.com/nevenincs/vaultspec-core/issues/535), [#549](https://github.com/nevenincs/vaultspec-core/issues/549), [#550](https://github.com/nevenincs/vaultspec-core/issues/550), [#551](https://github.com/nevenincs/vaultspec-core/issues/551)) ([#557](https://github.com/nevenincs/vaultspec-core/issues/557)) ([88cd51d](https://github.com/nevenincs/vaultspec-core/commit/88cd51db5dc93b2ee79342496217609389952be9))
+* **smoke:** accept MCPServer subclasses from create_server() ([0cadfc9](https://github.com/nevenincs/vaultspec-core/commit/0cadfc9b6ea874070c3af3f86bfba64123a36cd5))
+
 ## [0.2.5](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.4...vaultspec-core-v0.2.5) (2026-09-24)
 
 
