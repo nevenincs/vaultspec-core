@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:4fd70417ca35346b1df9a1771b257dd0e50c8c04d6779031804bf0918a9a2f31'
+body_hash: 'sha256:6c6ffd2af312ca641fdce48bc93f53205568f4d668c2120e3a7458d12a24f8c2'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -15,6 +15,7 @@ related:
   - '[[2026-02-16-environment-variable-adr]]'
   - '[[2026-09-23-typesafe-search-audit]]'
   - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
+  - '[[2026-09-25-environment-provisioning-adr]]'
 ---
 
 # `typesafe-search` adr: `hosted vault search on TypeSafe Jev, with rag as the agent-level fallback` | (**status:** `accepted`)
@@ -106,20 +107,23 @@ search feature as drafted.
   supply credentials to a globally installed tool.
 - The process environment only. Rejected: it fails the requested development-
   dependency workflow.
-- The process environment, then the workspace `.env` in DEPENDENCY or DEV mode.
-  **Chosen.**
+- The process environment, explicitly provisioned private local settings, then the
+  workspace `.env` in DEPENDENCY or DEV mode. **Chosen.** The explicit provisioning
+  contract is governed by `2026-09-25-environment-provisioning-adr`.
 
 ## Constraints
 
 - **Credential.** Enrollment is `VAULTSPEC_CORE_TYPESAFE_API_KEY` alone.
   - The generic `TYPESAFE_API_KEY` and rag's variable never enrol core.
-  - The key is read from the process environment. Only when it is absent there, core
-    runs from the workspace's own environment (the running interpreter lives inside
+  - The key is read from the process environment, then explicitly provisioned private
+    local settings in any install mode. An explicit blank disables lower sources.
+    Only when both sources omit it, core runs from the workspace's own environment (the running interpreter lives inside
     the workspace), and the workspace declares DEPENDENCY or DEV install mode, is it
     read from the workspace-root `.env`, and only that one variable. The declaration
     alone never suffices, because the repository writes it.
-  - The endpoint, model and every other setting are code constants that no `.env`
-    can change.
+  - The endpoint and model remain code constants that no environment file can change.
+    The private store admits only registry-approved runtime settings under the
+    provisioning decision; root `.env` remains a credential-only fallback.
   - The key never appears in output, logs, diagnostics or errors. Surfaces report only
     whether it is configured and from which source.
 - **No rag.** Core still calls no rag API, imports no rag module and opens no socket to

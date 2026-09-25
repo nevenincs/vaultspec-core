@@ -193,18 +193,21 @@ class TestEditorResolution:
             os.environ["VAULTSPEC_EDITOR"] = ed_vaultspec
             assert resolve_editor(target_dir=tmp_path) == ed_vaultspec
 
-            # 5. Local config should take precedence over VAULTSPEC_EDITOR
+            # 5. Environment settings override committed project configuration.
             from vaultspec_core.core.local_config import set_config_value
 
             # Write local config
             get_local_config_path(tmp_path)
             set_config_value("editor", ed_config, target_dir=tmp_path)
-            assert resolve_editor(target_dir=tmp_path) == ed_config
+            assert resolve_editor(target_dir=tmp_path) == ed_vaultspec
 
             # 6. Editor override flag should take precedence over local config
             assert (
                 resolve_editor(editor_override=ed_flag, target_dir=tmp_path) == ed_flag
             )
+            for name in ("VAULTSPEC_EDITOR", "VISUAL", "EDITOR"):
+                os.environ.pop(name, None)
+            assert resolve_editor(target_dir=tmp_path) == ed_config
 
         finally:
             # Restore environment variables

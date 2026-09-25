@@ -365,8 +365,13 @@ reaches the model. An empty or blank query, a query over 2,000 characters, a `li
 outside 1 to 11, an unknown type, or `index` fails the whole call with a protocol error.
 
 **Enabling hosted search.** Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` in the server's
-environment. If the variable is absent there, the server reads that one variable from
-the workspace-root `.env` instead, but only when both hold: the server runs from the
+environment, or provision it with
+`vaultspec-core install --env VAULTSPEC_CORE_TYPESAFE_API_KEY` (add `--upgrade` for an
+existing installation). Process values override the protected `.vaultspec/.env` store,
+which works in all install modes; an explicit blank disables hosted calls. The resolver
+refreshes local file changes without changing the server's inherited environment. If
+neither source supplies the variable, the server reads that one variable from the
+workspace-root `.env` instead, but only when both hold: the server runs from the
 workspace's own environment (its Python interpreter lives inside the workspace, as a
 project virtual environment does), and the workspace declares the `dependency` or `dev`
 install mode. A globally installed vaultspec-core, such as a uv tool, a pipx install, or
@@ -751,13 +756,13 @@ document count, latest activity, whether a plan exists, lifecycle status, plan t
 plan completion percent), the plans currently in flight (stem, feature, tier, open and
 closed step counts, completion percent, and the next open step), vault-wide totals, and
 `hosted_search`. That field reports whether [`search`](#search) has a key (`configured`)
-and, when it does, where the key was found (`source`: `environment` or `dotenv`). It
-describes configuration, not whether the key works. Next to it, `companion` reports
-whether the `vaultspec-rag` companion is provisioned, which decides the next step a
-declined `search` names (`package`, `signal`, `mode`, `version`, `floor`,
-`health_authority`; the key is absent when the probe failed). It reports configuration,
-not liveness: a provisioned companion can still be down. Both fields come from the same
-backend call as `vaultspec-core status --json`. Every response carries a
+and, when it does, where the key was found (`source`: `environment`, `local_env`, or
+`dotenv`). It describes configuration, not whether the key works. Next to it,
+`companion` reports whether the `vaultspec-rag` companion is provisioned, which decides
+the next step a declined `search` names (`package`, `signal`, `mode`, `version`,
+`floor`, `health_authority`; the key is absent when the probe failed). It reports
+configuration, not liveness: a provisioned companion can still be down. Both fields come
+from the same backend call as `vaultspec-core status --json`. Every response carries a
 `tool_schema_version` field so a client can detect a server upgrade.
 
 Pass a target to trace one plan or feature instead. The response then reports each

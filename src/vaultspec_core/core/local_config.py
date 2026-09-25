@@ -188,14 +188,14 @@ def resolve_editor(
 
     Order:
       1. editor_override (e.g. from --editor flag)
-      2. local config `editor` value
-      3. VAULTSPEC_EDITOR env var
-      4. VISUAL env var
-      5. EDITOR env var
+      2. VAULTSPEC_EDITOR env var
+      3. VISUAL env var
+      4. EDITOR env var
+      5. local config `editor` value
       6. "vi" fallback
 
     Every rung is validated by :mod:`vaultspec_core.core.editor` before it is
-    returned. The first two rungs - the flag and the committed config file -
+    returned. The flag and the committed config file
     are treated as untrusted channels and must additionally name a known
     editor program; the environment rungs are structurally validated only, and
     are therefore the way to use an editor the allowlist does not know.
@@ -220,16 +220,6 @@ def resolve_editor(
         if _accept_editor_candidate(editor_override, "the --editor flag", "untrusted"):
             return editor_override
 
-    local_editor = get_config_value("editor", target_dir)
-    if local_editor:
-        sources_tried.append(f"local config 'editor' ({local_editor!r})")
-        if _accept_editor_candidate(
-            str(local_editor),
-            "the project-local config key 'editor'",
-            "untrusted",
-        ):
-            return str(local_editor)
-
     from ..config import EDITOR, VAULTSPEC_EDITOR, VISUAL, env_value
 
     for var in (VAULTSPEC_EDITOR, VISUAL, EDITOR):
@@ -240,6 +230,16 @@ def resolve_editor(
                 env_editor, f"the ${var.env_name} environment variable", "trusted"
             ):
                 return env_editor
+
+    local_editor = get_config_value("editor", target_dir)
+    if local_editor:
+        sources_tried.append(f"local config 'editor' ({local_editor!r})")
+        if _accept_editor_candidate(
+            str(local_editor),
+            "the project-local config key 'editor'",
+            "untrusted",
+        ):
+            return str(local_editor)
 
     sources_tried.append("fallback 'vi'")
     if shutil.which("vi"):

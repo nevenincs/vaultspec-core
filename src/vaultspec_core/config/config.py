@@ -171,6 +171,8 @@ class VaultSpecConfig:
     def from_environment(
         cls,
         overrides: dict[str, Any] | None = None,
+        *,
+        root: Path | None = None,
     ) -> VaultSpecConfig:
         """Create a config from environment variables and optional overrides.
 
@@ -178,11 +180,13 @@ class VaultSpecConfig:
 
         1. *overrides* dict (keyed by ``attr_name``)
         2. ``VAULTSPEC_*`` env var
-        3. Dataclass default
+        3. Explicitly provisioned project settings
+        4. Dataclass default
 
         Args:
             overrides: Optional mapping of attribute name to value that takes
                 precedence over environment variables and defaults.
+            root: Workspace whose explicitly provisioned settings may be read.
 
         Returns:
             A fully-populated ``VaultSpecConfig`` instance.
@@ -192,6 +196,9 @@ class VaultSpecConfig:
         """
         overrides = overrides or {}
         kwargs: dict[str, Any] = {}
+        from .local_env import read_local_environment
+
+        local = read_local_environment(_config_root(root))
 
         for var in CONFIG_REGISTRY:
             # Variables read at call time are not configuration fields.
@@ -205,6 +212,8 @@ class VaultSpecConfig:
 
             # 2. VAULTSPEC_* env var
             raw: str | None = os.environ.get(var.env_name)
+            if raw is None and var.persistable:
+                raw = local.get(var.env_name)
             source: str | None = var.env_name if raw is not None else None
 
             # 3. Default
@@ -453,6 +462,8 @@ class ConfigVariable:
             (see :mod:`vaultspec_core.config.credential`). Only a secret may
             be so marked: the file is repository content, and it supplies
             credentials, never settings.
+        persistable: Whether installation may import this variable into protected
+            project-local storage.
 
     Raises:
         ValueError: If the name's prefix does not match the scope, or a
@@ -471,6 +482,7 @@ class ConfigVariable:
     secret: bool = False
     scope: VariableScope = VariableScope.PRODUCT
     workspace_dotenv: bool = False
+    persistable: bool = False
 
     def __post_init__(self) -> None:
         owned = self.scope is not VariableScope.EXTERNAL
@@ -484,6 +496,8 @@ class ConfigVariable:
             raise ValueError(
                 f"{self.env_name}: only a secret may be read from a workspace .env"
             )
+        if self.persistable and self.scope is not VariableScope.PRODUCT:
+            raise ValueError(f"{self.env_name}: only product settings may be persisted")
 
 
 # -- Entries call sites name -----------------------------------------------------
@@ -509,8 +523,7 @@ VAULTSPEC_EDITOR: Final = ConfigVariable(
     description=(
         "Editor command. Interactive creation of a rule, skill, agent or "
         "trigger opens it, or zed -w when unset. The edit verbs consult it "
-        "after the --editor flag and the project config key, before VISUAL "
-        "and EDITOR."
+        "after the --editor flag, before VISUAL, EDITOR and the project config key."
     ),
 )
 
@@ -521,14 +534,15 @@ VAULTSPEC_CORE_TYPESAFE_API_KEY: Final = ConfigVariable(
     default=None,
     description=(
         "TypeSafe API key that enables hosted vault search. Read from the "
-        "process environment first. A workspace-root .env supplies it only "
+        "process environment first, then explicitly provisioned local settings. "
+        "A workspace-root .env supplies it only "
         "when vaultspec-core runs from the workspace's own environment (its "
         "project virtual environment) in dependency or dev mode, never for "
-        "a globally installed tool. Unset or blank means hosted search is "
-        "not configured."
+        "a globally installed tool. A blank override disables hosted search."
     ),
     secret=True,
     workspace_dotenv=True,
+    persistable=True,
 )
 
 VAULTSPEC_LOG_LEVEL: Final = ConfigVariable(
@@ -547,6 +561,7 @@ VAULTSPEC_JSON_PRETTY: Final = ConfigVariable(
     attr_name=None,
     var_type=str,
     default=None,
+    persistable=True,
     description=(
         "Indents --json output. Any value other than 0, false, no, off or "
         "blank turns it on; unset, the envelope is one compact line."
@@ -558,6 +573,7 @@ VAULTSPEC_NO_HINTS: Final = ConfigVariable(
     attr_name=None,
     var_type=str,
     default=None,
+    persistable=True,
     description=(
         "Set to 1 to drop the Next actions block commands print after their "
         "report; equivalent to --no-hints. Only the exact value 1 counts."
@@ -729,6 +745,7 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
     # -- I/O -------------------------------------------------------------------
     ConfigVariable(
         env_name="VAULTSPEC_IO_BUFFER_SIZE",
+        persistable=True,
         attr_name="io_buffer_size",
         var_type=int,
         default=8192,
@@ -737,6 +754,7 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
     ),
     ConfigVariable(
         env_name="VAULTSPEC_TERMINAL_OUTPUT_LIMIT",
+        persistable=True,
         attr_name="terminal_output_limit",
         var_type=int,
         default=1_000_000,
@@ -746,6 +764,7 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
     # -- Concurrency -----------------------------------------------------------
     ConfigVariable(
         env_name="VAULTSPEC_LOCK_TIMEOUT_SECONDS",
+        persistable=True,
         attr_name="lock_timeout_seconds",
         var_type=float,
         default=120.0,
@@ -793,7 +812,10 @@ def _registered(var: ConfigVariable) -> ConfigVariable:
 
 
 def env_value(
-    var: ConfigVariable, environ: Mapping[str, str] | None = None
+    var: ConfigVariable,
+    environ: Mapping[str, str] | None = None,
+    *,
+    root: Path | None = None,
 ) -> str | None:
     """Return the raw value of registered variable *var*, read now.
 
@@ -803,7 +825,9 @@ def env_value(
 
     Args:
         var: A :data:`CONFIG_REGISTRY` entry.
-        environ: The environment to read; ``None`` reads the process's own.
+        environ: An explicit mapping reads only that mapping. Otherwise process
+            presence overrides eligible project-local settings.
+        root: Workspace for local settings; defaults to the current context.
 
     Returns:
         The value as set, which may be blank, or ``None`` when unset.
@@ -812,7 +836,23 @@ def env_value(
         ValueError: If *var* is not a registry entry.
     """
     env = os.environ if environ is None else environ
-    return env.get(_registered(var).env_name)
+    name = _registered(var).env_name
+    if name in env or environ is not None or not var.persistable:
+        return env.get(name)
+    from .local_env import read_local_environment
+
+    return read_local_environment(_config_root(root)).get(name)
+
+
+def _config_root(root: Path | None) -> Path:
+    if root is not None:
+        return root.resolve()
+    from ..core.types import get_context
+
+    try:
+        return get_context().target_dir.resolve()
+    except LookupError:
+        return Path.cwd().resolve()
 
 
 def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str]:
@@ -837,14 +877,17 @@ def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str
 
 
 _cached_config: VaultSpecConfig | None = None
+_cached_inputs: tuple[object, ...] | None = None
 _config_lock = threading.Lock()
 
 
-def get_config(overrides: dict[str, Any] | None = None) -> VaultSpecConfig:
-    """Return the global ``VaultSpecConfig`` instance.
+def get_config(
+    overrides: dict[str, Any] | None = None, *, root: Path | None = None
+) -> VaultSpecConfig:
+    """Return configuration for the current workspace and environment.
 
     If *overrides* is provided a fresh instance is created (not cached).
-    Otherwise the cached singleton is returned, creating it on first call.
+    Otherwise the cache refreshes when the workspace or effective inputs change.
     Thread-safe: concurrent callers from the MCP server will not race
     on the read-modify of ``_cached_config``.
 
@@ -856,19 +899,30 @@ def get_config(overrides: dict[str, Any] | None = None) -> VaultSpecConfig:
     Returns:
         The current (or freshly created) ``VaultSpecConfig`` singleton.
     """
-    global _cached_config
+    global _cached_config, _cached_inputs
+
+    from .local_env import read_local_environment
+
+    root = _config_root(root)
 
     if overrides is not None:
-        return VaultSpecConfig.from_environment(overrides)
+        return VaultSpecConfig.from_environment(overrides, root=root)
 
     with _config_lock:
-        if _cached_config is None:
-            _cached_config = VaultSpecConfig.from_environment()
+        inputs = (
+            root,
+            tuple(os.environ.get(var.env_name) for var in CONFIG_REGISTRY),
+            tuple(sorted(read_local_environment(root).items())),
+        )
+        if _cached_config is None or inputs != _cached_inputs:
+            _cached_config = VaultSpecConfig.from_environment(root=root)
+            _cached_inputs = inputs
         return _cached_config
 
 
 def reset_config() -> None:
     """Clear the cached singleton so the next :func:`get_config` recreates it."""
-    global _cached_config
+    global _cached_config, _cached_inputs
     with _config_lock:
         _cached_config = None
+        _cached_inputs = None

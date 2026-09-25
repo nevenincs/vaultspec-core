@@ -600,6 +600,45 @@ async def _drive_with_a_key(project: Path) -> None:
         assert _SENTINEL_KEY not in result.model_dump_json()
 
 
+async def _drive_with_local_settings(project: Path) -> None:
+    from vaultspec_core.config.provisioning import (
+        apply_environment,
+        prepare_environment,
+    )
+
+    name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+    request = prepare_environment(project, [name], environ={name: _SENTINEL_KEY})
+    apply_environment(project, request)
+    environment = {key: value for key, value in os.environ.items() if key != name}
+    async with stdio_session(project, environ=environment) as session:
+        await session.initialize()
+        result = await session.call_tool("status", {})
+        assert data_of(result)["hosted_search"] == {
+            "configured": True,
+            "source": CredentialSource.LOCAL_ENV.value,
+        }
+        assert _SENTINEL_KEY not in result.model_dump_json()
+        cli = CliRunner(env={name: None}).invoke(
+            app, ["-t", str(project), "status", "--json"]
+        )
+        assert cli.exit_code == 0, cli.output
+        assert (
+            json.loads(cli.stdout)["data"]["hosted_search"]
+            == data_of(result)["hosted_search"]
+        )
+        assert _SENTINEL_KEY not in cli.output
+        apply_environment(
+            project, prepare_environment(project, [name], environ={name: ""})
+        )
+        refreshed = data_of(await session.call_tool("status", {}))
+        assert refreshed["hosted_search"] == {"configured": False, "source": None}
+
+
+@pytest.mark.integration
+def test_cli_and_running_mcp_share_local_settings_without_exposing_values() -> None:
+    run_in_fresh_workspace(_drive_with_local_settings, prefix="vsc-local-settings-")
+
+
 @pytest.mark.integration
 def test_without_a_key_search_reports_not_configured_and_sends_nothing() -> None:
     run_in_fresh_workspace(_drive_without_a_key, prefix="vsc-mcp-search-")

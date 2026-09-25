@@ -1,26 +1,8 @@
-"""Read one named variable from a dotenv file, and nothing else from it.
+"""Literal dotenv readers; neither evaluates shell code nor interpolates variables.
 
-Core configuration comes from the process environment, and core loads no
-``.env`` at runtime. The one exception is a credential that a workspace may
-keep in its own ``.env`` when it runs core as a project dependency. That file
-is repository content, so this reader is deliberately not a loader:
-
-- It returns the value of the single variable a caller names. Nothing else in
-  the file is read into the process, so a cloned repository's ``.env`` cannot
-  reach any other setting.
-- It supports the common shapes only: blank lines, ``#`` comment lines, an
-  optional ``export`` prefix, an unquoted value with an optional trailing
-  ``# comment``, and a value wrapped in single or double quotes. There is no
-  interpolation, no escape processing and no multi-line value; a value that
-  opens a quote and never closes it on its own line is treated as absent
-  rather than guessed at.
-- When a name is assigned more than once, the last assignment wins, as it does
-  when a shell sources the file.
-- It never logs. The values it exists to read are credentials.
-
-A missing, unreadable or undecodable file, an absent name and a blank value
-all read as ``None``: for a caller choosing between sources, each means the
-same thing - this source supplies nothing.
+The legacy credential reader selects one named value and treats blanks as absent.
+Explicit imports use strict assignment parsing, preserve blanks, and round-trip
+quoted single-line values. No reader modifies the process environment.
 """
 
 from __future__ import annotations
@@ -59,6 +41,61 @@ def _unquote(raw: str) -> str | None:
             return None
         return raw[1:closing]
     return _TRAILING_COMMENT.sub("", raw)
+
+
+def parse_dotenv(text: str) -> dict[str, str]:
+    """Parse a bounded import without interpolation, retaining explicit blanks.
+
+    Double quotes support escaped backslashes and quotes. Other backslashes
+    stay literal (including Windows paths). Errors never repeat input text.
+    """
+    values: dict[str, str] = {}
+    for number, line in enumerate(text.splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = _ASSIGNMENT.fullmatch(line)
+        if match is None:
+            raise ValueError(f"Invalid environment assignment at line {number}")
+        raw = match.group("value").strip()
+        value = _parse_import_value(raw)
+        if value is None:
+            raise ValueError(f"Invalid environment value at line {number}")
+        values[match.group("name")] = value
+    return values
+
+
+def _parse_import_value(raw: str) -> str | None:
+    if raw[:1] not in ("'", '"'):
+        return _TRAILING_COMMENT.sub("", raw).rstrip()
+    quote = raw[0]
+    value: list[str] = []
+    index = 1
+    while index < len(raw):
+        char = raw[index]
+        if char == quote:
+            tail = raw[index + 1 :].strip()
+            return "".join(value) if not tail or tail.startswith("#") else None
+        if (
+            quote == '"'
+            and char == "\\"
+            and index + 1 < len(raw)
+            and raw[index + 1] in ('"', "\\")
+        ):
+            index += 1
+            char = raw[index]
+        value.append(char)
+        index += 1
+    return None
+
+
+def format_dotenv(values: dict[str, str]) -> str:
+    """Encode single-line settings using literal, round-trippable quoting."""
+    lines = []
+    for name, value in sorted(values.items()):
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'{name}="{escaped}"\n')
+    return "".join(lines)
 
 
 def read_dotenv_value(path: Path, name: str) -> str | None:

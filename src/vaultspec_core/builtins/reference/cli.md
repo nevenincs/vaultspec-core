@@ -56,6 +56,7 @@ Commands:
 
 Flags on commands the release already has:
 
+- `vaultspec-core install` - `--env`, `--env-file`
 - `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
@@ -411,6 +412,19 @@ Deploy the framework into the target directory.
 | `--mode`    | auto    | Provisioning mode: `tool` (uvx), `dependency` (project venv, ships in built distributions), or `dev` (default dev group, renders like dependency but does not ship); auto-detected from pyproject.toml. |
 | `--json`    | off     | Emit machine-readable output.                                                                                                                                                                           |
 
+`--env NAME` imports a supported process variable; `--env NAME=VALUE` supplies a
+non-secret setting. `--env-file PATH` imports supported names from a bounded dotenv
+file. Explicit entries win over imported entries. Only named keys replace values in the
+ignored, owner-restricted `.vaultspec/.env`. Upgrade, force and sync preserve other
+keys; dry runs write nothing. Tracked or redirected stores are refused. Outputs carry
+names and outcomes only. Full framework uninstall removes the store.
+
+Runtime order: explicit command flags, process environment, provisioned local settings,
+trusted root `.env` credentials, defaults. Blank credentials disable lower sources. CLI
+and MCP share workspace-scoped resolution. Importable names: the TypeSafe key,
+`VAULTSPEC_IO_BUFFER_SIZE`, `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`,
+`VAULTSPEC_LOCK_TIMEOUT_SECONDS`, `VAULTSPEC_JSON_PRETTY`, `VAULTSPEC_NO_HINTS`.
+
 ### vaultspec-core uninstall
 
 Remove the framework from the target directory.
@@ -602,9 +616,9 @@ operation). The `data` payload carries `plans_in_flight`, `recent_documents`,
 version integer convention.
 
 The rollup's Discovery section and `data.hosted_search` (`configured`, `source`:
-`environment` or `dotenv`) report whether hosted vault search is configured;
-`data.companion` reports the semantic-search companion. Both are configuration, not
-liveness.
+`environment`, `local_env`, or `dotenv`) report whether hosted vault search is
+configured; `data.companion` reports the semantic-search companion. Both are
+configuration, not liveness.
 
 ### vaultspec-core vault search
 
@@ -948,9 +962,9 @@ Body-content flags on `add` vary by resource: `vaultspec-core spec rules add` ta
 `--body TEXT`; `vaultspec-core spec skills add` takes `--description TEXT` and
 `--template TEXT`; `vaultspec-core spec agents add` takes `--description TEXT`. All
 three also accept `--from-file PATH`. `edit` accepts `--editor CMD` to override the
-editor binary for one invocation; resolution order is `--editor`, project config,
-`$VISUAL`, `$EDITOR` / `VAULTSPEC_EDITOR`, `vi`. `status` accepts `--json` and reports
-the missing, drifted, and stale rows of a prune-enabled dry-run sync.
+editor binary for one invocation; resolution order is `--editor`, `VAULTSPEC_EDITOR`,
+`VISUAL`, `EDITOR`, project config, `vi`. `status` accepts `--json` and reports the
+missing, drifted, and stale rows of a prune-enabled dry-run sync.
 
 ### vaultspec-core spec system
 
@@ -1058,18 +1072,18 @@ order and bumps the manifest version.
 
 All prefixed `VAULTSPEC_`. Env vars override defaults but are overridden by `--target`.
 
-| Variable                          | Type   | Default      | Description                                                                                                                                                                                 |
-| --------------------------------- | ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`            | path   | cwd          | Root workspace directory.                                                                                                                                                                   |
-| `VAULTSPEC_DOCS_DIR`              | str    | `.vault`     | Vault directory name.                                                                                                                                                                       |
-| `VAULTSPEC_FRAMEWORK_DIR`         | str    | `.vaultspec` | Framework directory name.                                                                                                                                                                   |
-| `VAULTSPEC_CLAUDE_DIR`            | str    | `.claude`    | Claude tool directory name.                                                                                                                                                                 |
-| `VAULTSPEC_GEMINI_DIR`            | str    | `.gemini`    | Gemini tool directory name.                                                                                                                                                                 |
-| `VAULTSPEC_ANTIGRAVITY_DIR`       | str    | `.agents`    | Antigravity directory name.                                                                                                                                                                 |
-| `VAULTSPEC_IO_BUFFER_SIZE`        | int    | `8192`       | I/O read buffer size in bytes.                                                                                                                                                              |
-| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int    | `1000000`    | Subprocess stdout capture limit.                                                                                                                                                            |
-| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`  | float  | `120.0`      | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                          |
-| `VAULTSPEC_LOG_LEVEL`             | str    | `INFO`       | Root log level for the CLI.                                                                                                                                                                 |
-| `VAULTSPEC_EDITOR`                | str    | `zed -w`     | Editor command for resource editing.                                                                                                                                                        |
-| `VAULTSPEC_CORE_TYPESAFE_API_KEY` | secret | unset        | Enables hosted vault search; read from the environment, else the workspace `.env` when core runs from the workspace's own environment in `dependency` or `dev` install mode. Never printed. |
-| `VAULTSPEC_STDIO_WATCHDOG`        | str    | on           | MCP server lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit).                                                                                                           |
+| Variable                          | Type   | Default      | Description                                                                                                                                                                                                                     |
+| --------------------------------- | ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`            | path   | cwd          | Root workspace directory.                                                                                                                                                                                                       |
+| `VAULTSPEC_DOCS_DIR`              | str    | `.vault`     | Vault directory name.                                                                                                                                                                                                           |
+| `VAULTSPEC_FRAMEWORK_DIR`         | str    | `.vaultspec` | Framework directory name.                                                                                                                                                                                                       |
+| `VAULTSPEC_CLAUDE_DIR`            | str    | `.claude`    | Claude tool directory name.                                                                                                                                                                                                     |
+| `VAULTSPEC_GEMINI_DIR`            | str    | `.gemini`    | Gemini tool directory name.                                                                                                                                                                                                     |
+| `VAULTSPEC_ANTIGRAVITY_DIR`       | str    | `.agents`    | Antigravity directory name.                                                                                                                                                                                                     |
+| `VAULTSPEC_IO_BUFFER_SIZE`        | int    | `8192`       | I/O read buffer size in bytes.                                                                                                                                                                                                  |
+| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int    | `1000000`    | Subprocess stdout capture limit.                                                                                                                                                                                                |
+| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`  | float  | `120.0`      | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                                                              |
+| `VAULTSPEC_LOG_LEVEL`             | str    | `INFO`       | Root log level for the CLI.                                                                                                                                                                                                     |
+| `VAULTSPEC_EDITOR`                | str    | `zed -w`     | Editor command for resource editing.                                                                                                                                                                                            |
+| `VAULTSPEC_CORE_TYPESAFE_API_KEY` | secret | unset        | Enables hosted vault search; read from the environment, then provisioned `.vaultspec/.env`, else the workspace `.env` when core runs from the workspace's own environment in `dependency` or `dev` install mode. Never printed. |
+| `VAULTSPEC_STDIO_WATCHDOG`        | str    | on           | MCP server lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit).                                                                                                                                               |

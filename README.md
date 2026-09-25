@@ -89,7 +89,10 @@ optional [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package add
 semantic search across the vault and your code.
 
 Hosted vault search and ADR cross-referencing are optional. Set
-`VAULTSPEC_CORE_TYPESAFE_API_KEY` to enable:
+`VAULTSPEC_CORE_TYPESAFE_API_KEY` in the environment, or import it by name with
+`vaultspec-core install --env VAULTSPEC_CORE_TYPESAFE_API_KEY` (add `--upgrade` for an
+existing installation; see
+[local provisioning](docs/CLI.md#local-environment-provisioning)) to enable:
 
 - [`vaultspec-core vault search`](docs/CLI.md#vaultspec-core-vault-search) (MCP:
   `search`): answers vault questions with a supporting passage.

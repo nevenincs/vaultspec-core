@@ -127,9 +127,7 @@ class TestPrecedence:
 
         assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
 
-    def test_blank_environment_value_falls_through_to_dotenv(
-        self, tmp_path: Path
-    ) -> None:
+    def test_blank_environment_value_disables_dotenv(self, tmp_path: Path) -> None:
         root = _workspace(
             tmp_path, mode=InstallMode.DEPENDENCY, dotenv=_dotenv_line(DOTENV_KEY)
         )
@@ -138,7 +136,7 @@ class TestPrecedence:
             KEY_VAR, root, {NAME: "   "}, interpreter_prefix=_own_env(root)
         )
 
-        assert credential == Credential(DOTENV_KEY, CredentialSource.DOTENV)
+        assert credential is None
 
     def test_blank_environment_value_without_dotenv_is_absent(
         self, tmp_path: Path

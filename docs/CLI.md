@@ -127,6 +127,7 @@ Commands:
 
 Flags on commands the release already has:
 
+- `vaultspec-core install` - `--env`, `--env-file`
 - `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
@@ -488,10 +489,52 @@ Deploy the vaultspec framework into the target directory.
   `dependency` and `dev` use `uv run --no-sync`. Selection order: explicit `--mode`,
   saved mode in `.vaultspec/workspace.json`, dependency detection in `pyproject.toml`,
   then `tool`. This option doesn't change package dependency declarations.
+- `--env NAME` - Import a supported variable from the process environment. Repeatable.
+  `--env NAME=VALUE` supplies a non-secret setting directly. Secret values on the
+  command line are refused; import them by name or file.
+- `--env-file PATH` - Import supported names from a UTF-8 dotenv file (maximum 64 KiB).
+  Explicit `--env` entries override file entries; the last repeated entry wins.
 - `--no-hints` (default off) - Suppress next-step advisory hints.
 - `--json` (default off) - Emit machine-readable output.
 
 `core` installs `.vaultspec/` only, without any provider config.
+
+#### Local environment provisioning
+
+```bash
+vaultspec-core install --env VAULTSPEC_CORE_TYPESAFE_API_KEY
+vaultspec-core install --upgrade --env-file /private/vaultspec.env --env VAULTSPEC_NO_HINTS=1
+```
+
+The first command imports an already exported key without putting its value in shell
+history. Only supplied keys replace existing values. Installation, adoption, upgrade,
+`--force`, and sync preserve unmentioned settings; a failed install does not replace
+them. Existing installations still require `--upgrade` or `--force`. Dry runs report
+names and planned outcomes without writing. Outputs never show imported values.
+
+Values are stored in `.vaultspec/.env`, outside the vault. The installer establishes
+mandatory ignore rules, refuses tracked or redirected storage paths, and writes
+atomically with owner-only permissions (a restricted DACL on Windows). Ignore protection
+remains required when managed-block maintenance is disabled. The commit gate rejects
+force-added local environment files. Full framework uninstall removes this local store.
+Protect the original import file separately; installation never rewrites it.
+
+Supported imports are `VAULTSPEC_CORE_TYPESAFE_API_KEY`, `VAULTSPEC_IO_BUFFER_SIZE`,
+`VAULTSPEC_TERMINAL_OUTPUT_LIMIT`, `VAULTSPEC_LOCK_TIMEOUT_SECONDS`,
+`VAULTSPEC_JSON_PRETTY`, and `VAULTSPEC_NO_HINTS`. Other names are refused. Dotenv
+imports support comments, `export`, and single-line quoted or unquoted values, with no
+variable interpolation or shell evaluation. Double-quoted backslashes and quotes may be
+escaped.
+
+Runtime precedence is explicit command options, process environment, provisioned local
+settings, the trusted root `.env` credential fallback, then defaults. An explicit blank
+credential disables hosted features without falling through to another source. Both CLI
+and MCP use this resolver, scoped to the selected workspace; file and environment
+changes refresh its cache. Local settings work in all install modes, while the root
+`.env` fallback retains the trust restrictions described under environment variables.
+Provisioning does not copy secrets into generated MCP configuration or change the parent
+shell's environment. A running MCP server retains its inherited process environment
+until restarted; that environment continues to override local file edits.
 
 #### Examples
 
@@ -907,13 +950,13 @@ framework health.
 
 The rollup's Discovery section says which vault search to reach for. First it says
 whether hosted vault search (`vaultspec-core vault search`) is configured and whether
-the key came from the `environment` or the workspace `dotenv`. It then shows whether the
-`vaultspec-rag` companion is provisioned, which decides the next step a declined vault
-search names. Both lines report configuration, not liveness: a configured key can still
-be rejected when a search runs, and a provisioned companion can still be down. Under
-`--json` they are `data.hosted_search` (`configured`, `source`) and `data.companion`
-(`package`, `signal`, `mode`, `version`, `floor`, `health_authority`; the key is absent
-when the probe failed).
+the key came from the `environment`, provisioned `local_env`, or workspace `dotenv`. It
+then shows whether the `vaultspec-rag` companion is provisioned, which decides the next
+step a declined vault search names. Both lines report configuration, not liveness: a
+configured key can still be rejected when a search runs, and a provisioned companion can
+still be down. Under `--json` they are `data.hosted_search` (`configured`, `source`) and
+`data.companion` (`package`, `signal`, `mode`, `version`, `floor`, `health_authority`;
+the key is absent when the probe failed).
 
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace - a plan-line header, then each step (display path, checkbox state, a
@@ -3419,6 +3462,41 @@ Enumerate all known configuration entries and current values.
 
 ______________________________________________________________________
 
+## Project coordination
+
+### vaultspec-core project context
+
+```bash
+vaultspec-core project context [OPTIONS] OBJECTIVE
+```
+
+Collect recent Git activity, branches, worktrees, and optional GitHub issues and PRs to
+propose a bounded attention order for the developer's objective. The command reads
+project state without changing repositories or trackers. Missing sources are reported as
+incomplete coverage. A configured TypeSafe key enables optional ranking; without a key,
+with `--no-hosted`, or after a service failure, deterministic ordering is used.
+
+#### Arguments
+
+- `OBJECTIVE` - The developer outcome to prioritize.
+
+#### Options
+
+- `--repo OWNER/REPO` - Read issues and PRs from this GitHub repository using `gh`.
+- `--previous FILE` - Reuse unchanged judgments from a previous JSON result for up to
+  one hour. Input is limited to 64,000 bytes.
+- `--limit INTEGER` (default `5`, range `1..10`) - Maximum attention items returned.
+- `--no-hosted` - Disable hosted ranking even when a key is configured.
+- `--target DIR` (`-t`, default cwd) - Project directory to inspect.
+- `--json` - Emit structured observations, coverage, ordering, and available usage.
+
+#### Examples
+
+```bash
+vaultspec-core project context "Finish the release and unblock active PRs" --no-hosted
+vaultspec-core project context "Prioritize today's work" --repo owner/project --json
+```
+
 ## Environment variables
 
 vaultspec-core owns the `VAULTSPEC_` variables below and honours a few external
@@ -3448,7 +3526,7 @@ overridden by the `--target` flag.
   `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.
 - `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command. The edit verbs
   (`vaultspec-core spec {rules|skills|agents} edit`) resolve in order: `--editor` flag,
-  project config `editor`, `VAULTSPEC_EDITOR`, `VISUAL`, `EDITOR`, `vi`. Interactive
+  `VAULTSPEC_EDITOR`, `VISUAL`, `EDITOR`, project config `editor`, `vi`. Interactive
   creation of a rule, skill, agent, or trigger opens `VAULTSPEC_EDITOR`, or `zed -w`
   when it is unset. Unlike the flag and the config key, an editor named in the
   environment is not restricted to the recognised set; see
@@ -3461,14 +3539,16 @@ overridden by the `--target` flag.
   exact value `1` counts; anything else leaves the hints in place.
 - `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key that
   enables hosted vault search (`vaultspec-core vault search` and the MCP `search` tool).
-  It is read from the process environment. It is read from the workspace-root `.env`
-  only when it is absent from the environment, core runs from the workspace's own
-  environment (its Python interpreter lives inside the workspace, as a project virtual
-  environment does), and the workspace declares the `dependency` or `dev` install mode.
-  Only this one variable is read from that file. A globally installed core (a uv tool, a
-  pipx install, or a release binary) never reads the workspace `.env`. The generic
-  `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
-  `vaultspec-core status` reports only whether one is configured and from which source.
+  It is read from the process environment, then explicitly provisioned
+  `.vaultspec/.env`. A blank in either source disables hosted features. The
+  workspace-root `.env` is read only when both sources omit it, core runs from the
+  workspace's own environment (its Python interpreter lives inside the workspace, as a
+  project virtual environment does), and the workspace declares the `dependency` or
+  `dev` install mode. Only this one variable is read from that file. A globally
+  installed core (a uv tool, a pipx install, or a release binary) never reads the
+  workspace `.env`. The generic `TYPESAFE_API_KEY` does not enable it. The key never
+  appears in output; `vaultspec-core status` reports only whether one is configured and
+  from which source.
 - `VAULTSPEC_NON_INTERACTIVE` (presence, unset by default) - Set to any value, even
   blank, to declare that no operator is watching, as CI does. Repository triggers that
   await approval are then skipped instead of prompted for.

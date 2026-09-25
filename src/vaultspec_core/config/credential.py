@@ -1,34 +1,17 @@
-"""Where a credential comes from, and who may supply it.
+"""Resolve opt-in credentials without loading files into the process environment.
 
-A credential is a secret :data:`~vaultspec_core.config.CONFIG_REGISTRY` entry.
-Only the name its entry declares supplies it: the hosted-search key, for
-example, is not enrolled by the generic ``TYPESAFE_API_KEY`` or by
-vaultspec-rag's own variable, so a key provisioned for another tool never
-sends vault content anywhere by accident.
-
-Precedence is the process environment first, then the workspace-root ``.env``
-for an entry marked ``workspace_dotenv``. The ``.env`` is repository content,
-so it is consulted only when core is running from the workspace's own
-environment: the running interpreter lives inside the workspace (its project
-virtual environment) and the workspace declares that it runs core as a
-project dependency (``dependency`` or ``dev`` install mode). The declaration
-alone is not enough, because the repository writes it: a globally installed
-core - a uv tool, a pipx install, a release binary - pointed at a freshly
-cloned repository has its interpreter outside that repository, so it never
-picks up a credential the repository supplies. Running a project's own
-environment is already a decision to trust that project's code. From the file
-only the one named variable is read, so repository content can at most supply
-a key, never a setting. A workspace declaration that cannot be read counts as
-no declaration: the ``.env`` stays closed rather than opening on a guess.
-
-The key is held in a :class:`Credential` whose ``repr`` omits it, and it is
-never logged. Status surfaces carry :class:`HostedSearchConfig`, the
-credential's non-secret view: whether a key is configured, and from where.
+Process presence wins, including an explicit blank that disables the credential.
+Next is the protected, explicitly provisioned project-local store in every install
+mode. Last is the legacy root ``.env`` for marked credentials only: dependency or
+dev mode and an interpreter inside the workspace are both required to trust it.
+Only the registered name enables the feature; generic or sibling-tool keys do not.
+Status exposes configuration and source, never values.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -40,6 +23,7 @@ from ..core.exceptions import VaultSpecError
 from ..core.workspace_mode import resolve_install_mode
 from .config import env_value
 from .dotenv import read_dotenv_value
+from .local_env import read_local_environment
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -68,6 +52,7 @@ class CredentialSource(StrEnum):
 
     ENVIRONMENT = "environment"
     DOTENV = "dotenv"
+    LOCAL_ENV = "local_env"
 
 
 @dataclass(frozen=True)
@@ -161,9 +146,15 @@ def resolve_credential(
     """
     if not var.secret:
         raise ValueError(f"{var.env_name} is not a credential")
-    key = (env_value(var, environ) or "").strip()
-    if key:
-        return Credential(key=key, source=CredentialSource.ENVIRONMENT)
+    environment = os.environ if environ is None else environ
+    value = env_value(var, environment)
+    if value is not None:
+        key = value.strip()
+        return Credential(key=key, source=CredentialSource.ENVIRONMENT) if key else None
+    value = read_local_environment(root).get(var.env_name) if var.persistable else None
+    if value is not None:
+        key = value.strip()
+        return Credential(key=key, source=CredentialSource.LOCAL_ENV) if key else None
     if not var.workspace_dotenv:
         return None
     prefix = Path(sys.prefix) if interpreter_prefix is None else interpreter_prefix

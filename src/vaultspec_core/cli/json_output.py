@@ -35,6 +35,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import VAULTSPEC_JSON_PRETTY, env_value
+from ..core.exceptions import VaultSpecError
 
 __all__ = ["json_format_kwargs", "pretty_enabled"]
 
@@ -61,7 +62,11 @@ def pretty_enabled() -> bool:
     Returns:
         ``True`` when the environment opts into indentation.
     """
-    raw = env_value(VAULTSPEC_JSON_PRETTY) or ""
+    try:
+        raw = env_value(VAULTSPEC_JSON_PRETTY) or ""
+    except VaultSpecError:
+        # Formatting must still work when the response reports a settings error.
+        return False
     return raw.strip().lower() not in _FALSEY
 
 

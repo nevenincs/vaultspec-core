@@ -502,14 +502,16 @@ def rmtree_robust(path: Path) -> None:
     shutil.rmtree(path, onexc=_on_exc)
 
 
-def _open_atomic_temp(path: Path) -> tuple[int, Path, tuple[int, int]]:
+def _open_atomic_temp(
+    path: Path, prefix: str = ".vs-write-"
+) -> tuple[int, Path, tuple[int, int]]:
     """Exclusively create an unpredictable regular file beside *path*."""
     flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
     for optional_flag in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW"):
         flags |= getattr(os, optional_flag, 0)
 
     for _attempt in range(128):
-        candidate = path.with_name(f".vs-write-{secrets.token_hex(16)}.tmp")
+        candidate = path.with_name(f"{prefix}{secrets.token_hex(16)}.tmp")
         try:
             fd = os.open(candidate, flags, 0o666)
         except FileExistsError:
@@ -634,8 +636,19 @@ def _replace_atomic(tmp: Path, path: Path) -> None:
         return
 
 
-def atomic_write_bytes(path: Path, content: bytes) -> None:
-    """Atomically replace *path* from an exclusively created sibling file."""
+def atomic_write_bytes(
+    path: Path,
+    content: bytes,
+    *,
+    prepare_temp: Callable[[int, Path], None] | None = None,
+    temp_prefix: str = ".vs-write-",
+) -> None:
+    """Atomically replace *path* from an exclusively created sibling file.
+
+    ``prepare_temp`` may establish private permissions before any bytes are
+    written; its policy replaces destination-mode preservation. ``temp_prefix``
+    lets callers keep sensitive temporaries under their compulsory ignore rule.
+    """
     destination_mode: int | None = None
     try:
         destination = path.lstat()
@@ -662,9 +675,13 @@ def atomic_write_bytes(path: Path, content: bytes) -> None:
         if stat.S_ISREG(destination.st_mode):
             destination_mode = stat.S_IMODE(destination.st_mode)
 
-    fd, tmp, identity = _open_atomic_temp(path)
+    fd, tmp, identity = _open_atomic_temp(path, temp_prefix)
     owns_tmp = True
     try:
+        if prepare_temp is not None:
+            prepare_temp(fd, tmp)
+            _assert_owned_temp(tmp, identity)
+            destination_mode = None
         view = memoryview(content)
         while view:
             written = os.write(fd, view)
