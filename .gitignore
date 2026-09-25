@@ -198,6 +198,8 @@ dev/statistics/out/
 /.gitignore.lock
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock
+/.vaultspec/.env
+/.vaultspec/.env.*
 # <<< vaultspec-managed <<<
 
 # Release binaries built locally by `just binaries`, and the stock

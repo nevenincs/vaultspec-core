@@ -207,6 +207,10 @@ changes, failures, or unresolved concerns justify another run; Step completion d
 require a separate formal review. Workers verify their assigned scope, while the
 orchestrator coordinates shared checks and integrated review.
 
+Give shared or expensive checks one owner and pass their status and results to
+reviewers. The [review guide](correctness.md#share-verification-evidence) explains
+evidence reuse and incomplete verification.
+
 To resume interrupted work, ask the agent to continue or specify a Step. Use
 [status](CLI.md#vaultspec-core-status) to check progress and the next open Step.
 

@@ -53,6 +53,7 @@ Delegate when it helps and the plan's Parallelization section defines compatible
 assignments. Choose `vaultspec-low-executor`, `vaultspec-standard-executor`, or
 `vaultspec-high-executor` by difficulty. Supply the plan stem, feature tag, assigned
 Steps or container, starting Step id, write ownership, and relevant existing evidence.
+Name owners of shared checks and include any in-flight status and result locations.
 Workers follow this skill and their persona's Return message contract. Coordinate shared
 metadata and commits; permission to parallelize does not require delegation.
 

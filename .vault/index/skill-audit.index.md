@@ -6,13 +6,14 @@ tags:
 date: '2026-07-31'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:5cae6def29961aa5509d93b0abca8c009e9beaf730009f9d4093c6f2bc9233c3'
+body_hash: 'sha256:8084636f65653533e621c36c55e000ec1f766f317e0521ba7021a6f22813327a'
 related:
   - '[[2026-02-22-skill-audit-adr]]'
   - '[[2026-02-22-skill-audit-execution-summary]]'
   - '[[2026-02-22-skill-audit-plan]]'
   - '[[2026-02-22-skill-audit-research]]'
   - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
+  - '[[2026-09-25-skill-audit-code-review-audit]]'
   - '[[2026-09-25-skill-audit-curate-audit]]'
   - '[[2026-09-25-skill-audit-projectmanager-audit]]'
 ---
@@ -30,6 +31,7 @@ Auto-generated index of all documents tagged with `#skill-audit`.
 ### audit
 
 - `2026-09-25-skill-audit-adr-authoring-audit` - `skill-audit` audit: `ADR authoring, placement, and persona contracts`
+- `2026-09-25-skill-audit-code-review-audit` - `skill-audit` audit: `Review evidence reuse and parallel check ownership`
 - `2026-09-25-skill-audit-curate-audit` - `skill-audit` audit: `Standalone curation scope and authority audit`
 - `2026-09-25-skill-audit-projectmanager-audit` - `skill-audit` audit: `Project coordination routing and context audit`
 

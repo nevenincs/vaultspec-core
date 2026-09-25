@@ -148,6 +148,12 @@ before handoff for merge or reporting completion. L1 has no Phase-close gate. On
 covers coincident gates on the same changes. A Step closes on its own verification;
 review does not gate each Step or each document.
 
+Verification belongs to the change, not to each agent. Reuse applicable results across
+execution and review; assign one owner to shared or expensive checks. Reviewers assess
+the evidence independently and run additional checks for concrete gaps or changed
+inputs. Report pending verification separately from code defects; do not claim
+completion without the required evidence. The review skill owns evidence handling.
+
 Review the integrated behavior against the plan and governing decisions, tracing
 affected workflows across their interfaces. For framework work this includes rules,
 skills, personas, templates, and executable checks together. Review files as evidence of

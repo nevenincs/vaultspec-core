@@ -26,4 +26,9 @@ the plan and the review gate. For single-persona work, load the persona directly
 - The supervisor holds the review gate, `vaultspec-code-review` at each point of the
   review cadence in the vaultspec section. A Phase is reported done to the user only
   after its review.
-- Workers report through `SendMessage`, including "nothing found".
+- Assign one owner for shared, expensive, or stateful checks. Share commands, checked
+  state, running status, and results through existing handoffs or logs. Workers reuse
+  applicable evidence and report gaps; only independent focused checks run concurrently.
+  Separate worktrees still share machine capacity and may share services or quotas.
+- Workers report through the host's available messaging mechanism, including "nothing
+  found".

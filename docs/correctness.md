@@ -20,14 +20,16 @@ For hook activation and setup choices, see
 ## Review the change
 
 For planned work, ask your agent to use `vaultspec-code-review`. Give it the
-implementation scope and the feature's documents. It compares the integrated result with
-the plan and any governing ADRs, consulting supporting evidence as needed. Record scope,
-findings, and recommendations in the feature's rolling audit. A change without a plan is
-reviewed in the reply and does not require an audit record.
+implementation scope, existing check results, active check owners, and the feature's
+documents. It compares the integrated result with the plan and any governing ADRs,
+consulting supporting evidence as needed. Record scope, findings, and recommendations in
+the feature's rolling audit. A change without a plan is reviewed in the reply and does
+not require an audit record.
 
 For planned work, review at each Phase close, at plan close, and before handoff for
 merge or completion. Combine coincident reviews. An L1 plan has no Phases, so it has no
-Phase-close gate. Tests and local checks still run with each Step.
+Phase-close gate. Each Step needs verification evidence for its changed behavior;
+applicable results can be reused across execution and review.
 
 Trace the affected workflow across its components: do the interfaces agree, do failure
 paths behave as intended, and do the tests cover the promised result? For documentation
@@ -43,6 +45,33 @@ vaultspec-core vault add audit --feature payment-retries
 Replace `payment-retries` with your feature's tag. This creates a template, not a
 completed review. Record the reviewed scope and result even when no problems are found;
 append later reviews and resolutions to the same audit.
+
+## Share verification evidence
+
+Review starts with a defined diff base and target, including any uncommitted changes.
+Reuse CI results, execution logs, or worker handoffs that identify the check command and
+scope, checked state, outcome, relevant environment, and result location. Check whether
+the relevant code, tests, dependencies, or check conditions have changed. Matching a
+commit identifier alone is insufficient when the working tree has changed; an unrelated
+commit does not automatically invalidate evidence.
+
+The supervisor assigns one owner to shared, expensive, or stateful checks; a solo agent
+owns its checks. Reviewers inspect applicable results and continue code analysis while
+checks run. Independent focused checks can run concurrently when resources allow.
+Separate worktrees do not isolate CPU, memory, ports, services, or external quotas.
+These are coordination instructions for agents, not an automatic test scheduler.
+
+Run additional checks for a specific coverage gap, changed inputs, a suspected defect,
+or a project requirement. Choose the smallest useful check. Independent review requires
+independent judgment, not a second execution of every command. Required long-running
+checks remain required: report their owner and next action if they are unfinished or
+cannot run. Timeouts and infrastructure failures do not establish a code defect.
+
+Report findings and verification coverage separately. Critical findings yield `FAIL`;
+high findings yield `REVISION REQUIRED`. Otherwise, unresolved required verification
+yields `PENDING`; applicable passing evidence yields `PASS`. A pending review neither
+invents a defect nor reopens a Step by itself. Resume it with the missing results and
+any changed interactions, keeping completed analysis.
 
 <p id="what-the-review-does-and-does-not-buy-you"></p>
 <p id="what-the-framework-tells-the-agent"></p>
@@ -61,7 +90,10 @@ the findings. Resolve uncertainty that could change your acceptance decision.
 
 ## Proving a guard can fail
 
-Verify that a test detects the defect it targets:
+When a guard's ability to detect its target defect is in doubt, or the project requires
+it, a focused mutation check can establish that behavior. This is not a requirement to
+revalidate every test. Coordinate with the check owner before mutating even an isolated
+copy, since its checks may still use shared resources:
 
 1. Run the focused test and confirm it passes. For pytest, use
    `pytest path/to/test_file.py::test_name`.
@@ -90,7 +122,8 @@ the work they check; a file-change record alone does not show that tests ran.
 ## What to run before you call something done
 
 1. [Check the feature records and review any repairs](./verification.md#check-records-before-committing).
-1. Run the project's tests, linting, and type checks.
+1. Ensure applicable evidence covers the project's required tests, linting, formatting,
+   and type checks. Coordinate missing checks with their owner.
 1. Review the implementation against the approved scope and any governing decisions
    using the [review step](#review-the-change). Address findings and rerun affected
    checks.
