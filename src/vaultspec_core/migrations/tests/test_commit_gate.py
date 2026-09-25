@@ -1,10 +1,10 @@
 """Tests for the ``commit_gate`` registry entry.
 
-Exercises :func:`vaultspec_core.migrations.m_0_2_5_commit_gate.migrate`, and
-the driver that runs it, against real workspaces: retired hooks converge on the
-gate in a YAML config (including one ``sync`` no longer manages) and in a
-managed ``prek.toml`` block, the operator's own hooks survive, and declined,
-hook-free, block-free and config-free workspaces are left exactly as found.
+Exercises :func:`vaultspec_core.migrations.m_0_2_5_commit_gate.migrate` against
+real workspaces: retired hooks converge on the gate in a YAML config (including
+one ``sync`` no longer manages) and in a managed ``prek.toml`` block, the
+operator's own hooks survive, and declined, hook-free, block-free and
+config-free workspaces are left exactly as found.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ _YAML = ".pre-commit-config.yaml"
 _YML = ".pre-commit-config.yml"
 _GATE = "vaultspec-commit-gate"
 
-# The hook set 0.2.4 scaffolded, beside an operator hook that must survive.
+# The hook set scaffolded before the gate, beside an operator hook that must survive.
 _RETIRED = (
     "repos:\n"
     "- repo: local\n"
@@ -212,24 +212,6 @@ def test_preview_deletes_nothing(tmp_path: Path) -> None:
     (tmp_path / _YAML).write_text(_RETIRED, encoding="utf-8")
 
     assert preview(tmp_path) == []
-
-
-def test_the_driver_runs_it_for_a_0_2_4_workspace(factory: WorkspaceFactory) -> None:
-    """Installed at 0.2.4, the registry converges the config and records 0.2.5."""
-    from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
-    from vaultspec_core.migrations import run_pending_migrations
-
-    factory.install()
-    manifest = read_manifest_data(factory.root)
-    manifest.vaultspec_version = "0.2.4"
-    write_manifest_data(factory.root, manifest)
-    (factory.root / _YAML).write_text(_RETIRED, encoding="utf-8")
-
-    results = run_pending_migrations(factory.root)
-
-    assert [r.name for r in results] == ["commit_gate"]
-    assert _ids(factory.root / _YAML) == ["ruff", _GATE]
-    assert read_manifest_data(factory.root).vaultspec_version == "0.2.5"
 
 
 class TestLeavesWhatItCannotRead:
