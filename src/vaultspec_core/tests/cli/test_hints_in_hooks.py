@@ -87,6 +87,7 @@ def test_a_commit_hooks_git_index_file_suppresses_hints(broken_repo: Path) -> No
     assert result.returncode == 1, result.stdout
     assert "Next action" not in result.stdout
     assert "vault repair" not in result.stdout
+    assert "--fix" not in result.stdout
 
 
 def test_a_failed_check_proposes_only_a_repair_preview(broken_repo: Path) -> None:
@@ -95,6 +96,9 @@ def test_a_failed_check_proposes_only_a_repair_preview(broken_repo: Path) -> Non
     assert result.returncode == 1, result.stdout
     assert "vaultspec-core vault repair --dry-run" in result.stdout
     assert "vaultspec-core vault repair\n" not in result.stdout
+    # Outside a hook the auto-fix suggestion still prints, so the hook tests'
+    # absence assertions are about the hook and not about this document.
+    assert "--fix" in result.stdout
 
 
 def test_a_failed_check_in_a_commit_hook_proposes_no_follow_up(
@@ -117,3 +121,4 @@ def test_a_failed_check_in_a_commit_hook_proposes_no_follow_up(
     assert "Dangling wiki-link" in output or "nowhere-doc" in output, output
     assert "Next action" not in output
     assert "vault repair" not in output
+    assert "--fix" not in output

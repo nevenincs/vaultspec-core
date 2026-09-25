@@ -273,6 +273,13 @@ def render_check_result(
     # names); escape it so Rich does not treat [[...]] as console markup.
     from rich.markup import escape
 
+    from ...config import GIT_INDEX_FILE, env_value
+
+    # Inside a commit hook (git exports GIT_INDEX_FILE to every one), output is
+    # often acted on without review, and an auto-fix runs vault-wide rather
+    # than on the one document a finding names. Hand-written guidance for a
+    # finding no auto-fix resolves still prints.
+    in_commit_hook = env_value(GIT_INDEX_FILE) is not None
     rendered = 0
     suppressed = 0
     for diag in result.diagnostics:
@@ -291,7 +298,7 @@ def render_check_result(
             console.print(f"      {message}")
         else:
             console.print(f"    [{style}]{icon}[/{style}] {message}")
-        if diag.fix_description:
+        if diag.fix_description and not (diag.fixable and in_commit_hook):
             console.print(f"      [dim]fix: {escape(diag.fix_description)}[/dim]")
     if suppressed:
         console.print(

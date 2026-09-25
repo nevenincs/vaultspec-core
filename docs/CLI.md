@@ -3458,8 +3458,8 @@ vaultspec-core also honours these external variables. It does not own them.
 - `NO_COLOR` (presence) - Set to any value, even blank, to disable colour in console
   output.
 - `GIT_INDEX_FILE` (presence) - Set by git for every commit hook it runs. While it is
-  set, commands print no `Next actions` block, because hook output is often acted on
-  without review.
+  set, commands print no `Next actions` block and no `--fix` suggestion for a finding,
+  because hook output is often acted on without review.
 - `COLUMNS` (int) - Console width. When unset, the width is read from the terminal once
   at startup.
 - `VISUAL`, `EDITOR` (str) - Editor commands the edit verbs consult after
