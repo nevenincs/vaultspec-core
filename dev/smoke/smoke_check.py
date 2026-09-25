@@ -25,7 +25,7 @@ import importlib.metadata
 import shutil
 import subprocess
 import sys
-from typing import NoReturn
+from typing import NoReturn, cast
 
 
 def _fail(msg: str) -> NoReturn:
@@ -81,18 +81,19 @@ def check_mcp_server_factory() -> None:
 
         from vaultspec_core.mcp_server.app import create_server
 
-        server = create_server()
+        # Typed as ``object``: the smoke check proves what the installed wheel
+        # returns at runtime, which the annotation cannot vouch for.
+        server = cast("object", create_server())
     except Exception as exc:
         _fail(
             f"create_server() raised {type(exc).__name__}: {exc}\n"
             "  This may be caused by import-time side effects in "
             "register_vault_tools when running in a bare environment."
         )
+    kind = type(server).__name__
     if not isinstance(server, MCPServer):
-        _fail(
-            f"create_server() returned {type(server).__name__}, expected an MCPServer"
-        )
-    print(f"PASS: create_server() returns an MCPServer ({type(server).__name__})")
+        _fail(f"create_server() returned {kind}, expected an MCPServer")
+    print(f"PASS: create_server() returns an MCPServer ({kind})")
 
 
 def check_cli_version() -> None:
