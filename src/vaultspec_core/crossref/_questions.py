@@ -9,8 +9,8 @@ threshold were measured against an exhaustive pair judgment on two vaults of
 cut, the deadlines, the sweep size and the corpus size - are engineering
 bounds chosen so that no run's cost depends on the vault or on its caller.
 
-The model is the one hosted search pins: every threshold below was measured
-against it, so moving to a new model is a deliberate re-evaluation.
+The transport uses the core model selector shared with hosted search; the API
+resolves its stable alias. The measurements inform thresholds, not a release pin.
 
 Question texts refer to state fields by backticked path. Option texts carry
 vault text and are sanitised by the engine before they are placed in a
@@ -20,8 +20,6 @@ question; the question wording itself is sent as written.
 from __future__ import annotations
 
 from typing import Final
-
-from ..search._questions import MODEL
 
 __all__ = [
     "ARTIFACT_QID",
@@ -43,7 +41,6 @@ __all__ = [
     "MAX_REFUSALS",
     "MAX_SOURCES",
     "MIN_SOURCE_SECONDS",
-    "MODEL",
     "NEED_QID",
     "NONE_KEY",
     "NONE_OPTION",
@@ -67,12 +64,15 @@ __all__ = [
 #: unmeasured, and the pool below covers a shrinking share of the corpus.
 MAX_CORPUS: Final = 5_000
 
-#: The sections that carry an ADR's commitment, in the order they are joined
-#: into its decision state.
+#: Priority order for decision state. Other sections are retained too; a
+#: bounded share per section prevents lengthy context from hiding constraints.
 DECISION_SECTIONS: Final = (
-    "Problem Statement",
-    "Implementation",
+    "Decision",
+    "Decision Outcome",
     "Constraints",
+    "Implementation",
+    "Problem Statement",
+    "Context",
     "Rationale",
     "Consequences",
 )
@@ -131,7 +131,7 @@ LINK_THRESHOLD: Final = 0.5
 WORKERS: Final = 12
 
 #: Seconds one source may spend on the provider, across every request.
-SOURCE_DEADLINE: Final = 60.0
+SOURCE_DEADLINE: Final = 15.0
 
 #: Seconds one sweep may spend, across every source.
 RUN_DEADLINE: Final = 300.0

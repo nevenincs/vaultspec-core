@@ -34,6 +34,8 @@ from concurrent.futures import FIRST_EXCEPTION, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from vaultspec_core.core.enums import TypeSafeModel
+
 from ..search._transport import (
     ChoiceAnswer,
     ContentRejectedError,
@@ -52,7 +54,6 @@ from ._questions import (
     DECLARED_EXTRA,
     HEADER_WEIGHT,
     LINK_THRESHOLD,
-    MODEL,
     NEED_QID,
     NONE_KEY,
     NONE_OPTION,
@@ -113,7 +114,7 @@ class Meter:
         """Report the source so far."""
         with self._lock:
             return CrossrefUsage(
-                model=self._model or MODEL,
+                model=self._model or TypeSafeModel.JEV,
                 requests=self._requests,
                 input_tokens=self._tokens,
                 elapsed_ms=math.ceil((time.monotonic() - self._started) * 1000),
@@ -139,8 +140,13 @@ class Judgement:
     refused: bool = False
 
 
-def _state(record: AdrRecord) -> dict[str, str]:
-    return {"title": record.title, "text": record.decision}
+def _state(record: AdrRecord) -> dict[str, object]:
+    return {
+        "title": record.title,
+        "status": record.status.value if record.status else "unknown",
+        "text": record.decision,
+        "input_truncated": record.input_truncated,
+    }
 
 
 def _option(index: Index, record: AdrRecord) -> str:
@@ -379,6 +385,7 @@ def judge(
             score=score,
             relation=relation,
             declared=stem in declared,
+            input_truncated=candidate.input_truncated,
         )
         (links if kind is VerdictKind.LINK else weak).append(verdict)
     links.sort(key=lambda v: (-v.score, v.stem))
@@ -390,6 +397,10 @@ def judge(
             pool=len(pool),
             judged=len(judged),
             unjudged_declared=unjudged,
+            source_truncated=source.input_truncated,
+            candidates_truncated=sum(
+                index.records[stem].input_truncated for stem in judged
+            ),
         ),
         dropped=dropped,
         refused=bool(answers) and all(answer is None for answer in answers),

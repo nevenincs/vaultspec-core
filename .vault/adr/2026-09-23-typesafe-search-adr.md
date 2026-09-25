@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#typesafe-search'
 date: '2026-09-23'
-modified: '2026-09-23'
+modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:5884e798ffe939e5451e403989a86877fdee5cd11d03130430f3bf66b7f1e5d1'
+body_hash: 'sha256:4fd70417ca35346b1df9a1771b257dd0e50c8c04d6779031804bf0918a9a2f31'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -14,6 +14,7 @@ related:
   - '[[2026-08-23-envelope-optimization-adr]]'
   - '[[2026-02-16-environment-variable-adr]]'
   - '[[2026-09-23-typesafe-search-audit]]'
+  - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
 ---
 
 # `typesafe-search` adr: `hosted vault search on TypeSafe Jev, with rag as the agent-level fallback` | (**status:** `accepted`)
@@ -129,8 +130,11 @@ search feature as drafted.
   code before any model call. The model never widens or overrides them.
 - **Verbatim excerpts.** Returned excerpts are the record's own text, addressed by
   local block identifiers. The model never authors returned text.
-- **Pinned model.** The model is pinned by version ID (`jev-1.13.0` at adoption), not
-  a moving alias. Question texts, weights and thresholds live in one module.
+- **Canonical model selector.** All Jev requests use `TypeSafeModel.JEV` from the
+  core enum, whose stable API alias is resolved by TypeSafe. Production and test code
+  contain no numbered Jev identifiers. The API response supplies the actual model
+  identity retained in usage. Question texts, weights and thresholds remain explicit
+  policy in their owning modules.
 - **Sanitised requests.** Model-facing text maps backticks and angle brackets to
   typographic equivalents. Every request is size-checked against the published request
   bounds before sending.
@@ -162,8 +166,8 @@ A search package in core owns five layers, top to bottom.
 - **Corpus.** It reads vault records from disk per query. From each record it derives
   a summary (title, lead, distinctive headings) and fenced-code-aware paragraph blocks
   with line ranges.
-- **Question set.** One module holds every question text, option, weight, threshold and
-  the pinned model ID.
+- **Question set.** One module holds every question text, option, weight and threshold.
+  Model selection comes from the core enum shared by every TypeSafe caller.
 - **Engine.** Hard filters are applied first.
   - Stage 1 sends the query as state. There is one Choice per record type over
     summaries, each with a `none` option, packed into bounded requests run
@@ -223,9 +227,9 @@ the engine, credential and constraints are unchanged.
   requested record types when the companion probe reports rag provisioned, and
   otherwise the core listing verbs (`find`, `vault list`) plus grep. The resolved next
   step is a typed part of the backend result, not surface prose.
-- **State-free guidance.** Guidance prose carries no runtime condition. Vault questions
-  go to `search`; when it declines, agents run what its reply names. There is no
-  `status` gate.
+- **Vault-question guidance.** Vault questions go to `search`; when it declines, agents
+  run what its reply names. Discovery requires no preliminary `status` gate. The
+  separate ADR authoring pass follows the conditional cross-reference contract.
 - **Thin surfaces.** The CLI and MCP are renderers over one backend result, with
   identical fields and semantics. Neither holds search or status business logic.
 - **ADR listing stays.** Listing `.vault/adr/` beside search stays mandatory until
@@ -249,6 +253,13 @@ bullet above; nothing else changes.
   Code search still runs.
 - **Revisit trigger.** Measured hosted-search recall remains the trigger for revisiting
   the listing at discovery.
+
+**Amendment, 2026-09-25:** The user explicitly required API-resolved Jev selection
+from one canonical core enum, with no numbered model identifiers in production or
+tests, and reaffirmed credential-only opt-in. This replaces the model pin above.
+Evidence: `2026-09-25-skill-audit-adr-authoring-audit`; API contract:
+https://docs.typesafe.ai/api and https://docs.typesafe.ai/models. The request uses the
+stable alias directly; no separate model-list request is needed per evaluation.
 
 ## Rationale
 
@@ -300,8 +311,9 @@ key, never redirect one.
 - **Blocking rule.** Correctness depends on a third party's blocking rule staying
   within what the sanitiser covers. A new trigger would surface as unscored records,
   not a wrong answer.
-- **Model upgrades.** Each Jev upgrade is a deliberate re-evaluation, not a silent
-  change.
+- **Model upgrades.** The stable API alias follows provider releases. Recorded results
+  identify the serving model; observed regressions inform evaluation and threshold
+  changes without routine source or test edits for release numbers.
 
 **Pathways.**
 

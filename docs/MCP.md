@@ -469,7 +469,7 @@ Example response:
   "total": 6,
   "truncated": true,
   "usage": {
-    "model": "jev-1.13.0",
+    "model": "<API-reported model>",
     "requests": 6,
     "input_tokens": 41250,
     "elapsed_ms": 1234,
@@ -517,22 +517,24 @@ data flow described under [`search`](#search).
 | `after`       | string or null         | `null`  | Resume a sweep after this ADR, the `next_after` of the previous reply.                       |
 | `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                  |
 | `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                         |
+| `body`        | string or null         | `null`  | Proposed body prose for one ADR, judged without changing it; no sweep or apply.              |
 
 A call needs `refs`, `feature`, `isolated`, or `all_adrs`. `feature` and `isolated`
 narrow together; `refs` and `all_adrs` each stand alone, and combining either with
-another selector is refused. The read-only server takes one parameter, `ref`, the ADR to
-judge.
+another selector is refused. The read-only server takes `ref`, the ADR to judge, and
+optional `body` prose. Body prose omits frontmatter and allows amendments to be checked
+before changing accepted text; the source result is marked `draft`.
 
 **Bounds.** Every other ADR is ranked by code alone, the best 192 are put to the model
 as Choice questions of at most 32 options, and the best 32, plus up to 8 declared links
-outside them, are judged in pairs. A source costs at most 46 requests and 60 seconds, a
-sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300 seconds,
-and a vault may hold at most 5,000 ADRs. Sweeps run in stem order and store no state. An
-ADR the provider refuses to read is held open while the sweep judges on, past its source
-limit by up to two more ADRs if it must: a later ADR the provider reads shows the
-refusal was that ADR's own, and the sweep moves past both. A refusal no read settles,
-three refusals in a row, or any other failure stops the sweep with `stopped` set and the
-cursor before the first refusal still open, so resuming retries from there.
+outside them, are judged in pairs. A source has at most 46 requests and a 15-second
+deadline, a sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300
+seconds, and a vault may hold at most 5,000 ADRs. Sweeps run in stem order and store no
+state. An ADR the provider refuses to read is held open while the sweep judges on, past
+its source limit by up to two more ADRs if it must: a later ADR the provider reads shows
+the refusal was that ADR's own, and the sweep moves past both. A refusal no read
+settles, three refusals in a row, or any other failure stops the sweep with `stopped`
+set and the cursor before the first refusal still open, so resuming retries from there.
 
 **Verdicts.** Each row has `stem`, `kind`, `score`, `relation`, `status`, `declared`,
 and `applied` when this call wrote it. `link` means the source should link the ADR;
@@ -554,6 +556,12 @@ processed (without it, a resume starts from the beginning), `stopped` when a swe
 early, and `usage` (requests, input tokens, and `unscored`, the requests the provider
 refused to read) when anything was sent. A source whose every pair was refused is
 `unavailable` with `content_rejected`, never a source with no links.
+
+Judged sources include `coverage`: `corpus`, `pool`, `judged`, `source_truncated`, and
+`candidates_truncated`. Returned candidates with clipped decision text carry
+`input_truncated`. This is distinct from reply-row `truncated`. The 6,000-character
+input budget is shared across sections, with decisions and constraints first. Read
+relevant full records when coverage is incomplete; `ok` does not prove no conflicts.
 
 ______________________________________________________________________
 

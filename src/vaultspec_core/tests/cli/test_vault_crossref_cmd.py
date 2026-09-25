@@ -30,7 +30,7 @@ from vaultspec_core.cli.vault_crossref_cmd import (
 )
 from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.core.discovery_guidance import LIST_VAULT
-from vaultspec_core.core.enums import AdrStatus
+from vaultspec_core.core.enums import AdrStatus, TypeSafeModel
 from vaultspec_core.crossref import (
     MAX_SOURCES,
     REPLY_VERDICTS,
@@ -129,6 +129,33 @@ class TestNotConfigured:
 
 
 class TestRefusedInput:
+    @pytest.mark.parametrize("options", [("--apply",), ("--all",)])
+    def test_body_file_cannot_write_or_sweep(
+        self, tmp_path: Path, options: tuple[str, ...]
+    ) -> None:
+        root = _workspace(tmp_path)
+        body = root / "draft.md"
+        body.write_text("## Decision\n\nUse durable writes.", encoding="utf-8")
+        result = _crossref(root, _SOURCE, "--body-file", str(body), *options, key="k")
+        assert result.exit_code == 2
+        assert "--body-file requires one ADR" in result.output
+
+    def test_body_file_is_read_without_overwriting_the_source(
+        self, tmp_path: Path
+    ) -> None:
+        root = _workspace(tmp_path)
+        source = root / ".vault" / "adr" / f"{_SOURCE}.md"
+        before = source.read_bytes()
+        body = root / "draft.md"
+        body.write_text("## Decision\n\nUse durable writes.", encoding="utf-8-sig")
+        result = _crossref(root, _SOURCE, "--body-file", str(body), "--json")
+        assert result.exit_code == 0, result.output
+        assert (
+            json.loads(result.stdout)["data"]["sources"][0]["status"]
+            == "not_configured"
+        )
+        assert source.read_bytes() == before
+
     def test_no_source_is_refused(self, tmp_path: Path) -> None:
         result = _crossref(_workspace(tmp_path))
         assert result.exit_code == 2
@@ -165,6 +192,7 @@ def _verdict(number: int, kind: VerdictKind = VerdictKind.LINK) -> Verdict:
         relation="shared_artifact",
         declared=kind is VerdictKind.WEAK,
         applied=kind is VerdictKind.LINK,
+        input_truncated=True,
     )
 
 
@@ -175,7 +203,7 @@ def _judged(source: str, rows: int) -> CrossrefOutcome:
         verdicts=tuple(_verdict(i) for i in range(rows)),
         bounds=Bounds(corpus=5_000, pool=192, judged=40, unjudged_declared=("x",)),
         dropped=0,
-        usage=CrossrefUsage("jev-1.13.0", 46, 140_000, 4_000, 1),
+        usage=CrossrefUsage(TypeSafeModel.JEV, 46, 140_000, 4_000, 1),
     )
 
 

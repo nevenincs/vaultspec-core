@@ -93,6 +93,8 @@ def _verdict_fields(verdict: Verdict) -> dict[str, object]:
         fields["status"] = verdict.status.value
     if verdict.applied:
         fields["applied"] = True
+    if verdict.input_truncated:
+        fields["input_truncated"] = True
     return fields
 
 
@@ -123,8 +125,19 @@ def _sweep_source(outcome: CrossrefOutcome, budget: int) -> dict[str, object]:
     }
     if outcome.write_failed:
         fields["write_failed"] = list(outcome.write_failed)
+    if outcome.draft:
+        fields["draft"] = True
     if outcome.bounds is not None and outcome.bounds.unjudged_declared:
         fields["unjudged_declared"] = len(outcome.bounds.unjudged_declared)
+    if outcome.bounds is not None:
+        bounds = outcome.bounds
+        fields["coverage"] = {
+            "corpus": bounds.corpus,
+            "pool": bounds.pool,
+            "judged": bounds.judged,
+            "source_truncated": bounds.source_truncated,
+            "candidates_truncated": bounds.candidates_truncated,
+        }
     _decline_fields(outcome, fields)
     return fields
 

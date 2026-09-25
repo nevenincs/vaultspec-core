@@ -15,7 +15,7 @@ import pytest
 from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.core.diagnosis.collectors_companion import RAG_DISTRIBUTION_NAME
 from vaultspec_core.core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
-from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.enums import InstallMode, TypeSafeModel
 from vaultspec_core.core.mcps_mode import render_launch_for_mode
 from vaultspec_core.search import (
     SEARCHABLE_TYPES,
@@ -202,7 +202,7 @@ class TestOutcomeInvariant:
 class TestVerdict:
     @staticmethod
     def _ranked(*, answered: bool, unscored: int) -> SearchOutcome:
-        usage = SearchUsage("jev-1.13.0", 1, 1, 1, unscored)
+        usage = SearchUsage(TypeSafeModel.JEV, 1, 1, 1, unscored)
         return SearchOutcome(
             status=SearchStatus.OK, query="q", answered=answered, usage=usage
         )

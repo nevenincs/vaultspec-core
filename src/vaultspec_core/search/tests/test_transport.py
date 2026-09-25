@@ -10,13 +10,13 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.search import UnavailableReason
 from vaultspec_core.search._questions import (
     ANSWERS,
     ANSWERS_CRITERIA,
     KIND,
     KIND_CRITERIA,
-    MODEL,
     WHERE,
 )
 from vaultspec_core.search._transport import (
@@ -99,7 +99,7 @@ def _answers(**overrides: object) -> dict[str, object]:
 
 def _ok(answers: Mapping[str, object] | None = None, **extra: object) -> Reply:
     payload: dict[str, object] = {
-        "model": MODEL,
+        "model": TypeSafeModel.JEV,
         "answers": _answers() if answers is None else dict(answers),
         "usage": {"input_tokens": 120, "output_tokens": 12},
     }
@@ -114,12 +114,14 @@ def _client(provider: ScriptedProvider, **kwargs: Any) -> JevClient:
 class TestSuccess:
     def test_valid_reply_is_parsed_into_typed_answers(self) -> None:
         with (
-            ScriptedProvider(_ok(provider_note="ignored")) as provider,
+            ScriptedProvider(
+                _ok(model="provider-resolved-model", provider_note="ignored")
+            ) as provider,
             _client(provider) as client,
         ):
             evaluation = client.evaluate(STATE, QUESTIONS)
 
-        assert evaluation.model == MODEL
+        assert evaluation.model == "provider-resolved-model"
         assert (evaluation.input_tokens, evaluation.output_tokens) == (120, 12)
         assert evaluation.elapsed_ms >= 0
         assert evaluation.answers["answers"] == NoulAnswer(noul=0.91)
@@ -145,7 +147,7 @@ class TestSuccess:
         (received,) = provider.received
         assert received.headers["Authorization"] == f"Bearer {KEY}"
         assert received.headers["Content-Type"] == "application/json"
-        assert received.payload()["model"] == MODEL
+        assert received.payload()["model"] == TypeSafeModel.JEV
 
     def test_state_is_sanitised_and_questions_are_sent_verbatim(self) -> None:
         state = {
@@ -202,7 +204,7 @@ class TestSuccess:
         errors: list[BaseException] = []
         slow = Reply.json(
             {
-                "model": MODEL,
+                "model": TypeSafeModel.JEV,
                 "answers": _answers(),
                 "usage": {"input_tokens": 1, "output_tokens": 1},
             },
@@ -236,7 +238,7 @@ class TestSuccess:
         errors: list[BaseException] = []
         slow = Reply.json(
             {
-                "model": MODEL,
+                "model": TypeSafeModel.JEV,
                 "answers": _answers(),
                 "usage": {"input_tokens": 1, "output_tokens": 1},
             },
@@ -396,7 +398,7 @@ class TestFailures:
         ):
             evaluation = client.evaluate(STATE, QUESTIONS)
 
-        assert evaluation.model == MODEL
+        assert evaluation.model == TypeSafeModel.JEV
         assert len(provider.received) == 2
 
     def test_dropped_connection_is_a_transport_failure(self) -> None:
@@ -587,11 +589,11 @@ class TestAnswerValidation:
         [
             Reply(status=200, body=b"<html>ok</html>", content_type="text/html"),
             Reply.json(["not", "an", "object"]),
-            Reply.json({"answers": _answers(), "model": MODEL}),
+            Reply.json({"answers": _answers(), "model": TypeSafeModel.JEV}),
             Reply.json(
                 {
                     "answers": _answers(),
-                    "model": MODEL,
+                    "model": TypeSafeModel.JEV,
                     "usage": {"input_tokens": -1, "output_tokens": 0},
                 }
             ),
@@ -634,7 +636,7 @@ class TestSecrecy:
             Reply.html(403, f"<html>blocked {KEY}</html>"),
             Reply.json({}, 503, headers=(("retry-after", "0"),)),
             Reply(drop=True),
-            Reply.json({"answers": {}, "model": MODEL, "echo": KEY}),
+            Reply.json({"answers": {}, "model": TypeSafeModel.JEV, "echo": KEY}),
         ]
         failures: list[HostedSearchError] = []
         for reply in replies:

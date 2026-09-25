@@ -31,6 +31,7 @@ Exit codes:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
@@ -56,6 +57,13 @@ if TYPE_CHECKING:
     from vaultspec_core.crossref import CrossrefOutcome, SweepOutcome
 
 __all__ = ["cmd_adr_crossref"]
+
+_BodyFile = Annotated[
+    Path | None,
+    typer.Option(
+        "--body-file", help="Judge proposed body prose for one ADR; no writes"
+    ),
+]
 
 
 def _envelope_status(outcomes: tuple[CrossrefOutcome, ...]) -> Outcome:
@@ -86,6 +94,8 @@ def _source_lines(outcome: CrossrefOutcome) -> list[TreeLine]:
         return lines
     count = len(outcome.links)
     head = f"{outcome.source}: {count} link{'' if count == 1 else 's'}"
+    if outcome.draft:
+        head += " (proposed body; not persisted)"
     lines = [TreeLine(head, style="bold")]
     for verdict in outcome.verdicts:
         mark = "declared" if verdict.declared else "new"
@@ -97,6 +107,10 @@ def _source_lines(outcome: CrossrefOutcome) -> list[TreeLine]:
             f"{verdict.stem} ({mark})"
         )
         lines.append(TreeLine(text, depth=1, style=style))
+        if verdict.input_truncated:
+            lines.append(
+                TreeLine("candidate input clipped; read the full ADR", depth=2)
+            )
     for stem in outcome.write_failed:
         lines.append(
             TreeLine(f"could not write the link to {stem}", depth=1, style="red")
@@ -105,6 +119,17 @@ def _source_lines(outcome: CrossrefOutcome) -> list[TreeLine]:
         extra = len(outcome.bounds.unjudged_declared)
         lines.append(
             TreeLine(f"{extra} declared link(s) not judged", depth=1, style="dim")
+        )
+    if outcome.bounds is not None:
+        bounds = outcome.bounds
+        lines.append(
+            TreeLine(
+                f"{bounds.judged} candidate(s) selected from {bounds.corpus} ADRs; "
+                f"source input clipped: {bounds.source_truncated}; "
+                f"{bounds.candidates_truncated} candidate input(s) clipped",
+                depth=1,
+                style="dim",
+            )
         )
     return lines
 
@@ -182,6 +207,7 @@ def cmd_adr_crossref(
         bool,
         typer.Option("--apply", help="Write each new link verdict into related:"),
     ] = False,
+    body_file: _BodyFile = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     target: TargetOption = None,
 ) -> None:
@@ -201,8 +227,15 @@ def cmd_adr_crossref(
     root = _get_ctx().target_dir
     single = len(names) == 1 and feature is None and not all_adrs and not isolated
     try:
+        if body_file is not None and (not single or after is not None or apply):
+            raise InvalidSourceError(
+                "--body-file requires one ADR, without sweep options or --apply"
+            )
+        body = (
+            body_file.read_text(encoding="utf-8-sig") if body_file is not None else None
+        )
         if single and after is None:
-            outcome = crossref_adr(root, names[0], apply=apply)
+            outcome = crossref_adr(root, names[0], apply=apply, body=body)
             _emit(
                 outcome_fields(outcome),
                 (outcome,),
@@ -222,7 +255,7 @@ def cmd_adr_crossref(
         )
     except (InvalidSourceError, CorpusTooLargeError) as exc:
         raise typer.BadParameter(str(exc), param_hint="'REFS'") from exc
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         handle_error(exc, json_output=json_output)
         return
     _emit(

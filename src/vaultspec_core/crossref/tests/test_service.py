@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
 from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY, reset_config
+from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.crossref import (
     REPLY_VERDICTS,
     CrossrefStatus,
@@ -37,7 +39,6 @@ from vaultspec_core.crossref._questions import (
     POOL,
 )
 from vaultspec_core.search._models import UnavailableReason
-from vaultspec_core.search._questions import MODEL
 from vaultspec_core.search._transport import JevClient
 from vaultspec_core.search.tests.scripted_provider import (
     Received,
@@ -99,7 +100,9 @@ class Judge:
             (qid, question), *_ = questions.items()
             answers = {qid: self._choice(question["criteria"])}
         usage = {"input_tokens": len(received.body) // 4, "output_tokens": 0}
-        return Reply.json({"model": MODEL, "answers": answers, "usage": usage})
+        return Reply.json(
+            {"model": TypeSafeModel.JEV, "answers": answers, "usage": usage}
+        )
 
     @staticmethod
     def _choice(criteria: dict[str, str]) -> dict[str, Any]:
@@ -206,6 +209,113 @@ def test_a_small_vault_judges_every_candidate_without_a_choice_stage(
     assert outcome.usage.requests == 6
     # Judging writes nothing.
     assert _related(tmp_path, SOURCE) == ["[[2026-01-03-declared-adr]]"]
+
+
+def test_proposed_body_reaches_judge_without_replacing_accepted_text(
+    tmp_path: Path,
+    provider: ScriptedProvider,
+) -> None:
+    write_adr(tmp_path, SOURCE, status="accepted", implementation="Old commitment.")
+    write_adr(
+        tmp_path,
+        "2026-01-02-governing-adr",
+        problem="Long motivation. " * 700,
+        extra=f"## Decision\n\n{LINK} Never acknowledge uncommitted writes.",
+    )
+    path = tmp_path / ".vault" / "adr" / f"{SOURCE}.md"
+    before = path.read_bytes()
+    body = "## Implementation\n\nProposed new commitment."
+    outcome = crossref_adr(
+        tmp_path, SOURCE, body=body, environ=ENV, client=_client(provider)
+    )
+    assert path.read_bytes() == before
+    assert outcome.status is CrossrefStatus.OK
+    assert outcome.draft and not outcome.written
+    assert len(outcome.links) == 1
+    assert outcome.verdicts[0].input_truncated
+    payload = provider.received[0].payload()
+    assert payload["state"]["source"]["status"] == "proposed"
+    assert "Proposed new commitment" in payload["state"]["source"]["text"]
+    assert "Old commitment" not in payload["state"]["source"]["text"]
+    assert (
+        "Never acknowledge uncommitted writes" in payload["state"]["candidate"]["text"]
+    )
+    fields = cast("list[dict[str, Any]]", outcome_fields(outcome)["sources"])[0]
+    assert fields["draft"] is True
+    assert fields["coverage"] == {
+        "corpus": 2,
+        "pool": 1,
+        "judged": 1,
+        "source_truncated": False,
+        "candidates_truncated": 1,
+    }
+    assert fields["verdicts"][0]["input_truncated"] is True
+
+
+@pytest.mark.parametrize(
+    "environ", [{}, {VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name: ""}]
+)
+def test_proposed_body_does_not_opt_in_without_a_key(
+    tmp_path: Path,
+    provider: ScriptedProvider,
+    environ: dict[str, str],
+) -> None:
+    _small_vault(tmp_path)
+    outcome = crossref_adr(
+        tmp_path,
+        SOURCE,
+        body="## Decision\n\nUse durable writes.",
+        environ=environ,
+        client=_client(provider),
+    )
+    assert outcome.status is CrossrefStatus.NOT_CONFIGURED
+    assert provider.received == []
+    assert outcome.usage is None
+
+
+@pytest.mark.parametrize(
+    "body,apply", [("", False), ("---\ntags: []\n---", False), ("Draft", True)]
+)
+def test_invalid_draft_is_refused_before_spending(
+    tmp_path: Path,
+    provider: ScriptedProvider,
+    body: str,
+    apply: bool,
+) -> None:
+    _small_vault(tmp_path)
+    with pytest.raises(InvalidSourceError):
+        crossref_adr(
+            tmp_path,
+            SOURCE,
+            body=body,
+            apply=apply,
+            environ=ENV,
+            client=_client(provider),
+        )
+    assert provider.received == []
+
+
+def test_expired_source_budget_sends_no_http_request(
+    tmp_path: Path,
+    provider: ScriptedProvider,
+) -> None:
+    from vaultspec_core.crossref._corpus import load_adrs
+    from vaultspec_core.crossref._prefilter import Index
+    from vaultspec_core.crossref._service import _judge_one
+
+    _small_vault(tmp_path)
+    index = Index(load_adrs(tmp_path))
+    outcome = _judge_one(
+        tmp_path,
+        _client(provider),
+        index.records[SOURCE],
+        index,
+        deadline=time.monotonic() - 1.0,
+        apply=False,
+    )
+    assert outcome.status is CrossrefStatus.UNAVAILABLE
+    assert outcome.reason is UnavailableReason.DEADLINE
+    assert provider.received == []
 
 
 def test_a_large_vault_sends_bounded_sanitised_choice_questions(

@@ -108,6 +108,7 @@ class Verdict:
             which way to decide.
         declared: Whether the source already links the candidate.
         applied: Whether this run wrote the link.
+        input_truncated: Whether the candidate's decision text was clipped.
     """
 
     stem: str
@@ -119,6 +120,7 @@ class Verdict:
     relation: str
     declared: bool
     applied: bool = False
+    input_truncated: bool = False
 
 
 @dataclass(frozen=True)
@@ -131,12 +133,16 @@ class Bounds:
         judged: Candidates judged pairwise.
         unjudged_declared: Declared links neither in the cut nor among the
             extra declared links judged.
+        source_truncated: Whether the source's decision input was clipped.
+        candidates_truncated: Selected candidates with clipped decision input.
     """
 
     corpus: int
     pool: int
     judged: int
     unjudged_declared: tuple[str, ...] = ()
+    source_truncated: bool = False
+    candidates_truncated: int = 0
 
 
 @dataclass(frozen=True)
@@ -144,7 +150,7 @@ class CrossrefUsage:
     """What judging one source cost.
 
     Attributes:
-        model: The model version the provider reported, or the pinned one.
+        model: The model the provider reported, or the requested alias before a reply.
         requests: Evaluations sent, each at most the transport's attempts.
         input_tokens: Billed input tokens.
         elapsed_ms: Wall time spent on the provider.
@@ -175,6 +181,7 @@ class CrossrefOutcome:
         usage: What was sent; ``None`` when nothing was.
         write_failed: Stems of ``link`` verdicts that applying could not
             write into the source's ``related:``.
+        draft: Whether the source was an in-memory proposed body.
     """
 
     source: str
@@ -186,6 +193,7 @@ class CrossrefOutcome:
     next_step: NextStep | None = None
     usage: CrossrefUsage | None = None
     write_failed: tuple[str, ...] = ()
+    draft: bool = False
 
     @property
     def links(self) -> tuple[Verdict, ...]:

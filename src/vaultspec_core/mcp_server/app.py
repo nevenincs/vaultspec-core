@@ -62,7 +62,7 @@ class _ReadOnlyArgumentGuard(Extension):
         refused: str | None = None
         if params.name == "check" and "fix" in arguments:
             refused = "read-only check does not accept the 'fix' argument"
-        elif params.name == "crossref" and set(arguments) - {"ref"}:
+        elif params.name == "crossref" and set(arguments) - {"ref", "body"}:
             refused = "read-only crossref judges one 'ref' and writes nothing"
         if refused is not None:
             return CallToolResult(

@@ -13,11 +13,10 @@ Each ADR is seen three ways.
 lead: the first prose line of its Problem Statement. This is what an option in
 the Choice stage shows, so it is bounded in characters.
 
-**Decision state.** The sections that carry the commitment - Problem
-Statement, Implementation, Constraints, Rationale and Consequences - joined in
-that order and clipped as one text. This is what the pair judgment reads. A
-record without those sections, a legacy or hand-shaped one, falls back to its
-whole body.
+**Decision state.** Decision and constraint sections come first, with every
+other section retained. Long records share the character budget across
+sections; clipping is reported, never mistaken for complete decision input.
+A record without sections falls back to its whole body.
 
 **Fingerprint.** The inline code spans of the body, normalised into the
 concrete artifacts the decision governs: module and file paths, CLI verbs,
@@ -41,6 +40,7 @@ from ..vaultcore.markdown import (
     HTML_COMMENT_RE,
     INLINE_CODE_RE,
     document_title,
+    iter_headings,
     iter_sections,
 )
 from ..vaultcore.models import DocType
@@ -68,6 +68,7 @@ __all__ = [
     "fingerprint",
     "load_adrs",
     "wiki_stem",
+    "with_body",
 ]
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,7 @@ class AdrRecord:
         declared: The stems of the ADRs this record's ``related:`` names, in
             the order it names them.
         artifacts: How often each normalised artifact appears in the body.
+        input_truncated: Whether the decision state lost text to its bound.
     """
 
     stem: str
@@ -129,6 +131,7 @@ class AdrRecord:
     decision: str
     declared: tuple[str, ...] = ()
     artifacts: Counter[str] = field(default_factory=Counter)
+    input_truncated: bool = False
 
     def header(self) -> str:
         """The record as one line: ``[feature] title. lead``."""
@@ -202,26 +205,76 @@ def _title(body: str, stem: str) -> str:
     return clip(heading.strip("` ") or stem, TITLE_CHARS)
 
 
-def _decision(body: str) -> tuple[str, str]:
-    """Return the decision state text and the Problem Statement's lead."""
-    sections = {
-        section.heading.text.strip().lower(): section.body.strip()
-        for section in iter_sections(body)
-    }
-    kept = [
-        f"## {name}\n{sections[name.lower()]}"
-        for name in DECISION_SECTIONS
-        if sections.get(name.lower())
-    ]
-    problem = sections.get(DECISION_SECTIONS[0].lower(), "")
+def _decision(body: str) -> tuple[str, str, bool]:
+    """Return bounded decision text, its lead, and whether text was clipped."""
+    sections = list(iter_sections(body))
+    problem = next(
+        (s.body for s in sections if s.heading.text.lower() == "problem statement"),
+        "",
+    )
     first = next((line for line in problem.splitlines() if line.strip()), "")
-    text = "\n\n".join(kept) if kept else body
-    return clip(text, DECISION_CHARS), clip(_plain(first), LEAD_CHARS)
+    lead = clip(_plain(first), LEAD_CHARS)
+    if not sections:
+        return clip(body, DECISION_CHARS), lead, len(body) > DECISION_CHARS
+    priorities = {name.lower(): rank for rank, name in enumerate(DECISION_SECTIONS)}
+    ordered = sorted(
+        sections, key=lambda s: priorities.get(s.heading.text.lower(), len(priorities))
+    )
+    parts = [f"## {s.heading.text}\n{s.body.strip()}" for s in ordered]
+    title_lines = {h.line for h in iter_headings(body) if h.level == 1}
+    preamble = "\n".join(
+        line
+        for number, line in enumerate(body.splitlines(), 1)
+        if number < sections[0].heading.line and number not in title_lines
+    ).strip()
+    if preamble:
+        parts.append(preamble)
+    text = "\n\n".join(parts)
+    if len(text) <= DECISION_CHARS:
+        return text, lead, False
+    # Reserve separators, then redistribute short sections' unused shares.
+    # Pathological section counts still obey the hard bound and report clipping.
+    remaining = DECISION_CHARS - 2 * (len(parts) - 1)
+    if remaining < len(parts):
+        return clip(text, DECISION_CHARS), lead, True
+    allowances = [0] * len(parts)
+    for offset, index in enumerate(
+        sorted(range(len(parts)), key=lambda i: len(parts[i]))
+    ):
+        allowance = min(len(parts[index]), remaining // (len(parts) - offset))
+        allowances[index] = allowance
+        remaining -= allowance
+    bounded = "\n\n".join(
+        clip(part, size) for part, size in zip(parts, allowances, strict=True)
+    )
+    return bounded, lead, True
 
 
 def adr_dir(root: Path) -> Path:
     """Return the directory the vault at *root* keeps its ADRs in."""
     return root / get_config().docs_dir / DocType.ADR.value
+
+
+def with_body(record: AdrRecord, body: str) -> AdrRecord:
+    """Project proposed body prose under an existing ADR's identity and links."""
+    from ..core.enums import AdrStatus
+    from ._models import InvalidSourceError
+
+    prose = HTML_COMMENT_RE.sub("", body).strip()
+    if not prose or prose.startswith("---"):
+        raise InvalidSourceError(
+            "a draft needs nonempty body prose without frontmatter"
+        )
+    decision, lead, truncated = _decision(prose)
+    return replace(
+        record,
+        title=_title(prose, record.stem) if document_title(prose) else record.title,
+        status=AdrStatus.PROPOSED,
+        decision=decision,
+        lead=lead,
+        artifacts=fingerprint(prose),
+        input_truncated=truncated,
+    )
 
 
 def _read(path: Path, root: Path) -> AdrRecord | None:
@@ -233,7 +286,7 @@ def _read(path: Path, root: Path) -> AdrRecord | None:
         return None
     metadata, body = parse_vault_metadata(text.replace("\r\n", "\n"))
     body = HTML_COMMENT_RE.sub("", body)
-    decision, lead = _decision(body)
+    decision, lead, input_truncated = _decision(body)
     declared = tuple(
         dict.fromkeys(
             stem
@@ -251,6 +304,7 @@ def _read(path: Path, root: Path) -> AdrRecord | None:
         decision=decision,
         declared=declared,
         artifacts=fingerprint(body),
+        input_truncated=input_truncated,
     )
 
 

@@ -38,7 +38,7 @@ from ..core.exceptions import AdvisoryLockTimeoutError
 from ..search._models import UnavailableReason
 from ..vaultcore.models import DocType
 from ..vaultcore.related_links import link_document
-from ._corpus import AdrRecord, load_adrs, wiki_stem
+from ._corpus import AdrRecord, load_adrs, wiki_stem, with_body
 from ._engine import Meter, judge
 from ._models import (
     CrossrefOutcome,
@@ -202,6 +202,7 @@ def crossref_adr(
     ref: str,
     *,
     apply: bool = False,
+    body: str | None = None,
     environ: Mapping[str, str] | None = None,
     client: JevClient | None = None,
 ) -> CrossrefOutcome:
@@ -211,6 +212,8 @@ def crossref_adr(
         root: The workspace root.
         ref: The source ADR: a stem, filename, path or ``[[wiki-link]]``.
         apply: Write the ``link`` verdicts the source does not declare yet.
+        body: Proposed body prose replacing the source in memory only. Cannot
+            be combined with applying links.
         environ: The environment the credential is read from; ``None`` reads
             :data:`os.environ`.
         client: A client to use instead of building one; not closed here.
@@ -222,8 +225,14 @@ def crossref_adr(
         InvalidSourceError: If *ref* names no ADR of this vault.
         CorpusTooLargeError: If the vault holds more ADRs than one run reads.
     """
+    deadline = time.monotonic() + SOURCE_DEADLINE
+    if body is not None and apply:
+        raise InvalidSourceError("a draft body cannot be combined with apply")
     records = {record.stem: record for record in load_adrs(root)}
     source = _resolve(ref, records)
+    if body is not None:
+        source = with_body(source, body)
+        records[source.stem] = source
     credential = _credential(root, environ)
     if credential is None:
         return _declined(root, source.stem)
@@ -232,14 +241,15 @@ def crossref_adr(
     if active is None:
         return _declined(root, source.stem, UnavailableReason.CREDENTIAL_REJECTED)
     try:
-        return _judge_one(
+        outcome = _judge_one(
             root,
             active,
             source,
             Index(list(records.values())),
-            deadline=time.monotonic() + SOURCE_DEADLINE,
+            deadline=deadline,
             apply=apply,
         )
+        return replace(outcome, draft=body is not None)
     finally:
         if owned:
             active.close()

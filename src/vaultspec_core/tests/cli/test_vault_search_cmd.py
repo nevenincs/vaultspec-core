@@ -28,6 +28,7 @@ from vaultspec_core.cli.rendering import TRUNCATE_MARKER
 from vaultspec_core.cli.vault_search_cmd import _json_text, _outcome_lines
 from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
 from vaultspec_core.core.discovery_guidance import LIST_VAULT
+from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.core.windowing import apply_window
 from vaultspec_core.search import (
     DEFAULT_RESULTS,
@@ -313,7 +314,7 @@ def _page(*, answered: bool = True, unscored: int | None = None) -> SearchOutcom
     usage = (
         None
         if unscored is None
-        else SearchUsage("jev-1.13.0", 16, 41_250, 1_235, unscored)
+        else SearchUsage(TypeSafeModel.JEV, 16, 41_250, 1_235, unscored)
     )
     return SearchOutcome(
         status=SearchStatus.OK,
@@ -455,7 +456,7 @@ def _json_tokens(shape: str, limit: int) -> float:
         answered=False,
         hits=tuple(hits),
         window=window,
-        usage=SearchUsage("jev-1.13.0", 16, 41_250, 1_235, 99),
+        usage=SearchUsage(TypeSafeModel.JEV, 16, 41_250, 1_235, 99),
     )
     text = _json_text(outcome)
     assert len(json.loads(text)["data"]["hits"]) == limit

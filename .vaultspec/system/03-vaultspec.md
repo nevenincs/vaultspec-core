@@ -51,6 +51,12 @@ Assess decision coverage separately from planning need:
 - Routine execution needs no new ADR. A question stays in the conversation unless its
   answer establishes a costly decision that implementation will build on.
 
+The ADR author owns placement and reconciliation of affected existing wording. Propose
+the new ruling and any necessary older-ADR edits together; links do not resolve a
+contradiction. The ADR skill owns the conditional Jev check, using the configured
+TypeSafe key as opt-in. Without it, use local discovery. Semantic results guide reading
+and reconciliation; they grant no authority and add no approval gate.
+
 Work directly when this session can finish it without needing durable sequencing or
 handoff. State briefly that no plan is needed. An ADR may still be required by the
 decision test; its Implementation section then bounds the direct work. Review unplanned
@@ -107,6 +113,11 @@ the authorization basis. If authorization already exists, persist it and proceed
 otherwise present the concrete record and ask. Draft plans may link proposed decisions,
 but no Step executes on unaccepted authority. Completed plans retain historical links;
 reopening work requires reassessing the decisions for the affected Step.
+
+Acceptance establishes decision authority, not rollout completion. Distinguish binding
+commitments from implementation hypotheses: adapt details within the commitments, and
+revise an invalidated commitment or rationale with evidence and authorization. Expected
+rollout gaps do not by themselves contradict or retire the decision.
 
 The approved plan authorizes its Steps and in-scope corrections. Use the plan verbs to
 record routine path corrections or clarifications and continue. A material scope change,

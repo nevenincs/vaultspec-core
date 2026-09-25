@@ -117,8 +117,13 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.5`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.2.5`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Flags on commands the release already has:
+
+- `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -1626,9 +1631,9 @@ grow with the size of the vault:
 - The best 32 of the combined ranking, plus up to 8 declared links outside them, are
   judged in pairs.
 
-A source costs at most 46 requests and 60 seconds. A sweep takes at most 50 sources, or
-52 when it must settle a refusal, and 300 seconds, and the vault may hold at most 5,000
-ADRs.
+A source costs at most 46 requests under a 15-second deadline. A sweep takes at most 50
+sources, or 52 when it must settle a refusal, and 300 seconds, and the vault may hold at
+most 5,000 ADRs.
 
 Cross-referencing uses the hosted-search key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
 [environment variables](#environment-variables)) and sends ADR text to the TypeSafe API.
@@ -1664,6 +1669,9 @@ anything.
   three refusals in a row, or any other failure stops the sweep with `stopped` set and
   the cursor before the first refusal still open, so resuming retries from there.
 - `--max-sources N` (default `10`) - Most ADRs one sweep judges, from `1` to `50`.
+- `--body-file PATH` - Judge proposed body prose for one existing ADR without changing
+  it. Use this for an amendment before replacing accepted text. Omit frontmatter; no
+  sweep options or `--apply` may accompany it. The result marks the source as `draft`.
 - `--apply` (default off) - Write each new `link` verdict into the source's `related:`,
   as each source finishes, without reading them first. Nothing is removed, and no
   candidate is written to. To add only the links you have read and confirmed, run
@@ -1683,6 +1691,13 @@ not write, and, when it was not judged, its `reason`, `next_step`, and `remediat
 `remaining`, `next_after` when sources remain and one was processed (without it, a
 resume starts from the beginning), `stopped` when a sweep ended early, and `usage` when
 anything was sent.
+
+Each judged source includes `coverage`: corpus, pool, and judged candidate counts,
+`source_truncated`, and `candidates_truncated`. Each returned candidate whose input was
+clipped has `input_truncated`. Decision and constraint sections receive space before
+context can consume the 6,000-character budget; other sections are retained within that
+bound. Read relevant full records when input was clipped. An `ok` response means the
+bounded judgment completed, not that every conflict was excluded.
 
 Exit codes:
 

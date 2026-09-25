@@ -3,11 +3,12 @@ tags:
   - '#adr'
   - '#framework-reword'
 date: '2026-09-08'
-modified: '2026-09-08'
+modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:70e2e1021daeb62b171227a43f0a08814bb63d374bd914b7598552b9d741ce86'
+body_hash: 'sha256:a53fe571131ee15189e968b5c79bbd3f01bd831e5b08baf4ad686f572d8c9112'
 related:
   - "[[2026-09-08-framework-reword-research]]"
+  - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
 ---
 
 # `framework-reword` adr: `proportional pipeline routing and decision coverage` | (**status:** `accepted`)
@@ -36,6 +37,22 @@ A costly decision establishes or changes a commitment whose reversal requires co
 An approved plan may have no governing ADR when discovery finds no costly decision involved. Its Description records that coverage assessment and scope; no placeholder ADR or evidence record is required merely for planning. Existing governing ADRs must still be linked. Research, Reference, or an Audit with sufficient evidence may ground a decision. Missing evidence is gathered in the appropriate record. Plans inherit ADR evidence transitively; direct supporting links remain optional.
 
 Approval is scoped user authorization, including explicit advance authorization. Persist its basis; never infer it from elapsed time or record status alone. Routine corrections within approved intent do not need renewed permission; changed scope, costly commitments, or external authority do. Preserve accepted ADR content while an amendment is pending, presenting a proposed revision separately for approval before replacing it. A successor must be accepted before supersession retires the old decision. Historical plan links retain their historical meaning; active execution must have accepted decision coverage.
+
+The ADR author owns placement and proposed reconciliation of affected current wording:
+reuse, a subsection or amendment to the same decision, a distinct decision, or
+supersession. Present necessary older-ADR edits with the new ruling and apply existing
+authority coherently. Detailed evidence remains in its evidence home; retain the context
+needed to understand scope and rationale. Acceptance establishes authority, not rollout
+completion. Implementation hypotheses can change within binding commitments; invalidated
+commitments require an evidenced, authorized revision. Research-only delegation uses the
+general researcher; the ADR persona drafts from supplied evidence.
+
+The opt-in authoring check follows `2026-09-23-adr-crossref-adr`. It guides reconciliation
+without adding an approval gate, credential prerequisite, or repeated unchanged review.
+
+**Amendment, 2026-09-25:** Authorized by the user's request to apply the ADR authoring
+audit findings to skills, personas, wording rules and backend. Evidence:
+`2026-09-25-skill-audit-adr-authoring-audit`. Existing approval and routing boundaries hold.
 
 ## Implementation
 

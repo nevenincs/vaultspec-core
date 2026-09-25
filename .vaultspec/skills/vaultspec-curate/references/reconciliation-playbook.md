@@ -23,22 +23,22 @@ first; this playbook assumes the canonical status set.
 
 For each cluster of decisions on a shared concept:
 
-- Start from one cross-reference sweep. `vaultspec-core vault adr crossref --all --json`
-  (MCP: `crossref`) judges each ADR against the rest within fixed ceilings: at most 50
-  ADRs a sweep, 46 paid requests and 60 seconds an ADR. `--isolated` takes only ADRs
-  that link no other ADR. Take one sweep per curation run and report its `next_after`,
-  `remaining`, and `stopped` in the audit; the next sweep repeats the selector with
-  `--after <next_after>` on the orchestrator's go-ahead. On `not_configured`, run the
-  next step the reply names. On `stopped`, report the reason; a sweep stopped on time or
-  a transient failure is resumed later, and one stopped on a refusal (`content_rejected`
-  or `request_too_large`) means no read settled it: cross-reference one other ADR on its
-  own, and if that is judged, cross-reference the first refused ADR on its own. If it is
-  refused again, its refusal is its own: record it and resume with `--after` set to it.
-  Otherwise resume as usual. Every refused source at or before `next_after` was refused
-  on its own text, whether or not the sweep stopped: record it. Each `link` verdict is a
-  candidate missing link; each `weak` verdict is a declared link judged below the
-  threshold. The `relation` label says which pairs to read in full; it does not classify
-  the pair for you.
+- When hosted search is configured, start from one cross-reference sweep.
+  `vaultspec-core vault adr crossref --all --json` (MCP: `crossref`) judges each ADR
+  against the rest within fixed ceilings: at most 50 ADRs a sweep, 46 paid requests and
+  15 seconds an ADR. `--isolated` takes only ADRs that link no other ADR. Take one sweep
+  per curation run and report its `next_after`, `remaining`, and `stopped` in the audit;
+  the next sweep repeats the selector with `--after <next_after>` on the orchestrator's
+  go-ahead. On `not_configured`, run the next step the reply names. On `stopped`, report
+  the reason; a sweep stopped on time or a transient failure is resumed later, and one
+  stopped on a refusal (`content_rejected` or `request_too_large`) means no read settled
+  it: cross-reference one other ADR on its own, and if that is judged, cross-reference
+  the first refused ADR on its own. If it is refused again, its refusal is its own:
+  record it and resume with `--after` set to it. Otherwise resume as usual. Every
+  refused source at or before `next_after` was refused on its own text, whether or not
+  the sweep stopped: record it. Each `link` verdict is a candidate missing link; each
+  `weak` verdict is a declared link judged below the threshold. The `relation` label
+  says which pairs to read in full; it does not classify the pair for you.
 - Surface the cluster with the `vaultspec-discovery` rule's decision search and ADR
   listing. Search finds same-topic ADRs that share no obvious filename or feature tag;
   the listing catches what search misses.
@@ -68,8 +68,8 @@ that has an ADR, enumerate its lifecycle documents
 (`vaultspec-core vault list --feature <feature> --json`, or the feature index), read
 them whole, and judge against the boundary:
 
-- An ADR passage whose substance the related research or reference already records is
-  restated grounding, not decision content.
+- Duplicated detailed evidence is restated grounding. Preserve the concise context
+  needed to understand the ADR's scope and rationale.
 - Decision language in a research or audit body - a chosen option stated as settled, "we
   will", a recommendation phrased as the decision - is a displaced decision.
 - The same fact carried by two documents with diverging substance is a forked fact.
@@ -90,10 +90,12 @@ Classify every finding into one of these, because the action differs by class:
   refinements of a single decision: a supersession chain of non-pivots, or sibling
   `accepted` records - possibly contradictory - sharing one scope. The markers can all
   be formally correct; the fragmentation itself is the finding.
-- **Decision-vs-code drift (advisory).** An `accepted` ADR is not reflected in the code,
-  or a retired decision still governs it. Report only; never auto-amend the ADR.
-- **Orphaned or stranded decision (advisory).** A decision with no implementation and no
-  successor, or disconnected from the decision graph.
+- **Decision-vs-code drift (advisory).** Code violates an accepted commitment, or a
+  retired decision still governs it. Distinguish expected rollout gaps and changes to
+  implementation hypotheses within the commitments. Report violations; never auto-amend
+  authority to match code.
+- **Orphaned or stranded decision (advisory).** A decision with no implementation,
+  planned rollout, or successor, or disconnected from the decision graph.
 - **Off-taxonomy or missing status (mechanical).** A status value outside the canonical
   set, or none at all.
 - **Missing cross-reference (safe once confirmed).** A `crossref` `link` verdict the

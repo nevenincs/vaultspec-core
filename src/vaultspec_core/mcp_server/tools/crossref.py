@@ -76,6 +76,7 @@ class VerdictRow(LeanResult):
         status: The candidate's ADR status.
         declared: Whether the source already links it.
         applied: Whether this call wrote the link.
+        input_truncated: Whether the candidate's decision input was clipped.
     """
 
     stem: str
@@ -85,6 +86,7 @@ class VerdictRow(LeanResult):
     status: str | None = None
     declared: bool
     applied: bool | None = None
+    input_truncated: bool | None = None
 
 
 class SourceRow(LeanResult):
@@ -103,6 +105,8 @@ class SourceRow(LeanResult):
         reason: Why a configured run failed.
         next_step: What to run instead when the source was not judged.
         remediation: The reason and the next step, as one sentence.
+        coverage: Corpus, pool, judged counts and source/candidate input clipping.
+        draft: Whether an in-memory proposed body was judged.
     """
 
     source: str
@@ -117,6 +121,8 @@ class SourceRow(LeanResult):
     reason: str | None = None
     next_step: dict[str, Any] | None = None
     remediation: str | None = None
+    coverage: dict[str, int | bool] | None = None
+    draft: bool | None = None
 
 
 class CrossrefResult(LeanResult):
@@ -202,20 +208,16 @@ def register_crossref_tools(
             after: str | None = None,
             max_sources: _MaxSources = DEFAULT_SOURCES,
             apply: bool = False,
+            body: str | None = None,
         ) -> CrossrefResult:
             """Find the ADRs a decision should cross-reference, within fixed bounds.
 
-            Judges each ADR against the vault's other ADRs and returns
-            ``link`` verdicts (should be linked) and ``weak`` ones (declared,
-            judged below the threshold). One ref judges that ADR; several refs,
-            ``feature``, ``isolated`` or ``all_adrs`` sweep in stem order,
-            at most ``max_sources``, resumable with ``after=next_after``.
-            ``apply`` writes new link verdicts into each source's
-            ``related:``. Relations are advisory. Without a TypeSafe key it
-            sends nothing and returns ``not_configured`` with a next step.
+            Returns link and weak verdicts. Resume sweeps with ``after=next_after``.
+            ``body`` previews one amendment; ``apply`` adds links. Relations are
+            advisory; inspect ``coverage``. No key: no data sent, ``not_configured``.
 
             Args:
-                ctx: The MCP request context (unused).
+                ctx: Request context.
                 refs: ADRs to judge.
                 feature: Sweep this feature's ADRs.
                 isolated: Sweep only ADRs that link no other ADR.
@@ -223,6 +225,7 @@ def register_crossref_tools(
                 after: Resume a sweep after this stem.
                 max_sources: Most ADRs one sweep judges.
                 apply: Write new link verdicts.
+                body: Proposed body prose for one ref, without persisting; no apply.
             """
             _ = ctx
             root = _get_ctx().target_dir
@@ -243,9 +246,13 @@ def register_crossref_tools(
             )
             if not sweeping:
                 outcome = await _run(
-                    functools.partial(crossref_adr, root, refs[0], apply=apply)
+                    functools.partial(
+                        crossref_adr, root, refs[0], apply=apply, body=body
+                    )
                 )
                 return CrossrefResult.model_validate(outcome_fields(outcome))
+            if body is not None:
+                raise ToolError("a draft body requires one ADR, without sweep options")
             sweep = await _run(
                 functools.partial(
                     crossref_sweep,
@@ -274,7 +281,9 @@ def register_crossref_tools(
     )
     @compact_result(_summary)
     @_isolated_context
-    async def crossref_read_only(ctx: _CrossrefContext, ref: _Ref) -> CrossrefResult:
+    async def crossref_read_only(
+        ctx: _CrossrefContext, ref: _Ref, body: str | None = None
+    ) -> CrossrefResult:
         """Find the ADRs a decision should cross-reference, within fixed bounds.
 
         Judges one ADR against the vault's other ADRs and returns ``link``
@@ -286,10 +295,11 @@ def register_crossref_tools(
         Args:
             ctx: The MCP request context (unused).
             ref: The ADR to judge: stem, filename, path or [[wiki-link]].
+            body: Proposed body prose to judge without persisting it.
         """
         _ = ctx
         root = _get_ctx().target_dir
-        outcome = await _run(functools.partial(crossref_adr, root, ref))
+        outcome = await _run(functools.partial(crossref_adr, root, ref, body=body))
         return CrossrefResult.model_validate(outcome_fields(outcome))
 
     _ = crossref_read_only

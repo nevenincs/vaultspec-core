@@ -72,9 +72,9 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, ClassVar, Final, Self, cast
 from urllib.parse import urlsplit
 
+from ..core.enums import TypeSafeModel
 from ..core.exceptions import VaultSpecError
 from ._models import UnavailableReason
-from ._questions import MODEL
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -532,7 +532,9 @@ def _prepare(
     plain_questions = {
         qid: _rebuild(question, _verbatim) for qid, question in questions.items()
     }
-    body = _encode({"state": clean_state, "model": MODEL, "questions": plain_questions})
+    body = _encode(
+        {"state": clean_state, "model": TypeSafeModel.JEV, "questions": plain_questions}
+    )
     longest = max(len(_encode(question)) for question in plain_questions.values())
     bound = (len(_encode(clean_state)) + longest) / BYTES_PER_TOKEN
     if len(body) / BYTES_PER_TOKEN > REQUEST_TOKEN_LIMIT or bound > STATE_TOKEN_LIMIT:

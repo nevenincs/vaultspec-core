@@ -5,7 +5,7 @@ tags:
 date: '2026-09-25'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:d5bd144a072452eece512a3d1f670bb911ad0769d1d07e640dc70eadee52ac94'
+body_hash: 'sha256:3f5b755dfc75132483bd2c6a5ac654e24de7ffbb03627d86d1ea6528c45b915f'
 related:
   - "[[2026-09-08-framework-reword-adr]]"
   - "[[2026-09-23-adr-crossref-adr]]"
@@ -254,6 +254,74 @@ transport, CLI supersession, and ADR grounding. Run with
 `python -m pytest src/vaultspec_core/crossref/tests/test_service.py src/vaultspec_core/mcp_server/tests/test_crossref_tool.py src/vaultspec_core/tests/cli/test_vault_adr_supersede.py src/vaultspec_core/tests/cli/test_check_adr_grounding.py -q`.
 The cross-reference service tests use a scripted local provider; they test integration,
 not hosted model accuracy. No broad suite or repeated formal reviews were commissioned.
+
+### implementation | low | Authorized findings applied across the authoring path
+
+On 2026-09-25 the user authorized applying the findings to skills, personas, wording
+rules and backend, with every TypeSafe call conditional on the configured API key. The
+user separately required removal of numbered Jev identifiers from production and tests.
+The changes amend the existing cross-reference, hosted-search and framework-routing
+ADRs, citing this audit, rather than adding duplicate decisions.
+
+- The ADR skill requires one configured, advisory pass on a populated draft. It reuses
+  supplied results for unchanged relevant state, uses local discovery without a key,
+  and does not make a provider failure an authoring gate. No network call was added to
+  edit, deterministic checks or commit hooks. Delegation remains optional.
+- The author owns placement and concrete proposed reconciliation of affected older
+  wording. The research skill selects the general researcher; the ADR persona drafts
+  from evidence and no longer returns a Research body. Rules, template and curation
+  distinguish binding commitments, implementation hypotheses and expected rollout gaps.
+- CLI `--body-file` and MCP `body` judge proposed prose in memory under an existing
+  ADR's identity and links. The draft cannot apply links or sweep. Accepted bytes remain
+  intact; successful results identify the draft. Both normal and read-only MCP surfaces
+  support this input. Source judgment uses a 15-second deadline; a single-source call
+  starts that deadline before corpus and client setup.
+- Projection retains custom and repeated sections, shares the 6,000-character budget
+  across sections, and exposes clipping in state, candidate rows and source coverage.
+  Corpus, pool and selected-pair counts remain visible. No context ceiling was raised.
+- `TypeSafeModel.JEV` in `core/enums.py` is the sole model selector. The API resolves
+  the stable alias and supplies the actual serving model in its response. Transport and
+  usage retain that returned identity. Source, tests and product documentation contain
+  no numbered Jev references; a lexical-test example now uses a generic product name.
+  The API contract is https://docs.typesafe.ai/api and https://docs.typesafe.ai/models.
+
+The final live CLI amendment probe completed in **2.534 seconds**, with **38 logical
+evaluations**, **138,892 billed input tokens**, zero unscored requests and zero writes.
+It selected 33 pairs from a 133-candidate pool over 134 ADRs. The source and 24 selected
+candidate inputs were explicitly marked clipped. Two link suggestions and four weak
+declared links were returned; full-record reading remains necessary. All ADR hashes
+matched before and after the probe. Scratch evidence: `final-offering-outcome.json` and
+`final-offering-summary.json` in the directory named under Scope.
+
+Across the corpus, **zero Constraints headings are now omitted**, versus 15 in the
+original projection inventory, and no input exceeds its character bound. **91 records
+report clipping**: all sections now count toward the budget, unlike the original
+five-section projection. This is an input-coverage improvement, not a measured recall
+or accuracy gain. Full-corpus content, source wording and the selection changed, so the
+new live result is not a controlled comparison with the earlier timing rows.
+
+The ADR skill, ADR persona, research skill and template total 1,882 words versus 1,914
+before these edits, despite the added amendment and reconciliation guidance. The MCP
+crossref definition remains within its original 2,550-character budget, and the whole
+MCP surface remains within its existing ceiling. Bundled policy and eight matching local
+policy sources were updated together and synced into Codex, including its inline persona
+prompts. The separately installed TypeSafe skill remains available.
+
+Verification covered the search transport and engine, cross-reference corpus and
+service, CLI and MCP parity, no-key/no-send behavior, proposed-body nonmutation,
+invalid draft/apply combinations, coverage propagation, reply/context budgets and
+API-reported model identity. The main focused run passed 387 tests; its context-budget
+failure was corrected and passed in the subsequent checks. The follow-up CLI/MCP and
+documentation-guard run passed 209 tests and found one runtime-patching violation in a
+new test. That test was changed to exercise an actual expired deadline without patching;
+the four relevant checks then passed. Fourteen lexical tests also passed after removing
+the model-specific tokenizer example. Ruff, Markdown formatting/lint and the project-wide
+type check passed. The unchanged suites were not repeated after these narrow corrections.
+
+The seven-section immutable body schemas remain compatible. Decision clarity is improved
+through authoring guidance; the structural validator still does not certify that prose
+contains a sound decision. No blanket semantic pass/fail gate or automatic authority
+change was introduced.
 
 ## Recommendations
 

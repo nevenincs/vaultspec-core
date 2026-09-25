@@ -43,11 +43,10 @@ related:
 # `{feature}` adr: `{title}` | (**status:** `{proposed|accepted|rejected|superseded|deprecated}`)
 
 <!-- DOCUMENT BOUNDARY:
-     This record owns the decision and only the decision. Grounding evidence
-     lives in the related research/reference/audit documents and is cited by stem
-     (e.g. `2026-02-04-editor-demo-research`), never restated - a restated
-     fact forks and goes stale. A fact this record needs but the grounding
-     lacks is added to the grounding first, then cited. -->
+     Keep the ruling understandable on its own: scope, commitment, rationale,
+     consequences. Cite detailed research/reference/audit evidence by stem.
+     Each section may be a sentence; do not pad it to resemble a specification.
+     Inconclusive experiments remain evidence, not an accepted decision. -->
 
 ## Problem Statement
 
@@ -70,14 +69,14 @@ Rationale. -->
 
 ## Constraints
 
-<!-- Blocking constraints, and how stable the features this decision relies on are,
-     each cited by stem or locator. -->
+<!-- Binding commitments and scope, including exceptions and affected prior rulings.
+     Make obligations distinguishable from implementation hypotheses. -->
 
 ## Implementation
 
-<!-- A high-level overview (not a plan) of HOW and WHAT will be implemented. Focus on condensed but clear prose that describes functionality layering.
-
-Do not add code; cite the `{reference}` record by stem for any implementation detail. -->
+<!-- Lead with the chosen decision: "We will ..." and its scope. Follow with only the
+     implementation outline needed to understand it. Mark hypotheses that may change
+     within the constraints; keep task sequencing and code elsewhere. -->
 
 ## Rationale
 
@@ -88,4 +87,5 @@ Do not add code; cite the `{reference}` record by stem for any implementation de
 
 ## Consequences
 
-<!-- Gains, but framed honestly. Difficulties. Pathways this feature opens. Pitfalls. -->
+<!-- Benefits, accepted costs, and conditions that would require reconsideration.
+     Acceptance does not assert that implementation is already complete. -->

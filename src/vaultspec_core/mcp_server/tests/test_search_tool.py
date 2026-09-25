@@ -31,7 +31,7 @@ from vaultspec_core.core.diagnosis.collectors_companion import (
     CompanionSignal,
 )
 from vaultspec_core.core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
-from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.enums import InstallMode, TypeSafeModel
 from vaultspec_core.core.mcps_mode import render_launch_for_mode
 from vaultspec_core.core.windowing import apply_window
 from vaultspec_core.mcp_server.app import create_server
@@ -139,7 +139,7 @@ def _ranked(
         hits=tuple(page),
         window=window,
         usage=SearchUsage(
-            model="jev-1.13.0",
+            model=TypeSafeModel.JEV,
             requests=6,
             input_tokens=41_250,
             elapsed_ms=1_235,
@@ -278,7 +278,7 @@ async def test_an_unanswered_whole_page_says_so() -> None:
             status=SearchStatus.UNAVAILABLE,
             query="q",
             reason=UnavailableReason.DEADLINE,
-            usage=SearchUsage("jev-1.13.0", 3, 900, 25_000, 0),
+            usage=SearchUsage(TypeSafeModel.JEV, 3, 900, 25_000, 0),
             next_step=_LISTING,
         ),
     ],

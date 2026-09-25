@@ -10,6 +10,12 @@ from __future__ import annotations
 from enum import IntEnum, StrEnum
 
 
+class TypeSafeModel(StrEnum):
+    """API model selectors; the provider resolves the current stable release."""
+
+    JEV = "jev-latest"
+
+
 class CapabilityLevel(IntEnum):
     """Tiered capability levels used to select an appropriate model."""
 

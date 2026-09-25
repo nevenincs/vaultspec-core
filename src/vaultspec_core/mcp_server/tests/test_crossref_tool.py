@@ -20,7 +20,7 @@ from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
 from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
-from vaultspec_core.core.enums import AdrStatus
+from vaultspec_core.core.enums import AdrStatus, TypeSafeModel
 from vaultspec_core.crossref import (
     MAX_SOURCES,
     Bounds,
@@ -91,7 +91,7 @@ async def test_the_read_only_surface_takes_one_ref_and_refuses_apply(
     mcp = create_server(read_only=True)
     crossref = _tool(await mcp.list_tools(), "crossref")
 
-    assert set(crossref.input_schema["properties"]) == {"ref"}
+    assert set(crossref.input_schema["properties"]) == {"ref", "body"}
     async with Client(mcp) as client:
         refused = await client.call_tool("crossref", {"ref": _SOURCE, "apply": True})
 
@@ -106,8 +106,16 @@ async def test_the_read_only_surface_takes_one_ref_and_refuses_apply(
         {"refs": []},
         {"refs": ["2026-09-09-nothing-adr"]},
         {"all_adrs": True, "max_sources": MAX_SOURCES + 1},
+        {"all_adrs": True, "body": "## Decision\n\nDraft."},
+        {"refs": [_SOURCE], "body": "## Decision\n\nDraft.", "apply": True},
     ],
-    ids=["nothing-named", "unknown-adr", "sweep-over-ceiling"],
+    ids=[
+        "nothing-named",
+        "unknown-adr",
+        "sweep-over-ceiling",
+        "draft-sweep",
+        "draft-apply",
+    ],
 )
 async def test_bad_input_is_refused(
     vault_root: Path, arguments: dict[str, Any]
@@ -130,6 +138,7 @@ def test_a_reply_with_verdicts_reaches_mcp_exactly_as_the_cli_prints_it() -> Non
         score=0.61234,
         relation="depends_on",
         declared=False,
+        input_truncated=True,
     )
     written = dataclasses.replace(
         verdict, stem="2026-02-22-other-adr", status=AdrStatus.ACCEPTED, applied=True
@@ -140,8 +149,16 @@ def test_a_reply_with_verdicts_reaches_mcp_exactly_as_the_cli_prints_it() -> Non
                 source=_SOURCE,
                 status=CrossrefStatus.OK,
                 verdicts=(verdict, written),
-                bounds=Bounds(corpus=3, pool=2, judged=2, unjudged_declared=("x",)),
-                usage=CrossrefUsage("jev-1.13.0", 2, 900, 12, 0),
+                bounds=Bounds(
+                    corpus=3,
+                    pool=2,
+                    judged=2,
+                    unjudged_declared=("x",),
+                    source_truncated=True,
+                    candidates_truncated=1,
+                ),
+                draft=True,
+                usage=CrossrefUsage(TypeSafeModel.JEV, 2, 900, 12, 0),
                 write_failed=("2026-02-23-broken-adr",),
             ),
         ),
@@ -198,7 +215,17 @@ async def _drive_without_a_key(project: Path) -> None:
     async with stdio_session(project, "--read-only", environ=environ) as session:
         await session.initialize()
         judged = data_of(await session.call_tool("crossref", {"ref": _SOURCE}))
+        draft = data_of(
+            await session.call_tool(
+                "crossref",
+                {
+                    "ref": _SOURCE,
+                    "body": "## Decision\n\nUse durable writes.",
+                },
+            )
+        )
     assert judged == payload
+    assert draft == payload
 
     async with stdio_session(project, environ=environ) as session:
         await session.initialize()

@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#adr-crossref'
 date: '2026-09-23'
-modified: '2026-09-23'
+modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:a7a7ae7b266b2c600b69d4a60848743f2767cb8102fe61739625939bdd99287a'
+body_hash: 'sha256:1a92a8c5dc85a830f3b75e2a07e099be76648a9474b10480a522f64672b9235e'
 related:
   - "[[2026-09-23-adr-crossref-research]]"
   - "[[2026-09-23-typesafe-search-adr]]"
@@ -15,6 +15,7 @@ related:
   - "[[2026-07-09-firmware-mcp-primacy-adr]]"
   - '[[2026-08-23-envelope-optimization-adr]]'
   - '[[2026-09-23-adr-crossref-audit]]'
+  - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
 ---
 
 # `adr-crossref` adr: `bounded ADR cross-referencing on TypeSafe Jev, as a core backend with one CLI and MCP surface` | (**status:** `accepted`)
@@ -80,7 +81,7 @@ corpus can be reconciled after the fact.
 
 - **Inherited unchanged.** The hosted-search credential and its resolver (the config
   layer's, once the environment-variable centralisation lands), consent by credential
-  presence, the pinned model, the transport, sanitised state, request size bounds,
+  presence, the canonical model selector, the transport, sanitised state, request size bounds,
   validated answers, the typed failure taxonomy, the backend-resolved next step, no rag
   calls and no new runtime dependency, as `2026-09-23-typesafe-search-adr` sets them.
   The default test suite needs no network or key.
@@ -90,9 +91,11 @@ corpus can be reconciled after the fact.
 - **Measured parameters.** Pool of 192 code-ranked candidates; Choice questions of at
   most 32 options, dealt round robin into balanced questions, each with a `none` option;
   a cut of 32 fused candidates; fusion by reciprocal rank with constant 10, Choice
-  weighted 2 and each code rank 1, ties broken by stem; decision state of the Problem
-  Statement, Implementation, Constraints, Rationale and Consequences sections, clipped to
-  6,000 characters per ADR; `link` verdict at a pair score of 0.5.
+  weighted 2 and each code rank 1, ties broken by stem; `link` verdict at a pair score
+  of 0.5. Decision input retains all sections, including custom and repeated headings,
+  with Decision, Decision Outcome, Constraints and Implementation first. Long sections
+  share the unchanged 6,000-character per-ADR budget, redistributing unused space from
+  short sections. Source and candidate clipping is explicit in state and output.
 - **Engineering ceilings**, code constants chosen so that no cost depends on the vault or
   the caller, not measured optima:
   - Corpus: at most 5,000 ADR files; a larger ADR directory is refused before any file is
@@ -102,7 +105,7 @@ corpus can be reconciled after the fact.
   - Declared links: up to 8 declared ADR links outside the cut are judged too, best fused
     rank first; the rest are reported unjudged.
   - Per source: at most 46 evaluations (6 Choice, 40 pair), each with at most the
-    transport's attempts, at most 12 in flight, under one 60-second deadline.
+    transport's attempts, at most 12 in flight, under one 15-second deadline.
   - Per sweep: at most 50 sources (default 10), judged one at a time under their own
     bounds and one 300-second run deadline.
   - Per reply: a source lists only `link` and `weak` verdicts; a sweep lists at most 80
@@ -138,7 +141,11 @@ package's transport and the hosted-search credential rather than duplicating the
   refused pair leaves that candidate unjudged; both are counted. When every pair is
   refused the source is `unavailable` with `content_rejected`, never "no links". Any
   other provider failure fails the source with its typed reason.
-- **Service.** One entry point judges one ADR. A sweep judges named ADRs, one feature's,
+- **Service.** One entry point judges one ADR. Optional proposed body prose substitutes
+  the source in memory, keeping its identity and declared links and marking its status
+  proposed. It cannot apply links or be combined with a sweep. The single-source
+  deadline starts before corpus and client setup. No accepted body is replaced.
+  One entry point also supports sweeps. A sweep judges named ADRs, one feature's,
   the isolated ones (declaring no ADR link), or all, in stem order after an optional
   cursor; its outcome names the last source judged so the next run resumes after it,
   and no sweep state is stored. A sweep skips superseded and rejected sources unless they
@@ -146,25 +153,31 @@ package's transport and the hosted-search credential rather than duplicating the
 
 Surfaces are renderers over one backend result with identical fields:
 
-- **CLI.** `vaultspec-core vault adr crossref [REF...] [--feature F] [--isolated] [--all] [--after STEM] [--max-sources N] [--apply] [--json]`; out-of-range counts are
+- **CLI.** `vaultspec-core vault adr crossref [REF...] [--feature F] [--isolated] [--all] [--after STEM] [--max-sources N] [--apply] [--body-file PATH] [--json]`; out-of-range counts are
   refused.
 - **MCP.** A hot `crossref` tool with a declared output schema, registered whether or not
   a key is present. Normal surface: judges one or several ADRs, may apply; not read-only,
   not destructive, idempotent (a repeated call against the same vault writes nothing
   new), open-world. Read-only surface: judges one ADR, never applies; read-only,
-  idempotent, open-world. The read-only server rejects any other argument rather than
-  silently ignoring it.
+  idempotent, open-world. Both surfaces allow optional `body` prose for one ADR.
+  The read-only server rejects arguments other than `ref` and `body`. Reply `coverage`
+  reports corpus, pool and judged counts, source clipping, and the count of selected
+  candidates with clipped input. Returned clipped candidates carry `input_truncated`;
+  `draft` distinguishes a proposed-body result. Reply-row `truncated` stays separate.
 - **Decline.** Without a key the outcome is `not_configured` and nothing is sent; a
   failure is `unavailable` with its reason. Both carry the next step hosted search
   resolves for ADRs.
 
 Framework prose adopts the step:
 
-- **`vaultspec-adr`.** Once an ADR's decision sections are drafted, running `crossref`
-  on it is optional but recommended: confirmed `link` verdicts are added to `related:`,
-  and pairs labelled `supersedes`, `refines` or `conflicts` are read in full before the
-  author settles amendment, supersession or a distinct decision. Labels flag, they never
-  decide.
+- **`vaultspec-adr`.** When hosted search is configured, the author runs one advisory
+  `crossref` pass on the populated draft before offering it. Amendments use `body` or
+  `--body-file` to preserve accepted text. Reuse results for the same draft and relevant
+  corpus; repeat only for materially changed commitments or evidence. The author reads
+  relevant pairs and proposes concrete reconciliation of affected older wording. Labels
+  flag, they never decide. No key means local discovery; service failure uses the named
+  fallback without gating authoring. Incomplete input or bounded recall cannot certify
+  absence of conflict. No network check is added to edit, commit, or deterministic check.
 - **`vaultspec-curate`.** ADR-versus-ADR reconciliation starts from bounded `crossref`
   sweeps instead of hand-driven pairwise search; the curator reads the returned `link`
   verdicts and `weak` declared links and judges them.
@@ -182,6 +195,14 @@ whose restricted allowlist gains `crossref` in its one-ADR, judge-only form.
 - **Selection.** A sweep needs a selector. Named ADRs stand alone, and so does all; a feature and the isolated ADRs narrow together. Other combinations, an empty feature, and a cursor that names no ADR are refused.
 - **Writes.** A link write that fails, including a lock timeout, is reported against its verdict and never discards the judgment; the CLI then exits 1.
 - **Spend.** The first failure that decides a source cancels every evaluation not yet sent, and a sweep does not start a source with less than 15 seconds of its budget left.
+
+**Amendment, 2026-09-25, authoring:** Authorized by the user's instruction to apply
+the skill audit findings across skills, personas, wording rules and backend, with all
+TypeSafe use conditional on the configured API key. Evidence:
+`2026-09-25-skill-audit-adr-authoring-audit`. This refines input projection, exposes
+coverage, adds nonpersisting amendment input, reduces the source deadline to 15 seconds,
+and makes the authoring pass conditional on opt-in. It does not add a tool, automatic
+acceptance, mandatory agent delegation, or a repeated review gate.
 
 ## Rationale
 
@@ -206,7 +227,7 @@ measured and ratcheted like every other hot tool's.
 - **Recall is partial by design.** At 534 ADRs the cut loses about a quarter of all links
   and 9% of strong ones. A sweep may find a missed link from its other end; that recovery
   is unmeasured. The parameters were tuned on two vaults and one model version, so a
-  model change is a deliberate re-evaluation.
+  serving model and projection affect results; measured recall is not a permanent guarantee.
 - **Surface cost.** A tenth hot tool adds standing schema context to every MCP session.
 - **Hollow records.** A template-only ADR yields no useful decision state; its verdicts
   stay weak until it is written.

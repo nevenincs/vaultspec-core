@@ -33,7 +33,7 @@ body heading. Record `supersedes` and `superseded_by` edges from
 
 ## Reconcile
 
-- Decision against decision: run one sweep,
+- Decision against decision: when hosted search is configured, run one sweep,
   `vaultspec-core vault adr crossref --all --json` (or `--feature <feature>`). When the
   orchestrator gave you a cursor, resume with the same selector plus
   `--after <next_after>`. One sweep is all a run takes: each ADR costs up to 46 paid
@@ -82,7 +82,9 @@ body heading. Record `supersedes` and `superseded_by` edges from
   (an ADR candidate; you never author it), and any contradiction that needs author
   judgment. These go into the audit as recommendations.
 - Never rewrite an ADR to match the code. Report decision-against-code drift as a
-  finding. The ADR-from-code retrofit runs only on an explicit user request.
+  finding. The ADR-from-code retrofit runs only on an explicit user request. Distinguish
+  expected rollout gaps and in-scope hypothesis changes from violations of binding
+  commitments. Preserve the context needed to understand each ruling.
 
 ## Verify
 

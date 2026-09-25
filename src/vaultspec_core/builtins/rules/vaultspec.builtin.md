@@ -20,12 +20,13 @@ placeholders, and filename patterns are catalogued in
 - **Reference** (`.vault/reference/`) grounds work in code: how this or another codebase
   implements the thing, as patterns with `file:line` locators, not copied code. Requires
   nothing.
-- **ADR** (`.vault/adr/`) records one decision and only the decision, citing research
-  and other evidence by stem, never restating it. Requires sufficient Research,
-  Reference, or Audit evidence. Its heading starts `proposed`; approval, unchanged
-  reuse, amendments, and supersession follow the vaultspec system section.
-  `vaultspec-core vault adr supersede OLD --by NEW` owns supersession after the
-  successor is accepted. Pending amendment text never replaces accepted content.
+- **ADR** (`.vault/adr/`) records one decision, with the context needed to understand
+  its scope and rationale. Cite detailed evidence by stem instead of duplicating it.
+  Requires sufficient Research, Reference, or Audit evidence. Its heading starts
+  `proposed`; approval, unchanged reuse, amendments, and supersession follow the
+  vaultspec system section. `vaultspec-core vault adr supersede OLD --by NEW` owns
+  supersession after the successor is accepted. Pending amendment text never replaces
+  accepted content.
 - **Plan** (`.vault/plan/`) sequences authorized work with decision coverage assessed
   under the vaultspec system section. When no costly decision is involved and no ADR
   governs, its Description records that assessment. Otherwise, `related:` lists every
