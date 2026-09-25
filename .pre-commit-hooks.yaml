@@ -1,20 +1,29 @@
-# Consolidated hooks (scaffolded by default)
+# vaultspec-commit-gate: the hook vaultspec-core scaffolds. One read-only
+# process checks the staged vault documents and blocks staged per-machine
+# files. It blocks only on errors the commit introduces.
+#
+# The workspace doctor is not a commit hook. It diagnoses the machine and
+# the workspace, not the commit, so it would block commits on state they
+# neither caused nor can fix. Run 'vaultspec-core spec doctor' explicitly
+# or in CI.
+
+- id: vaultspec-commit-gate
+  name: Vaultspec commit gate
+  entry: uv run --no-sync vaultspec-core commit-gate
+  language: system
+  always_run: true
+  pass_filenames: true
+
+# Whole-vault hooks, kept for projects that reference them by id. Each one
+# scans the entire vault on every commit; prefer vaultspec-commit-gate.
 #
 # vault-fix: runs all vault checkers as a pure gate, reporting naming,
 # frontmatter, link, dangling, reference, and body-link findings and
-# blocking the commit on them. It does NOT repair: unattended
-# corpus-mutating repair from inside a commit is retired by the
-# modified-stamp-provenance decision. Run 'vaultspec-core vault check all
-# --fix' deliberately and commit its effects visibly. The hook id keeps
-# its historical spelling so existing installs update in place.
-# Schema migrations are NOT performed by this hook - they are owned by the
-# vaultspec_core.migrations registry, which runs once per upgrade (or
-# lazily on the first vault command after an upgrade) and never
-# re-runs. Use 'vaultspec-core migrations status' / 'migrations run'
-# for explicit control.
-#
-# spec-check: runs the workspace doctor, diagnosing framework, provider,
-# and tooling health.
+# blocking the commit on them. It does NOT repair: run
+# 'vaultspec-core vault check all --fix' deliberately and commit its
+# effects visibly. Schema migrations are owned by the
+# vaultspec_core.migrations registry; use 'vaultspec-core migrations
+# status' / 'migrations run' for explicit control.
 
 - id: vault-fix
   name: Vault gate
@@ -28,13 +37,6 @@
   entry: uv run --no-sync vaultspec-core check-providers
   language: system
   always_run: true
-  pass_filenames: false
-
-- id: spec-check
-  name: Spec check
-  entry: uv run --no-sync vaultspec-core spec doctor
-  language: system
-  types: [markdown]
   pass_filenames: false
 
 # Granular hooks for consumer projects that need fine-grained control.

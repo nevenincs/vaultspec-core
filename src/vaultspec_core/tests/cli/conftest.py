@@ -33,6 +33,9 @@ if TYPE_CHECKING:
 # Disable Rich/Typer color output in tests.
 os.environ["NO_COLOR"] = "1"
 typer.rich_utils.COLOR_SYSTEM = None
+# A suite run from inside a commit hook inherits git's GIT_INDEX_FILE, which
+# suppresses next-step hints; the hint tests need them on.
+os.environ.pop("GIT_INDEX_FILE", None)
 
 
 def setup_rules_dir(root: Path) -> None:

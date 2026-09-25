@@ -1794,8 +1794,9 @@ the frontmatter name. Pick the one whose side you trust.
   doc types.
 - `exec-mapping` (`--fix`: no, `--feature`: yes) - Pair ledger rows with plan Steps: a
   per-Step record or a closed Step with no row in an existing ledger is an error; a
-  closed Step with no row in a plan without a ledger, a row for an open or unknown Step,
-  is a warning; a row for a retired Step is clean.
+  closed Step with no row in a plan without a ledger, or a row for an unknown Step, is a
+  warning; a row for a still-open Step is info (work in flight); a row for a retired
+  Step is clean.
 - `body-sections` (`--fix`: no, `--feature`: yes) - Check document bodies carry the
   sections their template mandates.
 - `feature-rename-integrity` (`--fix`: no, `--feature`: yes) - Surface exec folders
@@ -3456,6 +3457,9 @@ vaultspec-core also honours these external variables. It does not own them.
 - `CI` (presence) - Set by CI systems. Same effect as `VAULTSPEC_NON_INTERACTIVE`.
 - `NO_COLOR` (presence) - Set to any value, even blank, to disable colour in console
   output.
+- `GIT_INDEX_FILE` (presence) - Set by git for every commit hook it runs. While it is
+  set, commands print no `Next actions` block, because hook output is often acted on
+  without review.
 - `COLUMNS` (int) - Console width. When unset, the width is read from the terminal once
   at startup.
 - `VISUAL`, `EDITOR` (str) - Editor commands the edit verbs consult after

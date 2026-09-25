@@ -202,7 +202,8 @@ class TestLedgerRows:
 
         assert result.diagnostics == []
 
-    def test_row_for_open_step_is_warning(self, tmp_path: Path) -> None:
+    def test_row_for_open_step_is_info(self, tmp_path: Path) -> None:
+        """An open Step with rows is work in flight, not a defect (#535)."""
         _skeleton(tmp_path)
         _write_plan(tmp_path, ("S01", "S02"), checked=("S01",))
         _write_ledger(
@@ -212,9 +213,10 @@ class TestLedgerRows:
 
         result = _run(tmp_path)
 
-        warnings = _by_severity(result, Severity.WARNING)
-        assert len(warnings) == 1
-        assert "S02" in warnings[0].message and "still open" in warnings[0].message
+        infos = _by_severity(result, Severity.INFO)
+        assert len(infos) == 1
+        assert "S02" in infos[0].message and "still open" in infos[0].message
+        assert _by_severity(result, Severity.WARNING) == []
         assert _by_severity(result, Severity.ERROR) == []
 
     def test_row_for_retired_step_is_clean(self, tmp_path: Path) -> None:

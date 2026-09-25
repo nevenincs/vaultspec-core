@@ -871,11 +871,11 @@ management.
 Run diagnostic collectors across the framework, providers, builtins, `.gitignore`, vault
 content, and configuration files.
 
-| Option          | Short | Default | Description                                                                                                                                                      |
-| --------------- | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--target DIR`  | `-t`  | cwd     | Diagnose another directory.                                                                                                                                      |
-| `--json`        | -     | off     | Emit the diagnosis as JSON.                                                                                                                                      |
-| `--gate-errors` | -     | off     | Fold the warning exit (1) to 0 so only errors (exit 2) fail; used by the `spec-check` pre-commit hook so expected provider-mirror lag does not deadlock commits. |
+| Option          | Short | Default | Description                                                                                                                                               |
+| --------------- | ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--target DIR`  | `-t`  | cwd     | Diagnose another directory.                                                                                                                               |
+| `--json`        | -     | off     | Emit the diagnosis as JSON.                                                                                                                               |
+| `--gate-errors` | -     | off     | Fold the warning exit (1) to 0 so only errors (exit 2) fail; for CI and other automation gates, where expected provider-mirror lag must not fail the run. |
 
 ### vaultspec-core spec rules
 

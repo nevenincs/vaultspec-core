@@ -16,15 +16,17 @@ Findings, by severity:
   fold's ``T``), because execution under that plan is being logged and this
   Step was closed without evidence.
 - ``WARNING``: a closed Step with no row when the plan has no ledger yet, or
-  only a ledger folded from history (all ``T`` rows); a ledger row for a Step
-  that is still open; a row naming a Step the plan never had; a ledger whose
-  parent plan is missing or unparseable.
+  only a ledger folded from history (all ``T`` rows); a row naming a Step
+  the plan never had; a ledger whose parent plan is missing or unparseable.
 - ``INFO``: a closed Step with no row on a plan whose only evidence is
   records predating ``step_id:``. Visible, but out of the warning count,
   because nothing can clear it: those records name no Step and
   ``vault exec fold`` declines to attribute them rather than guess. The
   ambiguous state above stays a WARNING, so this cannot mask a Step that was
-  genuinely closed without logging.
+  genuinely closed without logging. Also ``INFO``: ledger rows for a Step
+  that is still open. That is work in flight, not a defect: the executor
+  logged what it touched and the Step's checks have not passed yet, so
+  nothing truthful clears it and it must not fail ``doctor`` (issue #535).
 - Clean: a row naming a retired Step. Ledger rows are history; the Step ran
   before it was retired and the row is the evidence.
 
@@ -415,8 +417,9 @@ def _row_diagnostic(
     """Classify one ledger Step against the parent plan's Step sets.
 
     Returns ``None`` when the Step is live and closed, or retired (its rows
-    are history); a WARNING when the Step is live but still open, or when
-    the plan never had it.
+    are history); an INFO when the Step is live but still open, which is
+    work in flight rather than a defect; a WARNING when the plan never had
+    it.
     """
     if step_id in retired_ids:
         return None
@@ -427,13 +430,16 @@ def _row_diagnostic(
             path=rel_path,
             message=(
                 f"Ledger has rows for Step {step_id}, which is still open in "
-                f"'{live_plan_path.stem}'."
+                f"'{live_plan_path.stem}' (work in flight)."
             ),
-            severity=Severity.WARNING,
+            # Status, not a defect: an open Step with logged rows is the normal
+            # mid-execution state, so it stays visible but out of the warning
+            # count that fails `doctor` (issue #535).
+            severity=Severity.INFO,
             fixable=False,
             fix_description=(
-                "Close the Step with `vaultspec-core vault plan step check` "
-                "once its checks pass, or reopen the work the rows describe."
+                "None needed while the work is in flight. Close the Step with "
+                "`vaultspec-core vault plan step check` once its checks pass."
             ),
         )
     return CheckDiagnostic(

@@ -518,6 +518,22 @@ def test_pre_commit_carries_no_retired_vault_hooks() -> None:
     assert ids >= CANONICAL_HOOK_IDS
 
 
+def test_published_hooks_offer_the_gate_and_not_the_doctor() -> None:
+    """The hook manifest consumers reference by id never runs the doctor.
+
+    The doctor diagnoses the machine and the workspace, so as a commit hook it
+    blocks commits on state they did not cause, such as a vaultspec-core
+    older than the committed floor, and it reads the whole vault to do so.
+    """
+    from vaultspec_core.core.precommit import CANONICAL_HOOK_IDS
+
+    hooks = cast("list[_PreCommitHook]", _load_yaml(".pre-commit-hooks.yaml"))
+    ids = {hook["id"] for hook in hooks}
+    assert ids >= CANONICAL_HOOK_IDS
+    assert "spec-check" not in ids
+    assert not [hook["id"] for hook in hooks if "spec doctor" in hook["entry"]]
+
+
 def _toolchain_targets(verb_name: str) -> set[str]:
     """Return the target names the dev toolchain declares for one verb."""
     from dev import toolchain

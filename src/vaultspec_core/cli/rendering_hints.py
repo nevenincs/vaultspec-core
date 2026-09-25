@@ -44,9 +44,12 @@ _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
         'git commit -m "Commit changes after successful vault checks"',
         "Your vault is clean. Proceed to commit your changes",
     ),
+    # A preview, not the repair itself: a hint is often followed without
+    # review, and the repair pipeline rewrites documents beyond the ones a
+    # finding names.
     ("vault.check.all", "failed"): (
-        "vaultspec-core vault repair",
-        "Run safe auto-corrections to resolve vault errors",
+        "vaultspec-core vault repair --dry-run",
+        "Preview the safe auto-corrections before applying any",
     ),
     ("install", "created"): (
         "vaultspec-core status",
@@ -80,12 +83,20 @@ def hints_suppressed(no_hints: bool = False) -> bool:
     Hints are advisory and must be silenceable for scripted contexts, per
     the cli-next-step-hints ADR. They are off when the caller passes
     ``--no-hints`` or the ``VAULTSPEC_NO_HINTS=1`` environment variable is
-    set. This is the one predicate every hint surface consults so the
-    suppression contract cannot drift per command.
+    set. They are also off inside a git commit hook, detected by the
+    ``GIT_INDEX_FILE`` git exports to every commit hook: hook output is often
+    acted on without review, so a hook that runs a command must not propose a
+    follow-up that rewrites documents the commit never touched. This is the
+    one predicate every hint surface consults so the suppression contract
+    cannot drift per command.
     """
-    from ..config import VAULTSPEC_NO_HINTS, env_value
+    from ..config import GIT_INDEX_FILE, VAULTSPEC_NO_HINTS, env_value
 
-    return no_hints or env_value(VAULTSPEC_NO_HINTS) == "1"
+    return (
+        no_hints
+        or env_value(VAULTSPEC_NO_HINTS) == "1"
+        or env_value(GIT_INDEX_FILE) is not None
+    )
 
 
 def render_next_actions(pairs: Sequence[tuple[str, str]]) -> None:
