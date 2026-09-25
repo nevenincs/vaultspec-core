@@ -5,10 +5,11 @@ tags:
 date: '2026-09-25'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:242780497662ad63a45bba1fe1cd228ee40bbe2eed3c7e69ab6877ee1e232bab'
+body_hash: 'sha256:3a7e9542b1825e6110c9049f9a3698c13d064e64dbfa09435381f34e95c8469f'
 related:
   - "[[2026-09-08-framework-reword-adr]]"
   - "[[2026-05-05-plan-hardening-adr]]"
+  - '[[2026-09-25-project-context-adr]]'
 ---
 
 # `skill-audit` audit: `Project coordination routing and context audit`
@@ -139,3 +140,78 @@ is not a runtime token measurement. Existing agent-rendering and builtin-seeding
 passed 111 cases. All 18 lightweight repository guards, Markdown checks and generated
 reference checks passed. No new tests assert prose substrings, and no agent routing
 accuracy or hosted project-triage performance claim is made.
+
+## Backend implementation and smoke, 2026-09-25
+
+The user authorized the proposed backend with "It's good. Make the changes". The
+public interface and data-flow decision is `2026-09-25-project-context-adr`.
+Implementation is direct, within one cohesive session, without invoking vaultspec
+skills. The earlier hypothetical capability finding is resolved by the implemented
+command; the evidence below does not claim a measured improvement in agent behavior.
+
+### context-surface | resolved | One bounded read supplies local and optional remote observations
+
+`src/vaultspec_core/project/collect.py` reads up to 30 recent branches, inspects eight
+worktrees, and optionally reads 20 open issues and 20 open PRs from an explicit GitHub
+repository. A shared ten-second deadline bounds subprocess collection. Source failures,
+truncation, omitted dependencies and untracked files remain explicit. Stable worktree
+identities preserve separate checkouts sharing a branch and flag that overlap. Local
+unmerged files, failed CI, conflicting PRs and requested changes remain deterministic
+attention signals. Branch names never join fork PRs to local worktrees.
+
+`src/vaultspec_core/project/context.py` owns the reply and optional credential use;
+`src/vaultspec_core/cli/project_cmd.py` exposes it through the CLI and existing gateway.
+No hot MCP tool, always-on inventory, repository mutation, or tracker mutation is added.
+Skill and persona guidance reuse supplied observations and fetch missing context only.
+The five-item default reply proposes attention, not an executable dependency schedule.
+
+### hosted-reuse | resolved | Objective judgments are bounded and optional
+
+`src/vaultspec_core/project/ranking.py` shortlists twelve items, then optionally asks one
+batch of independent objective-fit Scores within five seconds. The canonical selector,
+credential resolver and existing transport remain the only hosted path. No key or an
+explicit disable makes no call. Provider failure falls back to a consistent lexical
+ranking rather than mixing cached model scores with unscored candidates. Model scores
+cannot override observed blocker or shared-branch attention bands.
+
+A supplied prior result reuses judgments only for the same objective, item facts,
+question semantics and canonical selector, for up to one hour. Every invocation gathers
+fresh observations. There is no persistent cache and old facts never replace fresh
+ones. Typed probabilities, score ranges, bounded input files and invalidation paths are
+covered by tests. The serving model identity comes from the API response.
+
+### measured-smoke | information | Wiring and reuse work; productivity remains unmeasured
+
+One live sequence used this repository's two local worktrees, four open issues and one
+open PR, scoped to `nevenincs/vaultspec-core`. Each invocation made seven source commands
+and read 4,699 stdout bytes. The objective was to prepare a release across active
+features. Five items were returned from seven observed items.
+
+| Mode                          | Backend elapsed | Reply bytes | Hosted calls | Input tokens | Reused judgments |
+| ----------------------------- | --------------- | ----------- | ------------ | ------------ | ---------------- |
+| Deterministic                 | 1,879.56 ms     | 4,192       | 0            | 0            | 0                |
+| Hosted                        | 2,285.49 ms     | 5,234       | 1            | 3,020        | 0                |
+| Fresh observations plus reuse | 1,625.44 ms     | 5,223       | 0            | 0            | 7                |
+
+The hosted evaluation took 610.36 ms and reported 282 output tokens. A prior local-only
+smoke took 186.87 ms and five Git commands. These are single observations, not latency
+percentiles. Reply bytes are UTF-8 JSON bytes, not measured agent tokens; source bytes
+exclude subprocess stderr and HTTP framing. The hosted reply is larger than the raw
+source stdout in this small example because it carries provenance, unknowns and reusable
+judgments. No token-saving percentage, ranking accuracy, dependency recall, agent tool-use
+reduction or developer productivity improvement is established. The concrete reuse gain
+is seven retained judgments with no second API call after fresh collection.
+
+## Backend validation
+
+Twenty-three focused project tests pass, using real Git repositories/worktrees and the
+real HTTP transport against a local scripted provider. They cover duplicate identities,
+shared branches, local merge conflicts, source windows, no-key and explicit-disable
+behavior, invalid credentials, hosted failures, changed evidence, stale/invalid cached
+scores, and preservation of blocker priority. Thirty-seven gateway, catalog and MCP
+context-budget tests pass, including invoking the command through MCP without adding a
+hot tool. All 18 lightweight repository guards pass after correcting environment-helper
+use and fully qualifying runnable CLI examples. Source lint, full type checks, Markdown
+checks and generated-reference checks pass. Live smoke confirms installed GitHub CLI
+field compatibility and the TypeSafe API path. No vaultspec skill or delegated persona
+was invoked, and no remote repository or tracker state was changed.

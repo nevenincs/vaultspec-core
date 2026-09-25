@@ -389,6 +389,11 @@ hand-edit between the markers.
 - `vaultspec-core config list` - Enumerate all known configuration entries and current
   values.
 
+### Project
+
+- `vaultspec-core project context` - Read local work and optional GitHub state; propose
+  a bounded attention order.
+
 <!-- vaultspec:generated:end command-inventory -->
 
 ## Workspace commands
@@ -452,6 +457,33 @@ vocabulary: `created`, `updated`, `unchanged`, `removed`, `restored`, `skipped`,
 reason worth reading; only `failed` stops the pipeline. With `--json`, the payload
 declares schema `vaultspec.sync.v1` and the top-level `status` is the run's aggregate
 outcome (`mixed` when items disagree).
+
+## Project context
+
+`vaultspec-core project context OBJECTIVE [--repo OWNER/REPO] [--previous FILE]`
+`[--limit 1..10] [--no-hosted] [--target DIR] [--json]`
+
+Read-only context for coordination across active workstreams. Works in a Git repository
+without a vaultspec installation. Reads at most 30 recent local branches and inspects 8
+worktrees, with a shared 10-second collection budget. `--repo` explicitly reads up to 20
+open issues and 20 open PRs on github.com through `gh`. Every source reports its window
+or failure. Boards, milestones, dependency edges, vault plans and untracked files remain
+uncollected. No repository or tracker state is changed.
+
+Returns five attention items by default: blocker and shared-branch signals, then tracked
+changes, then other work; objective fit and latest activity break ties. This is not an
+execution schedule. A configured core TypeSafe key opts into one objective-fit request
+over at most 12 summaries with a 5-second budget. `--no-hosted`, no key, or service
+failure uses deterministic ordering. Model selection and credential precedence are
+shared with vault search. `--previous` accepts a JSON result up to 64,000 bytes and
+reuses unchanged judgments for one hour after fresh collection; it supplies no current
+observations.
+
+JSON schema `vaultspec.project.context.v1` carries observations, source coverage,
+unknowns, ranking provenance, reusable judgments, command and token usage, and timing.
+Source and hosted failures are reported in the result with exit 0; invalid input exits
+2\. The existing MCP `discover`/`invoke` gateway exposes this verb without adding a hot
+tool.
 
 ## Vault commands
 

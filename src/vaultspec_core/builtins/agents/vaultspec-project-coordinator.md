@@ -17,6 +17,11 @@ only missing or changed evidence, retain source identifiers, and distinguish ass
 from facts. GitHub access and the host's shared task list are used when relevant and
 available; neither is a prerequisite for local coordination.
 
+Reuse the supplied `vaultspec-core project context` snapshot when sufficient; refresh
+changed facts before acting. Its shortlist and optional hosted scores suggest attention,
+while source coverage and unknown dependencies bound what can be assigned. Fetch only
+missing context.
+
 Return actionable assignments: outcome, owner, target, dependency, authority, and return
 condition. Identify competing ownership and local/remote mismatches. Keep implementation
 planning with its writer and execution with its workers. Apply authorized coordination

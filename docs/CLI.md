@@ -121,6 +121,10 @@ The latest published release is `0.2.5`. What follows is on this branch and not 
 release, so it cannot be installed yet. This list is generated from the recorded surface
 of that release; it is never hand-maintained.
 
+Commands:
+
+- `vaultspec-core project context`
+
 Flags on commands the release already has:
 
 - `vaultspec-core vault adr crossref` - `--body-file`
@@ -451,6 +455,11 @@ full options.
 - `vaultspec-core config unset` - Clear a local configuration entry.
 - `vaultspec-core config list` - Enumerate all known configuration entries and current
   values.
+
+### Project
+
+- `vaultspec-core project context` - Read local work and optional GitHub state; propose
+  a bounded attention order.
 
 <!-- vaultspec:generated:end command-inventory -->
 

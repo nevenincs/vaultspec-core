@@ -274,6 +274,40 @@ Priorities do not confer implementation or remote-action authority. Hosted vault
 and ADR cross-referencing can supply governing context when configured; project
 coordination does not depend on them.
 
+For a bounded starting snapshot, run:
+
+```bash
+vaultspec-core project context "Prepare the release across active features" --json
+vaultspec-core project context "Prepare the release" --repo OWNER/REPO --json
+```
+
+The command reads local branches and worktrees, tracked-change status and latest commit
+subjects. `--repo` explicitly adds open GitHub issues and PRs, including assignees,
+labels, review and CI signals, through an authenticated `gh` installation. Collection
+has a shared ten-second budget and reports source failures and truncated windows.
+Boards, milestones, dependency edges, vault plans and untracked files are not collected.
+Local branches are not joined to PRs by name, since forks can reuse branch names.
+
+The default reply contains five attention items (`--limit` accepts 1–10). Observed
+blocker and shared-branch signals come first, then tracked changes, with objective fit
+and recent activity breaking ties. This order guides investigation; it does not
+establish execution dependencies, merge readiness, ownership availability or permission
+to act.
+
+With `VAULTSPEC_CORE_TYPESAFE_API_KEY` configured, the backend sends at most twelve
+shortlisted summaries in one TypeSafe request with a five-second budget. It sends no
+file contents or issue bodies. Without a key, or on service failure, ordering uses local
+signals and lexical objective overlap. `--no-hosted` disables hosted ranking. The normal
+credential precedence applies, including a workspace `.env` only when core runs from
+that workspace's own declared development or dependency environment.
+
+Save `--json` output when continuity is useful and supply it as
+`--previous result.json`. The backend refreshes observations and reuses matching
+judgments for up to one hour; it never restores old facts as current state. Replies
+report source coverage, command counts, hosted usage, reuse and timings. The command
+writes no repository or tracker state and is discoverable through the existing MCP
+gateway as `vaultspec-core project context`.
+
 ## Customize the policy
 
 Add a project rule with its instructions:

@@ -53,6 +53,7 @@ def _register_subcommands() -> None:
     """Mount sub-apps with deferred imports to avoid circular dependencies."""
     from .config_cmd import config_app
     from .migrations_cmd import migrations_app
+    from .project_cmd import project_app
     from .spec_cmd import spec_app
     from .status_cmd import register as register_status
     from .vault_cmd import vault_app
@@ -65,6 +66,7 @@ def _register_subcommands() -> None:
     app.add_typer(spec_app, name="spec")
     app.add_typer(migrations_app, name="migrations")
     app.add_typer(config_app, name="config")
+    app.add_typer(project_app, name="project")
 
 
 _register_subcommands()

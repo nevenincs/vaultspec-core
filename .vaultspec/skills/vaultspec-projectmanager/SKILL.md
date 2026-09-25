@@ -18,11 +18,13 @@ missing access leaves those facts unknown without blocking a local workday plan.
 1. **Set the outcome.** Establish the horizon, workstreams, developer availability,
    priorities, and existing authority. Reuse supplied context; ask only for a missing
    constraint that would materially change the sequence.
-1. **Collect relevant state.** Read local worktrees, branch heads, working changes, and
-   recent activity. Add issue, PR, CI, board, milestone and vault-plan fields needed for
-   the question. Follow pagination when claiming complete coverage; otherwise state the
-   window. Keep stable identifiers, source locations, and observation times. Distinguish
-   facts from inferred dependencies and unknown remote state.
+1. **Collect relevant state.** Reuse supplied observations. When acquisition is needed,
+   run `vaultspec-core project context "<objective>" --json`; add `--repo OWNER/REPO`
+   for GitHub issues and PRs. It returns bounded Git state, attention signals, coverage,
+   and unknowns. Fetch board, milestone, dependency and vault-plan context only as
+   needed. Follow pagination when claiming complete coverage; otherwise state the
+   window. Retain identifiers and observation times; distinguish facts from inferred
+   relationships.
 1. **Choose a sequence.** Connect features, issues, PRs, plans, and worktrees where
    evidence supports the relationship. Identify blockers, competing ownership, stale
    assignments, and local/remote discrepancies. Order ready work by the user's
@@ -60,11 +62,14 @@ side effect of coordination.
 
 ## Optional hosted evidence
 
-TypeSafe requires the configured `VAULTSPEC_CORE_TYPESAFE_API_KEY` and a tool supporting
-the input. Core's `search` and `crossref` evaluate vault records, not arbitrary issue/PR
-payloads. Use them for relevant governing context, reuse unchanged results, and follow
-their fallback on failure. Coordination works without hosted judgments; do not invent a
-project-ranking tool or request credentials as a prerequisite.
+`vaultspec-core project context` works without credentials. With
+`VAULTSPEC_CORE_TYPESAFE_API_KEY`, it adds bounded TypeSafe objective-fit judgments;
+`--no-hosted` disables them. A supplied `--previous result.json` reuses unchanged
+judgments for up to one hour after refreshing observations. Hosted failure preserves
+deterministic ordering. This is an order for attention, not dependency scheduling or
+execution authority. Check source coverage and uncollected state before making
+assignments. Use `search` and `crossref` for governing vault context when needed; do not
+request credentials as a prerequisite.
 
 ## Return
 

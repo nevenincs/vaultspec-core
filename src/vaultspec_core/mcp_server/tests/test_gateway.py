@@ -92,6 +92,25 @@ async def test_invoke_readonly_verb_returns_parsed_json(vault_root: Path) -> Non
         assert payload["command"][0] == "vaultspec-core"
 
 
+async def test_project_context_is_discoverable_and_invokable(vault_root: Path) -> None:
+    """The cold coordination surface needs no additional registered tool."""
+    mcp = _gateway_server()
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "invoke",
+            {
+                "verb": "project context",
+                "positionals": ["prepare the release"],
+                "arguments": {"no-hosted": True, "limit": 2},
+            },
+        )
+        payload = data_of(result)
+    assert payload["ok"] is True
+    assert payload["data"]["schema"] == "vaultspec.project.context.v1"
+    assert payload["data"]["data"]["hosted"]["status"] == "disabled"
+    assert payload["data"]["data"]["returned"] <= 2
+
+
 async def test_invoke_unknown_verb_rejected_before_spawn(vault_root: Path) -> None:
     """An undeclared verb raises a protocol error and never spawns a process."""
     mcp = _gateway_server()
