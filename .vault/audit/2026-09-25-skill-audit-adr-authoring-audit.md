@@ -5,7 +5,7 @@ tags:
 date: '2026-09-25'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:847578c008d862e95d3ddb37d25bfe08722b2d04883b17810d93557756fb99fc'
+body_hash: 'sha256:d5bd144a072452eece512a3d1f670bb911ad0769d1d07e640dc70eadee52ac94'
 related:
   - "[[2026-09-08-framework-reword-adr]]"
   - "[[2026-09-23-adr-crossref-adr]]"
@@ -31,7 +31,8 @@ ADR, with a 10-15 second budget, remains a question for subsequent discussion.
 
 Evidence includes source inspection, a CLI inventory of all 134 ADRs, deterministic
 fixtures using production parsers and checks, six completed agent calls covering 36
-scenario responses, one separately retained timeout, and 65 passing existing tests. Raw
+scenario responses, one separately retained timeout, five completed live TypeSafe probes,
+and 65 passing existing tests. Raw
 prompts, answers, scripts, and JSON results are retained outside the repository at
 `C:/Users/hello/AppData/Local/Temp/vaultspec-adr-audit-w4icj2r2`. The findings and
 numerical results below are the durable record; those scratch files are supplementary.
@@ -166,10 +167,64 @@ The current single-source service has a 60-second deadline; the 15-second consta
 sweep-start threshold, not an offering-check budget:
 `src/vaultspec_core/crossref/_questions.py:133`. Existing research on section defects
 and lineage is recorded in `2026-09-23-adr-crossref-research`; it should be reused
-before designing another evaluator. The new read-only CLI probe returned
+before designing another evaluator. The initial read-only CLI probe returned
 `not_configured` in 1.226 seconds and changed no source. It judged zero pairs and
 provides no live TypeSafe latency or accuracy result. The host-agent timings below must
-not be used as TypeSafe timings. No credential was requested or exposed.
+not be used as TypeSafe timings. The credential-enabled follow-up below resolves this
+initial configuration limitation.
+
+### live-typesafe | low | Measured latency fits the proposed budget; coverage remains bounded
+
+On 2026-09-25, the user authorized credential recovery from the RAG or classification
+worktrees and configuration of core's main worktree. The RAG environment files had no
+populated TypeSafe variable. The classification main environment supplied
+`TYPESAFE_API_TOKEN`; core's main environment now has
+`VAULTSPEC_CORE_TYPESAFE_API_KEY`. The destination is Git-ignored and untracked. No
+credential value was printed, committed, or included in probe artifacts. The probe
+loaded that credential into its process environment and CLI child.
+
+All three cross-reference runs returned `ok`, with zero unscored evaluations and zero
+writes. Times are wall-clock observations, not provider-only timing. The CLI row includes
+process startup. Backend rows include corpus loading, index construction, client setup,
+and evaluation, with a deadline set 15 seconds from before that setup.
+
+| Live probe                         | Seconds | Evaluations | Billed input tokens | Suggested links |
+| ---------------------------------- | ------: | ----------: | ------------------: | --------------: |
+| CLI, cross-reference ADR           |   2.551 |          37 |             132,425 |               5 |
+| Backend, cross-reference ADR, 15 s |   1.821 |          37 |             131,235 |               5 |
+| Backend, hosted-search ADR, 15 s   |   1.665 |          37 |             131,060 |               8 |
+
+The sources were `2026-09-23-adr-crossref-adr` and
+`2026-09-23-typesafe-search-adr`. Both bounded backend runs used `jev-1.13.0`, loaded
+134 ADRs, formed a 133-candidate pool, and judged 32 pairs; neither left a declared link
+unjudged. The CLI surfaced the known read-only and tool-schema refinements. Evaluation
+counts are logical requests, not independently measured HTTP attempts or agent tool
+calls. No dollar cost was inferred. Successful bounded retrieval is not exhaustive
+corpus reconciliation or evidence that every suggestion is correct.
+
+A separate Noul question asked whether two simultaneously governing requirements
+contradict each other, treating an explicit scoped exception as compatible. The draft
+allowed configured hosted search to send vault text to TypeSafe while prohibiting other
+remote operations. An existing absolute local-only requirement scored **0.94** for
+conflict in **0.607 seconds** (405 input tokens). Replacing it with an explicit exception
+for that hosted search scored **0.27** in **0.573 seconds** (413 input tokens). Each
+returned 26 output tokens. These are two synthetic observations from a focused question,
+not the production relationship classifier, calibrated error rates, or proof that 0.27
+is an acceptable threshold.
+
+The scratch harness initially failed while serializing an immutable answer mapping
+after one successful remote response. It was corrected, the missing wording probe was
+rerun, and the three completed cross-reference runs were retained without rerunning.
+Usage for that unrecorded response is unavailable. Read-only mode and Git checks confirm
+that no ADR was changed; hashes also matched across the resumed wording probes.
+
+The observed latency makes a 10-15 second offering check plausible for this corpus.
+There is one sample per condition, no tail-latency or outage measurement, and no
+production offering hook in this test. Projection omissions identified above remain a
+more immediate correctness concern than latency. A future check should reuse the
+backend, expose incomplete coverage, and return actionable reconciliation candidates;
+these measurements do not justify a mandatory approval gate or repeated unchanged
+reviews.
 
 ### spike-results | low | Results are directional and reproducible within stated limits
 
