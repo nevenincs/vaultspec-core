@@ -1794,8 +1794,9 @@ the frontmatter name. Pick the one whose side you trust.
   doc types.
 - `exec-mapping` (`--fix`: no, `--feature`: yes) - Pair ledger rows with plan Steps: a
   per-Step record or a closed Step with no row in an existing ledger is an error; a
-  closed Step with no row in a plan without a ledger, a row for an open or unknown Step,
-  is a warning; a row for a retired Step is clean.
+  closed Step with no row in a plan without a ledger, or a row for an unknown Step, is a
+  warning; a row for a still-open Step is info (work in flight); a row for a retired Step
+  is clean.
 - `body-sections` (`--fix`: no, `--feature`: yes) - Check document bodies carry the
   sections their template mandates.
 - `feature-rename-integrity` (`--fix`: no, `--feature`: yes) - Surface exec folders
