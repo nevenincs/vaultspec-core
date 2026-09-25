@@ -6,7 +6,7 @@ tags:
 date: '2026-07-31'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:8084636f65653533e621c36c55e000ec1f766f317e0521ba7021a6f22813327a'
+body_hash: 'sha256:58cb0f2d0f3d830f468e17b23a2de33a47580461198b350a068821b7bcad2151'
 related:
   - '[[2026-02-22-skill-audit-adr]]'
   - '[[2026-02-22-skill-audit-execution-summary]]'
@@ -16,6 +16,7 @@ related:
   - '[[2026-09-25-skill-audit-code-review-audit]]'
   - '[[2026-09-25-skill-audit-curate-audit]]'
   - '[[2026-09-25-skill-audit-projectmanager-audit]]'
+  - '[[2026-09-25-skill-audit-review-context-research]]'
 ---
 
 # `skill-audit` feature index
@@ -46,3 +47,4 @@ Auto-generated index of all documents tagged with `#skill-audit`.
 ### research
 
 - `2026-02-22-skill-audit-research` - Skill Audit and Compliance Research
+- `2026-09-25-skill-audit-review-context-research` - `skill-audit` research: `TypeSafe review context ranking spike`
