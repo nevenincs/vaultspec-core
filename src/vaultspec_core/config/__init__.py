@@ -16,6 +16,7 @@ from .config import CODEX_HOME as CODEX_HOME
 from .config import COLUMNS as COLUMNS
 from .config import CONFIG_REGISTRY as CONFIG_REGISTRY
 from .config import EDITOR as EDITOR
+from .config import GIT_INDEX_FILE as GIT_INDEX_FILE
 from .config import NO_COLOR as NO_COLOR
 from .config import (
     VAULTSPEC_CORE_TYPESAFE_API_KEY as VAULTSPEC_CORE_TYPESAFE_API_KEY,

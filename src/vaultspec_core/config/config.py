@@ -40,6 +40,7 @@ __all__ = [
     "COLUMNS",
     "CONFIG_REGISTRY",
     "EDITOR",
+    "GIT_INDEX_FILE",
     "NO_COLOR",
     "VAULTSPEC_CORE_TYPESAFE_API_KEY",
     "VAULTSPEC_EDITOR",
@@ -621,6 +622,19 @@ NO_COLOR: Final = ConfigVariable(
     scope=VariableScope.EXTERNAL,
 )
 
+GIT_INDEX_FILE: Final = ConfigVariable(
+    env_name="GIT_INDEX_FILE",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description=(
+        "Set by git for every commit hook it runs. Next-step hints are "
+        "suppressed while it is set, because hook output is often acted on "
+        "without review."
+    ),
+    scope=VariableScope.EXTERNAL,
+)
+
 COLUMNS: Final = ConfigVariable(
     env_name="COLUMNS",
     attr_name=None,
@@ -766,6 +780,7 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
     VAULTSPEC_LOG_LEVEL,
     VAULTSPEC_JSON_PRETTY,
     VAULTSPEC_NO_HINTS,
+    GIT_INDEX_FILE,
     NO_COLOR,
     COLUMNS,
     # -- Unattended runs -------------------------------------------------------
