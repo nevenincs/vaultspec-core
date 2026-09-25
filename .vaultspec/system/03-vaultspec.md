@@ -116,8 +116,12 @@ uncovered choices to the orchestrator, who checks existing authority before aski
 
 ## Execute and recover
 
-On first entry read the plan whole. On resume, read `status`, the next open Step, and
-the decision sections it depends on. Ground the affected code, implement, verify, log,
+On first entry read the plan whole. On resume, read `status`, the next open Step, its
+governing decision sections, relevant plan-wide verification, and unresolved state.
+Reassess decision coverage when reopening historical work. Reconcile the last checkpoint
+with the ledger and Git: logging, closing, and committing are separate operations. If
+interrupted, complete the unfinished checkpoint before advancing; a checked Step alone
+does not prove its commit exists. Ground the affected code, implement, verify, log,
 close the Step through the owning verb, and commit. A run may close many Steps.
 Execution spans sessions; preserve the plan stem, feature tag, Step id, and unresolved
 state at handoff. Other skills finish a bounded artifact or report the missing input.

@@ -1,65 +1,66 @@
 ---
 name: vaultspec-execute
-description: Execute an approved plan Step by Step, across sessions. Use to start or resume a plan; it is the only skill that spans sessions.
+description: Implement or resume an approved plan with project conventions, proportionate verification, and durable Step checkpoints.
 ---
 
 # Execute (vaultspec-execute)
 
-Works an approved plan from its next open Step, leaving a checkpoint after every Step so
-any later session resumes without re-reading the cluster. Precondition: the plan has
-scoped authorization from the user, recorded per the vaultspec system section.
+Implement an approved plan within the system's scope and decision constraints. This
+skill owns execution practice; the system owns authorization, recovery, and review
+cadence, and executor personas own worker coordination and reporting.
 
 ## Resume
 
-- `vaultspec-core status <feature>` (or the `status` tool) names the next open Step. A
-  plan whose Description lacks an `Approved` line needs its authorization established:
-  persist existing authorization or present it and ask when none exists.
-- On the plan's first entry read it whole; on resume, read the next Step's row and the
-  ADR sections it depends on, if any. Confirm the decisions needed by the next Step are
-  accepted; reassess coverage when reopening historical work.
-- Ground the Step per the `vaultspec-discovery` rule before editing.
-- A dispatched worker skips orientation (the orchestrator did it) and works its assigned
-  container from the named Step onward.
+- Use `vaultspec-core status <feature>` (or `status`) and the system's Execute and
+  recover contract. Keep working context to the current assignment, governing
+  constraints, relevant verification criteria, and unresolved state.
+- A dispatched worker starts at its assigned Step and reuses the orchestrator's
+  grounding; inspect affected code as needed.
 
 ## Per Step
 
-- Implement exactly the Step's action in the files it names. Run the project's tests,
-  lint, and type checks.
-- Apply the system's blocker and approval contract. Expected new files, routine path
-  corrections, and implementation choices within approved constraints can proceed;
-  record row corrections through `plan_edit`. Raise missing prerequisites or uncovered
-  choices to the user only when existing authority cannot resolve them. Workers report
-  these to the orchestrator. Record the answer and continue.
+- Ground the Step per `vaultspec-discovery`. Before adding code, make a bounded search
+  for existing implementations, callers, and nearby tests. Reuse suitable code; stop
+  discovery when the implementation location and relevant patterns are clear.
+- Deliver the Step's intended behavior within its approved scope and file areas. Follow
+  local APIs, type hints, dependencies, naming, formatting, and error handling. Apply
+  the system's blocker contract to uncovered choices; record routine row corrections
+  through `plan_edit`. Workers route plan corrections to the orchestrator.
+- Run the project's configured formatting, lint, type checks, and relevant tests. Add or
+  update tests when needed to establish changed behavior. Reuse passing evidence while
+  affected code, dependencies, and check conditions remain unchanged; share it between
+  workers and supervisor. Broaden checks for changed interactions, failures, or explicit
+  project requirements.
+- Fix in-scope failures and rerun affected checks. If progress remains blocked or needs
+  missing authority or input, leave the Step open and report the failure and what is
+  needed to continue.
+
+## Checkpoint
+
 - Log the Step:
   `vaultspec-core vault exec log --feature {feature} --step S## --related <plan-stem> --row M:path`
-  (or the `log` tool), one `--row` per path touched, `--verify '<cmd>=pass'` when a
-  check ran, `--note` only on exception. The plan row states the intent and the commit
-  carries the diff.
-- Close the Step: `plan_progress` tool or `vaultspec-core vault plan step check`. Never
-  edit the checkbox by hand.
+  (or `log`), one `--row` per path touched, `--verify '<cmd>=pass'` or
+  `--verify '<cmd>=fail'` for checks actually run, `--note` only on exception.
+- Once the Step's required verification passes, close it with `plan_progress` or
+  `vaultspec-core vault plan step check`. Never edit the checkbox by hand.
 - Commit once per Step, code, ledger, and plan together, adding the `Vaultspec-Step`
   trailer (`vaultspec-core vault plan trailer emit --step S##`) when the repository
   already uses it. Code never cites the vault.
 
 ## Delegation
 
-Do the Steps yourself unless the plan's Parallelization section names assignments that
-may run concurrently; then dispatch executor personas (`vaultspec-low-executor`,
-`vaultspec-standard-executor`, or `vaultspec-high-executor` by the Step's difficulty) at
-approved Steps, each told the plan stem, the feature tag, its Steps or container, and
-its starting Step id, and to follow this skill as a worker; they return in their
-persona's Return message format. Workers never change plan structure; that routes back
-to you.
+Delegate when it helps and the plan's Parallelization section defines compatible
+assignments. Choose `vaultspec-low-executor`, `vaultspec-standard-executor`, or
+`vaultspec-high-executor` by difficulty. Supply the plan stem, feature tag, assigned
+Steps or container, starting Step id, write ownership, and relevant existing evidence.
+Workers follow this skill and their persona's Return message contract. Coordinate shared
+metadata and commits; permission to parallelize does not require delegation.
 
 ## Review and finish
 
-- At each point of the review cadence in the vaultspec section, run
-  `vaultspec-code-review`; a worker under `vaultspec-team` reports the close to its
-  supervisor instead, who reviews. `critical` or `high` findings reopen the affected
-  Steps (`vaultspec-core vault plan step uncheck`) and are fixed before continuing;
-  lower findings are recorded. In-scope corrections use approved Steps; new scope or
-  costly decisions require authorization. Review integrated behavior, not individual
-  documents. L1 has no Phase close; combine coincident plan-close and handoff reviews.
+- Use `vaultspec-code-review` at the system's review cadence, including its rules for
+  coincident gates, unchanged work, and corrective findings. Workers report closes to
+  their supervisor, who owns review.
 - At `L4`, report Wave and Epic completion against the external artifact named in the
   plan's `## Epic intent`.
 - When every Step is closed and the last review passes, report the plan complete with

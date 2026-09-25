@@ -380,8 +380,10 @@ def append_rows(body: str, rows: Sequence[str]) -> str:
     end of the document, so a trailing ``## Notes`` section stays intact and
     its prose is never parsed as coverage.
 
-    A row already present verbatim in the section is not appended again, so
-    re-running a Step is idempotent rather than duplicating its log.
+    Change rows are deduplicated against the section. Verification and
+    attribution batches are deduplicated only against the latest sequence
+    for that Step and label, so retries are idempotent without discarding
+    a return to an earlier result or worker.
 
     Args:
         body: The document body, frontmatter already stripped.
@@ -398,7 +400,38 @@ def append_rows(body: str, rows: Sequence[str]) -> str:
     if section is None:
         message = "document has no '## Changes' section to append to"
         raise ValueError(message)
-    return _append_to_section(body, section, rows)
+    history = _evidence_batches(body)
+    incoming = _evidence_batches(f"## {_CHANGES}\n\n{chr(10).join(rows)}")
+    new_evidence = {
+        row
+        for key, batch in incoming.items()
+        if history.get(key, [])[-len(batch) :] != batch
+        for row in batch
+    }
+    existing = {line.strip() for line in section.body.splitlines() if line.strip()}
+    fresh = [
+        line
+        for line in rows
+        if line.strip() not in existing
+        or any(
+            row in new_evidence for row in parse_ledger_rows(f"## {_CHANGES}\n\n{line}")
+        )
+    ]
+    return _append_to_section(body, section, fresh)
+
+
+def _evidence_batches(body: str) -> dict[tuple[str | None, str], list[LedgerRow]]:
+    """Group evidence by the Step and label whose last row readers use.
+
+    Keep commands together: a repeated command after a different command
+    is still new evidence. Comparing whole suffixes also permits an
+    idempotent retry of a log containing several checks.
+    """
+    batches: dict[tuple[str | None, str], list[LedgerRow]] = {}
+    for row in parse_ledger_rows(body):
+        if row.label is not None and row.label in (VERIFY_LABEL, BY_LABEL):
+            batches.setdefault((row.step_id, row.label), []).append(row)
+    return batches
 
 
 def append_notes(body: str, lines: Sequence[str]) -> str:
@@ -421,14 +454,14 @@ def append_notes(body: str, lines: Sequence[str]) -> str:
     if section is None:
         trimmed = body.rstrip("\n")
         return f"{trimmed}\n\n## {_NOTES}\n\n{chr(10).join(lines)}\n"
-    return _append_to_section(body, section, lines)
+    existing = {line.strip() for line in section.body.splitlines() if line.strip()}
+    fresh = [line for line in lines if line.strip() not in existing]
+    return _append_to_section(body, section, fresh)
 
 
 def _append_to_section(body: str, section: Section, rows: Sequence[str]) -> str:
-    """Append the not-yet-present *rows* to *section* of *body*."""
-    existing = {line.strip() for line in section.body.splitlines() if line.strip()}
-    fresh = [row for row in rows if row.strip() not in existing]
-    if not fresh:
+    """Append the selected *rows* to *section* of *body*."""
+    if not rows:
         return body
 
     # Rebuild the section in the layout the markdown hygiene check accepts,
@@ -446,4 +479,4 @@ def _append_to_section(body: str, section: Section, rows: Sequence[str]) -> str:
         kept += "\n" if extends_list else "\n\n"
     tail = body[section.end :]
     ending = "\n\n" if tail else "\n"
-    return f"{head}\n{kept}{chr(10).join(fresh)}{ending}{tail}"
+    return f"{head}\n{kept}{chr(10).join(rows)}{ending}{tail}"

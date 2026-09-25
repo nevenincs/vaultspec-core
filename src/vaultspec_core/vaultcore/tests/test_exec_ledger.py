@@ -10,12 +10,14 @@ import pytest
 
 from vaultspec_core.vaultcore.checks.markdown import apply_markdown_hygiene
 from vaultspec_core.vaultcore.exec_ledger import (
+    BY_LABEL,
     VERIFY_LABEL,
     append_notes,
     append_rows,
     format_note,
     format_row,
     is_ledger_stem,
+    ledger_step_evidence,
     ledger_step_ids,
     note_lines,
     parse_ledger_rows,
@@ -112,6 +114,66 @@ def test_step_ids_are_deduplicated_in_first_seen_order() -> None:
 
 class TestAppendRows:
     """The ledger is append-only and idempotent."""
+
+    @pytest.mark.parametrize(
+        "results", [("pass", "fail", "pass"), ("fail", "pass", "fail")]
+    )
+    def test_preserves_verification_transitions(self, results: tuple[str, ...]) -> None:
+        body = LEDGER
+        for result in results:
+            row = format_row("S01", VERIFY_LABEL, "pytest", result)
+            body = append_rows(body, [row])
+            assert ledger_step_evidence(body)["S01"].verify == result
+            assert append_rows(body, [row]) == body
+
+        checks = [
+            row.paths[-1]
+            for row in parse_ledger_rows(body)
+            if row.step_id == "S01" and row.label == VERIFY_LABEL
+        ]
+        assert checks == list(results)
+
+    def test_preserves_returning_worker_attribution(self) -> None:
+        body = LEDGER
+        for worker in ("worker-a", "worker-b", "worker-a"):
+            row = format_row("S01", BY_LABEL, worker)
+            body = append_rows(body, [row])
+            assert ledger_step_evidence(body)["S01"].by == worker
+            assert append_rows(body, [row]) == body
+
+    def test_replayed_check_batch_is_idempotent_across_other_steps(self) -> None:
+        rows = [
+            format_row("S01", "M", "src/a.py"),
+            format_row("S01", VERIFY_LABEL, "pytest", "pass"),
+            format_row("S01", VERIFY_LABEL, "ruff check", "fail"),
+            format_row("S01", BY_LABEL, "worker-a"),
+        ]
+        body = append_rows(LEDGER, rows)
+        body = append_rows(body, [format_row("S02", VERIFY_LABEL, "pytest", "fail")])
+
+        assert append_rows(body, rows) == body
+        assert ledger_step_evidence(body)["S01"].verify == "fail"
+        assert ledger_step_evidence(body)["S01"].rows == 2
+
+        # A later check of another command must still become the last result.
+        updated = append_rows(body, [rows[1]])
+        assert ledger_step_evidence(updated)["S01"].verify == "pass"
+        assert ledger_step_evidence(updated)["S02"].verify == "fail"
+
+    def test_transitions_within_a_batch_survive_its_retry(self) -> None:
+        rows = [
+            format_row("S01", VERIFY_LABEL, "pytest", result)
+            for result in ("pass", "fail", "pass")
+        ]
+        body = append_rows(LEDGER, rows)
+
+        assert append_rows(body, rows) == body
+        assert ledger_step_evidence(body)["S01"].verify == "pass"
+        assert [
+            row.paths[-1]
+            for row in parse_ledger_rows(body)
+            if row.step_id == "S01" and row.label == VERIFY_LABEL
+        ] == ["pass", "fail", "pass"]
 
     def test_format_row_renders_cells(self) -> None:
         assert format_row("S01", "M", "src/a.py") == "- `S01` `M` `src/a.py`"
