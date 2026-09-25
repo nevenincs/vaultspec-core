@@ -238,6 +238,23 @@ vaultspec-core vault graph --feature search-api
 See the [graph reference](CLI.md#vaultspec-core-vault-graph) for filtering and output
 options.
 
+## Curate an existing vault
+
+Ask for `vaultspec-curate` to review an existing feature, decision cluster, or corpus.
+This is user-started maintenance, independent of the implementation pipeline. Specify
+review-only work when you want findings without repairs to the reviewed records.
+
+The curator compares decisions, relevant code, and supporting evidence. It applies
+authorized, content-preserving repairs and records unresolved choices in a
+reconciliation audit. Historical recommendations remain evidence even when a later
+decision chose another option. Implementation gaps do not automatically change accepted
+authority.
+
+With TypeSafe configured, a bounded cross-reference batch helps select relevant pairs.
+The audit distinguishes records inventoried, model-scored, and actually reviewed, and
+records incomplete coverage and continuation. Verification follows the affected scope;
+unrelated vault warnings do not require an open-ended cleanup before the audit finishes.
+
 ## Customize the policy
 
 Add a project rule with its instructions:

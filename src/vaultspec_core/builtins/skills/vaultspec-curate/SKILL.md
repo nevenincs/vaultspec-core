@@ -1,144 +1,67 @@
 ---
 name: vaultspec-curate
-description: 'Reconcile the ADR architecture corpus against the codebase and the feature lifecycle documents against the single-home-fact boundary. Use to audit ADR status and supersession, find ADR-vs-ADR, ADR-vs-code, and document-vs-document conflicts (restated grounding, displaced decisions, forked facts), and action them. Mechanical .vault/ hygiene is the CLI''s job; this skill does the semantic reconciliation the CLI cannot.'
+description: 'Audit and reconcile existing ADRs, implementation, and supporting records when the user requests vault curation or retrofit. Report decision conflicts and coverage gaps, and apply authorized repairs without rewriting decision history.'
 ---
 
-# ADR architecture reconciliation skill (vaultspec-curate)
+# Vault curation
 
-This skill terminates within one run. It keeps the architecture decision record (ADR)
-corpus and the code it governs a single, curated, internally-consistent set of
-decisions. It reconciles each decision's declared status and supersession against
-reality, finds where decisions contradict each other or the codebase, and actions the
-result: propagating status, amending wording, and surfacing gaps, conflicts, and errors
-that need human judgment.
+Use this standalone maintenance workflow for a user-requested feature, decision cluster,
+or corpus audit. It is not a pipeline stage or a prerequisite for ordinary ADR
+authoring. The ADR author owns reconciliation for the decision being written; curation
+examines existing records across a wider scope.
 
-It also enforces the document boundary - each fact has one home: research grounds, the
-ADR decides, audits find - across a feature's lifecycle documents: an ADR restating its
-grounding's evidence, a research or audit body recording a decision, and the same fact
-forked across documents are curation findings with defined actions.
+Finish a bounded pass with findings, applied repairs, and an honest coverage statement.
+A partially reviewed corpus is a valid checkpoint, not a clean bill of health.
 
-Mechanical `.vault/` hygiene belongs to the `vaultspec-core` CLI (the `vaultspec-cli`
-rule). This skill judges what no check can decide: whether an `accepted` decision is
-implemented, whether two ADRs disagree, and whether a superseded decision still governs
-the code.
+## Scope and ownership
 
-## Preconditions (cede the mechanical layer first)
+Use the requested scope and existing authorization. A review-only request produces
+findings without repairing reviewed records. A curation request permits confirmed,
+content-preserving repairs within scope; changes to decision authority follow the
+system's approval contract. Prior authorization counts.
 
-Reconciliation reasons over a structurally-correct corpus. Before any semantic work:
+Work directly, or delegate a bounded assignment to `vaultspec-docs-curator` when useful.
+Give a delegate the scope, write authority, relevant evidence, and any continuation or
+service budget. One owner persists the audit and coordinates shared writes; do not run
+the same reconciliation independently in both sessions.
 
-- **Structural hygiene to the CLI.** Run `vaultspec-core vault check all --fix`. This
-  repairs frontmatter, links, names, stamps, and template drift. Never hand-fix these.
-- **Check the code index.** Decision recall goes through the `vaultspec-discovery`
-  rule's search and ADR listing. Code recall needs the `vaultspec-rag` index, and a
-  fresh worktree is often unindexed. Confirm with `vaultspec-rag server doctor`; if the
-  code index is empty, run `vaultspec-rag index --type code`. When `vaultspec-rag` is
-  unavailable, use the rule's fallback.
+Read `references/reconciliation-playbook.md` for the method and action boundaries. Read
+`references/adr-status-taxonomy.md` when interpreting or repairing status.
 
 ## Workflow
 
-Dispatch the `vaultspec-docs-curator` agent persona to run the reconciliation. Instruct
-it to: "Reconcile the ADR architecture corpus against the codebase. Establish the
-decision inventory and declared status, reconcile decisions against each other, against
-the code, and each feature's lifecycle documents against the single-home-fact boundary;
-action the safe findings, and surface the rest in an audit report."
+1. **Inventory.** List the requested ADRs with `vaultspec-core vault list adr --json`,
+   adding `--feature <feature>` when scoped. Follow `next_offset` with `--offset` while
+   `truncated` is true. Record counts and unresolved coverage, not a copy of every body.
+   Follow relevant relationships beyond the feature boundary without expanding write
+   scope.
+1. **Establish structural findings.** Run `vaultspec-core vault check all --json` once,
+   scoped with `--feature` when appropriate, or reuse a current result. Start read-only;
+   select owning repairs for actual findings within authority. Unrelated warnings do not
+   prevent semantic work on readable records. Use the discovery rule's code-search
+   fallback when RAG is unavailable; index provisioning is not a curation prerequisite.
+1. **Compare decisions.** Read relevant full records and their status and supersession
+   metadata. Use the playbook's optional TypeSafe pass when configured. Judge
+   overlapping commitments, missing relationships, and contradictory current wording.
+   Similar titles or a shared feature do not establish duplication.
+1. **Compare implementation and evidence.** Inspect the code that implements the
+   relevant commitments and the supporting records needed to test each finding.
+   Distinguish rollout gaps and adaptable implementation details from violations of an
+   accepted commitment. Preserve historical recommendations and evidence.
+1. **Repair and verify.** Apply authorized, unambiguous repairs through owning verbs.
+   Verify affected records and relationships once after the edits. Repeat only for a
+   changed result, a failed repair, or new evidence; record unresolved problems instead
+   of looping until the vault is clean.
+1. **Persist and return.** Reuse the relevant reconciliation audit or scaffold one with
+   `vaultspec-core vault add audit --feature <feature> --topic reconciliation`. Author
+   findings in the audit format and link their supporting records with
+   `vaultspec-core vault link add`. For a corpus audit, use the maintenance feature tag
+   supplied by the user or a descriptive tag for this audit.
 
-The persona operates a **Ground -> Reconcile -> Act -> Verify** loop, the
-`vaultspec-discovery` rule applied to decisions:
+## Result
 
-- **Ground.** Build the decision inventory: `vaultspec-core vault list adr --json` for
-  the set, the body H1 (and any legacy status section) for each declared status, and
-  `vaultspec-core vault graph --json` for the supersession and relatedness edges.
-- **Reconcile decision-vs-decision.** Start from one bounded cross-reference sweep:
-  `vaultspec-core vault adr crossref --all` (MCP: `crossref`), `--feature`, or
-  `--isolated`; a resumed sweep repeats its selector and adds the reported
-  `--after <next_after>`. One sweep judges at most 50 ADRs within fixed request and time
-  ceilings, at up to 46 paid requests each. Run one sweep per curation run; report its
-  `next_after`, `remaining`, and `stopped`, and start another only on the orchestrator's
-  go-ahead. On `not_configured`, run the next step the reply names. On `stopped`, report
-  the reason; a sweep stopped on time or a transient failure is resumed later, and one
-  stopped on a refusal (`content_rejected` or `request_too_large`) means no read settled
-  it: cross-reference one other ADR on its own, and if that is judged, cross-reference
-  the first refused ADR on its own. If it is refused again, its refusal is its own:
-  record it and resume with `--after` set to it. Otherwise resume as usual. Every
-  refused source at or before `next_after` was refused on its own text, whether or not
-  the sweep stopped: record it. Read the ADRs behind each `link` verdict and each `weak`
-  declared link, and judge them. Then surface the ADRs covering the same concept with
-  the `vaultspec-discovery` rule's decision search and ADR listing, read them whole, and
-  judge agreement, duplication, contradiction, or fragmentation (a refinement chain or
-  sibling accepted records on one scope).
-- **Reconcile decision-vs-code.** For each live decision, locate the implementation per
-  the `vaultspec-discovery` rule, read the epicenter file whole, and confirm the
-  decision is implemented; grep to confirm exact symbols.
-- **Reconcile document-vs-document.** For each feature with an ADR, read its lifecycle
-  documents against the boundary: restated grounding in the ADR, displaced decisions in
-  research or audit bodies, forked facts across documents.
-- **Act and Verify.** Apply the safe actions, surface the rest, re-run
-  `vaultspec-core vault check all`, and re-scan until clean.
-
-The full query patterns, the conflict taxonomy, and the per-class actions live in
-`references/reconciliation-playbook.md`. Read it before reconciling.
-
-## Canonical status taxonomy
-
-The curator enforces one canonical ADR status set and one supersession convention. The
-authoritative definition - the values, their meaning, the canonical encoding, and the
-divergences the curator must detect - is in `references/adr-status-taxonomy.md`. Read it
-before judging any status. This set is the one definition the core library, the ADR
-template, and the supersede tool all derive from; where the corpus or tooling diverges,
-the curator reconciles toward it.
-
-## Actions and autonomy boundaries
-
-The curator acts on what is mechanically safe and proposes what needs judgment.
-
-- **Act directly (mechanically safe).** Status-encoding and stamp normalization,
-  including propagation of an already-recorded, unambiguous supersession through an
-  owning body edit, per the reconciliation playbook. A new supersession uses
-  `vaultspec-core vault adr supersede OLD --by NEW` only after authorization and
-  successor acceptance. Use the CLI mutators (`vaultspec-core vault adr supersede`,
-  `vaultspec-core vault set-body`, `vaultspec-core vault edit`,
-  `vaultspec-core vault link add`) over raw file edits so the frontmatter contract and
-  the `modified` stamp stay canonical.
-- **Act directly (content-preserving boundary conformance).** Replacing an ADR's
-  restated evidence with a stem citation, and stripping decision language from a
-  research or audit body where an accepted ADR records the same decision, leaving a
-  one-line pointer. Invariants: no fact is destroyed - text is removed only where its
-  single home is confirmed, or created first by relocating the fact into its grounding
-  document; and no conformance edit ever changes what was decided - decision changes
-  belong to the `vaultspec-adr` amend-or-supersede path, on human approval. Where the
-  two copies diverge in substance, it is a forked fact, not a restatement: surface it
-  instead.
-- **Act directly (confirmed cross-reference).** Adding a `crossref` `link` verdict the
-  source does not declare, once reading both ADRs confirms it, with
-  `vaultspec-core vault link add`. A `weak` declared link is never removed on the
-  verdict alone; it is recorded with a recommendation.
-- **Propose for approval (judgment).** Rephrasing or amending conflicting ADR wording,
-  and any contradiction whose resolution is not obvious, are written into the audit as
-  recommendations, not applied unprompted.
-- **Never auto-retrofit ADRs to code.** ADRs drive codebase rollout, not the reverse.
-  The curator reports decision-vs-code drift as a finding but does not rewrite an ADR to
-  match the code on its own. Amending an ADR to reflect existing code (the legitimate
-  ADR-from-codebase retrofit for late-adopting projects) is offered and executed **only
-  on explicit human request**.
-
-## Audit persistence
-
-Persist findings as an audit report. Scaffold it with
-`vaultspec-core vault add audit --feature <feature> --topic reconciliation` so the CLI
-owns the filename and frontmatter and the report never collides with the feature's
-review audit, then author the body: the decision inventory, the conflicts found by
-class, the actions applied, and the recommendations requiring author judgment. The audit
-report is the one document the curator authors directly.
-
-## Artifact linking
-
-- Link persisted documents through `vaultspec-core vault link add`, which writes the
-  quoted `'[[wiki-links]]'` into `related:`; never hand-edit frontmatter or put links in
-  a body.
-
-## Additional resources
-
-- `references/adr-status-taxonomy.md` - the canonical status set, encodings,
-  supersession convention, and the divergences to detect.
-- `references/reconciliation-playbook.md` - the Ground/Reconcile/Act/Verify loop in
-  detail: query patterns, the conflict taxonomy, and the action for each class.
+Report reviewed and unreviewed scope, findings with evidence and concrete resolutions,
+actions taken, validation, and the audit stem. Include hosted-check usage, coverage
+limits, and continuation when applicable. Distinguish a completed scoped review from a
+partial pass. A finding resolved by an authorized repair stays in the audit with its
+resolution; do not require a second review of unchanged evidence.

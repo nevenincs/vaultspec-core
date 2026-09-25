@@ -508,16 +508,16 @@ suggested links and declared links judged weak. It is the same backend as
 `vaultspec-core vault adr crossref`, and it uses the hosted-search key and data flow
 described under [`search`](#search).
 
-| Parameter     | Type                   | Default | Description                                                                                  |
-| ------------- | ---------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`, at most 50. One ref is judged alone. |
-| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                   |
-| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                      |
-| `all_adrs`    | boolean                | `false` | Sweep every ADR that still governs; superseded and rejected ones are skipped unless named.   |
-| `after`       | string or null         | `null`  | Resume a sweep after this ADR, the `next_after` of the previous reply.                       |
-| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                  |
-| `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                         |
-| `body`        | string or null         | `null`  | Proposed body prose for one ADR, judged without changing it; no sweep or apply.              |
+| Parameter     | Type                   | Default | Description                                                                                               |
+| ------------- | ---------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`, at most 50. One ref is judged alone.              |
+| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                                |
+| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                                   |
+| `all_adrs`    | boolean                | `false` | Sweep non-retired ADRs, including proposals; superseded, rejected, and deprecated sources require naming. |
+| `after`       | string or null         | `null`  | Resume a sweep after this ADR, the `next_after` of the previous reply.                                    |
+| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                               |
+| `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                                      |
+| `body`        | string or null         | `null`  | Proposed body prose for one ADR, judged without changing it; no sweep or apply.                           |
 
 A call needs `refs`, `feature`, `isolated`, or `all_adrs`. `feature` and `isolated`
 narrow together; `refs` and `all_adrs` each stand alone, and combining either with

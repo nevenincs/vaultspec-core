@@ -444,11 +444,12 @@ def test_an_unknown_source_is_refused_before_anything_is_sent(
     assert provider.received == []
 
 
+@pytest.mark.parametrize("retired_status", ["superseded", "rejected", "deprecated"])
 def test_a_sweep_runs_in_stem_order_and_resumes_after_its_cursor(
-    tmp_path: Path, provider: ScriptedProvider
+    tmp_path: Path, provider: ScriptedProvider, retired_status: str
 ) -> None:
     _small_vault(tmp_path)
-    write_adr(tmp_path, "2026-01-04-retired-adr", status="superseded")
+    write_adr(tmp_path, "2026-01-04-retired-adr", status=retired_status)
 
     first = crossref_sweep(
         tmp_path, all_adrs=True, max_sources=3, environ=ENV, client=_client(provider)
@@ -479,11 +480,12 @@ def test_a_sweep_runs_in_stem_order_and_resumes_after_its_cursor(
     assert second.remaining == 0
 
 
+@pytest.mark.parametrize("retired_status", ["superseded", "rejected", "deprecated"])
 def test_a_sweep_can_take_only_isolated_or_named_adrs(
-    tmp_path: Path, provider: ScriptedProvider
+    tmp_path: Path, provider: ScriptedProvider, retired_status: str
 ) -> None:
     _small_vault(tmp_path)
-    write_adr(tmp_path, "2026-01-04-retired-adr", status="superseded")
+    write_adr(tmp_path, "2026-01-04-retired-adr", status=retired_status)
 
     isolated = crossref_sweep(
         tmp_path, isolated=True, max_sources=50, environ=ENV, client=_client(provider)

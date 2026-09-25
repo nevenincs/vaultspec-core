@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:1a92a8c5dc85a830f3b75e2a07e099be76648a9474b10480a522f64672b9235e'
+body_hash: 'sha256:6639d549a6af3eb1da4c80154ddd7f05a52f0ea4666a7c77edee152dc0475be2'
 related:
   - "[[2026-09-23-adr-crossref-research]]"
   - "[[2026-09-23-typesafe-search-adr]]"
@@ -16,6 +16,7 @@ related:
   - '[[2026-08-23-envelope-optimization-adr]]'
   - '[[2026-09-23-adr-crossref-audit]]'
   - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
+  - '[[2026-09-25-skill-audit-curate-audit]]'
 ---
 
 # `adr-crossref` adr: `bounded ADR cross-referencing on TypeSafe Jev, as a core backend with one CLI and MCP surface` | (**status:** `accepted`)
@@ -148,7 +149,7 @@ package's transport and the hosted-search credential rather than duplicating the
   One entry point also supports sweeps. A sweep judges named ADRs, one feature's,
   the isolated ones (declaring no ADR link), or all, in stem order after an optional
   cursor; its outcome names the last source judged so the next run resumes after it,
-  and no sweep state is stored. A sweep skips superseded and rejected sources unless they
+  and no sweep state is stored. A sweep skips superseded, rejected, and deprecated sources unless they
   are named; candidates include every status, and each verdict carries the candidate's.
 
 Surfaces are renderers over one backend result with identical fields:
@@ -203,6 +204,11 @@ TypeSafe use conditional on the configured API key. Evidence:
 coverage, adds nonpersisting amendment input, reduces the source deadline to 15 seconds,
 and makes the authoring pass conditional on opt-in. It does not add a tool, automatic
 acceptance, mandatory agent delegation, or a repeated review gate.
+
+**Amendment, 2026-09-25, retired sources:** Authorized by the user's curation audit
+and repair request. Evidence: `2026-09-25-skill-audit-curate-audit`. Automatic sweeps
+exclude deprecated sources alongside superseded and rejected ones; explicit historical
+sources and candidate coverage remain available. Proposed sources remain eligible.
 
 ## Rationale
 

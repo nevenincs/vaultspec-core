@@ -1,176 +1,117 @@
-# ADR reconciliation playbook
+# Reconciliation playbook
 
-The detailed Ground -> Reconcile -> Act -> Verify loop the curator runs. It applies the
-`vaultspec-discovery` rule to architecture decisions. Read `adr-status-taxonomy.md`
-first; this playbook assumes the canonical status set.
+The skill owns scope, workflow, and completion. This reference owns how to compare
+records and choose an action. Status meanings are in `adr-status-taxonomy.md`.
 
-## Ground: build the decision inventory
+## Build only the context the review needs
 
-1. Run the preconditions: `vaultspec-core vault check all --fix` for structural hygiene
-   (this includes `adr-status`, which surfaces the status divergences in the taxonomy
-   reference), and check the code index (`vaultspec-rag server doctor`; index with
-   `vaultspec-rag index --type code` if empty).
-1. Enumerate the corpus: `vaultspec-core vault list adr --json`. This gives path, name,
-   feature, date, and tags - but not status, which lives in the body.
-1. Parse each declared status from the body H1 (and any legacy `## Status` section) per
-   the taxonomy. Record status, the `superseded_by` / `supersedes` frontmatter edges,
-   and the feature for every ADR.
-1. Pull the decision topology: `vaultspec-core vault graph --json` (scope with
-   `--feature`, or `--node <stem> --depth N` for one decision's neighbourhood). The
-   supersession and relatedness edges expose chains, forks, and stranded nodes.
+List ADRs through the CLI, following `next_offset` while the result is `truncated`. Read
+each selected record's heading, commitments, evidence links, and `supersedes` /
+`superseded_by` frontmatter. Use
+`vaultspec-core vault graph --json --node <stem> --depth 1` or `--feature <feature>`
+when a relationship is unclear. Read supersession from node frontmatter or the records
+themselves; ordinary graph links are not proof of supersession. Follow named successors
+even when outside the graph's displayed scope.
 
-## Reconcile decision-vs-decision (intra-corpus)
+For a candidate conflict, read both records fully. Resolve their scope, status,
+exceptions, chronology, and authorization before treating different wording as a
+contradiction. Historical predecessors and complementary decisions can coexist without
+consolidation. Inspect supporting research, audits, and active plans where needed; a
+shared feature does not require reading every lifecycle document.
 
-For each cluster of decisions on a shared concept:
+For code comparisons, locate the affected implementation under the discovery rule and
+read enough surrounding code to test the commitment. An accepted ADR can precede its
+rollout; a retired implementation can remain during an authorized migration. Record
+those conditions separately from violations. Lack of a search hit or a graph edge does
+not establish an abandoned decision.
 
-- When hosted search is configured, start from one cross-reference sweep.
-  `vaultspec-core vault adr crossref --all --json` (MCP: `crossref`) judges each ADR
-  against the rest within fixed ceilings: at most 50 ADRs a sweep, 46 paid requests and
-  15 seconds an ADR. `--isolated` takes only ADRs that link no other ADR. Take one sweep
-  per curation run and report its `next_after`, `remaining`, and `stopped` in the audit;
-  the next sweep repeats the selector with `--after <next_after>` on the orchestrator's
-  go-ahead. On `not_configured`, run the next step the reply names. On `stopped`, report
-  the reason; a sweep stopped on time or a transient failure is resumed later, and one
-  stopped on a refusal (`content_rejected` or `request_too_large`) means no read settled
-  it: cross-reference one other ADR on its own, and if that is judged, cross-reference
-  the first refused ADR on its own. If it is refused again, its refusal is its own:
-  record it and resume with `--after` set to it. Otherwise resume as usual. Every
-  refused source at or before `next_after` was refused on its own text, whether or not
-  the sweep stopped: record it. Each `link` verdict is a candidate missing link; each
-  `weak` verdict is a declared link judged below the threshold. The `relation` label
-  says which pairs to read in full; it does not classify the pair for you.
-- Surface the cluster with the `vaultspec-discovery` rule's decision search and ADR
-  listing. Search finds same-topic ADRs that share no obvious filename or feature tag;
-  the listing catches what search misses.
-- Read the candidate ADRs whole. Judge them against each other for the conflict classes
-  below. Do not rely on titles; two ADRs can agree in title and contradict in Rationale.
-- Walk each feature's supersession chain end to end. A chain whose links are refinements
-  of one decision - not pivots - is a fragmented decision, even when every marker is
-  formally correct; so are sibling `accepted` records sharing one scope.
+## Optional hosted relationship check
 
-## Reconcile decision-vs-code
+Use TypeSafe only when `VAULTSPEC_CORE_TYPESAFE_API_KEY` is configured. Without it, use
+local discovery; do not request or install credentials as part of curation.
 
-For each `accepted` decision (and each `superseded` / `deprecated` one, inverted):
+Start with `vaultspec-core vault adr crossref --feature <feature> --json`, named ADRs,
+or `--all` for a corpus pass. `--isolated` narrows to ADRs without declared ADR links;
+it cannot establish general conflict coverage. Automatic sweeps exclude superseded,
+rejected, and deprecated sources; name a historical ADR explicitly when needed.
 
-- Locate the implementation per the `vaultspec-discovery` rule. For code search, narrow
-  with `--include-path`, `--function-name`, `--class-name`, or `--prefer production`.
-- Read the epicenter file whole. Confirm the decision is actually implemented as the ADR
-  describes.
-- Confirm exact symbols and insertion points with a targeted grep.
-- For `superseded` or `deprecated` decisions, invert the test: confirm the retired
-  approach no longer dominates the code. A retired decision still governing the codebase
-  is drift.
+The default batch takes 10 sources. Use one default batch unless the assignment supplies
+a larger source, time, or spend budget. A batch accepts `--max-sources` up to 50, with
+at most two extra sources to settle refusals; the backend enforces a 15-second source
+deadline and a 300-second sweep budget. Resume within the assigned budget using the same
+selector and the returned `next_after` as `--after`. A batch boundary does not require
+renewed approval within that budget. Reuse existing judgments for unchanged records.
 
-## Reconcile document-vs-document (lifecycle boundary)
+Read `remaining`, `stopped`, source statuses, `coverage`, `unjudged_declared`, reply
+`truncated`, and `usage.unscored`. Candidate `input_truncated` and coverage flags mean
+that the model did not see all the prose. Reply truncation means some verdict rows were
+not delivered; record that gap rather than treating the count of evaluated sources as
+completed semantic review. Do not rerun a sweep merely to recover omitted rows.
 
-Each fact has one home: research grounds, the ADR decides, audits find. For each feature
-that has an ADR, enumerate its lifecycle documents
-(`vaultspec-core vault list --feature <feature> --json`, or the feature index), read
-them whole, and judge against the boundary:
+A `link` verdict may already be declared; only an undeclared, independently confirmed
+relationship needs adding. Read relevant pairs to assess the advisory `relation` and
+`weak` verdicts. Bounded ranking can miss a conflict; supplement it with scoped local
+search and supersession/evidence links. Do not repeat the same discovery per pair.
 
-- Duplicated detailed evidence is restated grounding. Preserve the concise context
-  needed to understand the ADR's scope and rationale.
-- Decision language in a research or audit body - a chosen option stated as settled, "we
-  will", a recommendation phrased as the decision - is a displaced decision.
-- The same fact carried by two documents with diverging substance is a forked fact.
+On `not_configured` or service failure, use the named discovery fallback once and
+continue with available evidence. Retain the returned cursor and reason for an
+incomplete sweep. Do not invent a later cursor, run extra paid refusal probes, or
+silently skip a refused source. A refusal already behind the returned cursor is still
+unreviewed evidence to record. No hosted verdict authorizes a status change, removal, or
+semantic edit, and a successful call does not certify the corpus conflict-free.
 
-## Conflict taxonomy
+## Findings and actions
 
-Classify every finding into one of these, because the action differs by class:
+- **Status encoding.** Use `vaultspec-core vault check adr-status` and the taxonomy.
+  Quoting a known token preserves authority. Missing, unknown, or conflicting status
+  needs recorded authority before repair; never infer acceptance from implemented code.
+- **Unpropagated supersession.** Confirm reciprocal `superseded_by` / `supersedes`
+  metadata and the recorded transition. Then repair the predecessor's body through
+  `vaultspec-core vault set-body` or `vaultspec-core vault edit`. An intermediate
+  successor can itself be superseded. Ambiguous edges are findings, not permission to
+  reconstruct history. New supersession uses `vaultspec-core vault adr supersede` after
+  authorization and successor acceptance.
+- **Contradictory commitments.** Identify the exact clauses, their common scope, and why
+  exceptions or chronology do not resolve them. Propose concrete replacement wording and
+  necessary edits to affected ADRs together. Apply when existing or new authorization
+  covers the choice.
+- **Duplication or fragmentation.** Establish that records decide the same commitment,
+  rather than separate compatible choices. Recommend unchanged reuse, an amendment, or
+  consolidation as warranted. Do not force one accepted ADR per feature or erase a
+  legitimate historical chain.
+- **Decision versus code.** Cite the commitment and the implementation evidence. State
+  whether this is rollout, an implementation hypothesis, a violation, or insufficient
+  evidence. Report violations without rewriting authority to match code. A requested
+  retrofit can produce a proposed decision or amendment; acceptance still depends on
+  authorization covering that decision.
+- **Missing or weak relationship.** Add a confirmed missing link with
+  `vaultspec-core vault link add` within write scope. Never rerun with `--apply` to
+  write reviewed links: it buys new judgments and writes those results. A weak score
+  alone does not justify removing an existing link.
+- **Duplicated evidence.** Replace duplicated detail with a source-stem citation only
+  when the source contains that substance. Preserve enough context, options, rationale,
+  and consequences for the ADR to stand on its own. Unique evidence is not duplication;
+  propose relocation when its proper home is unclear.
+- **Displaced ruling or forked fact.** Distinguish claims of current authority from
+  dated recommendations, alternatives, observations, and findings. Historical evidence
+  can disagree with the chosen option without being wrong. Preserve it; clarify its
+  historical role and point to the ruling where needed. Remove redundant current ruling
+  language only when an accepted ADR records the same commitment and no evidence is
+  lost. Conflicting observations remain findings; an accepted ADR does not make an
+  empirical claim true. Surface a commitment with no authorizing ADR as a decision gap.
 
-- **Status drift (mechanical).** Declared status disagrees with the canonical encoding,
-  or frontmatter supersession disagrees with the body status. Safe to fix.
-- **Unpropagated supersession (mechanical).** `superseded_by` is set but the body status
-  was never rewritten (typically a legacy `## Status` ADR). Safe to fix.
-- **Contradiction (judgment).** Two ADRs make incompatible decisions on the same
-  concept, and neither supersedes the other. Needs human resolution.
-- **Duplication (judgment).** Two ADRs decide the same thing; one should supersede or
-  reference the other.
-- **Fragmented decision (judgment).** Several ADRs in one feature cluster are
-  refinements of a single decision: a supersession chain of non-pivots, or sibling
-  `accepted` records - possibly contradictory - sharing one scope. The markers can all
-  be formally correct; the fragmentation itself is the finding.
-- **Decision-vs-code drift (advisory).** Code violates an accepted commitment, or a
-  retired decision still governs it. Distinguish expected rollout gaps and changes to
-  implementation hypotheses within the commitments. Report violations; never auto-amend
-  authority to match code.
-- **Orphaned or stranded decision (advisory).** A decision with no implementation,
-  planned rollout, or successor, or disconnected from the decision graph.
-- **Off-taxonomy or missing status (mechanical).** A status value outside the canonical
-  set, or none at all.
-- **Missing cross-reference (safe once confirmed).** A `crossref` `link` verdict the
-  source does not declare, which reading both ADRs confirms.
-- **Weak declared link (judgment).** A declared ADR link `crossref` judged below the
-  threshold. The link may be stale, or the two decisions may share context the judgment
-  missed.
-- **Restated grounding (content-preserving).** An ADR re-narrates evidence its grounding
-  documents record, substance identical. Safe to fix.
-- **Displaced decision (content-preserving when homed; judgment when homeless).** A
-  research or audit body records a decision. Safe to fix when an accepted ADR records
-  the same decision; a decision no ADR records is homeless - surface it.
-- **Forked fact (judgment, one exception).** The same fact in two documents with
-  diverging substance. Surface it - except where one side is an accepted ADR's decision
-  and the other a grounding document's recommendation: the ADR is authoritative, and the
-  grounding side is safe to fix.
+Use owning body and link verbs for record edits; never hand-edit frontmatter. Apply
+content-preserving repairs only within write authority. Changes to accepted commitments
+follow the system contract, including prior authorization and separate proposed text.
 
-## Act: the action for each class
+## Verify and checkpoint
 
-- **Status drift, off-taxonomy, missing status.** Normalize toward the canonical
-  encoding. Prefer `vaultspec-core vault set-frontmatter` / `vaultspec-core vault edit`
-  for frontmatter and the CLI mutators over raw edits so stamps and the contract stay
-  canonical.
-- **Unpropagated supersession.** Read both records and confirm the existing
-  `superseded_by` / `supersedes` edges agree. Use `vaultspec-core vault set-body` or
-  `vaultspec-core vault edit` to normalize the predecessor's H1 to `superseded` and
-  remove any duplicate legacy status declaration without changing decision content. Its
-  immediate successor may itself now be superseded. This repairs body encoding, not the
-  relationship. If the edges or authority are ambiguous, record the conflict for
-  resolution. New supersession requires an accepted successor under the system contract;
-  never rewrite historical chains to make intermediate records accepted.
-- **Contradiction, duplication.** Do not silently rewrite. Record the conflicting ADRs,
-  the nature of the contradiction, and a recommended resolution in the audit for human
-  approval. Apply the chosen resolution only once approved.
-- **Fragmented decision.** Propose the consolidation in the audit: fold the chain's
-  refinements into the record that currently governs (amending its body in place, per
-  the amend-over-supersede rule the `vaultspec-adr` skill mandates) and supersede or
-  deprecate the rest, so exactly one record is `accepted` for the scope. Apply only once
-  approved.
-- **Decision-vs-code drift.** Report as a finding in the audit. ADRs drive rollout, so
-  never retrofit the ADR to the code automatically. If the human explicitly requests the
-  ADR-from-codebase retrofit (legitimate for late-adopting projects), amend the ADR's
-  Implementation prose via `vaultspec-core vault set-body` / `vaultspec-core vault edit`
-  and note it in the audit.
-- **Orphaned or stranded.** Surface in the audit with the graph evidence.
-- **Missing cross-reference.** Add each confirmed link with
-  `vaultspec-core vault link add`. Links go on the source only. Never rerun a sweep with
-  `--apply` to write links you read: a rerun judges again and writes its own verdicts.
-- **Weak declared link.** Never remove it on the verdict alone. Read both ADRs and
-  record the link in the audit with a recommendation to keep or remove it.
-- **Restated grounding.** Confirm the fact exists in the grounding document; if the ADR
-  is its only home, relocate it into the grounding body first. Then replace the ADR's
-  restatement with a stem citation (e.g. "per `2026-02-04-editor-demo-research`, ...")
-  via body-prose edit. The decision, the option set, the rationale's conclusions, and
-  the consequences must read semantically unchanged afterward; when unsure, propose
-  instead of applying.
-- **Displaced decision.** Where an accepted ADR records the decision, strip the decision
-  language from the research or audit body, leaving a one-line pointer to the ADR stem;
-  keep the evidence and option framing intact. Where no ADR records it, never author one
-  on your own - surface the homeless decision in the audit as an ADR candidate for the
-  human to take through `vaultspec-adr`.
-- **Forked fact.** ADR-vs-grounding: rewrite the grounding side to defer - keep its
-  evidence, drop the contradicted conclusion, point at the ADR stem. Any other fork:
-  record both locations and both readings in the audit; do not pick a winner.
+Check the affected documents or feature after edits. Read the changed passages with
+enough context to confirm that references resolve, retained evidence still supports the
+claims, and repairs preserve decision meaning. Use a whole-vault check when the changes
+have whole-vault scope; existing unrelated findings are not a completion gate.
 
-## Verify
-
-- Re-run `vaultspec-core vault check all` and re-scan the touched ADRs' status and
-  edges.
-- After boundary conformance edits, re-read each touched document pair whole and confirm
-  the invariants held: every removed fact still has a home, every citation resolves to a
-  document that carries the cited substance, and no decision changed.
-- Loop until the mechanical classes are clean and every judgment-class finding is
-  recorded.
-- Persist the audit via
-  `vaultspec-core vault add audit --feature <feature> --topic reconciliation`, then
-  author the inventory, the findings by class, the actions applied, and the
-  recommendations.
+Persist findings and resolutions in the reconciliation audit. Record scope reviewed,
+scope deferred, failed repairs, uncertainty, and any hosted usage and continuation. Stop
+when the bounded assignment is covered or its budget is reached. Resume from that
+checkpoint when work continues; repeat verification only when relevant evidence changes.

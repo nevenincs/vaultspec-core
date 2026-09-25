@@ -221,7 +221,7 @@ def register_crossref_tools(
                 refs: ADRs to judge.
                 feature: Sweep this feature's ADRs.
                 isolated: Sweep only ADRs that link no other ADR.
-                all_adrs: Sweep every ADR that still governs.
+                all_adrs: Sweep non-retired ADRs, proposals included.
                 after: Resume a sweep after this stem.
                 max_sources: Most ADRs one sweep judges.
                 apply: Write new link verdicts.

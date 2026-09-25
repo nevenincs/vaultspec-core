@@ -108,6 +108,32 @@ class TestDivergences:
             "legacy '## Status' section" in d.message for d in result.diagnostics
         )
 
+    def test_legacy_status_alongside_canonical_heading_warns(
+        self, tmp_path: Path
+    ) -> None:
+        body = _adr_body("# `demo` adr: `Title` | (**status:** `accepted`)")
+        body += "\n## Status\n\nRejected\n"
+        _, snap = _snapshot(tmp_path, "2026-01-01-demo-adr", body)
+
+        result = check_adr_status(tmp_path, snapshot=snap, fix=True)
+
+        assert result.warning_count == 1
+        assert "legacy '## Status' section" in result.diagnostics[0].message
+        assert result.fixed_count == 0
+
+    def test_superseded_without_successor_warns(self, tmp_path: Path) -> None:
+        _, snap = _snapshot(
+            tmp_path,
+            "2026-01-01-demo-adr",
+            _adr_body("# `demo` adr: `Title` | (**status:** `superseded`)"),
+        )
+
+        result = check_adr_status(tmp_path, snapshot=snap, fix=True)
+
+        assert result.warning_count == 1
+        assert "superseded_by" in result.diagnostics[0].message
+        assert result.fixed_count == 0
+
     def test_unpropagated_supersession_warns(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,
@@ -133,6 +159,25 @@ class TestDivergences:
 
 
 class TestQuotingFix:
+    @pytest.mark.parametrize("current_status", ["`accepted`", "accepted", "`proposed`"])
+    def test_stale_snapshot_does_not_replace_or_restamp_current_status(
+        self, tmp_path: Path, current_status: str
+    ) -> None:
+        stale = _adr_body("# `demo` adr: `Title` | (**status:** proposed)")
+        path, snapshot = _snapshot(tmp_path, "2026-01-01-demo-adr", stale)
+        path.parent.mkdir(parents=True)
+        current = (
+            "---\ntags: ['#adr', '#demo']\nmodified: '2026-01-01'\n---\n\n"
+            + _adr_body(f"# `demo` adr: `Title` | (**status:** {current_status})")
+        )
+        path.write_text(current, encoding="utf-8")
+        before = path.read_bytes()
+
+        result = check_adr_status(tmp_path, snapshot=snapshot, fix=True)
+
+        assert path.read_bytes() == before
+        assert result.fixed_count == 0
+
     def test_bare_token_warns_fixable(self, tmp_path: Path) -> None:
         _, snap = _snapshot(
             tmp_path,

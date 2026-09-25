@@ -1657,8 +1657,8 @@ anything.
 #### Options
 
 - `--feature TAG` (`-f`) - Sweep this feature's ADRs.
-- `--all` (default off) - Sweep every ADR that still governs. Superseded and rejected
-  ADRs are skipped unless named.
+- `--all` (default off) - Sweep non-retired ADRs, including proposals. Superseded,
+  rejected, and deprecated ADRs are skipped unless named.
 - `--isolated` (default off) - Sweep only ADRs that link no other ADR. Combines with
   `--feature` to narrow further; `--all` stands alone.
 - `--after STEM` - Resume a sweep after this ADR: the `next_after` a previous sweep
@@ -1821,7 +1821,9 @@ the frontmatter name. Pick the one whose side you trust.
   Research, Reference, or Audit evidence and the status of decisions linked by active
   approved plans. Decision-free plans may have no ADR links.
 - `adr-status` (`--fix`: yes, `--feature`: yes) - Validate ADR status against the
-  canonical taxonomy.
+  canonical taxonomy. Warn about legacy declarations even alongside a canonical H1, and
+  mismatches between superseded status and successor metadata. Repairs only quote a
+  known token; missing or conflicting authority requires inspection.
 - `rename-integrity` (`--fix`: yes, `--feature`: no) - Check name/filename integrity for
   rules, skills, and agents.
 - `encoding` (`--fix`: no, `--feature`: yes) - Surface `.vault/` documents that are not

@@ -184,7 +184,7 @@ def cmd_adr_crossref(
     ] = None,
     feature: FeatureFilterOption = None,
     all_adrs: Annotated[
-        bool, typer.Option("--all", help="Sweep every ADR that still governs")
+        bool, typer.Option("--all", help="Sweep non-retired ADRs, including proposals")
     ] = False,
     isolated: Annotated[
         bool,

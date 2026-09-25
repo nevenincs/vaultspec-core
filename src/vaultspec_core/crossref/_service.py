@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 
 #: Statuses a sweep skips unless the source is named: a decision that no
 #: longer governs gains nothing from new links.
-_RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED})
+_RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED, AdrStatus.DEPRECATED})
 
 #: Failures that can belong to one ADR's text rather than to the provider or
 #: the key. A sweep holds such a refusal open and judges on: a later source the
@@ -307,7 +307,7 @@ def crossref_sweep(
     """Cross-reference several ADRs in one bounded, resumable run.
 
     With *refs* the sweep takes exactly those ADRs; otherwise every ADR that
-    still governs (not superseded or rejected), narrowed to *feature* and, with
+    is not superseded, rejected, or deprecated, narrowed to *feature* and, with
     *isolated*, to ADRs that declare no ADR link; the two narrow together.
     *all_adrs* takes every such ADR unnarrowed. Named ADRs and *all_adrs* each
     stand alone, and one selector is required.
@@ -326,7 +326,7 @@ def crossref_sweep(
             :func:`crossref_adr` resolves its source.
         feature: Take only this feature's ADRs.
         isolated: Take only ADRs that declare no ADR link.
-        all_adrs: Take every ADR that still governs.
+        all_adrs: Take every non-retired ADR, including proposals.
         after: Take only sources whose stem sorts after this ADR: the
             ``next_after`` of the previous run.
         max_sources: Sources to judge; clamped to ``1..MAX_SOURCES``.

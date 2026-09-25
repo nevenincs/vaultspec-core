@@ -774,7 +774,7 @@ sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300 sec
 vault may hold at most 5,000 ADRs. Lists `link` verdicts (should be linked) and `weak`
 ones (declared, judged below the threshold, never removed), each with an advisory
 relation. One `REFS` entry is judged alone; several, `--feature TAG` (`-f`),
-`--isolated` (ADRs linking no other ADR) or `--all` (every ADR that still governs) sweep
+`--isolated` (ADRs linking no other ADR) or `--all` (non-retired ADRs, including proposals) sweep
 in stem order, resumable with `--after STEM` from the reply's `next_after` and the same
 selector; `--feature` and `--isolated` narrow together, while named ADRs and `--all`
 each stand alone. An ADR the provider refuses to read is held open while the sweep
@@ -791,6 +791,9 @@ source's `related:` as it finishes. `--json` emits `vaultspec.vault.adr.crossref
 `usage`; at most 80 verdict rows per reply. Requires `VAULTSPEC_CORE_TYPESAFE_API_KEY`;
 without it nothing is sent and the reply is `not_configured` with the search to run
 instead. MCP: `crossref`.
+
+Automatic sweeps skip superseded, rejected, and deprecated sources; name one explicitly
+to judge it as a source.
 
 For a proposed amendment, `--body-file PATH` judges body prose under one ADR's identity
 without replacing it. No frontmatter, sweep options, or `--apply`; the result marks

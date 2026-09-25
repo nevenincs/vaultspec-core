@@ -3,10 +3,11 @@ tags:
   - '#adr'
   - '#curator-reframe'
 date: '2026-06-28'
-modified: '2026-06-28'
-body_hash: 'sha256:412be72b64962def9ec69ec589585601111b60f1b559b8964f9166ba01084bdd'
+modified: '2026-09-25'
+body_hash: 'sha256:8857dcd0a08afa577d95249a5a47c9730dce682da8a15e46352b4edaabdb91ad'
 related:
   - "[[2026-06-28-curator-reframe-research]]"
+  - '[[2026-09-25-skill-audit-curate-audit]]'
 ---
 
 # `curator-reframe` adr: `canonical ADR status taxonomy and reconciliation curator` | (**status:** `accepted`)
@@ -84,6 +85,18 @@ status was never rewritten). It is registered in the checks `__init__`, included
 The `vaultspec-curate` skill references are finalized to treat the validator as present
 rather than forthcoming. The detailed encodings and divergence rules are carried in the
 skill's `adr-status-taxonomy.md` reference, which mirrors the enum.
+
+Quoting repair revalidates the current token under the document lock before writing;
+it cannot restore a snapshot's status over later authority. Legacy status sections are
+reported even alongside a canonical H1, and superseded status without successor
+metadata is advisory drift. Ambiguous authority remains a finding rather than a repair
+guess. Curation is scoped, user-started maintenance: preserve historical evidence,
+apply authorized content-preserving repairs, and verify affected records without
+requiring unrelated corpus findings to disappear.
+
+**Amendment, 2026-09-25:** Authorized by the user's request to audit curation and apply
+its skill and code findings. Evidence: `2026-09-25-skill-audit-curate-audit`. This refines
+safe repair and standalone curation behavior without changing the status vocabulary.
 
 ## Rationale
 
