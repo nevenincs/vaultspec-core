@@ -67,9 +67,9 @@ version = "0.2.6"
 
 [dependency-groups]
 # Local dev tooling only (PEP 735); NOT published in the wheel's Requires-Dist.
-# vaultspec-rag (semantic search) and its torch backend live here so they never
-# become runtime or published-extra dependencies of vaultspec-core. The cu130
-# torch source pin in [tool.uv.sources] applies because torch is a direct dep here.
+# vaultspec-rag (semantic search) lives here so it never becomes a runtime or
+# published-extra dependency of vaultspec-core. Only its `mcp` extra is taken:
+# the repo talks to the rag server and needs no local torch/GPU stack.
 dev = [
   "bandit>=1.9.4",
   "basedpyright>=1.39",
@@ -99,7 +99,6 @@ dev = [
   "pytest-xdist>=3.8.0",
   "radon>=6.0.1",
   "ruff>=0.15.2",
-  "torch>=2.4",
   "ty>=0.0.15",
   "vaultspec-rag[mcp]>=0.4.4",
   "vulture>=2.16",
@@ -838,13 +837,3 @@ known_first_party = ["vaultspec_core"]
     "ruff",
     "ty",
   ]
-
-[[tool.uv.index]]
-explicit = true
-name = "pytorch-cu130"
-url = "https://download.pytorch.org/whl/cu130"
-
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
-]
