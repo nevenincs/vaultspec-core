@@ -28,9 +28,15 @@ Subpackages:
         execution (Claude, Gemini).
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 __all__ = ["__version__"]
+
+if TYPE_CHECKING:
+    # __getattr__ below resolves this at runtime; a static declaration is
+    # what tells a type checker the name in __all__ genuinely exists, since
+    # nothing assigns it at module level until first access.
+    __version__: str
 
 
 def _installed_version() -> str:
