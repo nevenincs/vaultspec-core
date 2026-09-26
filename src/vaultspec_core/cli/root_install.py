@@ -259,7 +259,7 @@ def cmd_install(
         )
 
     if json_output:
-        from vaultspec_core.cli.rendering import render_envelope
+        from vaultspec_core.cli.rendering import render_install_envelope
 
         result["path"] = str(result["path"])
         post_errors = install_post_errors(result)
@@ -267,7 +267,7 @@ def cmd_install(
             status = "failed"
         else:
             status = "unchanged" if result["action"] == "dry_run" else "created"
-        typer.echo(render_envelope("install", status, result, hints=hint_dict))
+        typer.echo(render_install_envelope("install", status, result, hints=hint_dict))
         raise typer.Exit(1 if post_errors else 0)
 
     if result["action"] == "dry_run":
@@ -397,7 +397,7 @@ def cmd_uninstall(
         return
 
     if json_output:
-        from vaultspec_core.cli.rendering import render_envelope
+        from vaultspec_core.cli.rendering import render_install_envelope
 
         result["path"] = str(result["path"])
         if result["action"] == "dry_run":
@@ -406,7 +406,7 @@ def cmd_uninstall(
             status = "removed"
         else:
             status = "unchanged"
-        typer.echo(render_envelope("uninstall", status, result))
+        typer.echo(render_install_envelope("uninstall", status, result))
         raise typer.Exit(0)
 
     # Render result

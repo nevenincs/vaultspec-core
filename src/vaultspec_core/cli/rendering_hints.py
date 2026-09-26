@@ -1,7 +1,9 @@
 """Next-step advisory hints: the ``Next action(s):`` footer.
 
 Split out of :mod:`.rendering`. Re-exported from there so no import site
-outside the package needs to change.
+outside the package needs to change. :func:`hints_suppressed` itself now
+lives in :mod:`vaultspec_core.envelope`, which an importing package can use
+without the CLI command tree; it is re-exported here unchanged.
 """
 
 from __future__ import annotations
@@ -9,9 +11,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from vaultspec_core.console import get_console
+from vaultspec_core.envelope import hints_suppressed as hints_suppressed
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
 __all__ = [
     "SafeDict",
@@ -84,43 +87,6 @@ class SafeDict(dict[str, str]):
         return f"{{{key}}}"
 
 
-def hints_suppressed(
-    no_hints: bool = False, *, environ: Mapping[str, str] | None = None
-) -> bool:
-    """Report whether next-step hints are suppressed for this invocation.
-
-    Hints are advisory and must be silenceable for scripted contexts, per
-    the cli-next-step-hints ADR. They are off when the caller passes
-    ``--no-hints`` or ``VAULTSPEC_NO_HINTS`` carries a true word. They are
-    also off inside a git commit hook, detected by the ``GIT_INDEX_FILE`` git
-    exports to every commit hook: hook output is often acted on without
-    review, so a hook that runs a command must not propose a follow-up that
-    rewrites documents the commit never touched. Git owns that name and
-    defines it by presence, so it is read by presence; the product's own
-    switch is a boolean like every other. This is the one predicate every
-    hint surface consults so the suppression contract cannot drift per
-    command - in any package, not only this one.
-
-    Args:
-        no_hints: Whether the invocation passed ``--no-hints``.
-        environ: The environment to read; ``None`` reads the process's own.
-
-    Returns:
-        ``True`` when no hint may be printed.
-
-    Raises:
-        ConfigurationError: If the switch carries a word the boolean
-            vocabulary does not recognise.
-    """
-    from ..config import GIT_INDEX_FILE, VAULTSPEC_NO_HINTS, env_flag, env_present
-
-    return (
-        no_hints
-        or bool(env_flag(VAULTSPEC_NO_HINTS, environ))
-        or env_present(GIT_INDEX_FILE, environ)
-    )
-
-
 def render_next_actions(pairs: Sequence[tuple[str, str]]) -> None:
     """Print next-step hints in the one uniform footer form.
 
@@ -165,7 +131,7 @@ def emit_next_step_hint(
         A dict matching {"text": str, "command": str} for JSON, or None.
         Also prints to the console if not json_output.
     """
-    if hints_suppressed(no_hints):
+    if hints_suppressed(no_hints=no_hints):
         return None
 
     hint = _NEXT_STEP_HINTS.get((command, outcome))

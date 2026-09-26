@@ -1,10 +1,13 @@
 """Canonical outcome vocabulary and the ``--json`` envelope shape.
 
 Split out of :mod:`.rendering`: the ``Outcome`` taxonomy, the per-item
-:class:`OutcomeItem` shape, aggregation/counting helpers, the
-``--json`` envelope builder (:func:`json_envelope`), and the shared
-sync-outcome adapter (:func:`sync_outcomes`). Re-exported from
-:mod:`.rendering` so no import site outside the package needs to change.
+:class:`OutcomeItem` shape, aggregation/counting helpers, and the shared
+sync-outcome adapter (:func:`sync_outcomes`). The envelope builder
+(:func:`json_envelope`) and its renderers (:func:`render_envelope`,
+:func:`render_install_envelope`, :func:`render_error_envelope`) now live in
+:mod:`vaultspec_core.envelope`, which an importing package can use without
+the CLI command tree; they are re-exported here so no import site outside
+the package needs to change. Re-exported in turn from :mod:`.rendering`.
 """
 
 from __future__ import annotations
@@ -13,8 +16,22 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.console import get_console
+from vaultspec_core.envelope import (
+    json_envelope as json_envelope,
+)
+from vaultspec_core.envelope import (
+    json_format_kwargs,
+)
+from vaultspec_core.envelope import (
+    render_envelope as render_envelope,
+)
+from vaultspec_core.envelope import (
+    render_error_envelope as render_error_envelope,
+)
+from vaultspec_core.envelope import (
+    render_install_envelope as render_install_envelope,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -29,9 +46,7 @@ class Outcome(StrEnum):
     shared across every sync-shaped surface (``install``, ``sync``, the
     ``spec * sync`` family, ``migrations run``, ``vault repair``,
     ``vault check ... --fix``) so operators and tooling read a single
-    taxonomy instead of the five divergent vocabularies the CLI UX
-    audit documented (findings S2, S8, S10). See the
-    ``cli-sync-vocabulary`` ADR.
+    taxonomy instead of a divergent vocabulary per command.
 
     Members:
         CREATED: A destination that did not exist now exists.
@@ -220,148 +235,6 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
             parts.append(f"[{colour}]{n} {outcome.value}[/{colour}]")
     if parts:
         console.print("  " + "  ".join(parts))
-
-
-def json_envelope(
-    command: str,
-    status: str,
-    data: Mapping[str, object],
-    *,
-    version: int = 1,
-    hints: Mapping[str, object] | None = None,
-) -> dict[str, object]:
-    """Wrap a command payload in the canonical ``--json`` envelope.
-
-    Per the ``cli-json-consistency`` ADR every ``--json`` output shares
-    one shape - ``{schema, status, data, hints}`` - so a CI consumer
-    matches a single pattern across every verb.
-
-    Args:
-        command: Dotted command identifier (e.g. ``"sync"``,
-            ``"spec.rules.sync"``); forms the ``schema`` string.
-        status: The invocation's aggregate canonical outcome word.
-        data: The command's own payload, nested unmodified.
-        version: Schema version suffix appended to the ``schema`` string
-            (e.g. ``1`` yields ``vaultspec.{command}.v1``). Defaults to
-            ``1``; all existing callers inherit ``v1`` unchanged. Pass
-            ``version=2`` when a command's payload shape has been bumped
-            and the consuming contract must be versioned (e.g.
-            :func:`cmd_graph` after the v2 envelope bump).
-        hints: Optional structured next-step hint; omitted when absent.
-
-    Returns:
-        The envelope mapping ``{schema, status, data}`` plus ``hints``
-        when supplied.
-
-    Example::
-
-        # Default v1 - all existing callers unchanged
-        json_envelope("vault.check", "unchanged", {...})
-        # => {"schema": "vaultspec.vault.check.v1", ...}
-
-        # Explicit v2 for the graph command after its schema bump
-        json_envelope("vault.graph", "unchanged", {...}, version=2)
-        # => {"schema": "vaultspec.vault.graph.v2", ...}
-    """
-    envelope: dict[str, object] = {
-        "schema": f"vaultspec.{command}.v{version}",
-        "status": str(status),
-        "data": dict(data),
-    }
-    if hints is not None:
-        envelope["hints"] = dict(hints)
-    return envelope
-
-
-def render_envelope(
-    command: str,
-    status: str,
-    data: Mapping[str, object],
-    *,
-    version: int = 1,
-    hints: Mapping[str, object] | None = None,
-) -> str:
-    """Render the canonical envelope as the one JSON line a caller prints.
-
-    :func:`json_envelope` builds the shape; this renders it on the wire, in
-    the channel's own formatting. Every package that reports through the
-    envelope calls this rather than dumping its own, so a payload cannot
-    arrive compact from one command and indented from another.
-
-    Args:
-        command: Dotted command identifier; forms the ``schema`` string.
-        status: The invocation's aggregate canonical outcome word.
-        data: The command's own payload.
-        version: Schema version suffix.
-        hints: Optional structured next-step hint; omitted when absent.
-
-    Returns:
-        The serialised envelope, without a trailing newline.
-    """
-    import json
-
-    return json.dumps(
-        json_envelope(command, status, data, version=version, hints=hints),
-        **json_format_kwargs(),
-        default=str,
-    )
-
-
-def render_install_envelope(
-    schema: str,
-    status: str,
-    data: Mapping[str, object],
-    hints: Sequence[str] | None = None,
-) -> str:
-    """Render an install or uninstall report as the canonical JSON line.
-
-    The report shape every package's install surface shares: the verb's own
-    schema, one canonical status word, the package's payload, and whatever
-    advisory lines it would otherwise have printed, carried as
-    ``hints.next`` so a machine consumer reads them without parsing prose. A
-    caller that has nothing to advise passes nothing.
-
-    Args:
-        schema: The verb, ``install`` or ``uninstall``, forming the schema.
-        status: The canonical outcome word for the run.
-        data: The verb's own payload.
-        hints: Advisory next-step lines, in display order.
-
-    Returns:
-        The serialised envelope, without a trailing newline.
-    """
-    listed = list(hints or ())
-    return render_envelope(
-        schema, status, data, hints={"next": listed} if listed else None
-    )
-
-
-def render_error_envelope(message: str, *, hint: str | None = None) -> str:
-    """Render a failure as the canonical ``vaultspec.error.v1`` JSON line.
-
-    The counterpart of :func:`render_install_envelope` for the run that did
-    not get that far, so a ``--json`` consumer parses failures rather than
-    inferring them from an exit code. It formats through the error-safe
-    keywords: the indentation switch may itself be what failed, and a second
-    refusal raised while reporting the first would replace it.
-
-    Args:
-        message: What went wrong, as the operator needs to read it.
-        hint: Optional guidance; omitted when absent.
-
-    Returns:
-        The serialised envelope, without a trailing newline.
-    """
-    import json
-
-    from vaultspec_core.cli.json_output import error_format_kwargs
-
-    data: dict[str, object] = {"message": message}
-    if hint:
-        data["hint"] = hint
-    return json.dumps(
-        json_envelope("error", "failed", data), **error_format_kwargs(), default=str
-    )
 
 
 def emit_outcomes(

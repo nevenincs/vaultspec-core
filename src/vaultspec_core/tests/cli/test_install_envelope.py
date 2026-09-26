@@ -16,6 +16,7 @@ import pytest
 
 from vaultspec_core.cli.rendering_hints import hints_suppressed
 from vaultspec_core.cli.rendering_outcomes import (
+    render_envelope,
     render_error_envelope,
     render_install_envelope,
 )
@@ -58,20 +59,23 @@ class TestInstallEnvelope:
         assert "hints" not in payload
 
     def test_advisory_lines_ride_in_the_envelope(self) -> None:
-        line = render_install_envelope(
-            "install",
-            "created",
-            {},
-            ["vaultspec-core status", "vaultspec-core sync"],
-        )
+        # The same structured mapping emit_next_step_hint returns, not a
+        # second, install-specific hint shape.
+        hint = {"text": "Track progress", "command": "vaultspec-core status"}
 
-        assert json.loads(line)["hints"] == {
-            "next": ["vaultspec-core status", "vaultspec-core sync"]
-        }
+        line = render_install_envelope("install", "created", {}, hints=hint)
 
-    def test_an_empty_hint_sequence_is_no_hints(self) -> None:
+        assert json.loads(line)["hints"] == hint
+
+    def test_hints_is_keyword_only(self) -> None:
+        import inspect
+
+        parameters = inspect.signature(render_install_envelope).parameters
+        assert parameters["hints"].kind is inspect.Parameter.KEYWORD_ONLY
+
+    def test_no_hint_is_no_hints_key(self) -> None:
         assert "hints" not in json.loads(
-            render_install_envelope("uninstall", "removed", {}, [])
+            render_install_envelope("uninstall", "removed", {})
         )
 
     def test_it_is_one_line_a_caller_can_print(self) -> None:
@@ -85,6 +89,18 @@ class TestInstallEnvelope:
         line = render_install_envelope("install", "created", {"path": Path("/srv")})
 
         assert json.loads(line)["data"]["path"]
+
+    def test_it_matches_render_envelope_byte_for_byte(self) -> None:
+        """render_install_envelope is the one shape core's own install and
+        uninstall commands emit through - not a second envelope shape a
+        second function happens to also produce.
+        """
+        hint = {"text": "Track progress", "command": "vaultspec-core status"}
+        data = {"path": "/srv/project"}
+
+        assert render_install_envelope(
+            "install", "created", data, hints=hint
+        ) == render_envelope("install", "created", data, hints=hint)
 
 
 class TestErrorEnvelope:
@@ -119,7 +135,7 @@ class TestErrorEnvelope:
 
 class TestHintSuppression:
     def test_the_flag_suppresses(self) -> None:
-        assert hints_suppressed(True, environ={}) is True
+        assert hints_suppressed(no_hints=True, environ={}) is True
 
     def test_nothing_set_leaves_hints_in_place(self) -> None:
         assert hints_suppressed(environ={}) is False
