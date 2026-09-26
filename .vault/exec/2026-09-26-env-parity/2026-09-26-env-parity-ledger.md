@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:d8b62232e88164ff6862df62fb4a9c2a31046667a5f1c33b718079a87f737378'
+body_hash: 'sha256:be7da20bcfb82188e722fafb53969b96db157ded260d20ed1366d04b41dcf776'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -211,6 +211,26 @@ related:
 - `S15` `verify:` `just check-links` -> `pass`
 - `S15` `verify:` `just framework-reference-check` -> `pass`
 - `S15` `by:` `vaultspec-standard-executor`
+- `S08` `M` `src/vaultspec_core/tests/test_logging_config.py`
+- `S08` `verify:` `pytest src/vaultspec_core/tests/test_logging_config.py` -> `pass`
+- `S08` `by:` `vaultspec-standard-executor`
+- `S05` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S05` `verify:` `pytest src/vaultspec_core/config/tests/test_resolution.py` -> `pass`
+- `S05` `by:` `vaultspec-standard-executor`
+- `S07` `verify:` `pytest src/vaultspec_core/config/tests/test_workspace.py` -> `pass`
+- `S07` `by:` `vaultspec-standard-executor`
+- `S08` `M` `src/vaultspec_core/cli/_errors.py`
+- `S08` `verify:` `pytest src/vaultspec_core/tests/cli/test_global_options.py` -> `pass`
+- `S12` `A` `src/vaultspec_core/envelope.py`
+- `S12` `M` `src/vaultspec_core/cli/json_output.py`
+- `S12` `M` `src/vaultspec_core/cli/status_cmd.py`
+- `S12` `M` `src/vaultspec_core/tests/cli/test_install_envelope.py`
+- `S12` `M` `src/vaultspec_core/tests/cli/test_uninstall.py`
+- `S12` `verify:` `pytest src/vaultspec_core/tests/cli/test_install_envelope.py src/vaultspec_core/tests/cli/test_uninstall.py` -> `pass`
+- `S12` `by:` `vaultspec-standard-executor`
+- `S11` `M` `src/vaultspec_core/tests/cli/test_install.py`
+- `S11` `verify:` `pytest src/vaultspec_core/tests/cli/test_install.py -k TestUpgradeInfersDevModeForALegacyWorkspace` -> `pass`
+- `S11` `by:` `vaultspec-standard-executor`
 
 ## Notes
 
@@ -233,3 +253,9 @@ related:
 - `S44` vaultspec-dashboard commits 802bcde1 and review fix abb84961.
 - `S45` vaultspec-dashboard commit b096f45e.
 - `S43` review fix: vaultspec-a2a commit 22a02be1 names the core release that serves the launch command.
+- `S08` review fix: `resolve_log_level` now refuses a caller-supplied default outside `LOG_LEVELS` instead of letting `configure_logging` crash on it
+- `S05` review fix: `check_environment` takes a package parameter and validates that package's own chain instead of always core's whole registry; `_forget_registry's` docstring now states it is a testing-only hook
+- `S07` review fix: ResolvedTarget now enforces that a variable is carried if and only if the source is ENVIRONMENT; `apply_target` renders a bad `VAULTSPEC_TARGET_DIR` through the caller's own known `json_output` instead of letting it escape unrendered
+- `S08` review fix: a startup refusal from the root callback, which fires before Click parses the subcommand's own --json flag, now renders the canonical envelope when --json appears anywhere in argv, proven with a real subprocess
+- `S12` review fix: `render_envelope,` `render_install_envelope,` `render_error_envelope` and `hints_suppressed` moved to the CLI-free `vaultspec_core.envelope,` cutting import `vaultspec_core.envelope` to about 134ms/192 modules against 229ms/397 for the old `vaultspec_core.cli.rendering_outcomes` path; `render_install_envelope's` hints now take the same structured mapping every other envelope carries, keyword-only, and core's own install/uninstall render through it
+- `S11` review fix: dropped the internal decision-record identifier from `infer_upgrade_mode's` and `upgrade_mode_with_provenance's` docstrings; added an end-to-end install --upgrade test against a real legacy dev-group workspace with deployed uv-run hooks, asserting the persisted dev declaration and the rendered hook entries
