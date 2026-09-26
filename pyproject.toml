@@ -17,6 +17,7 @@ classifiers = [
 ]
 dependencies = [
   "PyYAML>=6.0.3",
+  "anyio>=4.10",
   "mcp>=2.0.0",
   "networkx>=3.6",
   "phart>=0.5.0",
@@ -67,9 +68,9 @@ version = "0.2.6"
 
 [dependency-groups]
 # Local dev tooling only (PEP 735); NOT published in the wheel's Requires-Dist.
-# vaultspec-rag (semantic search) and its torch backend live here so they never
-# become runtime or published-extra dependencies of vaultspec-core. The cu130
-# torch source pin in [tool.uv.sources] applies because torch is a direct dep here.
+# vaultspec-rag (semantic search) lives here so it never becomes a runtime or
+# published-extra dependency of vaultspec-core. Only its `mcp` extra is taken:
+# the repo talks to the rag server and needs no local torch/GPU stack.
 dev = [
   "bandit>=1.9.4",
   "basedpyright>=1.39",
@@ -78,11 +79,6 @@ dev = [
   # C90 measures. Configured from [tool.complexipy] below.
   "complexipy>=6.2",
   "deptry>=0.25.1",
-  # Sole consumer is `dev/audit/dependency_audit.py`, which posts the locked
-  # package set to the OSV querybatch API. Declared here rather than relied on
-  # transitively: `mcp@2.0.0` moved to `httpx2`, so nothing in the runtime tree
-  # pulls httpx any more.
-  "httpx>=0.28.1",
   "identify>=2.0.0",
   "mdformat>=1.0.0",
   "mdformat-frontmatter>=2.0.10",
@@ -99,7 +95,6 @@ dev = [
   "pytest-xdist>=3.8.0",
   "radon>=6.0.1",
   "ruff>=0.15.2",
-  "torch>=2.4",
   "ty>=0.0.15",
   "vaultspec-rag[mcp]>=0.4.4",
   "vulture>=2.16",
@@ -818,8 +813,9 @@ known_first_party = ["vaultspec_core"]
   # `httpx` WAS a fourth name here and is now resolved: the mcp 2.0 bump moved
   # the SDK to `httpx2`, so httpx stopped being a transitive of the runtime tree
   # entirely and the declaration was pinning a floor on a package nothing
-  # installed or imported. Its only first-party import is the unshipped
-  # `dev/audit/dependency_audit.py`, so it moved to the `dev` dependency group.
+  # installed or imported. Its last first-party consumer,
+  # `dev/audit/dependency_audit.py`, now speaks `http.client` directly, so the
+  # declaration is gone from the `dev` dependency group as well.
   #
   # The remaining names are the legacy `[project.optional-dependencies] dev`
   # extra, which duplicates the PEP 735 `dev` dependency group below it. They
@@ -838,13 +834,3 @@ known_first_party = ["vaultspec_core"]
     "ruff",
     "ty",
   ]
-
-[[tool.uv.index]]
-explicit = true
-name = "pytorch-cu130"
-url = "https://download.pytorch.org/whl/cu130"
-
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
-]

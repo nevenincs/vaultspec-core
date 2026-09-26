@@ -29,9 +29,19 @@ def stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
     exceeds the running package's version may have just bumped the
     manifest above the running release, and rewriting it back would
     silently re-flag the migration as pending on the next run.
+
+    Never advance past a pending migration either. The version means every
+    entry at or below it has run, and this stamp runs on paths that do not run
+    the registry (a plain ``sync``), so advancing it there retires the pending
+    entries unapplied and nothing ever offers them again.
     """
+    from ..migrations import REGISTRY
+
+    current = parse_version_tuple(mdata.vaultspec_version)
+    if any(parse_version_tuple(m.target_version) > current for m in REGISTRY):
+        return
     running = package_version()
-    if parse_version_tuple(running) > parse_version_tuple(mdata.vaultspec_version):
+    if parse_version_tuple(running) > current:
         mdata.vaultspec_version = running
 
 

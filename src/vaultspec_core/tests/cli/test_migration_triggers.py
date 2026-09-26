@@ -168,6 +168,39 @@ class TestInstallUpgradeTrigger:
         assert target.exists(), "migrated file must land in .vault/index/"
 
 
+class TestSyncLeavesPendingMigrationsPending:
+    """A plain ``sync`` runs no migration, so it must not record any as run.
+
+    ``sync`` stamps the manifest version on its way out. Stamping it past a
+    pending entry marks that entry applied without running it, and after that
+    neither ``install --upgrade`` nor ``migrations run`` ever offers it again.
+    """
+
+    def test_sync_does_not_advance_past_pending(self, tmp_path: Path):
+        from vaultspec_core.migrations import list_pending
+
+        factory = WorkspaceFactory(tmp_path).install("core")
+        _plant_legacy_index(tmp_path, "gamma")
+        _rewind_manifest(tmp_path, "0.1.16")
+
+        factory.sync()
+
+        assert read_manifest_data(tmp_path).vaultspec_version == "0.1.16"
+        assert "index_subfolder" in {m.name for m in list_pending(tmp_path)}
+
+    def test_upgrade_after_sync_still_migrates(self, tmp_path: Path):
+        factory = WorkspaceFactory(tmp_path).install("core")
+        legacy = _plant_legacy_index(tmp_path, "delta")
+        _rewind_manifest(tmp_path, "0.1.16")
+
+        factory.sync()
+        reset_workspace_cache()
+        factory.install("core", upgrade=True)
+
+        assert not legacy.exists()
+        assert (tmp_path / ".vault" / "index" / "delta.index.md").exists()
+
+
 class TestAuthoringVerbTrigger:
     """The two layout-sensitive authoring verbs still converge first.
 
