@@ -42,6 +42,7 @@ SYNTHESIZED_RULES = frozenset({"vaultspec-system"})  # core/system.py
 RUNTIME_VAULTSPEC_PATHS = frozenset(
     {
         "workspace.json",  # written by install; per-project state
+        "config.toml",  # written by config set / interactive setup; per-project state
         # Created by scaffold rather than copied from builtins: neither hooks
         # nor triggers ship a bundled example, because both hold shell commands
         # that would then land in every install, and a directory cannot be
