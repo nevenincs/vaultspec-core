@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:e364dc611407a84b31bed322a5382096c459f4fddae99446bde70c6b8b623f5f'
+body_hash: 'sha256:75a1e77b90334b3bbf5b304f41796740e3941e1d1a30dbe6b2a7f65665996fb4'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -130,6 +130,14 @@ related:
 - `S10` `verify:` `just check-type` -> `pass`
 - `S10` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/triggers src/vaultspec_core/tests/cli/test_hook_consent.py` -> `pass`
 - `S10` `by:` `vaultspec-high-executor`
+- `S11` `M` `src/vaultspec_core/core/install_mode.py`
+- `S11` `M` `src/vaultspec_core/core/commands.py`
+- `S11` `M` `src/vaultspec_core/core/provision.py`
+- `S11` `A` `src/vaultspec_core/core/tests/test_upgrade_mode.py`
+- `S11` `verify:` `just check-python` -> `pass`
+- `S11` `verify:` `just check-type` -> `pass`
+- `S11` `verify:` `pytest src/vaultspec_core/core src/vaultspec_core/tests/cli/test_migration_triggers.py src/vaultspec_core/tests/cli/test_collectors.py` -> `pass`
+- `S11` `by:` `vaultspec-high-executor`
 
 ## Notes
 
@@ -141,3 +149,4 @@ related:
 - `S04` review fix: every product value is refused at startup in one report, an error report never re-reads the switch that failed, the product marker outranks CI, and `NO_COLOR` follows set-and-non-empty
 - `S08` The test pinning the absence of --verbose is replaced by one pinning its effect.
 - `S09` The level-fallback test carried over from the log-level Step is corrected here to the refusal the policy requires.
+- `S11` A dev-group workspace launched through uv run now resolves DEV where it resolved TOOL.
