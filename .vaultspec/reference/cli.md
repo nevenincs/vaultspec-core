@@ -25,17 +25,21 @@ configuration.
 
 ## Global options
 
-| Option         | Short | Default | Description                                                        |
-| -------------- | ----- | ------- | ------------------------------------------------------------------ |
-| `--target DIR` | `-t`  | cwd     | Target workspace directory. Overrides the env var.                 |
-| `--debug`      | `-d`  | off     | Enable DEBUG-level logging (top-level only).                       |
-| `--verbose`    | `-v`  | off     | Enable INFO-level logging (top-level only); `--debug` outranks it. |
-| `--version`    | `-V`  | -       | Print version and exit (top-level only).                           |
-| `--help`       | -     | -       | Show help for any command or group.                                |
+| Option         | Short | Default    | Description                                                        |
+| -------------- | ----- | ---------- | ------------------------------------------------------------------ |
+| `--target DIR` | `-t`  | discovered | Target workspace directory. Overrides the env var.                 |
+| `--debug`      | `-d`  | off        | Enable DEBUG-level logging (top-level only).                       |
+| `--verbose`    | `-v`  | off        | Enable INFO-level logging (top-level only); `--debug` outranks it. |
+| `--version`    | `-V`  | -          | Print version and exit (top-level only).                           |
+| `--help`       | -     | -          | Show help for any command or group.                                |
 
 `--target` is accepted by workspace commands and by every `vaultspec-core vault`,
 `vaultspec-core spec`, and `vaultspec-core migrations` subcommand. `--json` is
 command-specific.
+
+With neither `--target` nor `VAULTSPEC_TARGET_DIR` set, the root is discovered from the
+working directory: the `.gt/` container root, then the worktree root, then the
+repository root, and the working directory itself only when none of those is found.
 
 ## Surface provenance
 
@@ -47,7 +51,7 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.5`, and every command, flag, and tool documented
+The latest published release is `0.2.6`, and every command, flag, and tool documented
 here is in it.
 
 <!-- vaultspec:generated:end unreleased-surface -->

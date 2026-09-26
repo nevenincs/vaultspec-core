@@ -39,8 +39,10 @@ top-level only. `--target` is accepted by target-aware workspace commands,
 `vaultspec-core migrations ...`. `--json` is command-specific and appears only on
 commands that support JavaScript Object Notation (JSON) output.
 
-- `--target DIR` (`-t`, default cwd) - Target workspace directory. Overrides
-  `VAULTSPEC_TARGET_DIR`. Defaults to the current working directory if neither is set.
+- `--target DIR` (`-t`, default discovered) - Target workspace directory. Overrides
+  `VAULTSPEC_TARGET_DIR`. With neither set, the root is discovered from the working
+  directory: the `.gt/` container root, then the worktree root, then the repository
+  root, and the working directory itself only when none of those is found.
 - `--debug` (`-d`, default off) - Enable DEBUG-level logging (top-level flag).
 - `--verbose` (`-v`, default off) - Enable INFO-level logging (top-level flag).
   `--debug` outranks it when both are given.
@@ -486,6 +488,10 @@ Deploy the vaultspec framework into the target directory.
 
 `core` installs `.vaultspec/` only, without any provider config.
 
+Exit codes: `0` success, `1` failure, `2` completed with a required step skipped. The
+three are shared by every vaultspec package's install surface; core has no step that
+reports `2` today.
+
 #### Examples
 
 - **Install the framework for all supported provider layers in the current directory**:
@@ -519,6 +525,10 @@ Remove the vaultspec framework from the target directory.
 
 `.vault/` is preserved by default. `--remove-vault` deletes it; commit or back up its
 records first.
+
+Exit codes: `0` success, `1` failure, `2` completed with a required step skipped. The
+three are shared by every vaultspec package's install surface; core has no step that
+reports `2` today.
 
 #### Examples
 
@@ -593,7 +603,8 @@ remains the corpus-wide gate for CI and explicit runs.
 
 #### Options
 
-- `--target DIR` (`-t`, default cwd) - Check a directory other than the current one.
+- `--target DIR` (`-t`, default discovered) - Check a directory other than the current
+  one.
 - `--json` (default off) - Output as JSON.
 
 Exit codes: `0` = nothing blocks, `1` = something blocks.
@@ -628,7 +639,8 @@ commands when you already know which half you are investigating.
 
 #### Options
 
-- `--target DIR` (`-t`, default cwd) - Diagnose a directory other than the current one.
+- `--target DIR` (`-t`, default discovered) - Diagnose a directory other than the
+  current one.
 - `--json` (default off) - Output as JSON.
 
 Exit codes: `0` = all ok, `1` = warnings, `2` = errors.
@@ -732,7 +744,7 @@ before computing a new hash.
 - `--check` / `--no-check` (default `--check`) - Run conformance checks before writing.
 - `--dry-run` (default off) - Preview without writing.
 - `--json` (default off) - Output as JSON.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -775,7 +787,7 @@ Use this when the metadata is already right and you only want to swap the prose;
 - `--check` / `--no-check` (default `--check`) - Run conformance checks before writing.
 - `--dry-run` (default off) - Preview without writing.
 - `--json` (default off) - Output as JSON.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -818,7 +830,7 @@ pass every value you want to keep. To add or drop a single edge instead, use
 - `--expected-blob-hash HASH` - Refuse the write unless the on-disk blob OID matches.
 - `--dry-run` (default off) - Preview without writing.
 - `--json` (default off) - Output as JSON.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -864,7 +876,7 @@ its tags, and its index - use `vaultspec-core vault feature rename`.
   renamed document.
 - `--dry-run` (default off) - Preview without writing.
 - `--json` (default off) - Output as JSON.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -1319,7 +1331,7 @@ Move all documents for a feature tag to the archive.
 - `--dry-run` (default off) - Preview planned changes.
 - `--no-hints` (default off) - Suppress next-step advisory hints.
 - `--json` (default off) - Emit machine-readable output.
-- `--target` (`-t`) - Target directory (defaults to current working directory).
+- `--target` (`-t`) - Target directory (defaults to the discovered workspace root).
 
 #### Examples
 
@@ -1343,7 +1355,7 @@ Restore all archived documents for a feature tag.
 
 - `--dry-run` (default off) - Preview planned changes.
 - `--json` (default off) - Emit machine-readable output.
-- `--target` (`-t`) - Target directory (defaults to current working directory).
+- `--target` (`-t`) - Target directory (defaults to the discovered workspace root).
 
 #### Examples
 
@@ -1563,7 +1575,7 @@ Preview first with `--dry-run` - this command touches many files at once.
 - `--force` (default off) - Merge the source into an existing target feature.
 - `--json` (default off) - Output as JSON.
 - `--no-hints` (default off) - Suppress next-step advisory hints.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -1598,7 +1610,7 @@ Supersede an old ADR with a new ADR.
 - `--by` - New ADR stem that supersedes the old one.
 - `--dry-run` (default off) - Preview without writing.
 - `--json` (default off) - Output as JSON.
-- `--target` (`-t`) - Target directory (defaults to current working directory).
+- `--target` (`-t`) - Target directory (defaults to the discovered workspace root).
 
 #### Examples
 
@@ -1677,7 +1689,7 @@ anything.
   without `--apply` and use `vaultspec-core vault link add`.
 - `--json` (default off) - Emit machine-readable output
   (`vaultspec.vault.adr.crossref.v1`).
-- `--target` (`-t`) - Target directory (defaults to current working directory).
+- `--target` (`-t`) - Target directory (defaults to the discovered workspace root).
 
 Under `--json`, `data.sources` holds one entry per source judged, with its `status`
 (`ok`, `not_configured`, or `unavailable`), its `verdicts` (`stem`, `kind`, `score`,
@@ -1736,7 +1748,7 @@ Promote an audit finding to a project-level rule.
 - `--force` (default off) - Overwrite existing rule source.
 - `--dry-run` (default off) - Preview without writing.
 - `--json` (default off) - Output as JSON.
-- `--target` (`-t`) - Target directory (defaults to current working directory).
+- `--target` (`-t`) - Target directory (defaults to the discovered workspace root).
 
 #### Examples
 
@@ -2328,7 +2340,7 @@ tag. For a whole-graph picture rather than an edge list, use
 
 - `--feature TAG` (`-f`) - Filter edges whose source has this feature tag.
 - `--json` (default off) - Output as JSON.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -2375,7 +2387,7 @@ scaffolded yet. The command exits `0` when the edge was added or already existed
 - `--force` (default off) - Allow creating a dangling edge whose target is not a real
   document.
 - `--json` (default off) - Output as JSON.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -2416,7 +2428,7 @@ fails.
 
 - `--dry-run` (default off) - Preview the change without writing.
 - `--json` (default off) - Output as JSON.
-- `--target DIR` (`-t`, default cwd) - Target directory.
+- `--target DIR` (`-t`, default discovered) - Target directory.
 
 #### Examples
 
@@ -2448,7 +2460,8 @@ reported as warnings and are not modified.
 
 #### Options
 
-- `--target DIR` (`-t`, default cwd) - Diagnose a directory other than the current one.
+- `--target DIR` (`-t`, default discovered) - Diagnose a directory other than the
+  current one.
 - `--json` (default off) - Emit the diagnosis as JSON.
 - `--gate-errors` (default off) - Exit `0` on warnings and fail (exit `2`) only on
   errors. Intended for the pre-commit gate, where warning-level provider-mirror lag is
@@ -2875,7 +2888,8 @@ Both commands exit zero when the requested policy already holds.
 #### Options
 
 - `--json` (default off) - Emit the result as JSON.
-- `--target DIR` (`-t`, default cwd) - Act on a directory other than the current one.
+- `--target DIR` (`-t`, default discovered) - Act on a directory other than the current
+  one.
 
 #### Examples
 
@@ -2913,7 +2927,8 @@ union merging of execution ledgers.
 #### Options
 
 - `--json` (default off) - Emit the result as JSON.
-- `--target DIR` (`-t`, default cwd) - Act on a directory other than the current one.
+- `--target DIR` (`-t`, default discovered) - Act on a directory other than the current
+  one.
 
 #### Examples
 
@@ -3238,7 +3253,7 @@ manifest. Read-only; never mutates.
 
 #### Options
 
-- `--target DIR` (`-t`, default cwd) - Inspect a workspace other than the current
+- `--target DIR` (`-t`, default discovered) - Inspect a workspace other than the current
   directory.
 - `--json` (default off) - Emit status, registered list, and pending list as JSON.
 
@@ -3267,7 +3282,7 @@ unchanged so the next invocation re-attempts it.
 
 #### Options
 
-- `--target DIR` (`-t`, default cwd) - Migrate a workspace other than the current
+- `--target DIR` (`-t`, default discovered) - Migrate a workspace other than the current
   directory.
 - `--dry-run` (default off) - List every document the pending migrations would delete
   and change nothing.
