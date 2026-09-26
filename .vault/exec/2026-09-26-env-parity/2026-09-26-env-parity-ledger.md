@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:896092bf682ec76e72258f19b57bea54c803936040696ffca2efb166020f87f3'
+body_hash: 'sha256:ab2129718776e33af2e07bcfc11822bb5d24a6b2532524415857cf19af306d65'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -81,6 +81,16 @@ related:
 - `S43` `verify:` `pytest src/vaultspec_a2a/providers/tests/test_acp_mcp.py` -> `pass`
 - `S43` `verify:` `ruff check` -> `pass`
 - `S43` `by:` `vaultspec-low-executor`
+- `S07` `M` `src/vaultspec_core/config/workspace.py`
+- `S07` `M` `src/vaultspec_core/config/__init__.py`
+- `S07` `M` `src/vaultspec_core/config/config.py`
+- `S07` `M` `src/vaultspec_core/cli/_target.py`
+- `S07` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S07` `M` `src/vaultspec_core/config/tests/test_workspace.py`
+- `S07` `verify:` `just check-python` -> `pass`
+- `S07` `verify:` `just check-type` -> `pass`
+- `S07` `verify:` `pytest src/vaultspec_core/config/tests src/vaultspec_core/tests/cli src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S07` `by:` `vaultspec-high-executor`
 
 ## Notes
 

@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:627ec06b04d64845d5c09070bb4668e701facc2baf06bb4d9c854fd67234198e'
+body_hash: 'sha256:427b3616ef8e683498aa6900dfbb83a4eebfa83cb0db9a38b9b833881afddb2e'
 ---
 
 # `env-parity` plan
@@ -61,7 +61,7 @@ Add the public, standard-library-only value vocabulary, open core's registry acc
 
 Route core's own entry points through the public resolution functions: workspace root, log level, editor ladder, unattended detection, legacy upgrade inference and the install envelope, all importable by other packages.
 
-- [ ] `W01.P02.S07` - Add a public workspace-root resolver ranking the invocation, then VAULTSPEC_TARGET_DIR, then discovery, and use it from the CLI and the MCP server; `src/vaultspec_core/cli/_target.py`.
+- [x] `W01.P02.S07` - Add a public workspace-root resolver ranking the invocation, then VAULTSPEC_TARGET_DIR, then discovery, and use it from the CLI and the MCP server; `src/vaultspec_core/cli/_target.py`.
 - [ ] `W01.P02.S08` - Add -v/--verbose to the root callback and honour VAULTSPEC_LOG_LEVEL when neither --debug nor --verbose is given, rejecting an unknown level name; `src/vaultspec_core/cli/root_app.py`.
 - [ ] `W01.P02.S09` - Resolve every editor use through one ladder, flag then VAULTSPEC_EDITOR then the committed config key then VISUAL then EDITOR then vi, and declare vi as the registry default; `src/vaultspec_core/core/local_config.py`.
 - [ ] `W01.P02.S10` - Expose unattended detection publicly outside the CLI package: CI or VAULTSPEC_NON_INTERACTIVE, a non-TTY standard input or output, or --json; `src/vaultspec_core/config/session.py`.
