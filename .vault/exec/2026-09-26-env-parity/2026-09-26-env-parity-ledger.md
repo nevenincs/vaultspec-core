@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:df2239d1fab075dfd7b71b1ba10df5b6eb4b1be18ca1dad08c08390976852965'
+body_hash: 'sha256:d4af47a7684f35b9f15c0ac07f2f9285d611a1d68e42d78c3655a3ad4efe6243'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -55,6 +55,12 @@ related:
 - `S36` `M` `.vault/adr/2026-07-13-index-drift-hardening-adr.md`
 - `S36` `verify:` `vaultspec-core vault check all` -> `pass`
 - `S36` `by:` `vaultspec-docs-curator`
+- `S01` `A` `src/vaultspec_core/env_values.py`
+- `S01` `M` `src/vaultspec_core/__init__.py`
+- `S01` `verify:` `just check-python` -> `pass`
+- `S01` `verify:` `just check-type` -> `pass`
+- `S01` `verify:` `pytest src/vaultspec_core/config/tests src/vaultspec_core/mcp_server/tests/test_tool_surface.py` -> `pass`
+- `S01` `by:` `vaultspec-high-executor`
 
 ## Notes
 

@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:926ddf5f1d193d2959ea19b6b6e6dc5d1ea20d5bed558c34fba412864d606601'
+body_hash: 'sha256:cb4d7b5483f1bf434abd0baffd0ecdf7359a3664fa1e15ff955b749ed2802ec2'
 ---
 
 # `env-parity` plan
@@ -50,7 +50,7 @@ Give vaultspec-core a public, importable implementation of the one resolution or
 
 Add the public, standard-library-only value vocabulary, open core's registry accessors to package registries with a framework fallback, open the workspace .env gate per package, and move core's own call sites and loaded fields onto one vocabulary and reject-on-invalid.
 
-- [ ] `W01.P01.S01` - Add a standard-library-only public vocabulary module: the true and false word tables, a parser that treats blank as unset, and the one rejection message naming variable, value and expected shape; `src/vaultspec_core/env_values.py`.
+- [x] `W01.P01.S01` - Add a standard-library-only public vocabulary module: the true and false word tables, a parser that treats blank as unset, and the one rejection message naming variable, value and expected shape; `src/vaultspec_core/env_values.py`.
 - [ ] `W01.P01.S02` - Let a package declare its own registry of ConfigVariable entries, add a framework_fallback field that chains a package-scoped entry to a shared VAULTSPEC_ entry, and make env_value and child_environment accept any registered package entry; `src/vaultspec_core/config/config.py`.
 - [ ] `W01.P01.S03` - Add a package parameter to resolve_credential so the workspace .env opens on that package's resolved install mode, keeping the interpreter-inside-workspace test and the one-variable read; `src/vaultspec_core/config/credential.py`.
 - [ ] `W01.P01.S04` - Move the per-site switch readings onto the shared vocabulary, turning VAULTSPEC_NON_INTERACTIVE and VAULTSPEC_NO_HINTS into booleans and keeping the stdio watchdog fail-safe; `src/vaultspec_core/cli/rendering_hints.py`.
