@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:2440b9bb036f7240f97f43e0977459de96a323faf57299104870da6bed2750e5'
+body_hash: 'sha256:6cec324b0d1ef56088b7b721a6882f839261fa5feeae0d95458964e6b50cab12'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -97,6 +97,15 @@ related:
 - `S04` `M` `src/vaultspec_core/cli/_errors.py`
 - `S04` `A` `src/vaultspec_core/tests/cli/test_unusable_settings.py`
 - `S04` `M` `src/vaultspec_core/tests/cli/test_console.py`
+- `S08` `M` `src/vaultspec_core/logging_config.py`
+- `S08` `M` `src/vaultspec_core/cli/root_app.py`
+- `S08` `M` `src/vaultspec_core/config/config.py`
+- `S08` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S08` `M` `src/vaultspec_core/tests/cli/test_global_options.py`
+- `S08` `verify:` `just check-python` -> `pass`
+- `S08` `verify:` `just check-type` -> `pass`
+- `S08` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/tests/cli/test_global_options.py` -> `pass`
+- `S08` `by:` `vaultspec-high-executor`
 
 ## Notes
 
@@ -106,3 +115,4 @@ related:
 - `S02` review fix: a registered name, not just an object, belongs to one package; a fallback may only reach a framework variable; registration is locked
 - `S03` review fix: the workspace .env gate takes no caller-supplied package; the declaring package's mode is the only one consulted
 - `S04` review fix: every product value is refused at startup in one report, an error report never re-reads the switch that failed, the product marker outranks CI, and `NO_COLOR` follows set-and-non-empty
+- `S08` The test pinning the absence of --verbose is replaced by one pinning its effect.
