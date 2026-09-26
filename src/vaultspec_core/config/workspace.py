@@ -376,6 +376,42 @@ def _absolute(path: Path, base: Path) -> Path:
     return _strip_unc(absolute.resolve())
 
 
+def _expanded(raw: str, variable: str) -> Path:
+    """Return *raw* as a path, with leading home shorthand expanded.
+
+    A shell expands ``~`` before the process ever sees it, so an invocation
+    never carries one. A variable does: ``VAULTSPEC_TARGET_DIR=~/work`` is
+    assigned, exported from a configuration file, or written into an agent
+    manifest without a shell in between, and the tilde arrives verbatim. A
+    root taken from the environment therefore expands it, or the operator's
+    home shorthand would be read as a directory literally named ``~``.
+
+    The home directory is the running process's own, as the platform
+    determines it, not one named in a caller-supplied environment mapping:
+    the shorthand means the home of whoever is running, and a second
+    implementation of the platform's rule is how that answer drifts.
+
+    Args:
+        raw: The value the variable carried.
+        variable: The name that carried it, for the refusal.
+
+    Returns:
+        The path, home shorthand expanded.
+
+    Raises:
+        ConfigurationError: If the value needs a home directory this process
+            cannot determine.
+    """
+    try:
+        return Path(raw).expanduser()
+    except RuntimeError as unresolvable:
+        raise ConfigurationError(
+            f"{variable} names a path under the home directory, which this "
+            f"process cannot determine: {raw!r}",
+            hint=f"Point {variable} at an absolute path instead.",
+        ) from unresolvable
+
+
 def resolve_target(
     explicit: Path | None = None,
     *,
@@ -392,6 +428,11 @@ def resolve_target(
     failure: it means discovery, which :func:`resolve_workspace` performs when
     handed no override.
 
+    A root the environment names expands leading home shorthand (``~``,
+    ``~user``); one the invocation names is taken as given, because the shell
+    or the CLI framework has already expanded whatever it was going to. A
+    relative root of either kind is taken against *cwd*.
+
     Args:
         explicit: The root the invocation named, or ``None``.
         package_root: The calling package's root entry. ``None`` reads
@@ -407,6 +448,8 @@ def resolve_target(
         ConfigurationError: If a variable names a directory that does not
             exist. A root that is not there cannot be discovered past: the
             operator asked for one workspace and would silently get another.
+            Also if a variable names a path under a home directory this
+            process cannot determine.
         ValueError: If *package_root* is not a registered entry.
     """
     base = _strip_unc((cwd or Path.cwd()).resolve())
@@ -420,7 +463,7 @@ def resolve_target(
 
     supplier = env_source(entry, environ)
     name = entry.env_name if supplier is None else supplier.env_name
-    root = _absolute(Path(raw), base)
+    root = _absolute(_expanded(raw, name), base)
     if not root.is_dir():
         raise ConfigurationError(
             str(rejection(name, "an existing directory", raw)),

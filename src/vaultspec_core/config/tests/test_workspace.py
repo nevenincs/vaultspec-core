@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -468,3 +471,80 @@ class TestResolveTarget:
                 environ={"VAULTSPEC_TARGET_DIR": str(not_a_dir)},
                 cwd=tmp_path,
             )
+
+
+class TestHomeShorthand:
+    """A root the environment names may use the operator's home shorthand."""
+
+    def test_the_framework_variable_expands_it(self, tmp_path: Path) -> None:
+        # No shell stands between an exported variable and this process, so
+        # the tilde arrives verbatim and is this code's to expand.
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": "~"},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == Path.home().resolve()
+        assert resolved.source == TargetSource.ENVIRONMENT
+
+    def test_a_package_variable_expands_it_too(self, tmp_path: Path) -> None:
+        resolved = resolve_target(
+            package_root=COMPANION_ROOT,
+            environ={"VAULTSPEC_TARGET_COMPANION_ROOT": "  ~  "},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == Path.home().resolve()
+        assert resolved.variable == "VAULTSPEC_TARGET_COMPANION_ROOT"
+
+    def test_an_invocation_root_is_taken_as_given(self, tmp_path: Path) -> None:
+        # The shell and the CLI framework have already expanded whatever they
+        # were going to; a tilde that survives that is a directory name.
+        resolved = resolve_target(Path("~"), cwd=tmp_path)
+
+        assert resolved.source == TargetSource.INVOCATION
+        assert resolved.path is not None
+        assert resolved.path.name == "~"
+
+    def test_an_undeterminable_home_is_refused_by_variable_name(
+        self, tmp_path: Path
+    ) -> None:
+        """Proven in a subprocess: home comes from the interpreter's own env.
+
+        ``Path.expanduser`` reads the platform's home variables from the
+        running process, not from the mapping handed to ``resolve_target``,
+        so the only honest way to run without one is to start an interpreter
+        that has none.
+        """
+        probe = (
+            "from pathlib import Path\n"
+            "from vaultspec_core.config import resolve_target\n"
+            "from vaultspec_core.core.exceptions import ConfigurationError\n"
+            "try:\n"
+            "    resolve_target(\n"
+            "        environ={'VAULTSPEC_TARGET_DIR': '~/workspace'},\n"
+            "        cwd=Path.cwd(),\n"
+            "    )\n"
+            "except ConfigurationError as refusal:\n"
+            "    print(refusal)\n"
+            "else:\n"
+            "    print('NO REFUSAL')\n"
+        )
+        homeless = {
+            name: value
+            for name, value in os.environ.items()
+            if name.upper() not in {"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"}
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", probe],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+            cwd=tmp_path,
+            env=homeless,
+        )
+
+        reported = result.stdout.strip()
+        assert "VAULTSPEC_TARGET_DIR" in reported
+        assert "home directory" in reported
