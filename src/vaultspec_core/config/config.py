@@ -878,10 +878,15 @@ def _forget_registry(
 ) -> None:
     """Undeclare *package*'s entries, or just *entries* of them.
 
-    Production code registers once at import and never undeclares. This is
-    for a test that declares a companion package: without it the entries it
-    invented outlive the module that invented them, and the next test sees a
-    registry no code under test ever built.
+    A testing hook, not a production entry point: production code registers
+    once at import and never undeclares, so nothing outside a test ever calls
+    this. It exists for a test that declares a companion package - without
+    it, the entries that test invented outlive the module that invented
+    them, and the next test sees a registry no code under test ever built.
+    Deliberately unexported: import it directly from this module
+    (``vaultspec_core.config.config``), never through the public
+    ``vaultspec_core.config`` package, which is the signal that a call site
+    reaching for it does not belong in production code.
 
     Args:
         package: The distribution whose entries to drop.
@@ -1062,7 +1067,9 @@ def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str
     return env
 
 
-def check_environment(environ: Mapping[str, str] | None = None) -> None:
+def check_environment(
+    environ: Mapping[str, str] | None = None, *, package: str = PACKAGE
+) -> None:
     """Refuse every unusable product value in *environ*, together.
 
     :meth:`VaultSpecConfig.from_environment` covers the variables that load
@@ -1072,11 +1079,18 @@ def check_environment(environ: Mapping[str, str] | None = None) -> None:
     already written everything it was going to write. An entry point calls
     this first, so a value nobody can use stops the run before it starts.
 
+    Only *package*'s own registered entries are checked, plus the framework
+    entry each one falls back to: a companion package calling this validates
+    its own variables and the shared ones its chain reaches, not core's
+    entire registry. vaultspec-core's own entry points call it with the
+    default; an importing package passes its own distribution name.
+
     A protective switch is exempt: leaving its guard armed is the safer
     reading of a typo, and refusing to start is not safer still.
 
     Args:
         environ: The environment to read; ``None`` reads the process's own.
+        package: The distribution whose registered entries to check.
 
     Raises:
         ConfigurationError: If any product-owned variable carries a value it
@@ -1084,7 +1098,14 @@ def check_environment(environ: Mapping[str, str] | None = None) -> None:
     """
     env = os.environ if environ is None else environ
     problems: list[str] = []
-    for var in CONFIG_REGISTRY:
+
+    chain: dict[int, ConfigVariable] = {}
+    for var in _REGISTRIES.get(package, []):
+        chain[id(var)] = var
+        if var.fallback is not None:
+            chain[id(var.fallback)] = var.fallback
+
+    for var in chain.values():
         if var.scope is not VariableScope.PRODUCT or var.fail_safe:
             continue
         raw = env.get(var.env_name)
@@ -1096,12 +1117,20 @@ def check_environment(environ: Mapping[str, str] | None = None) -> None:
 
     # The level name is the one product value whose vocabulary lives with the
     # logging setup rather than in a type, so it is asked rather than parsed.
+    # Every entry in the chain that is, or falls back to, the shared level
+    # variable is checked through it, package-scoped names included.
     from ..logging_config import resolve_log_level
 
-    try:
-        resolve_log_level(environ=env)
-    except ConfigurationError as refusal:
-        problems.append(str(refusal))
+    level_vars = (
+        var
+        for var in chain.values()
+        if var is VAULTSPEC_LOG_LEVEL or var.fallback is VAULTSPEC_LOG_LEVEL
+    )
+    for level_var in level_vars:
+        try:
+            resolve_log_level(variable=level_var, environ=env)
+        except ConfigurationError as refusal:
+            problems.append(str(refusal))
 
     if problems:
         raise ConfigurationError(_collected(problems))

@@ -99,15 +99,23 @@ def resolve_log_level(
         ConfigurationError: If the variable names a level that does not
             exist. Silently logging at some other level would hide exactly
             the diagnostics the operator was asking for.
-        ValueError: If *variable* is not a registered entry.
+        ValueError: If *variable* is not a registered entry, or if *default*
+            is not one of :data:`LOG_LEVELS`. A caller-supplied default that
+            is not itself a valid level is a programming error in the
+            caller, not an operator-facing configuration problem.
     """
+    normalised_default = default.upper()
+    if normalised_default not in LOG_LEVELS:
+        raise ValueError(
+            f"default must be one of {', '.join(LOG_LEVELS)}, got {default!r}"
+        )
     if debug:
         return "DEBUG"
     if verbose:
         return "INFO"
     supplied = env_value(variable, environ)
     if supplied is None:
-        return default.upper()
+        return normalised_default
     named = supplied.upper()
     if named not in LOG_LEVELS:
         entry = env_source(variable, environ) or variable
@@ -152,9 +160,12 @@ def configure_logging(
             resolved_level = level
     else:
         # Nothing was named here, so the shared ladder answers: the session
-        # environment, then this surface's own shipped default.
+        # environment, then this surface's own shipped default. named is
+        # always one of LOG_LEVELS at this point, but the fallback stays as
+        # a backstop against a mismatch between LOG_LEVELS and the logging
+        # module's own attribute names.
         named = resolve_log_level(default=str(VAULTSPEC_LOG_LEVEL.default))
-        resolved_level = getattr(logging, named)
+        resolved_level = getattr(logging, named, logging.INFO)
 
     # 2. Configure root logger
     root = logging.getLogger()

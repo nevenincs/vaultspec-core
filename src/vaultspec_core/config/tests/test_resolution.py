@@ -627,6 +627,60 @@ class TestStartupRefusal:
         check_environment({"CI": "whatever", "NO_COLOR": "yes please"})
 
 
+class TestCheckEnvironmentPerPackage:
+    """A companion checks its own entries, not core's whole registry."""
+
+    def test_a_companion_is_blind_to_a_bad_value_that_is_not_its_own(self) -> None:
+        # VAULTSPEC_IO_BUFFER_SIZE belongs to core alone; a companion's own
+        # startup check must not trip over a variable it never declared.
+        check_environment({"VAULTSPEC_IO_BUFFER_SIZE": "plenty"}, package=COMPANION)
+
+    def test_a_companions_own_bad_value_is_refused(self) -> None:
+        companion_level = ConfigVariable(
+            env_name="VAULTSPEC_RESOLUTION_COMPANION_LEVEL_A",
+            attr_name=None,
+            var_type=str,
+            default=None,
+            description="The companion's own level, chained to the shared name.",
+            fallback=VAULTSPEC_LOG_LEVEL,
+        )
+        register_registry(COMPANION, [companion_level])
+        try:
+            with pytest.raises(ConfigurationError) as refusal:
+                check_environment(
+                    {companion_level.env_name: "chatty"}, package=COMPANION
+                )
+            assert companion_level.env_name in str(refusal.value)
+        finally:
+            _forget_registry(COMPANION, [companion_level])
+
+    def test_the_framework_entry_a_companions_chain_reaches_is_also_checked(
+        self,
+    ) -> None:
+        # The companion's own name is unset; the bad value sits on the
+        # framework name behind it, and the chain still catches it.
+        companion_level = ConfigVariable(
+            env_name="VAULTSPEC_RESOLUTION_COMPANION_LEVEL_B",
+            attr_name=None,
+            var_type=str,
+            default=None,
+            description="The companion's own level, chained to the shared name.",
+            fallback=VAULTSPEC_LOG_LEVEL,
+        )
+        register_registry(COMPANION, [companion_level])
+        try:
+            with pytest.raises(ConfigurationError) as refusal:
+                check_environment({"VAULTSPEC_LOG_LEVEL": "chatty"}, package=COMPANION)
+            assert "VAULTSPEC_LOG_LEVEL" in str(refusal.value)
+        finally:
+            _forget_registry(COMPANION, [companion_level])
+
+    def test_cores_own_default_is_unchanged(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            check_environment({"VAULTSPEC_LOG_LEVEL": "chatty"})
+        assert "VAULTSPEC_LOG_LEVEL" in str(refusal.value)
+
+
 class TestLogLevel:
     """The level a process logs at, resolved over the one ladder."""
 
@@ -692,6 +746,16 @@ class TestLogLevel:
         assert "VAULTSPEC_LOG_LEVEL" in reported
         for level in LOG_LEVELS:
             assert level in reported
+
+    def test_a_callers_own_default_that_is_not_a_level_is_refused(self) -> None:
+        """A caller-supplied default outside LOG_LEVELS is a programming error.
+
+        resolve_log_level promises one of LOG_LEVELS back; a caller passing a
+        default it cannot honour must fail loudly rather than hand back a
+        name nothing downstream (getattr(logging, ...)) can resolve.
+        """
+        with pytest.raises(ValueError, match="DEBUG"):
+            resolve_log_level(environ={}, default="trace")
 
     def test_an_unknown_level_joins_the_startup_report(self) -> None:
         with pytest.raises(ConfigurationError) as refusal:

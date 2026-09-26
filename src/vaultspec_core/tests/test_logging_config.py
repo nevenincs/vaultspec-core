@@ -240,6 +240,17 @@ class TestInvalidLevel:
         logging_config.configure_logging(level="NONEXISTENT")
         assert logging.getLogger().level == logging.INFO
 
+    def test_getattr_fallback_never_raises_for_a_valid_level_name(self):
+        """The getattr(logging, named, ...) backstop is a no-op for every
+        name resolve_log_level can actually return.
+
+        Guards the fix for a prior defect where the fallback was dropped and
+        a caller-supplied default outside LOG_LEVELS crashed configure_logging
+        with AttributeError instead of failing at resolve_log_level.
+        """
+        for level in logging_config.LOG_LEVELS:
+            assert getattr(logging, level, None) is not None
+
     def test_an_unknown_env_var_level_is_refused(self):
         """A level name that does not exist is refused, not quietly replaced.
 
