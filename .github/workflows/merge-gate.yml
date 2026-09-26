@@ -109,33 +109,36 @@ jobs:
           tool: just@1.38.0
 
       - name: Initialize the worktree
+        id: init
         run: just init
 
-      # Separate steps so the check says which dimension failed. `always()`
-      # runs every later dimension after an earlier failure, while an
-      # unhandled non-zero exit still fails the job.
+      # Separate steps so the check says which dimension failed. Every later
+      # dimension still runs after an earlier failure, while an unhandled
+      # non-zero exit still fails the job. They run only on a worktree this job
+      # initialised: under `always()` a timed-out or cancelled job skipped
+      # checkout and then linted whatever a previous run left on the runner.
       - name: The lockfile agrees with pyproject.toml
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just deps-check
 
       - name: Workflow lint and CI contract
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-workflow
 
       - name: Python lint and format
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-python
 
       - name: Types on every target platform
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-type-platforms
 
       - name: TOML format
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-toml
 
       - name: Markdown format
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-markdown
 
   test-linux:
@@ -171,58 +174,59 @@ jobs:
           tool: just@1.38.0
 
       - name: Initialize the worktree
+        id: init
         run: just init
 
       - name: Documentation links
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-links
 
       - name: Cognitive complexity
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-complexity
 
       - name: Nesting depth
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-nesting
 
       - name: Module and class size
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-size
 
       - name: Strict types
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just check-type-strict
 
       - name: Run development harness guards
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just test-harness
 
       - name: Run repository-health guards
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just test-repo
 
       - name: Run broad test suite
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just test-broad
 
       # Fails rather than passing when the secret is absent, so a keyless run
       # can never read as a working provider.
       - name: Run hosted search against the live API
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         env:
           VAULTSPEC_CORE_TYPESAFE_API_KEY: ${{ secrets.VAULTSPEC_CORE_TYPESAFE_API_KEY }}
         run: just test-typesafe
 
       - name: Bootstrap framework
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just framework-install
 
       - name: Verify vault structure and links
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just vault-check
 
       - name: Python dependency vulnerability audit
-        if: always()
+        if: ${{ !cancelled() && steps.init.outcome == 'success' }}
         run: just audit-deps
 
   # Independent of the Linux suite: it must start even when that one fails.
