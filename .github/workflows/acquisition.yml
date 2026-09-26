@@ -330,58 +330,81 @@ jobs:
     # nothing.
     runs-on: [self-hosted, macOS, ARM64]
     steps:
-      # Homebrew is not on a non-interactive PATH on this host, and a login
-      # shell is not guaranteed. Resolve the prefix explicitly rather than
-      # assuming /opt/homebrew, so an Intel host with /usr/local also works.
-      - name: Put Homebrew on PATH
-        run: |
-          set -eu
-          for prefix in /opt/homebrew /usr/local; do
-            if [ -x "${prefix}/bin/brew" ]; then
-              echo "${prefix}/bin" >> "$GITHUB_PATH"
-              exit 0
-            fi
-          done
-          echo "::error::no brew found in /opt/homebrew or /usr/local"
-          exit 1
-
-      # A COLD acquisition. A self-hosted mac keeps whatever the last run
-      # left, and an already-installed formula or an already-trusted tap would
-      # let this job pass on a previous run's evidence.
+      # A PRIVATE Homebrew, cloned fresh into this job's temp directory, not
+      # the host's own. The host prefix belongs to its interactive user, and
+      # Homebrew is single-owner: the runner account cannot write that Cellar,
+      # so `brew install` there printed "Cellar is not writable", found the
+      # formula the owner had installed by hand, called it up to date and
+      # exited 0. The leg reported a successful install of a release it never
+      # fetched. A prefix, cache, log directory and trust store of this job's
+      # own make the acquisition cold by construction rather than by teardown,
+      # and leave the host's Homebrew untouched.
       #
-      # ORDER MATTERS. `brew untrust --formula` has to resolve the formula, so
-      # it must run while the tap is still tapped; untapping first leaves the
-      # trust entry behind and the next step then measures nothing. That is not
-      # hypothetical - it is how this leg was first written, and it reported a
-      # clean install from a machine that was still carrying the trust.
-      - name: Remove every trace of a previous install
+      # The latest stable tag, not the default branch: a new user's installer
+      # checks out the same tag. RUNNER_TEMP rather than /tmp, because Homebrew
+      # refuses a prefix inside its own temporary directory.
+      - name: Provision a private Homebrew
+        env:
+          REPO: ${{ github.repository }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -eux
-          brew uninstall --force vaultspec-core || true
-          brew untrust --formula nevenincs/tap/vaultspec-core || true
-          brew untrust nevenincs/tap || true
-          brew untap nevenincs/tap || true
-          # VACUITY GUARD. Every assertion below is about what a machine with
-          # no prior grant does. If a grant survived the teardown, the install
-          # would pass for the wrong reason.
-          #
-          # The path is DERIVED, not assumed: `brew trust` writes to
-          # ${XDG_CONFIG_HOME}/homebrew/trust.json when that is set and
-          # ~/.homebrew/trust.json otherwise. Hardcoding the second one makes
-          # this guard read a file that is never written on a host with XDG
-          # set, and a guard that reads the wrong file passes vacuously - which
-          # is the failure it exists to prevent, reintroduced inside itself.
-          if [ -n "${XDG_CONFIG_HOME:-}" ]; then
-            trust="${XDG_CONFIG_HOME}/homebrew/trust.json"
-          else
-            trust="${HOME}/.homebrew/trust.json"
+          tag="${EVENT_TAG:-${INPUT_TAG:-}}"
+          if [ -z "${tag}" ]; then
+            tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+                  | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
           fi
+          [ -n "${tag}" ] || { echo "::error::could not resolve a release tag"; exit 1; }
+          echo "EXPECTED_VERSION=${tag#vaultspec-core-v}" >> "$GITHUB_ENV"
+
+          root="${RUNNER_TEMP}/brew"
+          rm -rf "${root}"
+          mkdir -p "${root}/config"
+          brew_tag=$(git ls-remote --tags --refs https://github.com/Homebrew/brew \
+                     | sed 's#.*refs/tags/##' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+                     | sort -V | tail -1)
+          [ -n "${brew_tag}" ] || { echo "::error::could not resolve a Homebrew release tag"; exit 1; }
+          git -c advice.detachedHead=false clone -q --depth 1 --branch "${brew_tag}" \
+            https://github.com/Homebrew/brew "${root}/prefix"
+
+          echo "${root}/prefix/bin" >> "$GITHUB_PATH"
+          {
+            echo "BREW_ROOT=${root}"
+            echo "XDG_CONFIG_HOME=${root}/config"
+            echo "HOMEBREW_CACHE=${root}/cache"
+            echo "HOMEBREW_LOGS=${root}/logs"
+            echo "HOMEBREW_NO_AUTO_UPDATE=1"
+            echo "HOMEBREW_NO_ANALYTICS=1"
+            echo "HOMEBREW_NO_ENV_HINTS=1"
+          } >> "$GITHUB_ENV"
+
+      # VACUITY GUARD. Every assertion below is about what a machine with no
+      # prior install and no prior grant does. The private prefix makes that
+      # true by construction; this proves the job is actually using it, since
+      # the host prefix is still on PATH behind it.
+      #
+      # `brew trust` writes to ${XDG_CONFIG_HOME}/homebrew/trust.json when
+      # that is set, and the step above set it, so that is the file to read.
+      - name: Confirm the acquisition starts cold
+        run: |
+          set -eu
+          prefix=$(brew --prefix)
+          [ "${prefix}" = "${BREW_ROOT}/prefix" ] || {
+            echo "::error::brew resolved to ${prefix}, not the private prefix ${BREW_ROOT}/prefix"
+            exit 1
+          }
+          if brew list --formula vaultspec-core >/dev/null 2>&1; then
+            echo "::error::vaultspec-core is already installed in ${prefix}"
+            exit 1
+          fi
+          trust="${XDG_CONFIG_HOME}/homebrew/trust.json"
           if [ -e "${trust}" ] && grep -q 'nevenincs/tap' "${trust}"; then
-            echo "::error::a nevenincs/tap trust entry survived teardown; this leg cannot conclude anything about a clean machine"
+            echo "::error::a nevenincs/tap trust entry exists before install; this leg cannot conclude anything about a clean machine"
             cat "${trust}" >&2
             exit 1
           fi
-          echo "confirmed: no nevenincs/tap grant in ${trust}"
+          echo "confirmed: $(brew --version | head -1) at ${prefix}, nothing installed, no grant in ${trust}"
 
       # THE PUBLISHED COMMAND, verbatim from docs/channels.md, on a machine
       # with no grant. The tap-qualified name is load-bearing and not a
@@ -391,8 +414,20 @@ jobs:
       # the qualified name taps as it installs and is not refused.
       #
       # If this line and docs/channels.md ever disagree, one of them is wrong.
+      #
+      # The version is asserted, not inferred from the exit status: `brew
+      # install` exits 0 when it finds any installed version it considers
+      # current, which is how a stale formula once stood in for the release.
       - name: Install exactly the way the documentation says to
-        run: brew install nevenincs/tap/vaultspec-core
+        run: |
+          set -eu
+          brew install nevenincs/tap/vaultspec-core
+          installed=$(brew list --versions vaultspec-core | awk '{print $2}')
+          [ "${installed}" = "${EXPECTED_VERSION}" ] || {
+            echo "::error::brew installed vaultspec-core ${installed:-nothing}, but the release under test is ${EXPECTED_VERSION}"
+            exit 1
+          }
+          echo "confirmed: vaultspec-core ${installed} installed"
 
       # WHY THE DOCUMENTED COMMAND IS QUALIFIED, asserted rather than trusted
       # to prose. Without this, the step above passes just as happily if
@@ -435,6 +470,13 @@ jobs:
               echo "::error::${command} is not on PATH after brew install"
               exit 1
             }
+            case "${resolved}" in
+              "${BREW_ROOT}/prefix/"*) ;;
+              *)
+                echo "::error::${command} resolved to ${resolved}, outside the Homebrew prefix this job installed into"
+                exit 1
+                ;;
+            esac
             echo "${command} -> ${resolved}"
           done
 
@@ -492,10 +534,7 @@ jobs:
 
       - name: Clean up
         if: always()
-        run: |
-          brew uninstall --force vaultspec-core || true
-          brew untap nevenincs/tap || true
-          rm -rf "${RUNNER_TEMP}/brew-home" "${RUNNER_TEMP}/brew-proj" || true
+        run: rm -rf "${RUNNER_TEMP}/brew" "${RUNNER_TEMP}/brew-home" "${RUNNER_TEMP}/brew-proj" || true
 
   acquire-windows:
     timeout-minutes: 60
