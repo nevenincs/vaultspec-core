@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:27076f635cc8fdbeae51c410f0ff1b212f4a0904b713d4204e41e10f55eb38f6'
+body_hash: 'sha256:c62a157096f979ab09d17f50a6addedc9fd65ddc438126fa37dc311d7343877d'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -246,6 +246,22 @@ related:
 - `S17` `verify:` `dev test all` -> `pass`
 - `S17` `verify:` `dev build all` -> `pass`
 - `S17` `by:` `vaultspec-standard-executor`
+- `S42` `A` `src/vaultspec_a2a/control/env_registry.py`
+- `S42` `M` `src/vaultspec_a2a/control/settings_base.py`
+- `S42` `M` `src/vaultspec_a2a/control/config.py`
+- `S42` `M` `src/vaultspec_a2a/control/infra_config.py`
+- `S42` `M` `src/vaultspec_a2a/domain_config.py`
+- `S42` `M` `src/vaultspec_a2a/cli/main.py`
+- `S42` `M` `dev/credentials.py`
+- `S42` `M` `conftest.py`
+- `S42` `M` `.env.example`
+- `S42` `M` `.env.integration.example`
+- `S42` `M` `docs/operations.rst`
+- `S42` `A` `src/vaultspec_a2a/control/tests/test_settings_sources.py`
+- `S42` `A` `src/vaultspec_a2a/control/tests/test_settings_startup.py`
+- `S42` `A` `dev/tests/test_credentials_settings_file.py`
+- `S42` `verify:` `control and dev test suites` -> `pass`
+- `S42` `by:` `vaultspec-high-executor`
 
 ## Notes
 
@@ -277,3 +293,4 @@ related:
 - `S05` review fix: `_forget_registry` renamed to `forget_registry_for_tests` because basedpyright's reportUnusedFunction reads a leading underscore with no in-module caller as dead code; the `not-in-__all__,` not-re-exported boundary is unchanged
 - `S16` gate fix: removed a pytest.skip the repo's own no-doubles/no-skips guard forbids by source scan; the branch was dead anyway since every pinned callable's defining module declares `__all__`
 - `S17` gate run; release pending user confirmation. just ci fails only on the pre-existing workflow CI-contract violation in .github/workflows/acquisition.yml (lines 352, 391) naming set -eux / set -eu directly instead of a just recipe; that file is identical to origin/main and untouched by this branch. dev lint all's other nine dimensions (python, type, type-platforms, toml, links, markdown, complexity, nesting, size, type-strict) all pass. dev audit deps, dev vault check, dev test all (broad 5617, serial 57, vault-repair 29, harness 377, repo 179 - 6259 tests) and dev build all all pass
+- `S42` vaultspec-a2a commits c054cbc5, a9f13e54, 2b038916, 1ffb2be0; a second review round (worker startup, test isolation, DSN redaction) is in progress, so the Step stays open.
