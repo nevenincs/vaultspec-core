@@ -5,40 +5,14 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:aceb013015fcc5cf84d111bd967002ac8501d48d0c14baea5eed8e90c5e90f5b'
+body_hash: 'sha256:607d09dd92cc1ef18ed73e49ffa0b86e9c8b80fff392a6429231d4ae7ef7da8a'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
 
-<!-- Machine-owned, whole file: `vaultspec-core vault exec log` creates it
-     on first use and appends every row; never hand-edit it. Add no
-     frontmatter fields. Wiki-links belong in `related:` only.
-
-     ONE ledger per plan, the only execution artifact. Each row's first
-     column names its Step. -->
-
 # `env-parity` ledger
 
 ## Changes
-
-<!-- MECHANICAL LOG, append-only, one row per path touched per Step, written
-     by `--row`:
-       - `S##` `A` `path`   added
-       - `S##` `M` `path`   modified
-       - `S##` `D` `path`   deleted
-       - `S##` `R` `old` -> `new`   renamed
-     Paths are repo-relative, in backticks. No prose: the Step row states the
-     intent and the commit carries the diff.
-
-     Optional per-Step rows, written by `--verify` and `--by`:
-       - `S##` `verify:` `<command>` -> `pass` | `fail`
-       - `S##` `by:` `<persona>`
-
-     Rows are appended in Step order and never rewritten. Only rows in this
-     section register a Step as covered. `--note` adds a `## Notes` section
-     ONLY on exception (data loss, skipped work, a scaffold left in code, a
-     persistent failure), one `S##`-prefixed line each; it is otherwise
-     omitted. -->
 
 - `S13` `M` `.vault/adr/2026-02-16-environment-variable-adr.md`
 - `S13` `M` `.vault/adr/2026-02-19-workspace-path-decoupling-adr.md`
@@ -96,6 +70,11 @@ related:
 - `S05` `verify:` `just check-type` -> `pass`
 - `S05` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/mcp_server/tests` -> `pass`
 - `S05` `by:` `vaultspec-high-executor`
+- `S06` `A` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S06` `verify:` `just check-python` -> `pass`
+- `S06` `verify:` `just check-type` -> `pass`
+- `S06` `verify:` `just test-unit` -> `pass`
+- `S06` `by:` `vaultspec-high-executor`
 
 ## Notes
 

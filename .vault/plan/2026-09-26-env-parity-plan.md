@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:09284d9e329274ddfaf7b6e03ee5031a6c68a190422dd7954f1bc3cfe8f8dd22'
+body_hash: 'sha256:02dfc3945d6983b445fd8aef584efccf32eb498c95046d5a089da43f3323222d'
 ---
 
 # `env-parity` plan
@@ -55,7 +55,7 @@ Add the public, standard-library-only value vocabulary, open core's registry acc
 - [x] `W01.P01.S03` - Add a package parameter to resolve_credential so the workspace .env opens on that package's resolved install mode, keeping the interpreter-inside-workspace test and the one-variable read; `src/vaultspec_core/config/credential.py`.
 - [x] `W01.P01.S04` - Move the per-site switch readings onto the shared vocabulary, turning VAULTSPEC_NON_INTERACTIVE and VAULTSPEC_NO_HINTS into booleans and keeping the stdio watchdog fail-safe; `src/vaultspec_core/cli/rendering_hints.py`.
 - [x] `W01.P01.S05` - Reject invalid loaded-field values, reporting every problem together, instead of logging and using the default; `src/vaultspec_core/config/config.py`.
-- [ ] `W01.P01.S06` - Test the vocabulary, the chain fallback, blank-as-unset, collective rejection and the per-package credential gate against real files in temporary workspaces; `src/vaultspec_core/config/tests/test_resolution.py`.
+- [x] `W01.P01.S06` - Test the vocabulary, the chain fallback, blank-as-unset, collective rejection and the per-package credential gate against real files in temporary workspaces; `src/vaultspec_core/config/tests/test_resolution.py`.
 
 ### Phase `W01.P02` - core CLI and MCP server conformance
 
