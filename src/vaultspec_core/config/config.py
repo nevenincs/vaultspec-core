@@ -12,8 +12,16 @@ is declared in it exactly once, including the external conventions it honours
 own child processes. This module is the only place the process environment is
 touched. Settings that load once become :class:`VaultSpecConfig` fields;
 variables whose meaning is decided where they are used are read at call time
-through :func:`env_value`, and child processes get their environment from
-:func:`child_environment`. Both take registry entries, never names.
+through :func:`env_value` and :func:`env_flag`, and child processes get their
+environment from :func:`child_environment`. All take registry entries, never
+names.
+
+Another vaultspec package declares its own entries through
+:func:`register_registry` and then uses the same accessors, so the resolution
+order lives here once rather than once per package. A package-scoped entry may
+chain to a framework-scoped one through its ``fallback``: the package's own
+name is read first, and the shared name behind it supplies the value when it
+does not.
 """
 
 from __future__ import annotations
@@ -27,9 +35,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from ..core.enums import DirName
+from ..core.exceptions import ConfigurationError
+from ..env_values import BOOL_SHAPE, is_blank, parse_bool, rejection
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +52,7 @@ __all__ = [
     "EDITOR",
     "GIT_INDEX_FILE",
     "NO_COLOR",
+    "PACKAGE",
     "VAULTSPEC_CORE_TYPESAFE_API_KEY",
     "VAULTSPEC_EDITOR",
     "VAULTSPEC_JSON_PRETTY",
@@ -56,13 +67,20 @@ __all__ = [
     "VariableScope",
     "VaultSpecConfig",
     "child_environment",
+    "env_flag",
+    "env_present",
+    "env_source",
     "env_value",
     "get_config",
     "parse_csv_list",
     "parse_float_or_none",
     "parse_int_or_none",
+    "register_registry",
     "reset_config",
 ]
+
+#: The package whose registry this module declares.
+PACKAGE: Final = "vaultspec-core"
 
 
 def parse_csv_list(value: str) -> list[str]:
@@ -450,14 +468,21 @@ class ConfigVariable:
             report only whether it is set.
         scope: Who owns the variable; see :class:`VariableScope`.
         workspace_dotenv: If ``True``, a workspace-root ``.env`` may supply
-            the value when the workspace runs core from its own environment
-            (see :mod:`vaultspec_core.config.credential`). Only a secret may
-            be so marked: the file is repository content, and it supplies
-            credentials, never settings.
+            the value when the workspace runs the owning package from its own
+            environment (see :mod:`vaultspec_core.config.credential`). Only a
+            secret may be so marked: the file is repository content, and it
+            supplies credentials, never settings.
+        fallback: The framework-scoped entry this one chains to. A
+            package-scoped name is read first; when it supplies nothing, the
+            shared name behind it is read. A credential never chains, and an
+            external convention is not the framework's to chain.
+        package: Which package declared the entry. Set by
+            :func:`register_registry`, never by the caller that builds it.
 
     Raises:
-        ValueError: If the name's prefix does not match the scope, or a
-            non-secret variable is marked ``workspace_dotenv``.
+        ValueError: If the name's prefix does not match the scope, a
+            non-secret variable is marked ``workspace_dotenv``, or a
+            credential or external convention declares a fallback.
     """
 
     env_name: str
@@ -472,6 +497,8 @@ class ConfigVariable:
     secret: bool = False
     scope: VariableScope = VariableScope.PRODUCT
     workspace_dotenv: bool = False
+    fallback: ConfigVariable | None = None
+    package: str | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         owned = self.scope is not VariableScope.EXTERNAL
@@ -484,6 +511,16 @@ class ConfigVariable:
         if self.workspace_dotenv and not self.secret:
             raise ValueError(
                 f"{self.env_name}: only a secret may be read from a workspace .env"
+            )
+        if self.fallback is None:
+            return
+        # A credential is enrolled by one name, so that a key provisioned for
+        # one package never reaches another. Chaining would give it a second.
+        if self.secret or self.fallback.secret:
+            raise ValueError(f"{self.env_name}: a credential never chains")
+        if self.scope is VariableScope.EXTERNAL:
+            raise ValueError(
+                f"{self.env_name}: an external convention declares no fallback"
             )
 
 
@@ -795,39 +832,195 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
 ]
 
 
-#: Identities of the registered entries, so the accessors below refuse a
-#: variable that was built somewhere else instead of declared here.
-_REGISTERED: Final = frozenset(id(var) for var in CONFIG_REGISTRY)
+#: Which package declared each registered entry, keyed by the entry's
+#: identity, so the accessors below refuse a variable that was built somewhere
+#: else instead of declared in a registry.
+_DECLARED_BY: Final[dict[int, str]] = {}
+
+#: The registries themselves, which also keep every registered entry alive:
+#: identities are only unique while the objects behind them are.
+_REGISTRIES: Final[dict[str, list[ConfigVariable]]] = {}
+
+
+def register_registry(package: str, entries: Iterable[ConfigVariable]) -> None:
+    """Declare *package*'s environment variables, opening the accessors to them.
+
+    A package that wants :func:`env_value`, :func:`env_flag`,
+    :func:`child_environment` and
+    :func:`~vaultspec_core.config.credential.resolve_credential` for its own
+    variables registers them once, at import. Registration is what binds an
+    entry to the package whose install mode gates its credentials, so an
+    entry belongs to exactly one package.
+
+    Args:
+        package: The distribution name declaring the entries.
+        entries: The entries to register. Registering the same entries again
+            under the same package is a no-op.
+
+    Raises:
+        ValueError: If an entry is already registered by another package, or
+            chains to an entry no registry declares.
+    """
+    declared = list(entries)
+    for var in declared:
+        owner = _DECLARED_BY.get(id(var))
+        if owner is not None and owner != package:
+            raise ValueError(
+                f"{var.env_name} is already declared by {owner}; "
+                f"an entry belongs to one package"
+            )
+    known = _DECLARED_BY.keys() | {id(var) for var in declared}
+    for var in declared:
+        if var.fallback is not None and id(var.fallback) not in known:
+            raise ValueError(
+                f"{var.env_name} falls back to {var.fallback.env_name}, "
+                f"which no registry declares"
+            )
+
+    registry = _REGISTRIES.setdefault(package, [])
+    for var in declared:
+        if id(var) in _DECLARED_BY:
+            continue
+        var.package = package
+        _DECLARED_BY[id(var)] = package
+        registry.append(var)
+
+
+register_registry(PACKAGE, CONFIG_REGISTRY)
 
 
 def _registered(var: ConfigVariable) -> ConfigVariable:
-    """Return *var*, refusing one that is not a :data:`CONFIG_REGISTRY` entry."""
-    if id(var) not in _REGISTERED:
-        raise ValueError(f"{var.env_name} is not declared in CONFIG_REGISTRY")
+    """Return *var*, refusing one that no registry declares."""
+    if id(var) not in _DECLARED_BY:
+        raise ValueError(f"{var.env_name} is not declared in a registry")
     return var
+
+
+def _supplied(
+    var: ConfigVariable, environ: Mapping[str, str] | None
+) -> tuple[ConfigVariable, str] | None:
+    """Return the entry along *var*'s chain that supplies a value, and it.
+
+    Args:
+        var: A registered entry, possibly chaining to a framework entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        The supplying entry and its value, stripped, or ``None`` when no rung
+        of the chain is set to anything but blank.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
+    """
+    env = os.environ if environ is None else environ
+    entry: ConfigVariable | None = _registered(var)
+    while entry is not None:
+        raw = env.get(entry.env_name)
+        if not is_blank(raw):
+            # is_blank has already ruled None out.
+            return entry, str(raw).strip()
+        entry = entry.fallback
+    return None
 
 
 def env_value(
     var: ConfigVariable, environ: Mapping[str, str] | None = None
 ) -> str | None:
-    """Return the raw value of registered variable *var*, read now.
+    """Return the value of registered variable *var*, read now.
 
-    For variables whose meaning is decided where they are used - presence
-    alone, one exact token, a set of off values - and which must track the
-    environment at call time rather than when the configuration loaded.
+    For variables whose meaning is decided where they are used, and which
+    must track the environment at call time rather than when the
+    configuration loaded. A blank value is unset: it falls through to the
+    entry's framework fallback, and then reads as nothing at all, so a
+    variable cleared in a shell profile means the same as one never set.
 
     Args:
-        var: A :data:`CONFIG_REGISTRY` entry.
+        var: A registered entry.
         environ: The environment to read; ``None`` reads the process's own.
 
     Returns:
-        The value as set, which may be blank, or ``None`` when unset.
+        The value, stripped of surrounding whitespace, from the first rung of
+        the chain that supplies one; ``None`` when none does.
 
     Raises:
-        ValueError: If *var* is not a registry entry.
+        ValueError: If *var* is not a registered entry.
+    """
+    supplied = _supplied(var, environ)
+    return None if supplied is None else supplied[1]
+
+
+def env_source(
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
+) -> ConfigVariable | None:
+    """Return which entry along *var*'s chain supplied its value.
+
+    A message about an unusable value must name the variable the operator
+    actually set, which is *var* itself or the framework entry behind it.
+
+    Args:
+        var: A registered entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        The supplying entry, or ``None`` when the chain supplies nothing.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
+    """
+    supplied = _supplied(var, environ)
+    return None if supplied is None else supplied[0]
+
+
+def env_present(var: ConfigVariable, environ: Mapping[str, str] | None = None) -> bool:
+    """Return whether *var* is set at all, blank included.
+
+    For the external conventions whose owners define them by presence -
+    ``CI``, ``NO_COLOR``, ``GIT_INDEX_FILE`` - which keep their owners'
+    meanings rather than the product's blank-is-unset rule. A product-owned
+    switch is read with :func:`env_flag` instead.
+
+    Args:
+        var: A registered entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        ``True`` when the environment sets the name, whatever its value.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
     """
     env = os.environ if environ is None else environ
-    return env.get(_registered(var).env_name)
+    return _registered(var).env_name in env
+
+
+def env_flag(
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
+) -> bool | None:
+    """Return the switch *var* carries, in the one boolean vocabulary.
+
+    Args:
+        var: A registered entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        ``True`` or ``False`` from the first rung of the chain that supplies a
+        value; ``None`` when none does, leaving the default to the caller.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
+        ConfigurationError: If a rung supplies a word the vocabulary does not
+            recognise.
+    """
+    supplied = _supplied(var, environ)
+    if supplied is None:
+        return None
+    entry, raw = supplied
+    parsed = parse_bool(raw)
+    if parsed is None:
+        raise ConfigurationError(
+            str(rejection(entry.env_name, BOOL_SHAPE, raw, secret=entry.secret))
+        )
+    return parsed
 
 
 def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str]:
@@ -843,7 +1036,7 @@ def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str
         A fresh mapping the caller may hand to :mod:`subprocess`.
 
     Raises:
-        ValueError: If a variable is not a registry entry.
+        ValueError: If a variable is not a registered entry.
     """
     env = dict(os.environ)
     for var, value in assignments:

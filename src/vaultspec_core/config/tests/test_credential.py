@@ -77,7 +77,7 @@ class TestTheRegistryOwnsTheCredential:
             secret=True,
         )
 
-        with pytest.raises(ValueError, match="not declared in CONFIG_REGISTRY"):
+        with pytest.raises(ValueError, match="not declared in a registry"):
             resolve_credential(stray, tmp_path, {stray.env_name: ENV_KEY})
 
     def test_only_a_secret_may_be_read_from_a_workspace_dotenv(self) -> None:
