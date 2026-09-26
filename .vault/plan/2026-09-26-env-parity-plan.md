@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:007a51787be87b46e91590123875a9ac104a3cd6c7c0b2ea7f082baada562c2e'
+body_hash: 'sha256:be4e4dea1248afe9d2705e609f7026757a44fc13e169351aa4e2b19d9eb7e2a5'
 ---
 
 # `env-parity` plan
@@ -78,7 +78,7 @@ Correct the example file and documentation to the contract, record the reconcili
 
 - [x] `W01.P03.S13` - Amend the core records that contradict the code: environment-variable, typesafe-search, workspace-path-decoupling, cli-spec-edit-safety, install-mode and install-parity; `.vault/adr/2026-02-16-environment-variable-adr.md`.
 - [x] `W01.P03.S14` - State the resolution order and the workspace .env credential rule in the example file, and stop pointing at .env.local; `.env.example`.
-- [ ] `W01.P03.S15` - Document the resolution order, the framework variables and the chain fallback in the CLI guide and the bundled reference, including every registry entry; `docs/CLI.md`.
+- [x] `W01.P03.S15` - Document the resolution order, the framework variables and the chain fallback in the CLI guide and the bundled reference, including every registry entry; `docs/CLI.md`.
 - [ ] `W01.P03.S16` - Add a contract test pinning the public names and signatures other packages import for resolution, credentials, unattended detection and the install envelope; `src/vaultspec_core/tests/test_public_resolution_api.py`.
 - [ ] `W01.P03.S17` - Run core's full gate and cut the release that gates W02 and W03; `src/vaultspec_core`.
 

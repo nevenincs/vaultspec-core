@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:0d5a718a1b40b48cba222ecf6301950fc73f538ea01dd0b6e103845f46fdb5da'
+body_hash: 'sha256:d8b62232e88164ff6862df62fb4a9c2a31046667a5f1c33b718079a87f737378'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -203,6 +203,14 @@ related:
 - `S14` `M` `.env.example`
 - `S14` `verify:` `pytest dev/guards/test_environment_registry.py` -> `pass`
 - `S14` `by:` `vaultspec-standard-executor`
+- `S15` `M` `docs/CLI.md`
+- `S15` `M` `docs/MCP.md`
+- `S15` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S15` `M` `.vaultspec/reference/cli.md`
+- `S15` `verify:` `just check-markdown` -> `pass`
+- `S15` `verify:` `just check-links` -> `pass`
+- `S15` `verify:` `just framework-reference-check` -> `pass`
+- `S15` `by:` `vaultspec-standard-executor`
 
 ## Notes
 
