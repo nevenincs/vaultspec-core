@@ -26,10 +26,12 @@ import dataclasses
 import inspect
 import subprocess
 import sys
-from collections.abc import Callable
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 pytestmark = [pytest.mark.unit]
 
