@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:c5a5830c684873054a9efe5863751e2a95d05267cf446771c6fe39c40310d698'
+body_hash: 'sha256:27076f635cc8fdbeae51c410f0ff1b212f4a0904b713d4204e41e10f55eb38f6'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -239,6 +239,13 @@ related:
 - `S05` `verify:` `basedpyright src/vaultspec_core/config` -> `pass`
 - `S16` `M` `src/vaultspec_core/tests/test_public_resolution_api.py`
 - `S16` `verify:` `pytest dev/guards/test_test_suite_quality.py` -> `pass`
+- `S17` `verify:` `just ci` -> `fail`
+- `S17` `verify:` `dev lint all` -> `fail`
+- `S17` `verify:` `dev audit deps` -> `pass`
+- `S17` `verify:` `dev vault check` -> `pass`
+- `S17` `verify:` `dev test all` -> `pass`
+- `S17` `verify:` `dev build all` -> `pass`
+- `S17` `by:` `vaultspec-standard-executor`
 
 ## Notes
 
@@ -269,3 +276,4 @@ related:
 - `S11` review fix: dropped the internal decision-record identifier from `infer_upgrade_mode's` and `upgrade_mode_with_provenance's` docstrings; added an end-to-end install --upgrade test against a real legacy dev-group workspace with deployed uv-run hooks, asserting the persisted dev declaration and the rendered hook entries
 - `S05` review fix: `_forget_registry` renamed to `forget_registry_for_tests` because basedpyright's reportUnusedFunction reads a leading underscore with no in-module caller as dead code; the `not-in-__all__,` not-re-exported boundary is unchanged
 - `S16` gate fix: removed a pytest.skip the repo's own no-doubles/no-skips guard forbids by source scan; the branch was dead anyway since every pinned callable's defining module declares `__all__`
+- `S17` gate run; release pending user confirmation. just ci fails only on the pre-existing workflow CI-contract violation in .github/workflows/acquisition.yml (lines 352, 391) naming set -eux / set -eu directly instead of a just recipe; that file is identical to origin/main and untouched by this branch. dev lint all's other nine dimensions (python, type, type-platforms, toml, links, markdown, complexity, nesting, size, type-strict) all pass. dev audit deps, dev vault check, dev test all (broad 5617, serial 57, vault-repair 29, harness 377, repo 179 - 6259 tests) and dev build all all pass
