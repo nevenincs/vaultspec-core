@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:1f95e7bd9428a6dc8ce4810ecce25c604a7d2724846344f7545fcb3cd8754a19'
+body_hash: 'sha256:2d5e3a02ad299cfd646b701795214cf954f447e30461548c9bd377c0832cd0d3'
 ---
 
 # `env-parity` plan
@@ -66,7 +66,7 @@ Route core's own entry points through the public resolution functions: workspace
 - [x] `W01.P02.S09` - Resolve every editor use through one ladder, flag then VAULTSPEC_EDITOR then the committed config key then VISUAL then EDITOR then vi, and declare vi as the registry default; `src/vaultspec_core/core/local_config.py`.
 - [x] `W01.P02.S10` - Expose unattended detection publicly outside the CLI package: CI or VAULTSPEC_NON_INTERACTIVE, a non-TTY standard input or output, or --json; `src/vaultspec_core/config/session.py`.
 - [x] `W01.P02.S11` - Expose legacy upgrade-time mode inference as one public function taking a package name, so rag stops keeping its own variant; `src/vaultspec_core/core/install_mode.py`.
-- [ ] `W01.P02.S12` - Expose the install and uninstall envelope and hint rendering for reuse by other packages, and document the shared exit codes 0, 1 and 2; `src/vaultspec_core/cli/rendering_outcomes.py`.
+- [x] `W01.P02.S12` - Expose the install and uninstall envelope and hint rendering for reuse by other packages, and document the shared exit codes 0, 1 and 2; `src/vaultspec_core/cli/rendering_outcomes.py`.
 
 ### Phase `W01.P03` - core records, examples, documentation and the contract test
 

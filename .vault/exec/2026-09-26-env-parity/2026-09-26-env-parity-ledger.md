@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:75a1e77b90334b3bbf5b304f41796740e3941e1d1a30dbe6b2a7f65665996fb4'
+body_hash: 'sha256:aa8b495cfce0dbefa7208129a1d561a72135c05ccb49819bc50c1bdcdb2ddec0'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -138,6 +138,20 @@ related:
 - `S11` `verify:` `just check-type` -> `pass`
 - `S11` `verify:` `pytest src/vaultspec_core/core src/vaultspec_core/tests/cli/test_migration_triggers.py src/vaultspec_core/tests/cli/test_collectors.py` -> `pass`
 - `S11` `by:` `vaultspec-high-executor`
+- `S12` `M` `src/vaultspec_core/cli/rendering_outcomes.py`
+- `S12` `M` `src/vaultspec_core/cli/rendering.py`
+- `S12` `M` `src/vaultspec_core/cli/rendering_hints.py`
+- `S12` `M` `src/vaultspec_core/cli/root_install.py`
+- `S12` `M` `src/vaultspec_core/cli/_errors.py`
+- `S12` `M` `src/vaultspec_core/cli/_target.py`
+- `S12` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S12` `M` `.vaultspec/reference/cli.md`
+- `S12` `A` `src/vaultspec_core/tests/cli/test_install_envelope.py`
+- `S12` `verify:` `just check-python` -> `pass`
+- `S12` `verify:` `just check-type` -> `pass`
+- `S12` `verify:` `just framework-reference-check` -> `pass`
+- `S12` `verify:` `pytest src/vaultspec_core/tests src/vaultspec_core/config src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S12` `by:` `vaultspec-high-executor`
 
 ## Notes
 
@@ -150,3 +164,4 @@ related:
 - `S08` The test pinning the absence of --verbose is replaced by one pinning its effect.
 - `S09` The level-fallback test carried over from the log-level Step is corrected here to the refusal the policy requires.
 - `S11` A dev-group workspace launched through uv run now resolves DEV where it resolved TOOL.
+- `S12` just check-markdown fails only on three unformatted env-parity records and a duplicate frontmatter key in an unrelated feature's ledger, all untouched here.
