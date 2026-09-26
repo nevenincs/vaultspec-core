@@ -1,0 +1,318 @@
+---
+tags:
+  - '#exec'
+  - '#env-parity'
+date: '2026-09-26'
+modified: '2026-09-26'
+body_schema: 'body-v2'
+body_hash: 'sha256:06c914f291c914a3c85a39e4cf4bd5e5702dbf5ae8aa33163d9615530a39ebde'
+related:
+  - "[[2026-09-26-env-parity-plan]]"
+---
+
+# `env-parity` ledger
+
+## Changes
+
+- `S13` `M` `.vault/adr/2026-02-16-environment-variable-adr.md`
+- `S13` `M` `.vault/adr/2026-02-19-workspace-path-decoupling-adr.md`
+- `S13` `M` `.vault/adr/2026-05-17-cli-spec-edit-safety-adr.md`
+- `S13` `M` `.vault/adr/2026-07-13-install-mode-adr.md`
+- `S13` `M` `.vault/adr/2026-07-14-install-parity-adr.md`
+- `S13` `M` `.vault/adr/2026-09-23-typesafe-search-adr.md`
+- `S13` `verify:` `vaultspec-core vault check all` -> `pass`
+- `S13` `by:` `orchestrator`
+- `S36` `M` `.vault/adr/2026-09-21-typesafe-classifier-adr.md`
+- `S36` `M` `.vault/adr/2026-04-04-test-and-paths-adr.md`
+- `S36` `M` `.vault/adr/2026-04-12-vaultspec-rag-install-adr.md`
+- `S36` `M` `.vault/adr/2026-06-18-mcp-service-client-adr.md`
+- `S36` `M` `.vault/adr/2026-07-13-index-drift-hardening-adr.md`
+- `S36` `verify:` `vaultspec-core vault check all` -> `pass`
+- `S36` `by:` `vaultspec-docs-curator`
+- `S01` `A` `src/vaultspec_core/env_values.py`
+- `S01` `M` `src/vaultspec_core/__init__.py`
+- `S01` `verify:` `just check-python` -> `pass`
+- `S01` `verify:` `just check-type` -> `pass`
+- `S01` `verify:` `pytest src/vaultspec_core/config/tests src/vaultspec_core/mcp_server/tests/test_tool_surface.py` -> `pass`
+- `S01` `by:` `vaultspec-high-executor`
+- `S02` `M` `src/vaultspec_core/config/config.py`
+- `S02` `M` `src/vaultspec_core/config/__init__.py`
+- `S02` `M` `src/vaultspec_core/core/exceptions.py`
+- `S02` `M` `src/vaultspec_core/config/tests/test_environment.py`
+- `S02` `M` `src/vaultspec_core/config/tests/test_credential.py`
+- `S02` `verify:` `just check-python` -> `pass`
+- `S02` `verify:` `just check-type` -> `pass`
+- `S02` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/mcp_server/tests src/vaultspec_core/triggers/tests` -> `pass`
+- `S02` `by:` `vaultspec-high-executor`
+- `S03` `M` `src/vaultspec_core/config/credential.py`
+- `S03` `verify:` `just check-python` -> `pass`
+- `S03` `verify:` `just check-type` -> `pass`
+- `S03` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/search` -> `pass`
+- `S03` `by:` `vaultspec-high-executor`
+- `S04` `M` `src/vaultspec_core/cli/json_output.py`
+- `S04` `M` `src/vaultspec_core/cli/rendering_hints.py`
+- `S04` `M` `src/vaultspec_core/cli/_trigger_trust.py`
+- `S04` `M` `src/vaultspec_core/mcp_server/watchdog.py`
+- `S04` `A` `src/vaultspec_core/mcp_server/kill_switch.py`
+- `S04` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S04` `M` `src/vaultspec_core/config/config.py`
+- `S04` `M` `src/vaultspec_core/console.py`
+- `S04` `M` `src/vaultspec_core/vaultcore/checks/_base.py`
+- `S04` `M` `src/vaultspec_core/mcp_server/tests/test_watchdog.py`
+- `S04` `verify:` `just check-python` -> `pass`
+- `S04` `verify:` `just check-type` -> `pass`
+- `S04` `verify:` `pytest src/vaultspec_core/crossref src/vaultspec_core/config src/vaultspec_core/mcp_server/tests src/vaultspec_core/tests/cli src/vaultspec_core/vaultcore/tests` -> `pass`
+- `S04` `by:` `vaultspec-high-executor`
+- `S05` `M` `src/vaultspec_core/config/config.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S05` `M` `src/vaultspec_core/config/tests/test_config.py`
+- `S05` `verify:` `just check-python` -> `pass`
+- `S05` `verify:` `just check-type` -> `pass`
+- `S05` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S05` `by:` `vaultspec-high-executor`
+- `S06` `A` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S06` `verify:` `just check-python` -> `pass`
+- `S06` `verify:` `just check-type` -> `pass`
+- `S06` `verify:` `just test-unit` -> `pass`
+- `S06` `by:` `vaultspec-high-executor`
+- `S40` `by:` `orchestrator`
+- `S43` `M` `src/vaultspec_a2a/providers/_harness_mcp_registry.py`
+- `S43` `M` `src/vaultspec_a2a/providers/tests/test_acp_mcp.py`
+- `S43` `verify:` `pytest src/vaultspec_a2a/providers/tests/test_acp_mcp.py` -> `pass`
+- `S43` `verify:` `ruff check` -> `pass`
+- `S43` `by:` `vaultspec-low-executor`
+- `S07` `M` `src/vaultspec_core/config/workspace.py`
+- `S07` `M` `src/vaultspec_core/config/__init__.py`
+- `S07` `M` `src/vaultspec_core/config/config.py`
+- `S07` `M` `src/vaultspec_core/cli/_target.py`
+- `S07` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S07` `M` `src/vaultspec_core/config/tests/test_workspace.py`
+- `S07` `verify:` `just check-python` -> `pass`
+- `S07` `verify:` `just check-type` -> `pass`
+- `S07` `verify:` `pytest src/vaultspec_core/config/tests src/vaultspec_core/tests/cli src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S07` `by:` `vaultspec-high-executor`
+- `S02` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S02` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/tests src/vaultspec_core/mcp_server/tests src/vaultspec_core/triggers/tests src/vaultspec_core/core/tests` -> `pass`
+- `S04` `M` `src/vaultspec_core/cli/root_app.py`
+- `S04` `M` `src/vaultspec_core/cli/_errors.py`
+- `S04` `A` `src/vaultspec_core/tests/cli/test_unusable_settings.py`
+- `S04` `M` `src/vaultspec_core/tests/cli/test_console.py`
+- `S08` `M` `src/vaultspec_core/logging_config.py`
+- `S08` `M` `src/vaultspec_core/cli/root_app.py`
+- `S08` `M` `src/vaultspec_core/config/config.py`
+- `S08` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S08` `M` `src/vaultspec_core/tests/cli/test_global_options.py`
+- `S08` `verify:` `just check-python` -> `pass`
+- `S08` `verify:` `just check-type` -> `pass`
+- `S08` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/tests/cli/test_global_options.py` -> `pass`
+- `S08` `by:` `vaultspec-high-executor`
+- `S09` `M` `src/vaultspec_core/core/local_config.py`
+- `S09` `M` `src/vaultspec_core/core/agents.py`
+- `S09` `M` `src/vaultspec_core/core/rules.py`
+- `S09` `M` `src/vaultspec_core/core/skills.py`
+- `S09` `M` `src/vaultspec_core/core/triggers.py`
+- `S09` `M` `src/vaultspec_core/config/config.py`
+- `S09` `M` `src/vaultspec_core/cli/spec_cmd_agents.py`
+- `S09` `M` `src/vaultspec_core/cli/spec_cmd_rules.py`
+- `S09` `M` `src/vaultspec_core/cli/spec_cmd_skills.py`
+- `S09` `M` `src/vaultspec_core/config/tests/test_environment.py`
+- `S09` `M` `src/vaultspec_core/tests/cli/test_config_editor_safety.py`
+- `S09` `M` `src/vaultspec_core/tests/test_logging_config.py`
+- `S09` `verify:` `just check-python` -> `pass`
+- `S09` `verify:` `just check-type` -> `pass`
+- `S09` `verify:` `pytest src/vaultspec_core/tests src/vaultspec_core/core/tests src/vaultspec_core/config` -> `pass`
+- `S09` `by:` `vaultspec-high-executor`
+- `S10` `A` `src/vaultspec_core/config/session.py`
+- `S10` `M` `src/vaultspec_core/config/__init__.py`
+- `S10` `M` `src/vaultspec_core/cli/_trigger_trust.py`
+- `S10` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S10` `verify:` `just check-python` -> `pass`
+- `S10` `verify:` `just check-type` -> `pass`
+- `S10` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/triggers src/vaultspec_core/tests/cli/test_hook_consent.py` -> `pass`
+- `S10` `by:` `vaultspec-high-executor`
+- `S11` `M` `src/vaultspec_core/core/install_mode.py`
+- `S11` `M` `src/vaultspec_core/core/commands.py`
+- `S11` `M` `src/vaultspec_core/core/provision.py`
+- `S11` `A` `src/vaultspec_core/core/tests/test_upgrade_mode.py`
+- `S11` `verify:` `just check-python` -> `pass`
+- `S11` `verify:` `just check-type` -> `pass`
+- `S11` `verify:` `pytest src/vaultspec_core/core src/vaultspec_core/tests/cli/test_migration_triggers.py src/vaultspec_core/tests/cli/test_collectors.py` -> `pass`
+- `S11` `by:` `vaultspec-high-executor`
+- `S12` `M` `src/vaultspec_core/cli/rendering_outcomes.py`
+- `S12` `M` `src/vaultspec_core/cli/rendering.py`
+- `S12` `M` `src/vaultspec_core/cli/rendering_hints.py`
+- `S12` `M` `src/vaultspec_core/cli/root_install.py`
+- `S12` `M` `src/vaultspec_core/cli/_errors.py`
+- `S12` `M` `src/vaultspec_core/cli/_target.py`
+- `S12` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S12` `M` `.vaultspec/reference/cli.md`
+- `S12` `A` `src/vaultspec_core/tests/cli/test_install_envelope.py`
+- `S12` `verify:` `just check-python` -> `pass`
+- `S12` `verify:` `just check-type` -> `pass`
+- `S12` `verify:` `just framework-reference-check` -> `pass`
+- `S12` `verify:` `pytest src/vaultspec_core/tests src/vaultspec_core/config src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S12` `by:` `vaultspec-high-executor`
+- `S19` `M` `src/vaultspec_rag/cli/_core.py`
+- `S19` `M` `pyproject.toml`
+- `S19` `M` `uv.lock`
+- `S19` `M` `conftest.py`
+- `S19` `M` `src/vaultspec_rag/tests/test_install_torch_config.py`
+- `S19` `M` `src/vaultspec_rag/tests/test_packaging_metadata.py`
+- `S19` `A` `src/vaultspec_rag/tests/test_cli_no_dotenv_load.py`
+- `S19` `verify:` `just test-fast` -> `pass`
+- `S19` `by:` `vaultspec-standard-executor`
+- `S24` `M` `src/vaultspec_rag/config/_settings.py`
+- `S24` `verify:` `just test-fast` -> `pass`
+- `S24` `by:` `vaultspec-standard-executor`
+- `S31` `A` `src/vaultspec_rag/commands/_skip.py`
+- `S31` `M` `src/vaultspec_rag/commands/_install.py`
+- `S31` `M` `src/vaultspec_rag/commands/_uninstall.py`
+- `S31` `A` `src/vaultspec_rag/tests/test_install_skip_validation.py`
+- `S31` `M` `src/vaultspec_rag/tests/test_process_probe_source_structure.py`
+- `S31` `verify:` `just test-fast` -> `pass`
+- `S31` `by:` `vaultspec-standard-executor`
+- `S32` `M` `src/vaultspec_rag/commands/_torch_flow.py`
+- `S32` `M` `src/vaultspec_rag/commands/_install.py`
+- `S32` `M` `src/vaultspec_rag/commands/_provision.py`
+- `S32` `M` `src/vaultspec_rag/cli/_install.py`
+- `S32` `M` `docs/cli.md`
+- `S32` `M` `src/vaultspec_rag/tests/test_install_torch_config.py`
+- `S32` `verify:` `just test-fast` -> `pass`
+- `S32` `by:` `vaultspec-standard-executor`
+- `S33` `M` `src/vaultspec_rag/commands/_uninstall.py`
+- `S33` `M` `src/vaultspec_rag/cli/_install.py`
+- `S33` `M` `docs/cli.md`
+- `S33` `A` `src/vaultspec_rag/tests/test_uninstall_safety.py`
+- `S33` `M` `src/vaultspec_rag/tests/test_install_mode.py`
+- `S33` `M` `src/vaultspec_rag/tests/test_install_mcp_extra.py`
+- `S33` `M` `src/vaultspec_rag/tests/test_install_torch_config.py`
+- `S33` `verify:` `just test-fast` -> `pass`
+- `S33` `by:` `vaultspec-standard-executor`
+- `S35` `M` `src/vaultspec_rag/cli/_service_doctor.py`
+- `S35` `M` `src/vaultspec_rag/tests/test_server_doctor.py`
+- `S35` `verify:` `just test-fast` -> `pass`
+- `S35` `by:` `vaultspec-standard-executor`
+- `S44` `M` `engine/crates/ingest-core/src/runner.rs`
+- `S44` `M` `engine/crates/vaultspec-api/src/authoring/core_adapter.rs`
+- `S44` `verify:` `cargo test -p ingest-core -p vaultspec-api --lib` -> `pass`
+- `S44` `verify:` `cargo clippy --all-targets -D warnings` -> `pass`
+- `S44` `by:` `vaultspec-standard-executor`
+- `S45` `M` `.env.example`
+- `S45` `by:` `vaultspec-standard-executor`
+- `S43` `by:` `orchestrator`
+- `S14` `M` `.env.example`
+- `S14` `verify:` `pytest dev/guards/test_environment_registry.py` -> `pass`
+- `S14` `by:` `vaultspec-standard-executor`
+- `S15` `M` `docs/CLI.md`
+- `S15` `M` `docs/MCP.md`
+- `S15` `M` `src/vaultspec_core/builtins/reference/cli.md`
+- `S15` `M` `.vaultspec/reference/cli.md`
+- `S15` `verify:` `just check-markdown` -> `pass`
+- `S15` `verify:` `just check-links` -> `pass`
+- `S15` `verify:` `just framework-reference-check` -> `pass`
+- `S15` `by:` `vaultspec-standard-executor`
+- `S08` `M` `src/vaultspec_core/tests/test_logging_config.py`
+- `S08` `verify:` `pytest src/vaultspec_core/tests/test_logging_config.py` -> `pass`
+- `S08` `by:` `vaultspec-standard-executor`
+- `S05` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S05` `verify:` `pytest src/vaultspec_core/config/tests/test_resolution.py` -> `pass`
+- `S05` `by:` `vaultspec-standard-executor`
+- `S07` `verify:` `pytest src/vaultspec_core/config/tests/test_workspace.py` -> `pass`
+- `S07` `by:` `vaultspec-standard-executor`
+- `S08` `M` `src/vaultspec_core/cli/_errors.py`
+- `S08` `verify:` `pytest src/vaultspec_core/tests/cli/test_global_options.py` -> `pass`
+- `S12` `A` `src/vaultspec_core/envelope.py`
+- `S12` `M` `src/vaultspec_core/cli/json_output.py`
+- `S12` `M` `src/vaultspec_core/cli/status_cmd.py`
+- `S12` `M` `src/vaultspec_core/tests/cli/test_install_envelope.py`
+- `S12` `M` `src/vaultspec_core/tests/cli/test_uninstall.py`
+- `S12` `verify:` `pytest src/vaultspec_core/tests/cli/test_install_envelope.py src/vaultspec_core/tests/cli/test_uninstall.py` -> `pass`
+- `S12` `by:` `vaultspec-standard-executor`
+- `S11` `M` `src/vaultspec_core/tests/cli/test_install.py`
+- `S11` `verify:` `pytest src/vaultspec_core/tests/cli/test_install.py -k TestUpgradeInfersDevModeForALegacyWorkspace` -> `pass`
+- `S11` `by:` `vaultspec-standard-executor`
+- `S16` `A` `src/vaultspec_core/tests/test_public_resolution_api.py`
+- `S16` `verify:` `pytest src/vaultspec_core/tests/test_public_resolution_api.py` -> `pass`
+- `S16` `verify:` `just check-type` -> `pass`
+- `S16` `by:` `vaultspec-standard-executor`
+- `S05` `M` `src/vaultspec_core/config/tests/test_workspace.py`
+- `S05` `verify:` `basedpyright src/vaultspec_core/config` -> `pass`
+- `S16` `M` `src/vaultspec_core/tests/test_public_resolution_api.py`
+- `S16` `verify:` `pytest dev/guards/test_test_suite_quality.py` -> `pass`
+- `S17` `verify:` `just ci` -> `fail`
+- `S17` `verify:` `dev lint all` -> `fail`
+- `S17` `verify:` `dev audit deps` -> `pass`
+- `S17` `verify:` `dev vault check` -> `pass`
+- `S17` `verify:` `dev test all` -> `pass`
+- `S17` `verify:` `dev build all` -> `pass`
+- `S17` `by:` `vaultspec-standard-executor`
+- `S42` `A` `src/vaultspec_a2a/control/env_registry.py`
+- `S42` `M` `src/vaultspec_a2a/control/settings_base.py`
+- `S42` `M` `src/vaultspec_a2a/control/config.py`
+- `S42` `M` `src/vaultspec_a2a/control/infra_config.py`
+- `S42` `M` `src/vaultspec_a2a/domain_config.py`
+- `S42` `M` `src/vaultspec_a2a/cli/main.py`
+- `S42` `M` `dev/credentials.py`
+- `S42` `M` `conftest.py`
+- `S42` `M` `.env.example`
+- `S42` `M` `.env.integration.example`
+- `S42` `M` `docs/operations.rst`
+- `S42` `A` `src/vaultspec_a2a/control/tests/test_settings_sources.py`
+- `S42` `A` `src/vaultspec_a2a/control/tests/test_settings_startup.py`
+- `S42` `A` `dev/tests/test_credentials_settings_file.py`
+- `S42` `verify:` `control and dev test suites` -> `pass`
+- `S42` `by:` `vaultspec-high-executor`
+- `S05` `M` `src/vaultspec_core/tests/test_public_resolution_api.py`
+- `S05` `verify:` `pytest src/vaultspec_core/config/tests/test_resolution.py src/vaultspec_core/tests/test_public_resolution_api.py` -> `pass`
+- `S12` `M` `src/vaultspec_core/core/__init__.py`
+- `S12` `A` `src/vaultspec_core/core/tests/test_lazy_surface.py`
+- `S12` `verify:` `just check-type-strict` -> `pass`
+- `S12` `verify:` `just test-unit` -> `pass`
+- `S15` `M` `.vaultspec/reference/published-surface.json`
+- `S15` `by:` `vaultspec-high-executor`
+- `S10` `M` `src/vaultspec_core/cli/_hook_trust.py`
+- `S10` `verify:` `just test-unit` -> `pass`
+- `S42` `M` `src/vaultspec_a2a/telemetry/instrumentation.py`
+- `S42` `M` `src/vaultspec_a2a/worker/app.py`
+- `S42` `M` `src/vaultspec_a2a/testing/session_root.py`
+- `S42` `A` `dev/tests/test_import_time_settings.py`
+- `S42` `A` `src/vaultspec_a2a/control/tests/test_settings_redaction.py`
+- `S42` `verify:` `control, dev and telemetry suites` -> `pass`
+
+## Notes
+
+- `S36` Paths are in the vaultspec-rag repository, commit aeddb984 on its feat/env-parity branch.
+- `S40` The user approved the decision, the plan and the a2a operating-model change together in session on 2026-09-26; no file changed.
+- `S43` Paths are in the vaultspec-a2a repository, commit 368b64f6 on its feat/env-parity branch.
+- `S02` review fix: a registered name, not just an object, belongs to one package; a fallback may only reach a framework variable; registration is locked
+- `S03` review fix: the workspace .env gate takes no caller-supplied package; the declaring package's mode is the only one consulted
+- `S04` review fix: every product value is refused at startup in one report, an error report never re-reads the switch that failed, the product marker outranks CI, and `NO_COLOR` follows set-and-non-empty
+- `S08` The test pinning the absence of --verbose is replaced by one pinning its effect.
+- `S09` The level-fallback test carried over from the log-level Step is corrected here to the refusal the policy requires.
+- `S11` A dev-group workspace launched through uv run now resolves DEV where it resolved TOOL.
+- `S12` just check-markdown fails only on three unformatted env-parity records and a duplicate frontmatter key in an unrelated feature's ledger, all untouched here.
+- `S19` vaultspec-rag commits dcfdf822 and review fix 116f13ef. Workspace .env credentials stop reaching rag until S20-S23 land; no release may be cut before them.
+- `S24` vaultspec-rag commit 73817813.
+- `S31` vaultspec-rag commits 6243b629, 2d37d99d and review fix 584fde28 (vocabulary derived from core).
+- `S32` vaultspec-rag commit 7d561e41.
+- `S33` vaultspec-rag commits 86530609 and review fix 2e903220. Three GPU-gated integration test files were edited but not run on this host; the JSON refusal shape waits on S30.
+- `S35` vaultspec-rag commits f809b9e5 and review fix f0c811c2.
+- `S44` vaultspec-dashboard commits 802bcde1 and review fix abb84961.
+- `S45` vaultspec-dashboard commit b096f45e.
+- `S43` review fix: vaultspec-a2a commit 22a02be1 names the core release that serves the launch command.
+- `S08` review fix: `resolve_log_level` now refuses a caller-supplied default outside `LOG_LEVELS` instead of letting `configure_logging` crash on it
+- `S05` review fix: `check_environment` takes a package parameter and validates that package's own chain instead of always core's whole registry; `_forget_registry's` docstring now states it is a testing-only hook
+- `S07` review fix: ResolvedTarget now enforces that a variable is carried if and only if the source is ENVIRONMENT; `apply_target` renders a bad `VAULTSPEC_TARGET_DIR` through the caller's own known `json_output` instead of letting it escape unrendered
+- `S08` review fix: a startup refusal from the root callback, which fires before Click parses the subcommand's own --json flag, now renders the canonical envelope when --json appears anywhere in argv, proven with a real subprocess
+- `S12` review fix: `render_envelope,` `render_install_envelope,` `render_error_envelope` and `hints_suppressed` moved to the CLI-free `vaultspec_core.envelope,` cutting import `vaultspec_core.envelope` to about 134ms/192 modules against 229ms/397 for the old `vaultspec_core.cli.rendering_outcomes` path; `render_install_envelope's` hints now take the same structured mapping every other envelope carries, keyword-only, and core's own install/uninstall render through it
+- `S11` review fix: dropped the internal decision-record identifier from `infer_upgrade_mode's` and `upgrade_mode_with_provenance's` docstrings; added an end-to-end install --upgrade test against a real legacy dev-group workspace with deployed uv-run hooks, asserting the persisted dev declaration and the rendered hook entries
+- `S05` review fix: `_forget_registry` renamed to `forget_registry_for_tests` because basedpyright's reportUnusedFunction reads a leading underscore with no in-module caller as dead code; the `not-in-__all__,` not-re-exported boundary is unchanged
+- `S16` gate fix: removed a pytest.skip the repo's own no-doubles/no-skips guard forbids by source scan; the branch was dead anyway since every pinned callable's defining module declares `__all__`
+- `S17` gate run; release pending user confirmation. just ci fails only on the pre-existing workflow CI-contract violation in .github/workflows/acquisition.yml (lines 352, 391) naming set -eux / set -eu directly instead of a just recipe; that file is identical to origin/main and untouched by this branch. dev lint all's other nine dimensions (python, type, type-platforms, toml, links, markdown, complexity, nesting, size, type-strict) all pass. dev audit deps, dev vault check, dev test all (broad 5617, serial 57, vault-repair 29, harness 377, repo 179 - 6259 tests) and dev build all all pass
+- `S42` vaultspec-a2a commits c054cbc5, a9f13e54, 2b038916, 1ffb2be0; a second review round (worker startup, test isolation, DSN redaction) is in progress, so the Step stays open.
+- `S05` pre-release review fix: `check_environment` takes `include_framework` (default on) so a companion package's startup check also refuses a bad value on the framework switches it reads without a chain - `VAULTSPEC_NO_HINTS,` `VAULTSPEC_JSON_PRETTY,` `VAULTSPEC_NON_INTERACTIVE` - instead of refusing late at report time; the registry snapshot is taken under the registration lock
+- `S07` pre-release review fix: `resolve_target` expands home shorthand in a root the environment supplies, package-scoped name and `VAULTSPEC_TARGET_DIR` alike, before the existence check; an invocation root is still taken as given, and a home directory the process cannot determine is a ConfigurationError naming the supplying variable rather than a bare RuntimeError
+- `S12` pre-release review fix: `vaultspec_core.core` resolves its re-exports through a PEP 562 `__getattr__,` so importing one exception from core.exceptions no longer runs the agent collector, the sync engine and yaml behind it; interleaved -X importtime medians fall from 112.7ms/191 modules to 91.6ms/161 for `vaultspec_core.envelope` and from 108.8ms/190 to 88.4ms/160 for `vaultspec_core.config`
+- `S15` pre-release review fix: --target is documented as discovered (the .gt container root, then the worktree root, then the repository root, the working directory last) rather than defaulting to the working directory; install and uninstall state the three shared exit codes; the workspace copy of the bundled reference is reseeded through install core --upgrade, ending its 0.2.5 against 0.2.6 release-line drift
+- `S10` pre-release review fix: both consent gates call `is_unattended(json_output=json_output)` instead of restating the rule as `json_output` or not `operator_present();` the wrapper that only restated it is gone
+- `S42` review rounds 2 and 3: vaultspec-a2a commits 349b7ba8, 06752993, bfe6131a; final review PASS.

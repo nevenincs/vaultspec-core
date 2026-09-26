@@ -210,7 +210,7 @@ def _emit_status_hints(
     """Render advisory hint lines for status, returning the JSON shape."""
     from vaultspec_core.cli.rendering import hints_suppressed, render_next_actions
 
-    if hints_suppressed(no_hints):
+    if hints_suppressed(no_hints=no_hints):
         return None
 
     hints = [{"text": text, "command": command} for text, command in pairs]

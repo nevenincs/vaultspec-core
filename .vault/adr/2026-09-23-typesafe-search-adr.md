@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#typesafe-search'
 date: '2026-09-23'
-modified: '2026-09-23'
+modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:5884e798ffe939e5451e403989a86877fdee5cd11d03130430f3bf66b7f1e5d1'
+body_hash: 'sha256:cda9b2357e966a73f44aa523aa675af17fec624fc515c90ad075bcca5e3b6095'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -114,9 +114,12 @@ search feature as drafted.
   - The generic `TYPESAFE_API_KEY` and rag's variable never enrol core.
   - The key is read from the process environment. Only when it is absent there, core
     runs from the workspace's own environment (the running interpreter lives inside
-    the workspace), and the workspace declares DEPENDENCY or DEV install mode, is it
-    read from the workspace-root `.env`, and only that one variable. The declaration
-    alone never suffices, because the repository writes it.
+    the workspace), and core's resolved install mode for the workspace is DEPENDENCY
+    or DEV, is it read from the workspace-root `.env`, and only that one variable.
+    The mode is resolved as the install verbs resolve it: declared in
+    `.vaultspec/workspace.json`, otherwise detected from `pyproject.toml`. Neither
+    alone ever suffices, because the repository writes both; the interpreter test is
+    the trust boundary.
   - The endpoint, model and every other setting are code constants that no `.env`
     can change.
   - The key never appears in output, logs, diagnostics or errors. Surfaces report only
@@ -249,6 +252,15 @@ bullet above; nothing else changes.
   Code search still runs.
 - **Revisit trigger.** Measured hosted-search recall remains the trigger for revisiting
   the listing at discovery.
+
+**Amendment note, 2026-09-26, credential gate wording**: The Credential constraint
+above said the workspace must *declare* DEPENDENCY or DEV mode. The resolver has always
+gated on the *resolved* mode, which includes detection from `pyproject.toml`
+(`src/vaultspec_core/config/credential.py:112-133` calling `resolve_install_mode`,
+`src/vaultspec_core/core/workspace_mode.py:1042-1052`). The constraint now says so.
+Evidence: `2026-09-26-env-parity-research`, env files. The boundary is unchanged:
+declaration and detection are both repository content, and the interpreter-inside-
+workspace test is what keeps a globally installed tool from reading the file.
 
 ## Rationale
 

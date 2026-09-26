@@ -171,8 +171,8 @@ def cmd_agents_edit(
 
     Editor resolution order:
       1. Command-line --editor flag
-      2. Project-local config (vaultspec-core config set editor <value>)
-      3. $VAULTSPEC_EDITOR environment variable
+      2. $VAULTSPEC_EDITOR environment variable
+      3. Project-local config (vaultspec-core config set editor <value>)
       4. $VISUAL environment variable
       5. $EDITOR environment variable
       6. Fallback to 'vi'

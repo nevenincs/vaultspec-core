@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from vaultspec_core.cli._trigger_trust import operator_present
+from vaultspec_core.config import is_unattended
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -114,7 +114,7 @@ def hook_consent_gate(
     for spec in refused:
         detail.extend(describe_hook(spec, ctx.target_dir))
 
-    if json_output or not operator_present():
+    if is_unattended(json_output=json_output):
         _explain_refusal(names, detail)
         return names
 

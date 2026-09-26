@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#workspace-paths'
 date: '2026-02-19'
-modified: '2026-06-13'
-body_hash: 'sha256:84dd2b95cd58360a8cb207037ce5bcb47c76e415ac18a94d14062205f3d1e24c'
+modified: '2026-09-26'
+body_hash: 'sha256:c374a4e6e89d8835f192b6bf5fe57d2de16f22fe97273c11825d3ff7d5844259'
 related:
   - '[[2026-02-19-workspace-path-decoupling-research]]'
 ---
@@ -376,6 +376,15 @@ Unit tests for all detection modes using `tmp_path` fixtures:
 - Validation errors (missing content_root, missing framework lib/)
 - Bootstrap ordering: framework_root from structural, not from env vars
 - Windows path handling (UNC prefix stripping)
+
+**Amendment note, 2026-09-26**: The environment variables and flags named above were not adopted as written. `2026-09-26-env-parity-research` records what the code does.
+
+- **What was built.** The layout is resolved from one explicit target or from git and cwd discovery. `resolve_workspace(target_override=...)` in `src/vaultspec_core/config/workspace.py:310-402` puts the vault at `target / .vault` in explicit mode.
+- **What does not exist.** `VAULTSPEC_ROOT_DIR`, `VAULTSPEC_CONTENT_DIR`, `VAULTSPEC_VAULT_DIR`, `--root` and `--content-dir` are not in the code.
+- **The explicit target.** It comes from the `--target` flag (`src/vaultspec_core/cli/_target.py:117-152`). The workspace root variable is `VAULTSPEC_TARGET_DIR`, and today only the standalone MCP server reads it (`src/vaultspec_core/mcp_server/app.py:237`). The CLI does not read it, so "explicit env vars override everything" holds for the MCP server only.
+- **Vault location.** It follows the target root, as decided. `VAULTSPEC_DOCS_DIR` renames the vault directory for the call sites that consult the configuration.
+
+`2026-09-26-env-parity-adr` proposes that the CLI honour `VAULTSPEC_TARGET_DIR` as well.
 
 ## Rationale
 

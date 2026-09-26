@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from pathlib import Path
 
@@ -18,7 +17,8 @@ from vaultspec_core.config import (
     parse_int_or_none,
     reset_config,
 )
-from vaultspec_core.config.config import _SENTINEL, _parse_raw
+from vaultspec_core.config.config import _parse_field
+from vaultspec_core.core.exceptions import ConfigurationError
 
 pytestmark = [pytest.mark.unit]
 
@@ -146,32 +146,15 @@ class TestVaultSpecConfig:
         cfg3 = get_config()
         assert cfg3 is not cfg1
 
-    def test_validation_min_value(self, caplog: pytest.LogCaptureFixture) -> None:
-        # io_buffer_size has min_value=1
-        old = os.environ.get("VAULTSPEC_IO_BUFFER_SIZE")
-        os.environ["VAULTSPEC_IO_BUFFER_SIZE"] = "0"
-        caplog.set_level(logging.ERROR, logger="vaultspec_core.config.config")
-        try:
-            cfg = VaultSpecConfig.from_environment()
-            assert cfg.io_buffer_size == 8192  # falls back to default
-            matching = [
-                record
-                for record in caplog.records
-                if "below minimum" in record.getMessage()
-            ]
-            assert matching, (
-                f"expected a 'below minimum' log record; "
-                f"got {[r.getMessage() for r in caplog.records]}"
-            )
-            assert all(record.levelno == logging.ERROR for record in matching), (
-                f"'below minimum' record emitted at wrong level: "
-                f"{[record.levelname for record in matching]}"
-            )
-        finally:
-            if old is None:
-                os.environ.pop("VAULTSPEC_IO_BUFFER_SIZE", None)
-            else:
-                os.environ["VAULTSPEC_IO_BUFFER_SIZE"] = old
+    def test_validation_min_value(self) -> None:
+        # io_buffer_size has min_value=1, so 0 is out of range and the
+        # default must not quietly stand in for it.
+        with pytest.raises(ConfigurationError) as refusal:
+            VaultSpecConfig.from_environment(environ={"VAULTSPEC_IO_BUFFER_SIZE": "0"})
+
+        assert (
+            str(refusal.value) == "VAULTSPEC_IO_BUFFER_SIZE must be at least 1, got 0"
+        )
 
 
 def test_registry_coverage():
@@ -203,9 +186,7 @@ class TestSecretVariables:
         assert self.SECRET not in repr(cfg)
         assert VaultSpecConfig().typesafe_api_key is None
 
-    def test_unparseable_secret_is_redacted_from_the_log(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_unparseable_secret_is_redacted_from_the_refusal(self) -> None:
         var = ConfigVariable(
             env_name="VAULTSPEC_EXAMPLE_SECRET",
             attr_name="example_secret",
@@ -214,15 +195,16 @@ class TestSecretVariables:
             description="A numeric secret, to drive the conversion failure.",
             secret=True,
         )
-        caplog.set_level(logging.DEBUG, logger="vaultspec_core.config.config")
 
-        assert _parse_raw(var, self.SECRET, var.env_name) is _SENTINEL
-        assert "example_secret=<redacted>" in caplog.text
-        assert self.SECRET not in caplog.text
+        value, problem = _parse_field(var, self.SECRET)
 
-    def test_out_of_range_secret_is_redacted_from_the_log(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+        assert value is None
+        assert problem is not None
+        assert "VAULTSPEC_EXAMPLE_SECRET" in problem
+        assert "<redacted>" in problem
+        assert self.SECRET not in problem
+
+    def test_out_of_range_secret_is_redacted_from_the_refusal(self) -> None:
         var = ConfigVariable(
             env_name="VAULTSPEC_EXAMPLE_SECRET",
             attr_name="example_secret",
@@ -232,15 +214,14 @@ class TestSecretVariables:
             secret=True,
             min_value=10**12,
         )
-        caplog.set_level(logging.DEBUG, logger="vaultspec_core.config.config")
 
-        assert _parse_raw(var, "987654321", var.env_name) is _SENTINEL
-        assert "below minimum" in caplog.text
-        assert "987654321" not in caplog.text
+        _, problem = _parse_field(var, "987654321")
 
-    def test_non_secret_values_are_still_quoted(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+        assert problem is not None
+        assert "at least 1000000000000" in problem
+        assert "987654321" not in problem
+
+    def test_non_secret_values_are_still_quoted(self) -> None:
         var = ConfigVariable(
             env_name="VAULTSPEC_EXAMPLE_SIZE",
             attr_name="example_size",
@@ -249,7 +230,10 @@ class TestSecretVariables:
             description="A plain numeric variable.",
             min_value=10**12,
         )
-        caplog.set_level(logging.DEBUG, logger="vaultspec_core.config.config")
 
-        assert _parse_raw(var, "987654321", var.env_name) is _SENTINEL
-        assert "example_size=987654321" in caplog.text
+        _, problem = _parse_field(var, "987654321")
+
+        assert (
+            problem
+            == "VAULTSPEC_EXAMPLE_SIZE must be at least 1000000000000, got 987654321"
+        )

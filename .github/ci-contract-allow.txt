@@ -20,6 +20,8 @@ binaries.yml:Restore the execute bit
 binaries.yml:Start from an empty artifact directory
 binaries.yml:Drop the downloaded artifacts
 acquisition.yml:Install what acquisition itself needs
+acquisition.yml:Provision a private Homebrew
+acquisition.yml:Confirm the acquisition starts cold
 acquisition.yml:Return the workspace to the runner's user
 acquisition.yml:Clean up
 

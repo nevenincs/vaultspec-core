@@ -26,9 +26,9 @@ from .git_artifacts import (
 )
 from .install_mode import (
     fresh_install_schema_version,
-    infer_upgrade_mode,
     persist_resolved_mode,
     stamp_manifest_version_no_downgrade,
+    upgrade_mode_with_provenance,
 )
 from .precommit import (
     CANONICAL_ENTRY_PREFIX,
@@ -74,7 +74,6 @@ __all__ = [
     "filter_tools",
     "fresh_install_schema_version",
     "hook_defs_for_mode",
-    "infer_upgrade_mode",
     "init_run",
     "install_run",
     "persist_resolved_mode",
@@ -87,6 +86,7 @@ __all__ = [
     "sync_provider",
     "uninstall_run",
     "untrack_managed_paths",
+    "upgrade_mode_with_provenance",
     "validate_provider",
     "validate_skip",
 ]

@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#install-parity'
 date: '2026-07-14'
-modified: '2026-07-14'
-body_hash: 'sha256:c8f03c7b9a4bd428aab2ab986b5a646b642c7db17286d467a0fd6bc1291b84e4'
+modified: '2026-09-26'
+body_hash: 'sha256:24b4eb1f5bd6784df4033d65115fbe7a11a034732a63ac694bbcce3f4293e996'
 related:
   - "[[2026-07-14-install-parity-research]]"
   - "[[2026-07-13-install-mode-adr]]"
@@ -48,6 +48,13 @@ related:
 Core gains the `DEV` enum member alongside `TOOL` and `DEPENDENCY`; every renderer that branches on mode treats `DEV` as an alias of `DEPENDENCY` for rendering purposes (uvx-versus-module launch shape, hook entry form) while treating it as a distinct value for doctor labeling and declared-state bookkeeping. `WorkspaceDeclaration` moves from its shipped single-key schema to a `schema_version`-bumped per-package map (`{"packages": {<name>: {"mode": ..., "minimum_vaultspec_version"-equivalent floor}}}`); the read path recognizes the legacy single-key shape and folds it into the new map keyed to the current package on read, writing the migrated v2 shape back out, so no separate one-time migration command is needed. Detection gains a group-aware branch: presence of a package in `[project.dependencies]` is dependency-mode evidence as before, presence only in the default `dev` group is new dev-mode evidence, and named groups continue to fall outside detection's scope. Renderers and the doctor's diagnosis collectors are keyed by the *package's own* declared mode read from its own entry in the shared map: core's renderer and doctor consult core's entry, rag's renderer and doctor consult rag's entry, so a mixed configuration (core dependency-mode, rag tool-mode, or the reverse) renders and diagnoses each package independently without a shared branch.
 
 Rag's `_install.py` gains a `--mode tool|dependency|dev` flag threaded into the same resolution precedence order Q5 of `install-mode` already defines (flag, persisted declaration, detection, default), calling core's `workspace_mode` resolution with `package="vaultspec-rag"` rather than reimplementing precedence or detection locally. Rag's static `vaultspec-rag.builtin.json` MCP definition is replaced with a tokenized, mode-neutral definition in the same shape core's own builtin already uses, so core's existing sentinel-substitution renderer produces the correct `uv run`- or `uvx`-shaped command for rag without a second renderer. Rag's `server doctor` gains mode-and-floor rows mirroring core's doctor output, driven by the same per-package map entry. Rag's `--upgrade` path gains the same upgrade-time mode inference `install-mode`'s Q6 defines for core, applied to rag's own detection evidence. Rag's `--local-only` flag and its `~/.vaultspec-rag/local-only.json` per-host marker are unchanged; that marker selects a storage backend and remains orthogonal to placement mode, so it is not folded into the shared declaration.
+
+**Amendment note, 2026-09-26**: Two details of the Implementation above differ from the code (`2026-09-26-env-parity-research`).
+
+- **Detection.** Runtime evidence also counts `[project.optional-dependencies]`, which leak into built metadata, and dev evidence also counts the legacy `[tool.uv.dev-dependencies]` list (`src/vaultspec_core/core/workspace_mode.py:895-960`).
+- **Floor field.** The per-package floor is named `minimum_version` (`src/vaultspec_core/core/workspace_mode.py:233-243,355`).
+
+The two packages also diverge in one place. Rag's upgrade-time inference, which runs when no declaration exists yet, does not mirror core's. Core returns dependency mode only for a `uv run`-shaped hook (`src/vaultspec_core/core/install_mode.py:175-179`). Rag returns the detected dependency or dev mode whenever its MCP entry is present (vaultspec-rag `src/vaultspec_rag/commands/_mode.py:104-149`). `2026-09-26-env-parity-adr` proposes one core function for both.
 
 ## Rationale
 

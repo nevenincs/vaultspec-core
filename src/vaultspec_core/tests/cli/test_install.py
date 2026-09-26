@@ -430,6 +430,59 @@ class TestUpgradeRestoresVault:
         assert not (tmp_path / ".vault").exists()
 
 
+class TestUpgradeInfersDevModeForALegacyWorkspace:
+    """``install --upgrade`` on a legacy dev-group workspace with uv-run hooks
+    infers and persists dev mode, end to end, rather than leaving the
+    workspace undeclared or falling back to tool mode.
+    """
+
+    def test_a_legacy_dev_group_workspace_is_upgraded_to_dev(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        import json as _json
+
+        from vaultspec_core.core.enums import InstallMode
+        from vaultspec_core.core.precommit import entry_prefix_for_mode
+        from vaultspec_core.core.workspace_mode import (
+            CORE_DISTRIBUTION_NAME,
+            read_package_declaration,
+        )
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "legacy-workspace"\nversion = "0"\n'
+            '[dependency-groups]\ndev = ["vaultspec-core>=0.1.0"]\n',
+            encoding="utf-8",
+        )
+
+        # A real dev-mode install: real committed hooks, a real persisted
+        # declaration - then the declaration is stripped to leave exactly
+        # what a workspace provisioned before mode declarations existed
+        # would have: a dev-group listing, deployed uv-run hooks, and
+        # nothing recorded about which mode produced them.
+        setup = runner.invoke(app, ["-t", str(tmp_path), "install", "--mode", "dev"])
+        assert setup.exit_code == 0, setup.output
+        seeded = read_package_declaration(tmp_path, CORE_DISTRIBUTION_NAME)
+        assert seeded is not None
+        assert seeded.install_mode is InstallMode.DEV
+
+        declaration_path = tmp_path / ".vaultspec" / "workspace.json"
+        declaration = _json.loads(declaration_path.read_text(encoding="utf-8"))
+        del declaration["packages"][CORE_DISTRIBUTION_NAME]
+        declaration_path.write_text(_json.dumps(declaration), encoding="utf-8")
+        assert read_package_declaration(tmp_path, CORE_DISTRIBUTION_NAME) is None
+
+        result = runner.invoke(app, ["-t", str(tmp_path), "install", "--upgrade"])
+
+        assert result.exit_code == 0, result.output
+
+        resolved = read_package_declaration(tmp_path, CORE_DISTRIBUTION_NAME)
+        assert resolved is not None
+        assert resolved.install_mode is InstallMode.DEV
+
+        hooks_text = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        assert entry_prefix_for_mode(InstallMode.DEV) in hooks_text
+
+
 class TestFailedInstallLeavesNoPartialManifest:
     """A failed install must not block its own retry (issue #416).
 

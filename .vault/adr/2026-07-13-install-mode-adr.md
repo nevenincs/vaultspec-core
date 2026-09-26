@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#install-mode'
 date: '2026-07-13'
-modified: '2026-07-13'
-body_hash: 'sha256:b9b2df7643f1809acc3dfb73c263d7bd1386e7d45c43f5d421a9365aa0a84a99'
+modified: '2026-09-26'
+body_hash: 'sha256:ae6b87fe71f3ee14d0ea10651ae55b30fa73b4281ea4a6b5647e138d49aee381'
 related:
   - "[[2026-07-13-install-mode-research]]"
 ---
@@ -37,6 +37,8 @@ Vaultspec-core is development-harness tooling: it governs a project but is not a
 **Q5 - provision-time detection and precedence.** Chosen: `--mode` flag (explicit) takes precedence over the persisted mode in the workspace declaration, which takes precedence over detection, which takes precedence over the default. Detection signals, in order: absence of any `pyproject.toml` forces tool mode (nothing exists to resolve a dependency against); presence of `vaultspec-core` in the target's dependencies or dev-dependency group is evidence of deliberate dependency mode. Absent both signals, install defaults to tool mode. Install must refuse coherently when the signals conflict with an explicit request, e.g. `--mode dependency` in a repo with no `pyproject.toml` is a hard refusal with a remediation message, not a silent fallback to tool mode, since silently overriding an explicit flag reintroduces the opaque-failure-later pattern this decision exists to close.
 
 **Q6 - migration.** Chosen: existing workspaces carry no persisted mode. `install --upgrade` infers a mode using the Q5 detection order against the target's current state (an existing `uv run`-shaped canonical hook entry and a `pyproject.toml` dependency listing is treated as dependency-mode evidence) and records the inferred mode into the new persisted declaration on upgrade, rather than requiring every existing workspace to re-run install with an explicit flag. `doctor` gains a mode-mismatch check: artifacts shaped for one mode (a `uv run`-prefixed hook entry, a non-`uvx` MCP command) present in a workspace whose persisted declaration names the other mode are flagged with a fix hint pointing at `install --upgrade` or an explicit `--mode` re-run, keeping this check on the same `apply_file_sync`-routed comparator discipline the `diagnosis-surface-parity` decision established rather than inventing a second one.
+
+**Amendment note, 2026-09-26**: `2026-07-14-install-parity-adr` (D1) amended Q5's detection signals, and the code follows that record. A package in `[project.dependencies]` or `[project.optional-dependencies]` is dependency evidence. A package only in the default `dev` group, or in the legacy `[tool.uv.dev-dependencies]` list, is dev evidence and resolves to the DEV mode. Presence only in a named group is not evidence (`src/vaultspec_core/core/workspace_mode.py:895-960`). Evidence: `2026-09-26-env-parity-research`, resolution chains.
 
 ## Constraints
 

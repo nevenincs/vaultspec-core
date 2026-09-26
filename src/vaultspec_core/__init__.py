@@ -28,9 +28,38 @@ Subpackages:
         execution (Claude, Gemini).
 """
 
-from importlib.metadata import PackageNotFoundError, version
+from typing import TYPE_CHECKING, Any
 
-try:
-    __version__: str = version("vaultspec-core")
-except PackageNotFoundError:
-    __version__ = "0.0.0.dev0"
+__all__ = ["__version__"]
+
+if TYPE_CHECKING:
+    # __getattr__ below resolves this at runtime; a static declaration is
+    # what tells a type checker the name in __all__ genuinely exists, since
+    # nothing assigns it at module level until first access.
+    __version__: str
+
+
+def _installed_version() -> str:
+    """Return the installed distribution's version, or a development stand-in."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("vaultspec-core")
+    except PackageNotFoundError:
+        return "0.0.0.dev0"
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve ``__version__`` on first access rather than at import.
+
+    Reading the installed distribution's metadata costs more than the rest of
+    this package's import put together, and the modules a spawned worker
+    imports for the value vocabulary alone never ask for it. Resolving it
+    lazily keeps importing any submodule cheap, while
+    ``from vaultspec_core import __version__`` still works.
+    """
+    if name == "__version__":
+        resolved = _installed_version()
+        globals()[name] = resolved
+        return resolved
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

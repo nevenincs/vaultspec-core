@@ -180,9 +180,9 @@ def skills_add(
             fm = {"name": skill_name, "description": description}
             scaffold = build_file(fm, body_content)
             atomic_write(file_path, scaffold)
-            from ..config import get_config
+            from .local_config import resolve_editor
 
-            editor = get_config().editor
+            editor = resolve_editor()
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
                 launch_editor(editor, str(file_path))

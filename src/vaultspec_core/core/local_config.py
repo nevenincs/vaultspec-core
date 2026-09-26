@@ -5,11 +5,14 @@ from __future__ import annotations
 import shutil
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .editor import EditorTrust, validate_editor_command
 from .exceptions import EditorResolutionError, VaultSpecError
 from .helpers import atomic_write, ensure_dir
+
+if TYPE_CHECKING:
+    from ..config import ConfigVariable
 
 KNOWN_KEYS = {"editor"}
 
@@ -188,17 +191,26 @@ def resolve_editor(
 
     Order:
       1. editor_override (e.g. from --editor flag)
-      2. local config `editor` value
-      3. VAULTSPEC_EDITOR env var
+      2. VAULTSPEC_EDITOR env var
+      3. local config `editor` value
       4. VISUAL env var
       5. EDITOR env var
       6. "vi" fallback
 
+    The operator's own variable outranks the committed project file, as git
+    ranks ``GIT_EDITOR`` over ``core.editor``: the file is shared by everyone
+    who clones the repository, and a per-operator setting should not be
+    overridden by it.
+
     Every rung is validated by :mod:`vaultspec_core.core.editor` before it is
-    returned. The first two rungs - the flag and the committed config file -
-    are treated as untrusted channels and must additionally name a known
-    editor program; the environment rungs are structurally validated only, and
-    are therefore the way to use an editor the allowlist does not know.
+    returned. The flag and the committed config file are treated as untrusted
+    channels and must additionally name a known editor program; the
+    environment rungs are structurally validated only, and are therefore the
+    way to use an editor the allowlist does not know.
+
+    This is the one ladder: every surface that opens an editor, the edit
+    verbs and interactive creation alike, resolves through it, so the answer
+    cannot differ by command.
 
     Args:
         editor_override: The per-invocation ``--editor`` value, if any.
@@ -220,6 +232,23 @@ def resolve_editor(
         if _accept_editor_candidate(editor_override, "the --editor flag", "untrusted"):
             return editor_override
 
+    from ..config import EDITOR, VAULTSPEC_EDITOR, VISUAL, env_value
+
+    def _from_variable(var: ConfigVariable) -> str | None:
+        env_editor = env_value(var)
+        if not env_editor:
+            return None
+        sources_tried.append(f"${var.env_name} env var ({env_editor!r})")
+        if _accept_editor_candidate(
+            env_editor, f"the ${var.env_name} environment variable", "trusted"
+        ):
+            return env_editor
+        return None
+
+    own = _from_variable(VAULTSPEC_EDITOR)
+    if own is not None:
+        return own
+
     local_editor = get_config_value("editor", target_dir)
     if local_editor:
         sources_tried.append(f"local config 'editor' ({local_editor!r})")
@@ -230,16 +259,10 @@ def resolve_editor(
         ):
             return str(local_editor)
 
-    from ..config import EDITOR, VAULTSPEC_EDITOR, VISUAL, env_value
-
-    for var in (VAULTSPEC_EDITOR, VISUAL, EDITOR):
-        env_editor = env_value(var)
-        if env_editor:
-            sources_tried.append(f"${var.env_name} env var ({env_editor!r})")
-            if _accept_editor_candidate(
-                env_editor, f"the ${var.env_name} environment variable", "trusted"
-            ):
-                return env_editor
+    for var in (VISUAL, EDITOR):
+        generic = _from_variable(var)
+        if generic is not None:
+            return generic
 
     sources_tried.append("fallback 'vi'")
     if shutil.which("vi"):

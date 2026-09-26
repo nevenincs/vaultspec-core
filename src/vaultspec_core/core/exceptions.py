@@ -23,6 +23,14 @@ class VaultSpecError(Exception):
         self.hint = hint
 
 
+class ConfigurationError(VaultSpecError):
+    """A setting's value cannot be used, so the process refuses to start.
+
+    Raised where a value is read, not where it is written, so the message
+    names the variable that carried it rather than the code that asked.
+    """
+
+
 class ResourceNotFoundError(VaultSpecError):
     """A requested resource (rule, skill, agent, file) does not exist."""
 

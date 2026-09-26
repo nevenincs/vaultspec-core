@@ -160,9 +160,9 @@ def rules_add(
 
     if not rule_content:
         if is_interactive:
-            from ..config import get_config
+            from .local_config import resolve_editor
 
-            editor = get_config().editor
+            editor = resolve_editor()
             scaffold = f"---\nname: {rule_stem}\n---\n\n# Rule content\n"
             atomic_write(file_path, scaffold)
             logger.info("Opening editor (%s) for %s...", editor, file_path)

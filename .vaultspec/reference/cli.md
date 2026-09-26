@@ -25,16 +25,21 @@ configuration.
 
 ## Global options
 
-| Option         | Short | Default | Description                                        |
-| -------------- | ----- | ------- | -------------------------------------------------- |
-| `--target DIR` | `-t`  | cwd     | Target workspace directory. Overrides the env var. |
-| `--debug`      | `-d`  | off     | Enable DEBUG-level logging (top-level only).       |
-| `--version`    | `-V`  | -       | Print version and exit (top-level only).           |
-| `--help`       | -     | -       | Show help for any command or group.                |
+| Option         | Short | Default    | Description                                                        |
+| -------------- | ----- | ---------- | ------------------------------------------------------------------ |
+| `--target DIR` | `-t`  | discovered | Target workspace directory. Overrides the env var.                 |
+| `--debug`      | `-d`  | off        | Enable DEBUG-level logging (top-level only).                       |
+| `--verbose`    | `-v`  | off        | Enable INFO-level logging (top-level only); `--debug` outranks it. |
+| `--version`    | `-V`  | -          | Print version and exit (top-level only).                           |
+| `--help`       | -     | -          | Show help for any command or group.                                |
 
 `--target` is accepted by workspace commands and by every `vaultspec-core vault`,
 `vaultspec-core spec`, and `vaultspec-core migrations` subcommand. `--json` is
 command-specific.
+
+With neither `--target` nor `VAULTSPEC_TARGET_DIR` set, the root is discovered from the
+working directory: the `.gt/` container root, then the worktree root, then the
+repository root, and the working directory itself only when none of those is found.
 
 ## Surface provenance
 
@@ -388,14 +393,14 @@ Deploy the framework into the target directory.
 `PROVIDER` (default `all`): `all`, `core`, `claude`, `gemini`, `antigravity`, `codex`.
 `core` installs `.vaultspec/` only.
 
-| Option      | Default | Description                                                                                                                                                                                             |
-| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--upgrade` | off     | Re-sync builtins without re-scaffolding.                                                                                                                                                                |
-| `--dry-run` | off     | Preview without writing.                                                                                                                                                                                |
-| `--force`   | off     | Overwrite an existing installation.                                                                                                                                                                     |
-| `--skip`    | `[]`    | Skip a component (repeatable).                                                                                                                                                                          |
-| `--mode`    | auto    | Provisioning mode: `tool` (uvx), `dependency` (project venv, ships in built distributions), or `dev` (default dev group, renders like dependency but does not ship); auto-detected from pyproject.toml. |
-| `--json`    | off     | Emit machine-readable output.                                                                                                                                                                           |
+| Option      | Default | Description                                                                                                                                                                                                   |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--upgrade` | off     | Refresh everything install owns, idempotently: re-scaffolds any missing directory, runs pending migrations, re-infers the provisioning mode for a legacy workspace, syncs, and migrates the MCP launch shape. |
+| `--dry-run` | off     | Preview without writing.                                                                                                                                                                                      |
+| `--force`   | off     | Overwrite an existing installation.                                                                                                                                                                           |
+| `--skip`    | `[]`    | Skip a component (repeatable).                                                                                                                                                                                |
+| `--mode`    | auto    | Provisioning mode: `tool` (uvx), `dependency` (project venv, ships in built distributions), or `dev` (default dev group, renders like dependency but does not ship); auto-detected from pyproject.toml.       |
+| `--json`    | off     | Emit machine-readable output.                                                                                                                                                                                 |
 
 ### vaultspec-core uninstall
 
@@ -992,33 +997,84 @@ order and bumps the manifest version.
 
 ## Exit codes
 
-| Command                             | Codes                                                                                                                                          |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vaultspec-core vault check`        | `0` clean, `1` errors found.                                                                                                                   |
-| `vaultspec-core vault plan check`   | `0` clean, `1` at least one ERROR-severity finding.                                                                                            |
-| `vaultspec-core spec doctor`        | `0` all ok, `1` warnings, `2` errors (`--gate-errors` folds `1` to `0`).                                                                       |
-| `vaultspec-core spec mcps status`   | `0` config status ok, `1` otherwise.                                                                                                           |
-| `vaultspec-core migrations status`  | `0` up to date or no manifest, `1` migrations pending.                                                                                         |
-| `vaultspec-core migrations run`     | `0` success (including no-op), `1` a migration failed.                                                                                         |
-| `vaultspec-core vault search`       | `0` searched, or not configured (`skipped`); `1` configured but unavailable; `2` invalid input.                                                |
-| `vaultspec-core vault adr crossref` | `0` judged, or not configured (`skipped`); `1` configured but a source could not be judged, or a link could not be written; `2` invalid input. |
+| Command                                | Codes                                                                                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vaultspec-core install` / `uninstall` | `0` success, `1` failure, `2` completed with a required step skipped. Shared by every vaultspec package's install surface; core has no step that reports `2` today. |
+| `vaultspec-core vault check`           | `0` clean, `1` errors found.                                                                                                                                        |
+| `vaultspec-core vault plan check`      | `0` clean, `1` at least one ERROR-severity finding.                                                                                                                 |
+| `vaultspec-core spec doctor`           | `0` all ok, `1` warnings, `2` errors (`--gate-errors` folds `1` to `0`).                                                                                            |
+| `vaultspec-core spec mcps status`      | `0` config status ok, `1` otherwise.                                                                                                                                |
+| `vaultspec-core migrations status`     | `0` up to date or no manifest, `1` migrations pending.                                                                                                              |
+| `vaultspec-core migrations run`        | `0` success (including no-op), `1` a migration failed.                                                                                                              |
+| `vaultspec-core vault search`          | `0` searched, or not configured (`skipped`); `1` configured but unavailable; `2` invalid input.                                                                     |
+| `vaultspec-core vault adr crossref`    | `0` judged, or not configured (`skipped`); `1` configured but a source could not be judged, or a link could not be written; `2` invalid input.                      |
+
+## Settings resolution
+
+One order holds for every setting, in every process kind (CLI, MCP server, importing
+package). Earlier rungs win:
+
+1. **Invocation** - a CLI flag or an explicit programmatic override.
+1. **Session environment** - the process's own environment. A companion package's scoped
+   name (`VAULTSPEC_<PKG>_ROOT`, `VAULTSPEC_<PKG>_LOG_LEVEL`,
+   `VAULTSPEC_<PKG>_STDIO_WATCHDOG`) is read first and falls back to the framework name
+   behind it (`VAULTSPEC_TARGET_DIR`, `VAULTSPEC_LOG_LEVEL`, `VAULTSPEC_STDIO_WATCHDOG`
+   respectively); a credential never chains.
+1. **Workspace `.env`** - credentials only, under the gate below.
+1. **Persisted configuration** - `.vaultspec/config.toml` or
+   `.vaultspec/workspace.json`.
+1. **Derived and external defaults** - `pyproject.toml` mode detection, or a third-party
+   convention such as `VISUAL` then `EDITOR`.
+1. **The shipped default**, declared once in the table below.
+
+The workspace `.env` is `<workspace root>/.env`. It is never found by walking up from
+the working directory or from where the package is installed, and no variant
+(`.env.local` and the like) is read. It supplies a credential - today only
+`VAULTSPEC_CORE_TYPESAFE_API_KEY` - one name at a time, and only when both hold: the
+running interpreter lives inside the workspace, and the owning package's own resolved
+install mode for that workspace is `dependency` or `dev`. A globally installed tool run
+against a cloned repository never reads that repository's `.env`.
+
+Booleans read one vocabulary: `1`, `true`, `yes` or `on` against `0`, `false`, `no` or
+`off`, case-folded and stripped. A blank value is unset, not off, and falls through to
+the next rung. An invalid value for a product-owned variable refuses the process and
+names the variable, the value and the expected shape; the stdio watchdog is the one
+protective switch that instead warns and stays armed.
 
 ## Environment variables
 
-All prefixed `VAULTSPEC_`. Env vars override defaults but are overridden by `--target`.
+All prefixed `VAULTSPEC_`, except the honoured external conventions listed after them.
+Env vars override defaults but are overridden by an explicit flag.
 
-| Variable                          | Type   | Default      | Description                                                                                                                                                                                 |
-| --------------------------------- | ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`            | path   | cwd          | Root workspace directory.                                                                                                                                                                   |
-| `VAULTSPEC_DOCS_DIR`              | str    | `.vault`     | Vault directory name.                                                                                                                                                                       |
-| `VAULTSPEC_FRAMEWORK_DIR`         | str    | `.vaultspec` | Framework directory name.                                                                                                                                                                   |
-| `VAULTSPEC_CLAUDE_DIR`            | str    | `.claude`    | Claude tool directory name.                                                                                                                                                                 |
-| `VAULTSPEC_GEMINI_DIR`            | str    | `.gemini`    | Gemini tool directory name.                                                                                                                                                                 |
-| `VAULTSPEC_ANTIGRAVITY_DIR`       | str    | `.agents`    | Antigravity directory name.                                                                                                                                                                 |
-| `VAULTSPEC_IO_BUFFER_SIZE`        | int    | `8192`       | I/O read buffer size in bytes.                                                                                                                                                              |
-| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT` | int    | `1000000`    | Subprocess stdout capture limit.                                                                                                                                                            |
-| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`  | float  | `120.0`      | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                          |
-| `VAULTSPEC_LOG_LEVEL`             | str    | `INFO`       | Root log level for the CLI.                                                                                                                                                                 |
-| `VAULTSPEC_EDITOR`                | str    | `zed -w`     | Editor command for resource editing.                                                                                                                                                        |
-| `VAULTSPEC_CORE_TYPESAFE_API_KEY` | secret | unset        | Enables hosted vault search; read from the environment, else the workspace `.env` when core runs from the workspace's own environment in `dependency` or `dev` install mode. Never printed. |
-| `VAULTSPEC_STDIO_WATCHDOG`        | str    | on           | MCP server lifetime watchdog; `0`/`false`/`off`/`no` disables it (EOF-only exit).                                                                                                           |
+| Variable                           | Type   | Default       | Description                                                                                                                                                                                    |
+| ---------------------------------- | ------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`             | path   | discovered    | Root workspace directory, for every process kind.                                                                                                                                              |
+| `VAULTSPEC_DOCS_DIR`               | str    | `.vault`      | Vault directory name.                                                                                                                                                                          |
+| `VAULTSPEC_INDEX_DIR`              | str    | `index`       | Subdirectory of the vault holding the auto-generated feature indexes (`<feature>.index.md`).                                                                                                   |
+| `VAULTSPEC_FRAMEWORK_DIR`          | str    | `.vaultspec`  | Framework directory name.                                                                                                                                                                      |
+| `VAULTSPEC_CLAUDE_DIR`             | str    | `.claude`     | Claude tool directory name.                                                                                                                                                                    |
+| `VAULTSPEC_GEMINI_DIR`             | str    | `.gemini`     | Gemini tool directory name.                                                                                                                                                                    |
+| `VAULTSPEC_ANTIGRAVITY_DIR`        | str    | `.agents`     | Antigravity directory name.                                                                                                                                                                    |
+| `VAULTSPEC_IO_BUFFER_SIZE`         | int    | `8192`        | I/O read buffer size in bytes.                                                                                                                                                                 |
+| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`  | int    | `1000000`     | Subprocess stdout capture limit.                                                                                                                                                               |
+| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`   | float  | `120.0`       | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                             |
+| `VAULTSPEC_EDITOR`                 | str    | unset         | Editor command every surface that opens an editor consults. Read after `--editor` and before the project config key, `VISUAL` and `EDITOR`; `vi` is the last rung.                             |
+| `VAULTSPEC_CORE_TYPESAFE_API_KEY`  | secret | unset         | Enables hosted vault search; read from the environment, else the workspace `.env` under the gate above. Never printed.                                                                         |
+| `VAULTSPEC_LOG_LEVEL`              | str    | see below     | Root log level when neither `--debug` nor `--verbose` is given. `WARNING` for the CLI, `INFO` for the MCP server. An unknown name is refused.                                                  |
+| `VAULTSPEC_JSON_PRETTY`            | bool   | unset (off)   | Indents `--json` output.                                                                                                                                                                       |
+| `VAULTSPEC_NO_HINTS`               | bool   | unset (off)   | Drops the `Next actions` block; equivalent to `--no-hints`.                                                                                                                                    |
+| `VAULTSPEC_NON_INTERACTIVE`        | bool   | unset         | Declares that no operator is watching; repository triggers awaiting approval are skipped instead of prompted for. Outranks `CI` in both directions.                                            |
+| `VAULTSPEC_STDIO_WATCHDOG`         | bool   | unset (armed) | MCP server lifetime watchdog; a false word disables it (EOF-only exit); an unrecognised word warns and stays armed.                                                                            |
+| `VAULTSPEC_MCP_GATEWAY_INVOCATION` | str    | unset         | Internal: set by the MCP invoke gateway on every CLI process it spawns. Any non-empty value marks the process as having no terminal, so it refuses to open an editor. Not an operator setting. |
+
+vaultspec-core also honours these external conventions; it does not own them.
+
+| Variable            | Type            | Description                                                                                      |
+| ------------------- | --------------- | ------------------------------------------------------------------------------------------------ |
+| `CI`                | presence        | Set by CI systems. Same effect as `VAULTSPEC_NON_INTERACTIVE`.                                   |
+| `NO_COLOR`          | str (non-empty) | Set to any non-empty value to disable colour in console output.                                  |
+| `GIT_INDEX_FILE`    | presence        | Set by git for every commit hook it runs; suppresses the `Next actions` block and `--fix` hints. |
+| `COLUMNS`           | int             | Console width. Queried from the terminal once at startup when unset.                             |
+| `VISUAL`, `EDITOR`  | str             | Editor commands consulted after `VAULTSPEC_EDITOR` and the project config key, in that order.    |
+| `CLAUDE_CONFIG_DIR` | path            | Claude Code's configuration home, whose `.claude.json` holds user-scope MCP servers.             |
+| `CODEX_HOME`        | path            | Codex's home, whose `config.toml` holds user-scope MCP servers.                                  |

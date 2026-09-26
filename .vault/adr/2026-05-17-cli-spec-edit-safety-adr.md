@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-spec-edit-safety'
 date: '2026-05-17'
-modified: '2026-06-13'
-body_hash: 'sha256:98cd4efa87389c33519c7570b97d9b5ab14d35f6385663bdefb049a59029fe9e'
+modified: '2026-09-26'
+body_hash: 'sha256:295d8f730ad82fd9370b8fe4949149b511861985171882eff7fe33c0c72e6306'
 related:
   - '[[2026-05-17-cli-simplification-ux-audit]]'
   - '[[2026-05-17-cli-spec-edit-safety-research]]'
@@ -79,6 +79,13 @@ editor binary is resolved in this order:
    and exits non-zero.
 
 The hardcoded `zed` choice is removed entirely.
+
+**Amendment note, 2026-09-26**: `2026-09-26-env-parity-research` found two differences between this section and the code.
+
+- **An extra rung.** The code has a rung this list lacks: `$VAULTSPEC_EDITOR`, between the project-local config and `$VISUAL` (`src/vaultspec_core/core/local_config.py:215-257`). The environment rungs are validated structurally, while the flag and the committed config are held to the untrusted-channel allowlist.
+- **`zed` was removed only from the edit verbs.** Interactive creation of a rule, skill or agent still opens `get_config().editor`, whose default is `zed -w` (`src/vaultspec_core/config/config.py:166,509`; `src/vaultspec_core/core/rules.py:165`; `src/vaultspec_core/core/agents.py:790`).
+
+`2026-09-26-env-parity-adr` proposes one ladder and one `vi` default for both paths, with `$VAULTSPEC_EDITOR` ranked above the committed config key.
 
 **Exit-code honesty.** Wrap the editor invocation in an error
 handler that catches subprocess failures and configuration

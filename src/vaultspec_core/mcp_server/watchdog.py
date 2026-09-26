@@ -18,8 +18,9 @@ through layered anchors:
   orphaned or an explicitly named client dies; stdin EOF stays the primary
   exit path everywhere.
 
-``VAULTSPEC_STDIO_WATCHDOG`` (``0``/``false``/``off``/``no``) disables all
-arming. Every failure path fails open: a watchdog that cannot arm must
+A false word in ``VAULTSPEC_STDIO_WATCHDOG`` disables all arming; blank or
+unset leaves it armed, and so does a word the vocabulary does not recognise,
+which warns. Every failure path fails open: a watchdog that cannot arm must
 never prevent the server from serving. Before every hard exit one
 structured JSON event line is flushed to stderr, matching the companion
 vaultspec-rag server's event shape so host-side tooling can consume both.
@@ -49,8 +50,6 @@ import time
 
 logger = logging.getLogger(__name__)
 
-#: Values of the operator kill switch that disable all arming.
-_OFF_VALUES = frozenset({"0", "false", "off", "no"})
 
 #: Ancestors beyond this depth are noise (session managers, init); the
 #: spawning client is always within a few hops (client -> uv -> launcher).
@@ -84,19 +83,6 @@ _INFINITE = 0xFFFF_FFFF
 _WAIT_OBJECT_0 = 0x0000_0000
 _WAIT_TIMEOUT = 0x0000_0102
 _TH32CS_SNAPPROCESS = 0x0000_0002
-
-
-def watchdog_disabled(kill_switch: str | None) -> bool:
-    """Return whether the operator kill switch disables the watchdog.
-
-    This module stays standard-library only, so it does not read the
-    environment itself: the entry point reads ``VAULTSPEC_STDIO_WATCHDOG``
-    through the configuration layer and hands the raw value in.
-
-    Args:
-        kill_switch: The kill switch's raw value, or ``None`` when unset.
-    """
-    return (kill_switch or "").strip().lower() in _OFF_VALUES
 
 
 class _WatchedProcess:
@@ -613,7 +599,7 @@ def arm_client_watchdog(
     grace_seconds: float = _GRACE_SECONDS,
     rearm_seconds: float = _REARM_POLL_SECONDS,
     orphan_confirmations: int = _ORPHAN_CONFIRMATIONS,
-    kill_switch: str | None = None,
+    disabled: bool = False,
 ) -> bool:
     """Arm the lifetime backstop; return whether a watchdog thread started.
 
@@ -627,8 +613,8 @@ def arm_client_watchdog(
     on confirmed orphanhood. On POSIX a coarse reparent poll backstops
     abandonment without pipe closure.
 
-    Arming failures fail open, and ``VAULTSPEC_STDIO_WATCHDOG`` off values
-    skip arming entirely.
+    Arming failures fail open, and an operator who turned the watchdog off
+    skips arming entirely.
 
     Args:
         client_pid: Explicit client PID for the primary anchor. Defaults to
@@ -640,14 +626,18 @@ def arm_client_watchdog(
             attempts while no anchor is held.
         orphan_confirmations: Windows only; consecutive unanchored polls
             required before the process reaps itself as an orphan.
-        kill_switch: The raw ``VAULTSPEC_STDIO_WATCHDOG`` value, or ``None``
-            when unset; an off value skips arming.
+        disabled: Whether the operator turned the watchdog off. This module
+            stays standard-library only and loadable by path, so it neither
+            reads nor interprets the environment: the entry point resolves
+            ``VAULTSPEC_STDIO_WATCHDOG`` through
+            :func:`~vaultspec_core.mcp_server.kill_switch.watchdog_disabled`
+            and hands the answer in.
 
     Returns:
         ``True`` when a watchdog thread armed, ``False`` when arming was
         disabled or failed open and the server retains EOF-only shutdown.
     """
-    if watchdog_disabled(kill_switch):
+    if disabled:
         logger.info(
             "watchdog: disabled via VAULTSPEC_STDIO_WATCHDOG; "
             "stdin EOF is the only exit path"

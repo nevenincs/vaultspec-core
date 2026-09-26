@@ -63,6 +63,11 @@ class TestConsole:
         kwargs = _console_kwargs(environ={"NO_COLOR": "1"})
         assert kwargs["no_color"] is True
 
+    def test_empty_no_color_is_not_a_request_for_monochrome(self):
+        """no-color.org defines the convention as set *and non-empty*."""
+        kwargs = _console_kwargs(environ={"NO_COLOR": ""})
+        assert kwargs["no_color"] is False
+
 
 @pytest.mark.unit
 class TestConfigureStdio:

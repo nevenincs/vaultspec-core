@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.6...vaultspec-core-v0.3.0) (2026-09-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* an invalid value in a product-owned VAULTSPEC_* variable now refuses the run with exit 1 (all problems reported together, an error envelope under --json) instead of being logged and defaulted; VAULTSPEC_NON_INTERACTIVE, VAULTSPEC_NO_HINTS, VAULTSPEC_JSON_PRETTY and VAULTSPEC_STDIO_WATCHDOG share one boolean vocabulary with blank as unset, and VAULTSPEC_NON_INTERACTIVE=0 means interactive; NO_COLOR set but empty no longer disables colour; the editor ladder is --editor, VAULTSPEC_EDITOR, the committed editor key, VISUAL, EDITOR, then vi, and VaultSpecConfig.editor is removed; a VAULTSPEC_TARGET_DIR naming a missing directory is refused; upgrade-time mode inference moved to vaultspec_core.core.install_mode.infer_upgrade_mode and a legacy dev-group workspace with uv run hooks now upgrades to the DEV mode.
+
+### Features
+
+* resolve settings, env files and credentials in one order shared by every package ([#564](https://github.com/nevenincs/vaultspec-core/issues/564)) ([b1e4b4d](https://github.com/nevenincs/vaultspec-core/commit/b1e4b4d45ebb82cb8678df20fffd23b8c892e918))
+
+
+### Bug Fixes
+
+* **ci:** run the Homebrew acquisition leg in a private prefix ([#561](https://github.com/nevenincs/vaultspec-core/issues/561)) ([fb56eab](https://github.com/nevenincs/vaultspec-core/commit/fb56eab15bfae55eccb0ef447110bf2253e05027))
+
 ## [0.2.6](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.5...vaultspec-core-v0.2.6) (2026-09-25)
 
 

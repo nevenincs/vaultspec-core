@@ -28,57 +28,23 @@ Formatting is a property of the *channel*, not of any one command, so it
 lives here rather than at each call site. Setting ``VAULTSPEC_JSON_PRETTY``
 to a truthy value restores indentation for a human debugging a payload by
 hand; nothing in the agent path sets it.
+
+The implementation lives in :mod:`vaultspec_core.envelope`, which an
+importing package can use without paying for the CLI command tree; this
+module re-exports the same functions so no call site under
+:mod:`vaultspec_core.cli` needs to change.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from vaultspec_core.envelope import (
+    error_format_kwargs as error_format_kwargs,
+)
+from vaultspec_core.envelope import (
+    json_format_kwargs as json_format_kwargs,
+)
+from vaultspec_core.envelope import (
+    pretty_enabled as pretty_enabled,
+)
 
-from ..config import VAULTSPEC_JSON_PRETTY, env_value
-
-__all__ = ["json_format_kwargs", "pretty_enabled"]
-
-#: Compact separators: no space after ``,`` or ``:``. ``json.dumps`` defaults
-#: to ``", "`` and ``": "``, which adds two bytes per field on top of the
-#: indentation itself. Non-ASCII text is written as UTF-8 rather than
-#: ``\uXXXX`` escapes, which cost six bytes per character (twelve for an
-#: emoji) against the reply budgets; the entry point already makes stdout
-#: UTF-8 (``console.py``), so the raw form is always writable.
-_COMPACT: dict[str, Any] = {"separators": (",", ":"), "ensure_ascii": False}
-
-#: Indented form, for a human reading a payload directly.
-_PRETTY: dict[str, Any] = {"indent": 2, "ensure_ascii": False}
-
-_FALSEY = frozenset({"", "0", "false", "no", "off"})
-
-
-def pretty_enabled() -> bool:
-    """Report whether indented JSON was explicitly requested.
-
-    Read per call rather than cached at import so a test or a shell can
-    toggle it without reloading the module.
-
-    Returns:
-        ``True`` when the environment opts into indentation.
-    """
-    raw = env_value(VAULTSPEC_JSON_PRETTY) or ""
-    return raw.strip().lower() not in _FALSEY
-
-
-def json_format_kwargs() -> dict[str, Any]:
-    """Return the ``json.dumps`` formatting keywords for this channel.
-
-    Returns:
-        Compact separators by default; indentation when opted in.
-    """
-    return dict(_PRETTY) if pretty_enabled() else dict(_COMPACT)
-
-
-#: Spread into every CLI ``json.dumps`` call as
-#: ``json.dumps(payload, **json_format_kwargs())``. It is a function call
-#: rather than a module-level mapping on purpose: ``**`` unpacking of a
-#: ``dict`` subclass reads the underlying storage directly and bypasses any
-#: ``keys``/``__getitem__`` override, so a lazily-resolving mapping expands to
-#: nothing and silently restores the default separators. That failure is
-#: invisible - the payload still shrinks, because the indent is gone - which
-#: is exactly the kind of quiet regression this module exists to prevent.
+__all__ = ["error_format_kwargs", "json_format_kwargs", "pretty_enabled"]

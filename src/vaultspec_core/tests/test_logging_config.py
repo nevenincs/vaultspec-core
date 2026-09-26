@@ -14,6 +14,7 @@ import pytest
 from rich.logging import RichHandler
 
 import vaultspec_core.logging_config as logging_config
+from vaultspec_core.core.exceptions import ConfigurationError
 
 pytestmark = [pytest.mark.unit]
 
@@ -239,13 +240,29 @@ class TestInvalidLevel:
         logging_config.configure_logging(level="NONEXISTENT")
         assert logging.getLogger().level == logging.INFO
 
-    def test_invalid_env_var_falls_back_to_info(self):
-        """An unrecognized VAULTSPEC_LOG_LEVEL should fall back to INFO."""
+    def test_getattr_fallback_never_raises_for_a_valid_level_name(self):
+        """The getattr(logging, named, ...) backstop is a no-op for every
+        name resolve_log_level can actually return.
+
+        Guards the fix for a prior defect where the fallback was dropped and
+        a caller-supplied default outside LOG_LEVELS crashed configure_logging
+        with AttributeError instead of failing at resolve_log_level.
+        """
+        for level in logging_config.LOG_LEVELS:
+            assert getattr(logging, level, None) is not None
+
+    def test_an_unknown_env_var_level_is_refused(self):
+        """A level name that does not exist is refused, not quietly replaced.
+
+        Logging at some other level than the one asked for hides exactly the
+        diagnostics the operator was trying to see.
+        """
         old = os.environ.get("VAULTSPEC_LOG_LEVEL")
         os.environ["VAULTSPEC_LOG_LEVEL"] = "BOGUS"
         try:
-            logging_config.configure_logging()
-            assert logging.getLogger().level == logging.INFO
+            with pytest.raises(ConfigurationError) as refusal:
+                logging_config.configure_logging()
+            assert "VAULTSPEC_LOG_LEVEL" in str(refusal.value)
         finally:
             if old is None:
                 os.environ.pop("VAULTSPEC_LOG_LEVEL", None)

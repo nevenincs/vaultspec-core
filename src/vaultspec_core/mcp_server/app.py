@@ -3,7 +3,7 @@
 Constructs the ``MCPServer`` instance, registers the vault tool surface, and
 provides the runtime entry boundary for ``vaultspec-core-mcp``. Supports both
 root-CLI-injected context (via ``ctx.obj``) and standalone fallback
-configuration via :func:`~vaultspec_core.config.get_config`.
+resolution via :func:`~vaultspec_core.config.resolve_target`.
 """
 
 from __future__ import annotations
@@ -220,8 +220,13 @@ def _serve(
     Raises:
         typer.Exit: If ``root_dir`` cannot be resolved in standalone mode.
     """
+    from ..config import check_environment
     from ..core.types import init_paths
     from ..logging_config import configure_logging
+
+    # Before serving anything: a value nobody can use stops the server here,
+    # not in the middle of a tool call that has already changed the vault.
+    check_environment()
 
     # Ensure MCP uses stderr for everything to protect JSON-RPC on stdout
     configure_logging()
@@ -230,14 +235,12 @@ def _serve(
     if ctx_obj and "layout" in ctx_obj:
         root_dir = ctx_obj["target"]
     else:
-        # Fallback if run standalone
-        from ..config import get_config
+        # Fallback if run standalone: the same rungs the CLI resolves a root
+        # over, discovery included, so a host that sets the variable and a
+        # host that launches from the workspace agree.
+        from ..config import resolve_target, resolve_workspace
 
-        cfg = get_config()
-        root_dir = cfg.target_dir
-        if not root_dir:
-            typer.echo("Error: Target directory not resolved.", err=True)
-            raise typer.Exit(1)
+        root_dir = resolve_workspace(target_override=resolve_target().path).target_dir
 
     # Initialize core paths (TARGET_DIR, TEMPLATES_DIR, etc.)
     init_paths(root_dir)
@@ -251,10 +254,12 @@ def _serve(
     # (pipe creator primary, ancestor chain fallback, POSIX reparent poll).
     # Fails open to EOF-only behavior when it cannot arm.
     from ..config import VAULTSPEC_STDIO_WATCHDOG, env_value
+    from .kill_switch import watchdog_disabled
     from .watchdog import arm_client_watchdog
 
     if arm_client_watchdog(
-        parent_pid=parent_pid, kill_switch=env_value(VAULTSPEC_STDIO_WATCHDOG)
+        parent_pid=parent_pid,
+        disabled=watchdog_disabled(env_value(VAULTSPEC_STDIO_WATCHDOG)),
     ):
         logger.debug("Client watchdog armed")
     else:
@@ -300,8 +305,16 @@ def main(
 
 
 def run() -> None:
-    """Console-script entrypoint for the packaged MCP executable."""
-    app(prog_name=MCP_PROG_NAME)
+    """Console-script entrypoint for the packaged MCP executable.
+
+    A refusal raised beneath the command - an unusable setting, above all -
+    reaches the host as one stderr line and a non-zero exit, not as a source
+    traceback: the host renders whatever the server writes, and a traceback
+    tells the operator nothing the message does not.
+    """
+    from vaultspec_core.cli._errors import run_app
+
+    run_app(app, prog_name=MCP_PROG_NAME)
 
 
 if __name__ == "__main__":

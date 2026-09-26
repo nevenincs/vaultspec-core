@@ -2,29 +2,47 @@
 
 Determines how a target directory maps to ``.vault/`` and ``.vaultspec/``
 roots across standalone, explicit, git, worktree, and ``.gt/`` container modes.
-Key exports: :func:`resolve_workspace`, :func:`discover_git`, :class:`WorkspaceLayout`,
-:class:`GitInfo`, :class:`LayoutMode`, :class:`WorkspaceError`. Re-exported via
+Key exports: :func:`resolve_target`, :func:`resolve_workspace`,
+:func:`discover_git`, :class:`WorkspaceLayout`, :class:`GitInfo`,
+:class:`LayoutMode`, :class:`WorkspaceError`. Re-exported via
 :mod:`vaultspec_core.config`; consumed by :mod:`vaultspec_core.cli.root` and
 :mod:`vaultspec_core.core.types`.
+
+:func:`resolve_target` covers the two rungs that name a root - the invocation
+and the session environment - and leaves discovery to
+:func:`resolve_workspace`. Every package resolves its root through it, passing
+its own package-scoped entry, so one order holds everywhere.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from vaultspec_core.core.exceptions import VaultSpecError
+from vaultspec_core.core.exceptions import ConfigurationError, VaultSpecError
+from vaultspec_core.env_values import rejection
+
+from .config import VAULTSPEC_TARGET_DIR, env_source, env_value
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from .config import ConfigVariable
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "GitInfo",
     "LayoutMode",
+    "ResolvedTarget",
+    "TargetSource",
     "WorkspaceError",
     "WorkspaceLayout",
     "discover_git",
+    "resolve_target",
     "resolve_workspace",
 ]
 
@@ -305,6 +323,153 @@ def _validate(layout: WorkspaceLayout) -> None:
             f"target_dir does not exist: {layout.target_dir}\n"
             f"Provide a valid directory via --target."
         )
+
+
+class TargetSource(StrEnum):
+    """Which rung supplied a workspace root.
+
+    Attributes:
+        INVOCATION: The call itself named it - a ``--target`` flag, a tool
+            argument, or a programmatic override.
+        ENVIRONMENT: A registered variable named it, the package-scoped name
+            first and the framework name behind it.
+        DISCOVERY: Nothing named it, so it is discovered from the working
+            directory by :func:`resolve_workspace`.
+    """
+
+    INVOCATION = "invocation"
+    ENVIRONMENT = "environment"
+    DISCOVERY = "discovery"
+
+
+@dataclass(frozen=True)
+class ResolvedTarget:
+    """A workspace root and the rung that supplied it.
+
+    Attributes:
+        path: The absolute root, or ``None`` when no rung named one and the
+            caller should discover it from the working directory.
+        source: Which rung supplied :attr:`path`.
+        variable: The environment variable that supplied it, or ``None`` for
+            any other rung. A diagnostic names the variable the operator
+            actually set, which may be the framework name behind a
+            package-scoped one.
+    """
+
+    path: Path | None
+    source: TargetSource
+    variable: str | None = None
+
+    def __post_init__(self) -> None:
+        has_variable = self.variable is not None
+        from_environment = self.source is TargetSource.ENVIRONMENT
+        if has_variable != from_environment:
+            raise ValueError(
+                "variable is set if and only if source is ENVIRONMENT: "
+                f"got source={self.source!r}, variable={self.variable!r}"
+            )
+
+
+def _absolute(path: Path, base: Path) -> Path:
+    """Return *path* as an absolute path, relative ones taken against *base*."""
+    absolute = path if path.is_absolute() else base / path
+    return _strip_unc(absolute.resolve())
+
+
+def _expanded(raw: str, variable: str) -> Path:
+    """Return *raw* as a path, with leading home shorthand expanded.
+
+    A shell expands ``~`` before the process ever sees it, so an invocation
+    never carries one. A variable does: ``VAULTSPEC_TARGET_DIR=~/work`` is
+    assigned, exported from a configuration file, or written into an agent
+    manifest without a shell in between, and the tilde arrives verbatim. A
+    root taken from the environment therefore expands it, or the operator's
+    home shorthand would be read as a directory literally named ``~``.
+
+    The home directory is the running process's own, as the platform
+    determines it, not one named in a caller-supplied environment mapping:
+    the shorthand means the home of whoever is running, and a second
+    implementation of the platform's rule is how that answer drifts.
+
+    Args:
+        raw: The value the variable carried.
+        variable: The name that carried it, for the refusal.
+
+    Returns:
+        The path, home shorthand expanded.
+
+    Raises:
+        ConfigurationError: If the value needs a home directory this process
+            cannot determine.
+    """
+    try:
+        return Path(raw).expanduser()
+    except RuntimeError as unresolvable:
+        raise ConfigurationError(
+            f"{variable} names a path under the home directory, which this "
+            f"process cannot determine: {raw!r}",
+            hint=f"Point {variable} at an absolute path instead.",
+        ) from unresolvable
+
+
+def resolve_target(
+    explicit: Path | None = None,
+    *,
+    package_root: ConfigVariable | None = None,
+    environ: Mapping[str, str] | None = None,
+    cwd: Path | None = None,
+) -> ResolvedTarget:
+    """Resolve the workspace root from the invocation and the environment.
+
+    The two rungs that can *name* a root, in order: the invocation, then the
+    session environment. A package passes its own root entry, whose framework
+    fallback reaches ``VAULTSPEC_TARGET_DIR``; a package without one gets
+    ``VAULTSPEC_TARGET_DIR`` itself. Neither rung naming a root is not a
+    failure: it means discovery, which :func:`resolve_workspace` performs when
+    handed no override.
+
+    A root the environment names expands leading home shorthand (``~``,
+    ``~user``); one the invocation names is taken as given, because the shell
+    or the CLI framework has already expanded whatever it was going to. A
+    relative root of either kind is taken against *cwd*.
+
+    Args:
+        explicit: The root the invocation named, or ``None``.
+        package_root: The calling package's root entry. ``None`` reads
+            ``VAULTSPEC_TARGET_DIR`` directly.
+        environ: The environment to read; ``None`` reads the process's own.
+        cwd: The directory a relative root is taken against; ``None`` uses
+            the process's own working directory.
+
+    Returns:
+        The resolved root paired with the rung that supplied it.
+
+    Raises:
+        ConfigurationError: If a variable names a directory that does not
+            exist. A root that is not there cannot be discovered past: the
+            operator asked for one workspace and would silently get another.
+            Also if a variable names a path under a home directory this
+            process cannot determine.
+        ValueError: If *package_root* is not a registered entry.
+    """
+    base = _strip_unc((cwd or Path.cwd()).resolve())
+    if explicit is not None:
+        return ResolvedTarget(_absolute(explicit, base), TargetSource.INVOCATION)
+
+    entry = VAULTSPEC_TARGET_DIR if package_root is None else package_root
+    raw = env_value(entry, environ)
+    if raw is None:
+        return ResolvedTarget(None, TargetSource.DISCOVERY)
+
+    supplier = env_source(entry, environ)
+    name = entry.env_name if supplier is None else supplier.env_name
+    root = _absolute(_expanded(raw, name), base)
+    if not root.is_dir():
+        raise ConfigurationError(
+            str(rejection(name, "an existing directory", raw)),
+            hint=f"Point {name} at a directory that exists, or unset it.",
+        )
+    return ResolvedTarget(root, TargetSource.ENVIRONMENT, name)
 
 
 def resolve_workspace(
