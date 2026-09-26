@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:0f96be2524a3965fe5a35a6d278539508e4eab2cc948b92686c1d389643ec0aa'
+body_hash: 'sha256:fcb5dfcdf47a56ef77ac390a4efc7ab89e6631b65422b159522715c006e5082b'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -282,6 +282,79 @@ related:
 - `S17` `M` `.github/ci-contract-allow.txt`
 - `S17` `verify:` `GitHub CI on PR 564 (lint, Linux full suite, Windows library suite, merge gate, CodeQL)` -> `pass`
 - `S17` `by:` `orchestrator`
+- `S20` `A` `src/vaultspec_rag/config/_registry.py`
+- `S20` `M` `src/vaultspec_rag/config/_settings.py`
+- `S20` `M` `src/vaultspec_rag/config/_types.py`
+- `S20` `A` `src/vaultspec_rag/tests/test_env_registry.py`
+- `S20` `verify:` `just test-fast` -> `pass`
+- `S20` `by:` `vaultspec-high-executor`
+- `S21` `A` `src/vaultspec_rag/config/_credentials.py`
+- `S21` `M` `src/vaultspec_rag/cli/_process.py`
+- `S21` `M` `src/vaultspec_rag/cli/_service_start.py`
+- `S21` `M` `src/vaultspec_rag/commands/_install.py`
+- `S21` `M` `src/vaultspec_rag/commands/_provision.py`
+- `S21` `A` `src/vaultspec_rag/tests/test_env_credentials.py`
+- `S21` `verify:` `just test-fast` -> `pass`
+- `S21` `by:` `vaultspec-high-executor`
+- `S22` `M` `src/vaultspec_rag/search/_typesafe_transport.py`
+- `S22` `verify:` `just test-fast` -> `pass`
+- `S22` `by:` `vaultspec-high-executor`
+- `S23` `D` `src/vaultspec_rag/_env_values.py`
+- `S23` `M` `src/vaultspec_rag/config/_settings.py`
+- `S23` `M` `src/vaultspec_rag/memory_probe.py`
+- `S23` `verify:` `just test-fast` -> `pass`
+- `S23` `by:` `vaultspec-high-executor`
+- `S25` `M` `src/vaultspec_rag/config/_types.py`
+- `S25` `M` `src/vaultspec_rag/_gpu.py`
+- `S25` `M` `src/vaultspec_rag/cli/_gpu_errors.py`
+- `S25` `M` `src/vaultspec_rag/commands/_mcp_topology.py`
+- `S25` `M` `src/vaultspec_rag/indexer/_preprocess_schema.py`
+- `S25` `verify:` `just test-fast` -> `pass`
+- `S25` `by:` `vaultspec-high-executor`
+- `S26` `M` `src/vaultspec_rag/_named_root.py`
+- `S26` `M` `src/vaultspec_rag/cli/_app.py`
+- `S26` `M` `src/vaultspec_rag/mcp/_roots.py`
+- `S26` `M` `src/vaultspec_rag/server/_utils.py`
+- `S26` `verify:` `just test-fast` -> `pass`
+- `S26` `by:` `vaultspec-high-executor`
+- `S27` `M` `src/vaultspec_rag/logging_config.py`
+- `S27` `M` `src/vaultspec_rag/server/_main.py`
+- `S27` `M` `src/vaultspec_rag/cli/_app.py`
+- `S27` `A` `src/vaultspec_rag/tests/test_env_log_level.py`
+- `S27` `A` `src/vaultspec_rag/tests/test_server_entry_environment_refusal.py`
+- `S27` `verify:` `just test-fast` -> `pass`
+- `S27` `by:` `vaultspec-high-executor`
+- `S28` `M` `src/vaultspec_rag/server/_stdio_lifetime.py`
+- `S28` `verify:` `just test-fast` -> `pass`
+- `S28` `by:` `vaultspec-high-executor`
+- `S29` `M` `src/vaultspec_rag/cli/_install.py`
+- `S29` `A` `src/vaultspec_rag/tests/test_install_unattended.py`
+- `S29` `verify:` `just test-fast` -> `pass`
+- `S29` `by:` `vaultspec-high-executor`
+- `S30` `M` `src/vaultspec_rag/cli/_install.py`
+- `S30` `A` `src/vaultspec_rag/tests/test_install_json_envelope.py`
+- `S30` `A` `src/vaultspec_rag/tests/test_cli_refusal_channel.py`
+- `S30` `verify:` `just test-fast` -> `pass`
+- `S30` `by:` `vaultspec-high-executor`
+- `S34` `M` `src/vaultspec_rag/commands/_mode.py`
+- `S34` `M` `src/vaultspec_rag/tests/test_install_mode.py`
+- `S34` `verify:` `just test-fast` -> `pass`
+- `S34` `by:` `vaultspec-high-executor`
+- `S37` `M` `.env.example`
+- `S37` `M` `docs/configuration.md`
+- `S37` `M` `docs/installation.md`
+- `S37` `M` `docs/mcp.md`
+- `S37` `M` `docs/cli.md`
+- `S37` `M` `docs/automation.md`
+- `S37` `verify:` `check-docs-cli, check-docs-conventions, check-markdown` -> `pass`
+- `S37` `by:` `vaultspec-high-executor`
+- `S38` `A` `src/vaultspec_rag/tests/test_env_parity.py`
+- `S38` `A` `src/vaultspec_rag/tests/test_cli_help_import_order.py`
+- `S38` `verify:` `just test-fast` -> `pass`
+- `S38` `by:` `vaultspec-high-executor`
+- `S39` `verify:` `just test-fast (serial unit lane)` -> `pass`
+- `S39` `verify:` `just check-type-strict` -> `pass`
+- `S39` `by:` `vaultspec-high-executor`
 
 ## Notes
 
@@ -321,3 +394,17 @@ related:
 - `S10` pre-release review fix: both consent gates call `is_unattended(json_output=json_output)` instead of restating the rule as `json_output` or not `operator_present();` the wrapper that only restated it is gone
 - `S42` review rounds 2 and 3: vaultspec-a2a commits 349b7ba8, 06752993, bfe6131a; final review PASS.
 - `S17` The user confirmed core, rag and a2a as release targets on 2026-09-26. PR 564 squash-merged to main as b1e4b4d4 after two CI fixes (3574ffac: the no-home test assumed Windows; 012b21c0: main's pre-existing workflow-contract failure from 561 fixed by listing the two runner-plane acquisition steps). Release publication pending the release-please PR.
+- `S20` commit f6b5384e. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S21` commit 96221d66. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S22` commit 9e0faaed. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S23` commits 554e1e6e, e1e1120d (the mirror was deleted rather than kept as a re-export: the repo forbids pass-through modules). vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S25` commit 3e14c1a5; junction markers renamed `VAULTSPEC_RAG_JUNCTION_*.` vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S26` commits 8fe87684, f34e5ea1 (home expansion moved into core's `resolve_target).` vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S27` commits c08d5398, 94b16056, a72d7510, 11b0aa14 (review fixes: startup refusal in all three entry points; root path flags seeded after root resolution). vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S28` commit c92d99a2. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S29` commit 5280f688. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S30` commits a3e1fe91, dd09dc67, 11b0aa14, dd6bb16a (exit codes 0/1/2 per the shared table). vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S34` commit e37e7738. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S37` commits 256baf48, dd09dc67, dd6bb16a. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S38` commits 7571d824, 63fb1762, 3e747ebe, 84201194. Found: `vaultspec_core.cli` rebinds typer.main.TyperArgument process-wide at import, so help metavars depend on import order in any process importing both CLIs; rag tests assert the argument name; the rebinding itself is a vaultspec-core follow-up. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
+- `S39` 5305 passed, 0 failed at 84201194. Release pending: core 0.3.0 publication, S18 floor raise, and the merge of main after vaultspec-rag PR 548 lands (resolution map from the session owning 548).
