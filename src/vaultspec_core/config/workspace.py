@@ -360,6 +360,15 @@ class ResolvedTarget:
     source: TargetSource
     variable: str | None = None
 
+    def __post_init__(self) -> None:
+        has_variable = self.variable is not None
+        from_environment = self.source is TargetSource.ENVIRONMENT
+        if has_variable != from_environment:
+            raise ValueError(
+                "variable is set if and only if source is ENVIRONMENT: "
+                f"got source={self.source!r}, variable={self.variable!r}"
+            )
+
 
 def _absolute(path: Path, base: Path) -> Path:
     """Return *path* as an absolute path, relative ones taken against *base*."""

@@ -4,7 +4,31 @@ Provides :func:`handle_error` which converts domain exceptions into
 CLI error exits with optional hint messages.
 """
 
+import sys
+from collections.abc import Sequence
+
 import typer
+
+
+def argv_requests_json(argv: Sequence[str] | None = None) -> bool:
+    """Return whether ``--json`` appears as its own token in *argv*.
+
+    A refusal raised from the root callback - a bad ``VAULTSPEC_LOG_LEVEL``,
+    say - fires before Click has parsed the subcommand's own ``--json``
+    option, so there is no parsed flag to read yet. Scanning the raw argv for
+    the literal token is the only signal available at that point; it is
+    deliberately an exact-token match so a flag like ``--json-file`` is not
+    mistaken for it.
+
+    Args:
+        argv: The arguments to scan; ``None`` reads the process's own
+            (``sys.argv[1:]``, excluding the program name).
+
+    Returns:
+        ``True`` when ``--json`` is present as a whole token.
+    """
+    tokens = sys.argv[1:] if argv is None else argv
+    return "--json" in tokens
 
 
 def handle_error(exc: Exception, *, json_output: bool = False) -> None:
@@ -60,6 +84,12 @@ def run_app(app: typer.Typer, *, prog_name: str | None = None) -> None:
     -m vaultspec_core``, and the MCP server's as ``-c``. Both named something
     the user cannot type.
 
+    A refusal from this backstop may fire before Click has parsed the
+    subcommand's own ``--json`` flag - the root callback's own startup check
+    is one such case - so whether to render the canonical envelope instead of
+    prose is decided by scanning the raw argv (:func:`argv_requests_json`)
+    rather than by a parsed option nothing has reached yet.
+
     Args:
         app: The root Typer application to invoke.
         prog_name: The command name to render in usage and help. ``None``
@@ -74,7 +104,13 @@ def run_app(app: typer.Typer, *, prog_name: str | None = None) -> None:
     try:
         app(prog_name=prog_name)
     except VaultSpecError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        if getattr(exc, "hint", ""):
-            typer.echo(f"  Hint: {exc.hint}", err=True)
+        if argv_requests_json():
+            from vaultspec_core.cli.rendering import render_error_envelope
+
+            hint = getattr(exc, "hint", "") or None
+            print(render_error_envelope(str(exc), hint=hint))
+        else:
+            typer.echo(f"Error: {exc}", err=True)
+            if getattr(exc, "hint", ""):
+                typer.echo(f"  Hint: {exc.hint}", err=True)
         raise SystemExit(1) from exc

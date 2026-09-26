@@ -77,13 +77,21 @@ def main(
     ] = False,
 ) -> None:
     """Initialize workspace and logging."""
+    from vaultspec_core.cli._errors import argv_requests_json, handle_error
     from vaultspec_core.cli._target import reset, set_root_target
     from vaultspec_core.config import check_environment
+    from vaultspec_core.core.exceptions import ConfigurationError
     from vaultspec_core.logging_config import configure_logging, resolve_log_level
 
     # Before any command runs: a switch read at output time would otherwise
-    # refuse the run after it had already written everything it wrote.
-    check_environment()
+    # refuse the run after it had already written everything it wrote. This
+    # fires before Click parses the subcommand's own --json option, so
+    # whether to report through the canonical envelope is decided from the
+    # raw argv rather than a flag nothing has reached yet.
+    try:
+        check_environment()
+    except ConfigurationError as exc:
+        handle_error(exc, json_output=argv_requests_json())
 
     configure_logging(
         level=resolve_log_level(debug=debug, verbose=verbose),

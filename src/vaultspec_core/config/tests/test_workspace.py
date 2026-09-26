@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -16,6 +17,7 @@ from ..config import (
 )
 from ..workspace import (
     LayoutMode,
+    ResolvedTarget,
     TargetSource,
     discover_git,
     resolve_target,
@@ -24,7 +26,6 @@ from ..workspace import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
@@ -336,6 +337,27 @@ def _target_companion_registry() -> Iterator[None]:
     register_registry(TARGET_COMPANION, [COMPANION_ROOT])
     yield
     _forget_registry(TARGET_COMPANION)
+
+
+class TestResolvedTargetInvariant:
+    """A variable is carried if and only if the source is ENVIRONMENT."""
+
+    def test_environment_without_a_variable_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="ENVIRONMENT"):
+            ResolvedTarget(Path("/srv"), TargetSource.ENVIRONMENT, None)
+
+    def test_a_variable_outside_environment_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="ENVIRONMENT"):
+            ResolvedTarget(
+                Path("/srv"), TargetSource.INVOCATION, "VAULTSPEC_TARGET_DIR"
+            )
+
+    def test_invocation_and_discovery_carry_no_variable(self) -> None:
+        ResolvedTarget(Path("/srv"), TargetSource.INVOCATION, None)
+        ResolvedTarget(None, TargetSource.DISCOVERY, None)
+
+    def test_environment_with_a_variable_is_accepted(self) -> None:
+        ResolvedTarget(Path("/srv"), TargetSource.ENVIRONMENT, "VAULTSPEC_TARGET_DIR")
 
 
 class TestResolveTarget:

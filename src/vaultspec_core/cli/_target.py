@@ -159,10 +159,21 @@ def apply_target(
         # no subcommand override  - skip redundant work.
         return
 
-    effective = _effective_target(target)  # None means "discover" in resolve_workspace
-
+    from vaultspec_core.cli._errors import handle_error
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
+    from vaultspec_core.core.exceptions import ConfigurationError
     from vaultspec_core.core.types import init_paths
+
+    try:
+        # None means "discover" in resolve_workspace.
+        effective = _effective_target(target)
+    except ConfigurationError as e:
+        # A bad VAULTSPEC_TARGET_DIR is refused here, with the caller's own
+        # already-known json_output - unlike the root callback's own startup
+        # check, this call site has it, so there is no need to guess from
+        # argv.
+        handle_error(e, json_output=json_output)
+        return  # unreachable, but satisfies type checker
 
     fw_root = _resolve_framework_root(effective) if split_source else None
 
