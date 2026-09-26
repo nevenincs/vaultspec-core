@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:06c914f291c914a3c85a39e4cf4bd5e5702dbf5ae8aa33163d9615530a39ebde'
+body_hash: 'sha256:0f96be2524a3965fe5a35a6d278539508e4eab2cc948b92686c1d389643ec0aa'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -278,6 +278,10 @@ related:
 - `S42` `A` `dev/tests/test_import_time_settings.py`
 - `S42` `A` `src/vaultspec_a2a/control/tests/test_settings_redaction.py`
 - `S42` `verify:` `control, dev and telemetry suites` -> `pass`
+- `S17` `M` `src/vaultspec_core/config/tests/test_workspace.py`
+- `S17` `M` `.github/ci-contract-allow.txt`
+- `S17` `verify:` `GitHub CI on PR 564 (lint, Linux full suite, Windows library suite, merge gate, CodeQL)` -> `pass`
+- `S17` `by:` `orchestrator`
 
 ## Notes
 
@@ -316,3 +320,4 @@ related:
 - `S15` pre-release review fix: --target is documented as discovered (the .gt container root, then the worktree root, then the repository root, the working directory last) rather than defaulting to the working directory; install and uninstall state the three shared exit codes; the workspace copy of the bundled reference is reseeded through install core --upgrade, ending its 0.2.5 against 0.2.6 release-line drift
 - `S10` pre-release review fix: both consent gates call `is_unattended(json_output=json_output)` instead of restating the rule as `json_output` or not `operator_present();` the wrapper that only restated it is gone
 - `S42` review rounds 2 and 3: vaultspec-a2a commits 349b7ba8, 06752993, bfe6131a; final review PASS.
+- `S17` The user confirmed core, rag and a2a as release targets on 2026-09-26. PR 564 squash-merged to main as b1e4b4d4 after two CI fixes (3574ffac: the no-home test assumed Windows; 012b21c0: main's pre-existing workflow-contract failure from 561 fixed by listing the two runner-plane acquisition steps). Release publication pending the release-please PR.
