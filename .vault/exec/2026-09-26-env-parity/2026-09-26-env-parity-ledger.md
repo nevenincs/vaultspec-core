@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:ab2129718776e33af2e07bcfc11822bb5d24a6b2532524415857cf19af306d65'
+body_hash: 'sha256:2440b9bb036f7240f97f43e0977459de96a323faf57299104870da6bed2750e5'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -91,9 +91,18 @@ related:
 - `S07` `verify:` `just check-type` -> `pass`
 - `S07` `verify:` `pytest src/vaultspec_core/config/tests src/vaultspec_core/tests/cli src/vaultspec_core/mcp_server/tests` -> `pass`
 - `S07` `by:` `vaultspec-high-executor`
+- `S02` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S02` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/tests src/vaultspec_core/mcp_server/tests src/vaultspec_core/triggers/tests src/vaultspec_core/core/tests` -> `pass`
+- `S04` `M` `src/vaultspec_core/cli/root_app.py`
+- `S04` `M` `src/vaultspec_core/cli/_errors.py`
+- `S04` `A` `src/vaultspec_core/tests/cli/test_unusable_settings.py`
+- `S04` `M` `src/vaultspec_core/tests/cli/test_console.py`
 
 ## Notes
 
 - `S36` Paths are in the vaultspec-rag repository, commit aeddb984 on its feat/env-parity branch.
 - `S40` The user approved the decision, the plan and the a2a operating-model change together in session on 2026-09-26; no file changed.
 - `S43` Paths are in the vaultspec-a2a repository, commit 368b64f6 on its feat/env-parity branch.
+- `S02` review fix: a registered name, not just an object, belongs to one package; a fallback may only reach a framework variable; registration is locked
+- `S03` review fix: the workspace .env gate takes no caller-supplied package; the declaring package's mode is the only one consulted
+- `S04` review fix: every product value is refused at startup in one report, an error report never re-reads the switch that failed, the product marker outranks CI, and `NO_COLOR` follows set-and-non-empty
