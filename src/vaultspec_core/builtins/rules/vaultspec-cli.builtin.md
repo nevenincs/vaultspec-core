@@ -33,7 +33,7 @@ unchanged, removed, restored, skipped, or failed; only `failed` stops.
 Permitted: body prose of a scaffolded record, including the `proposed`, `accepted`,
 `rejected`, or `deprecated` token in an ADR's heading (`superseded` is set by
 `vaultspec-core vault adr supersede`). Policy sources under `.vaultspec/rules/`,
-`skills/`, `agents/`, `hooks/`, and `mcps/` are the user's: propose changes, apply them
-only on request, then run `vaultspec-core sync`. Forbidden: frontmatter, filenames, plan
-structure, Step checkboxes, new `.vault/` files, and anything inside generated provider
-directories.
+`skills/`, `agents/`, `hooks/`, `triggers/`, and `mcps/` are the user's: propose
+changes, apply them only on request, then run `vaultspec-core sync`. Forbidden:
+frontmatter, filenames, plan structure, Step checkboxes, new `.vault/` files, and
+anything inside generated provider directories.

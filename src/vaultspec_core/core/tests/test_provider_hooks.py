@@ -236,15 +236,29 @@ class TestLaneSeparation:
     misspelled one of its own. Separate directories buy the right to complain.
     """
 
-    def test_provider_loader_ignores_a_lifecycle_event_in_its_directory(
+    def test_provider_loader_warns_on_a_lifecycle_event_in_its_directory(
         self, tmp_path: Path
     ):
         (tmp_path / "doc.yaml").write_text(
             "event: config.synced\nactions:\n  - type: shell\n    command: echo doc\n",
             encoding="utf-8",
         )
+        warnings: list[str] = []
 
-        assert load_provider_hook_specs(tmp_path) == []
+        assert load_provider_hook_specs(tmp_path, warnings) == []
+        assert len(warnings) == 1
+        assert "doc.yaml" in warnings[0]
+        assert ".vaultspec/triggers/" in warnings[0]
+
+    def test_provider_loader_warns_on_an_unknown_event(self, tmp_path: Path):
+        (tmp_path / "typo.yaml").write_text(
+            "event: pre_tool_usee\ncommand: echo hi\n", encoding="utf-8"
+        )
+        warnings: list[str] = []
+
+        assert load_provider_hook_specs(tmp_path, warnings) == []
+        assert len(warnings) == 1
+        assert "pre_tool_usee" in warnings[0]
 
     def test_trigger_loader_warns_on_a_provider_event_in_its_directory(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

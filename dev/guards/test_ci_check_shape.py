@@ -126,6 +126,10 @@ PROVISIONING = frozenset({"just init", "just framework-install"})
 #: contributor runs it by name with the key exported.
 CREDENTIAL_GATED = frozenset({"just test-typesafe"})
 
+#: Run after an earlier gate failed, but not after a cancellation or timeout,
+#: and never unless this job's own checkout and provisioning succeeded.
+GATE_CONDITION = "${{ !cancelled() && steps.init.outcome == 'success' }}"
+
 
 def _load(path: Path) -> dict[str, Any]:
     """Parse one workflow file."""
@@ -435,18 +439,29 @@ def test_each_tier_keeps_its_recipes_and_one_provisioning_cycle() -> None:
 
 
 def test_gates_run_after_failures_without_erasing_failure() -> None:
-    """Independent gates always run and no step is allowed to mask red."""
+    """Independent gates run after each other's failures, never on a stale tree.
+
+    A bare `always()` also runs after a timeout or a cancellation that skipped
+    checkout, and then judges whatever an earlier run left on the runner: a
+    real run reported lint violations the checked-out commit had already fixed.
+    """
     jobs = _jobs()
     for job_id in (LINT_JOB, LINUX_JOB):
-        for step in jobs[job_id]["steps"]:
+        steps = jobs[job_id]["steps"]
+        init = [step for step in steps if step.get("run") == "just init"]
+        assert [step.get("id") for step in init] == ["init"], (
+            f"`{job_id}` must provision once, in a step the gates can name"
+        )
+        for step in steps:
             command = step.get("run", "")
             if not isinstance(command, str) or not command.strip().startswith("just "):
                 continue
             recipe = command.strip().removeprefix("just ").split()[0]
             if recipe == "init":
                 continue
-            assert step.get("if") == "always()", (
-                f"`{job_id}` gate `{recipe}` must run after earlier failures"
+            assert step.get("if") == GATE_CONDITION, (
+                f"`{job_id}` gate `{recipe}` must run after earlier failures, "
+                "and only on the worktree this job initialised"
             )
 
     for job in jobs.values():
