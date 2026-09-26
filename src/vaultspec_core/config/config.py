@@ -461,8 +461,12 @@ VAULTSPEC_TARGET_DIR: Final = ConfigVariable(
     attr_name="target_dir",
     var_type=Path,
     default=None,
-    description="The root directory for the workspace (where .vault/ and "
-    ".vaultspec/ live).",
+    description=(
+        "The root directory for the workspace (where .vault/ and .vaultspec/ "
+        "live), for every process kind. Ranked below an explicit --target and "
+        "above discovery from the working directory; blank means unset. A "
+        "directory that does not exist is refused rather than discovered past."
+    ),
 )
 
 VAULTSPEC_EDITOR: Final = ConfigVariable(

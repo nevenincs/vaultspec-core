@@ -6,9 +6,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.core.exceptions import ConfigurationError
+
+from ..config import VAULTSPEC_TARGET_DIR, ConfigVariable, register_registry
 from ..workspace import (
     LayoutMode,
+    TargetSource,
     discover_git,
+    resolve_target,
     resolve_workspace,
 )
 
@@ -299,3 +304,129 @@ class TestResolveWorkspace:
         attr = "target_dir"
         with pytest.raises(AttributeError):
             setattr(layout, attr, tmp_path / "changed")
+
+
+#: A companion package's own root entry, chained to the framework name, so
+#: the chain a real importing package declares is what is exercised here.
+TARGET_COMPANION = "vaultspec-target-companion"
+
+COMPANION_ROOT = ConfigVariable(
+    env_name="VAULTSPEC_TARGET_COMPANION_ROOT",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="The companion's own root, chained to the framework name.",
+    fallback=VAULTSPEC_TARGET_DIR,
+)
+
+register_registry(TARGET_COMPANION, [COMPANION_ROOT])
+
+
+class TestResolveTarget:
+    """Tests for the two rungs that name a workspace root."""
+
+    def test_invocation_outranks_the_environment(self, tmp_path: Path) -> None:
+        named = tmp_path / "named"
+        named.mkdir()
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+
+        resolved = resolve_target(
+            named,
+            environ={"VAULTSPEC_TARGET_DIR": str(elsewhere)},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == named
+        assert resolved.source == TargetSource.INVOCATION
+        assert resolved.variable is None
+
+    def test_framework_variable_supplies_the_root(self, tmp_path: Path) -> None:
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": str(tmp_path)},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == tmp_path
+        assert resolved.source == TargetSource.ENVIRONMENT
+        assert resolved.variable == "VAULTSPEC_TARGET_DIR"
+
+    def test_package_variable_outranks_the_framework_name(self, tmp_path: Path) -> None:
+        own = tmp_path / "own"
+        own.mkdir()
+        shared = tmp_path / "shared"
+        shared.mkdir()
+
+        resolved = resolve_target(
+            package_root=COMPANION_ROOT,
+            environ={
+                "VAULTSPEC_TARGET_COMPANION_ROOT": str(own),
+                "VAULTSPEC_TARGET_DIR": str(shared),
+            },
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == own
+        assert resolved.variable == "VAULTSPEC_TARGET_COMPANION_ROOT"
+
+    def test_package_variable_falls_back_to_the_framework_name(
+        self, tmp_path: Path
+    ) -> None:
+        resolved = resolve_target(
+            package_root=COMPANION_ROOT,
+            environ={"VAULTSPEC_TARGET_DIR": str(tmp_path)},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == tmp_path
+        assert resolved.variable == "VAULTSPEC_TARGET_DIR"
+
+    def test_nothing_named_means_discovery(self, tmp_path: Path) -> None:
+        resolved = resolve_target(environ={}, cwd=tmp_path)
+
+        assert resolved.path is None
+        assert resolved.source == TargetSource.DISCOVERY
+
+    def test_blank_variable_is_unset(self, tmp_path: Path) -> None:
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": "   "},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path is None
+        assert resolved.source == TargetSource.DISCOVERY
+
+    def test_relative_root_is_taken_against_the_working_directory(
+        self, tmp_path: Path
+    ) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": "nested"},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == nested
+
+    def test_missing_directory_is_refused_by_name(self, tmp_path: Path) -> None:
+        missing = tmp_path / "gone"
+
+        with pytest.raises(ConfigurationError) as excinfo:
+            resolve_target(
+                package_root=COMPANION_ROOT,
+                environ={"VAULTSPEC_TARGET_COMPANION_ROOT": str(missing)},
+                cwd=tmp_path,
+            )
+
+        assert "VAULTSPEC_TARGET_COMPANION_ROOT" in str(excinfo.value)
+
+    def test_a_file_is_not_a_workspace_root(self, tmp_path: Path) -> None:
+        not_a_dir = tmp_path / "root.txt"
+        not_a_dir.write_text("", encoding="utf-8")
+
+        with pytest.raises(ConfigurationError):
+            resolve_target(
+                environ={"VAULTSPEC_TARGET_DIR": str(not_a_dir)},
+                cwd=tmp_path,
+            )

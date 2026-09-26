@@ -3,7 +3,7 @@
 Constructs the ``MCPServer`` instance, registers the vault tool surface, and
 provides the runtime entry boundary for ``vaultspec-core-mcp``. Supports both
 root-CLI-injected context (via ``ctx.obj``) and standalone fallback
-configuration via :func:`~vaultspec_core.config.get_config`.
+resolution via :func:`~vaultspec_core.config.resolve_target`.
 """
 
 from __future__ import annotations
@@ -230,14 +230,12 @@ def _serve(
     if ctx_obj and "layout" in ctx_obj:
         root_dir = ctx_obj["target"]
     else:
-        # Fallback if run standalone
-        from ..config import get_config
+        # Fallback if run standalone: the same rungs the CLI resolves a root
+        # over, discovery included, so a host that sets the variable and a
+        # host that launches from the workspace agree.
+        from ..config import resolve_target, resolve_workspace
 
-        cfg = get_config()
-        root_dir = cfg.target_dir
-        if not root_dir:
-            typer.echo("Error: Target directory not resolved.", err=True)
-            raise typer.Exit(1)
+        root_dir = resolve_workspace(target_override=resolve_target().path).target_dir
 
     # Initialize core paths (TARGET_DIR, TEMPLATES_DIR, etc.)
     init_paths(root_dir)

@@ -7,6 +7,7 @@ its named entries, :func:`register_registry` for another package's entries, the
 :mod:`.config`; :func:`resolve_credential`
 and its types from :mod:`.credential`; :func:`read_dotenv_value` from
 :mod:`.dotenv`; and :class:`WorkspaceLayout`, :class:`LayoutMode`,
+:func:`resolve_target`, :class:`ResolvedTarget`, :class:`TargetSource`,
 :func:`resolve_workspace`, :func:`discover_git`, and :class:`WorkspaceError`
 from :mod:`.workspace`. Consumed by nearly every subpackage that needs
 vault/spec paths or runtime settings.
@@ -56,7 +57,10 @@ from .credential import resolve_credential as resolve_credential
 from .dotenv import read_dotenv_value as read_dotenv_value
 from .workspace import GitInfo as GitInfo
 from .workspace import LayoutMode as LayoutMode
+from .workspace import ResolvedTarget as ResolvedTarget
+from .workspace import TargetSource as TargetSource
 from .workspace import WorkspaceError as WorkspaceError
 from .workspace import WorkspaceLayout as WorkspaceLayout
 from .workspace import discover_git as discover_git
+from .workspace import resolve_target as resolve_target
 from .workspace import resolve_workspace as resolve_workspace
