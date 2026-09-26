@@ -23,6 +23,7 @@ import time
 from contextlib import redirect_stdout
 from pathlib import Path
 from types import ModuleType
+from typing import cast
 
 from dev.environment import child_environment
 from vaultspec_core.config.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
@@ -61,7 +62,7 @@ def symbols(text: str, names: list[str]) -> str:
     """Extract complete top-level Python definitions without executing them."""
     wanted = set(names)
     lines = text.splitlines()
-    pieces = []
+    pieces: list[str] = []
     for node in ast.parse(text).body:
         if (
             isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
@@ -84,7 +85,7 @@ def dump(path: Path, value: object) -> None:
 
 def build(output: Path) -> None:
     """Freeze three historical regressions and their corrected controls."""
-    candidates = []
+    candidates: list[dict[str, object]] = []
     selections = [
         (APP, ["create_server", "_LeanToolServer"]),
         (APP, ["_ReadOnlyArgumentGuard"]),
@@ -113,7 +114,7 @@ def build(output: Path) -> None:
     for index, candidate in enumerate(candidates):
         candidate["id"] = f"p{index:02}"
 
-    families = [
+    families: list[tuple[str, str, str, list[str], str, str, str]] = [
         (
             "factory",
             "0cadfc9b",
@@ -146,7 +147,7 @@ def build(output: Path) -> None:
             ACQUISITION + ":130-143",
         ),
     ]
-    cases = []
+    cases: list[dict[str, object]] = []
     for family, fix, path, names, intent, defect, relevant in families:
         before, after = git_text(fix + "^", path), git_text(fix, path)
         if names:
@@ -183,7 +184,11 @@ def build(output: Path) -> None:
     random.Random(83).shuffle(cases)
     for index, case in enumerate(cases):
         case["id"] = f"c{index + 1}"
-    fixture = {"snapshot": SNAPSHOT, "candidates": candidates, "cases": cases}
+    fixture: dict[str, object] = {
+        "snapshot": SNAPSHOT,
+        "candidates": candidates,
+        "cases": cases,
+    }
     dump(output / "fixtures.json", fixture)
     print(
         f"Built {len(cases)} cases with {len(candidates)} shared candidate passages.",
@@ -198,7 +203,7 @@ def words(value: str) -> set[str]:
 
 def verify(output: Path) -> None:
     """Confirm labels with the historical code, without asking either model."""
-    results = []
+    results: list[dict[str, object]] = []
     for revision in ("8373e597^", "8373e597"):
         name = "vaultspec_core.vaultcore._review_context_fixture"
         module = ModuleType(name)
@@ -206,7 +211,7 @@ def verify(output: Path) -> None:
         try:
             exec(compile(git_text(revision, LEDGER), LEDGER, "exec"), module.__dict__)
             body = "## Changes\n\n"
-            observed = []
+            observed: list[str] = []
             for value in ("pass", "fail", "pass"):
                 row = module.format_row("S01", module.VERIFY_LABEL, "pytest", value)
                 body = module.append_rows(body, [row])
@@ -275,7 +280,7 @@ def rank(output: Path, credential_file: Path | None) -> None:
         raise ValueError(
             "No configured credential or key in the explicitly supplied file"
         )
-    results = []
+    results: list[dict[str, object]] = []
     with JevClient(key, timeout=15, max_attempts=1) as client:
         for case in fixture["cases"]:
             state = {k: case[k] for k in ("intent", "path", "target", "diff")}
@@ -307,7 +312,7 @@ def rank(output: Path, credential_file: Path | None) -> None:
                     c["id"],
                 ),
             )
-            result = {
+            result: dict[str, object] = {
                 "case_id": case["id"],
                 "selector": TypeSafeModel.JEV,
                 "lexical": [c["id"] for c in lexical],
@@ -317,7 +322,7 @@ def rank(output: Path, credential_file: Path | None) -> None:
             started = time.monotonic()
             try:
                 response = client.evaluate(state, questions, deadline=started + 15)
-                answers = {}
+                answers: dict[str, dict[str, object]] = {}
                 scores: dict[str, float] = {}
                 for name, answer in response.answers.items():
                     if not isinstance(answer, ScoreAnswer):
@@ -495,7 +500,7 @@ def review(output: Path, model: str, effort: str, limit: int) -> None:
                 returncode = completed.returncode
             except subprocess.TimeoutExpired:
                 timed_out, returncode = True, None
-        events = []
+        events: list[dict[str, object]] = []
         for line in (
             (output / (name + ".jsonl")).read_text(encoding="utf-8").splitlines()
         ):
@@ -511,14 +516,18 @@ def review(output: Path, model: str, effort: str, limit: int) -> None:
             ),
             None,
         )
-        items = [e["item"] for e in events if e.get("type") == "item.completed"]
+        items = [
+            cast("dict[str, object]", e["item"])
+            for e in events
+            if e.get("type") == "item.completed"
+        ]
         tools = [
             item
             for item in items
             if item.get("type") in ("command_execution", "mcp_tool_call", "web_search")
         ]
         answer_path = work / "answer.json"
-        result = {
+        result: dict[str, object] = {
             "case_id": case["id"],
             "arm": arm,
             "model": model,

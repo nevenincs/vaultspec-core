@@ -11,7 +11,7 @@ import time
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -240,9 +240,10 @@ class _Remote(BaseModel):
 
 def remote_items(text: str, repo: str, kind: str) -> list[Item]:
     """Normalize a bounded GitHub response; never infer local/fork branch identity."""
-    rows = json.loads(text)
-    if not isinstance(rows, list):
+    parsed = json.loads(text)
+    if not isinstance(parsed, list):
         raise ValueError("expected a GitHub listing")
+    rows = cast("list[object]", parsed)
     items: dict[str, Item] = {}
     for value in rows[: _REMOTE_ITEMS + 1]:
         row = _Remote.model_validate(value)

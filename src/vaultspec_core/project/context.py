@@ -60,7 +60,7 @@ def project_context(
     elif credential:
         ranking = Ranking("no_candidates")
     ranked = ordered(objective, candidates, ranking)
-    selected = []
+    selected: list[dict[str, object]] = []
     for item in ranked[:limit]:
         selected.append(
             {

@@ -24,6 +24,8 @@ from .ranking import RANK_SECONDS, Ranking, load_previous, rank
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from .collect import Snippet
+
 
 def review_context(
     root: Path,
@@ -55,7 +57,7 @@ def review_context(
     if credential:
         if credential.key in objective:
             raise ValueError("objective contains the configured credential")
-        safe = []
+        safe: list[Snippet] = []
         for item in snapshot.snippets:
             if credential.key in item.content or credential.key in item.locator:
                 snapshot.excluded.append(

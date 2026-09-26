@@ -6,7 +6,7 @@ import json
 import math
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.search._transport import HostedSearchError, JevClient, ScoreAnswer
@@ -53,34 +53,48 @@ def load_previous(path: Path | None) -> dict[str, object]:
     if len(raw) > 128_000:
         raise ValueError("previous result exceeds 128000 bytes")
     value = json.loads(raw)
-    if not isinstance(value, dict) or value.get("schema") != SCHEMA:
+    if not isinstance(value, dict):
+        raise ValueError("previous must be a review context JSON result")
+    value = cast("dict[str, object]", value)
+    if value.get("schema") != SCHEMA:
         raise ValueError("previous must be a review context JSON result")
     data = value.get("data")
-    if not isinstance(data, dict) or not isinstance(data.get("judgment"), dict):
+    if not isinstance(data, dict):
         raise ValueError("previous result has no judgment")
-    return data["judgment"]
+    data = cast("dict[str, object]", data)
+    judgment = data.get("judgment")
+    if not isinstance(judgment, dict):
+        raise ValueError("previous result has no judgment")
+    return cast("dict[str, object]", judgment)
 
 
 def _cached(previous: dict[str, object], fingerprint: str, ids: set[str]) -> bool:
-    scores, stamp = previous.get("scores"), previous.get("at")
-    return (
-        previous.get("fingerprint") == fingerprint
-        and isinstance(stamp, (int, float))
-        and not isinstance(stamp, bool)
-        and math.isfinite(stamp)
-        and 0 <= time.time() - stamp <= _CACHE_SECONDS
-        and isinstance(scores, dict)
-        and set(scores) == ids
-        and all(
-            isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and math.isfinite(value)
-            and 0 <= value <= 3
-            for value in scores.values()
-        )
-        and isinstance(previous.get("model"), str)
-        and 0 < len(str(previous["model"])) <= 128
-    )
+    if previous.get("fingerprint") != fingerprint:
+        return False
+    stamp = previous.get("at")
+    if (
+        not isinstance(stamp, (int, float))
+        or isinstance(stamp, bool)
+        or not math.isfinite(stamp)
+        or not 0 <= time.time() - stamp <= _CACHE_SECONDS
+    ):
+        return False
+    scores = previous.get("scores")
+    if not isinstance(scores, dict):
+        return False
+    scores = cast("dict[str, object]", scores)
+    if set(scores) != ids:
+        return False
+    if not all(
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and 0 <= value <= 3
+        for value in scores.values()
+    ):
+        return False
+    model = previous.get("model")
+    return isinstance(model, str) and 0 < len(model) <= 128
 
 
 def rank(
@@ -114,7 +128,7 @@ def rank(
         )
     )
     if _cached(previous, fingerprint, set(questions)):
-        scores = previous["scores"]
+        scores = cast("dict[str, float]", previous["scores"])
         assert isinstance(scores, dict)
         return Ranking("reused", scores=dict(scores), judgment=previous)
     result = Ranking("available", requests=1)

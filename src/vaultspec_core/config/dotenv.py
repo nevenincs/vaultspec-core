@@ -91,7 +91,7 @@ def _parse_import_value(raw: str) -> str | None:
 
 def format_dotenv(values: dict[str, str]) -> str:
     """Encode single-line settings using literal, round-trippable quoting."""
-    lines = []
+    lines: list[str] = []
     for name, value in sorted(values.items()):
         escaped = value.replace("\\", "\\\\").replace('"', '\\"')
         lines.append(f'{name}="{escaped}"\n')

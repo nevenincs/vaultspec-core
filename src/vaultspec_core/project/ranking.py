@@ -9,7 +9,7 @@ import re
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.search._transport import HostedSearchError, JevClient, ScoreAnswer
@@ -107,17 +107,25 @@ def load_previous(path: Path | None) -> dict[str, object]:
     if len(raw) > 64_000:
         raise ValueError("previous result exceeds 64000 bytes")
     value = json.loads(raw)
-    if not isinstance(value, dict) or value.get("schema") != SCHEMA:
+    if not isinstance(value, dict):
+        raise ValueError("previous must be a project context JSON result")
+    value = cast("dict[str, object]", value)
+    if value.get("schema") != SCHEMA:
         raise ValueError("previous must be a project context JSON result")
     data = value.get("data")
-    if not isinstance(data, dict) or not isinstance(data.get("judgments"), dict):
+    if not isinstance(data, dict):
         raise ValueError("previous result has no judgment map")
-    return data["judgments"]
+    data = cast("dict[str, object]", data)
+    judgments = data.get("judgments")
+    if not isinstance(judgments, dict):
+        raise ValueError("previous result has no judgment map")
+    return cast("dict[str, object]", judgments)
 
 
 def _cached(value: object, now: float) -> dict[str, object] | None:
     if not isinstance(value, dict):
         return None
+    value = cast("dict[str, object]", value)
     score, confidence, stamp, model = (
         value.get(key) for key in ("score", "confidence", "at", "model")
     )
