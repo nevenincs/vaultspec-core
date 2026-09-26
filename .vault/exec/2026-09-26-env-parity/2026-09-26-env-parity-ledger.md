@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:c62a157096f979ab09d17f50a6addedc9fd65ddc438126fa37dc311d7343877d'
+body_hash: 'sha256:f1af744c342e981b56108ff4664b48305b2665a94ad62bbe55eaefdb9c07078e'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -262,6 +262,16 @@ related:
 - `S42` `A` `dev/tests/test_credentials_settings_file.py`
 - `S42` `verify:` `control and dev test suites` -> `pass`
 - `S42` `by:` `vaultspec-high-executor`
+- `S05` `M` `src/vaultspec_core/tests/test_public_resolution_api.py`
+- `S05` `verify:` `pytest src/vaultspec_core/config/tests/test_resolution.py src/vaultspec_core/tests/test_public_resolution_api.py` -> `pass`
+- `S12` `M` `src/vaultspec_core/core/__init__.py`
+- `S12` `A` `src/vaultspec_core/core/tests/test_lazy_surface.py`
+- `S12` `verify:` `just check-type-strict` -> `pass`
+- `S12` `verify:` `just test-unit` -> `pass`
+- `S15` `M` `.vaultspec/reference/published-surface.json`
+- `S15` `by:` `vaultspec-high-executor`
+- `S10` `M` `src/vaultspec_core/cli/_hook_trust.py`
+- `S10` `verify:` `just test-unit` -> `pass`
 
 ## Notes
 
@@ -294,3 +304,8 @@ related:
 - `S16` gate fix: removed a pytest.skip the repo's own no-doubles/no-skips guard forbids by source scan; the branch was dead anyway since every pinned callable's defining module declares `__all__`
 - `S17` gate run; release pending user confirmation. just ci fails only on the pre-existing workflow CI-contract violation in .github/workflows/acquisition.yml (lines 352, 391) naming set -eux / set -eu directly instead of a just recipe; that file is identical to origin/main and untouched by this branch. dev lint all's other nine dimensions (python, type, type-platforms, toml, links, markdown, complexity, nesting, size, type-strict) all pass. dev audit deps, dev vault check, dev test all (broad 5617, serial 57, vault-repair 29, harness 377, repo 179 - 6259 tests) and dev build all all pass
 - `S42` vaultspec-a2a commits c054cbc5, a9f13e54, 2b038916, 1ffb2be0; a second review round (worker startup, test isolation, DSN redaction) is in progress, so the Step stays open.
+- `S05` pre-release review fix: `check_environment` takes `include_framework` (default on) so a companion package's startup check also refuses a bad value on the framework switches it reads without a chain - `VAULTSPEC_NO_HINTS,` `VAULTSPEC_JSON_PRETTY,` `VAULTSPEC_NON_INTERACTIVE` - instead of refusing late at report time; the registry snapshot is taken under the registration lock
+- `S07` pre-release review fix: `resolve_target` expands home shorthand in a root the environment supplies, package-scoped name and `VAULTSPEC_TARGET_DIR` alike, before the existence check; an invocation root is still taken as given, and a home directory the process cannot determine is a ConfigurationError naming the supplying variable rather than a bare RuntimeError
+- `S12` pre-release review fix: `vaultspec_core.core` resolves its re-exports through a PEP 562 `__getattr__,` so importing one exception from core.exceptions no longer runs the agent collector, the sync engine and yaml behind it; interleaved -X importtime medians fall from 112.7ms/191 modules to 91.6ms/161 for `vaultspec_core.envelope` and from 108.8ms/190 to 88.4ms/160 for `vaultspec_core.config`
+- `S15` pre-release review fix: --target is documented as discovered (the .gt container root, then the worktree root, then the repository root, the working directory last) rather than defaulting to the working directory; install and uninstall state the three shared exit codes; the workspace copy of the bundled reference is reseeded through install core --upgrade, ending its 0.2.5 against 0.2.6 release-line drift
+- `S10` pre-release review fix: both consent gates call `is_unattended(json_output=json_output)` instead of restating the rule as `json_output` or not `operator_present();` the wrapper that only restated it is gone
