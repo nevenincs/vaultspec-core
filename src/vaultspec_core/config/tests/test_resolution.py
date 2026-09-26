@@ -38,7 +38,7 @@ from vaultspec_core.config import (
     resolve_credential,
     unattended_declared,
 )
-from vaultspec_core.config.config import _forget_registry
+from vaultspec_core.config.config import forget_registry_for_tests
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.exceptions import ConfigurationError
 from vaultspec_core.core.workspace_mode import (
@@ -111,7 +111,7 @@ def _companion_registry() -> Iterator[None]:
     """
     register_registry(COMPANION, [COMPANION_ROOT, COMPANION_SWITCH, COMPANION_KEY])
     yield
-    _forget_registry(COMPANION)
+    forget_registry_for_tests(COMPANION)
 
 
 def _unregistered(
@@ -385,7 +385,7 @@ def numeric_secret_entry() -> Iterator[None]:
     CONFIG_REGISTRY.append(_NUMERIC_SECRET)
     register_registry(PACKAGE, [_NUMERIC_SECRET])
     yield
-    _forget_registry(PACKAGE, [_NUMERIC_SECRET])
+    forget_registry_for_tests(PACKAGE, [_NUMERIC_SECRET])
     CONFIG_REGISTRY.remove(_NUMERIC_SECRET)
 
 
@@ -652,7 +652,7 @@ class TestCheckEnvironmentPerPackage:
                 )
             assert companion_level.env_name in str(refusal.value)
         finally:
-            _forget_registry(COMPANION, [companion_level])
+            forget_registry_for_tests(COMPANION, [companion_level])
 
     def test_the_framework_entry_a_companions_chain_reaches_is_also_checked(
         self,
@@ -673,7 +673,7 @@ class TestCheckEnvironmentPerPackage:
                 check_environment({"VAULTSPEC_LOG_LEVEL": "chatty"}, package=COMPANION)
             assert "VAULTSPEC_LOG_LEVEL" in str(refusal.value)
         finally:
-            _forget_registry(COMPANION, [companion_level])
+            forget_registry_for_tests(COMPANION, [companion_level])
 
     def test_cores_own_default_is_unchanged(self) -> None:
         with pytest.raises(ConfigurationError) as refusal:
@@ -736,7 +736,7 @@ class TestLogLevel:
                 == "CRITICAL"
             )
         finally:
-            _forget_registry(COMPANION, [companion])
+            forget_registry_for_tests(COMPANION, [companion])
 
     def test_an_unknown_level_is_refused_by_name(self) -> None:
         with pytest.raises(ConfigurationError) as refusal:

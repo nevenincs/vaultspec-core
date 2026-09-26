@@ -873,7 +873,7 @@ def register_registry(package: str, entries: Iterable[ConfigVariable]) -> None:
             registry.append(var)
 
 
-def _forget_registry(
+def forget_registry_for_tests(
     package: str, entries: Iterable[ConfigVariable] | None = None
 ) -> None:
     """Undeclare *package*'s entries, or just *entries* of them.
@@ -883,10 +883,13 @@ def _forget_registry(
     this. It exists for a test that declares a companion package - without
     it, the entries that test invented outlive the module that invented
     them, and the next test sees a registry no code under test ever built.
-    Deliberately unexported: import it directly from this module
-    (``vaultspec_core.config.config``), never through the public
-    ``vaultspec_core.config`` package, which is the signal that a call site
-    reaching for it does not belong in production code.
+    The ``_for_tests`` suffix is the contract: import it directly from this
+    module (``vaultspec_core.config.config``), never through the public
+    ``vaultspec_core.config`` package, which does not re-export it. A
+    leading underscore was rejected for the same name a module-private
+    helper would carry: this one is called only from outside the module, by
+    every test file above, and a private name whose only callers live
+    elsewhere is exactly the shape a dead-code check exists to catch.
 
     Args:
         package: The distribution whose entries to drop.

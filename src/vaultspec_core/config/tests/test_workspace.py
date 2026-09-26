@@ -12,7 +12,7 @@ from vaultspec_core.core.exceptions import ConfigurationError
 from ..config import (
     VAULTSPEC_TARGET_DIR,
     ConfigVariable,
-    _forget_registry,
+    forget_registry_for_tests,
     register_registry,
 )
 from ..workspace import (
@@ -336,7 +336,7 @@ def _target_companion_registry() -> Iterator[None]:
     """
     register_registry(TARGET_COMPANION, [COMPANION_ROOT])
     yield
-    _forget_registry(TARGET_COMPANION)
+    forget_registry_for_tests(TARGET_COMPANION)
 
 
 class TestResolvedTargetInvariant:
