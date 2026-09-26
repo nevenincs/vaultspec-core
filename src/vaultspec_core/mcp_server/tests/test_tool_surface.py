@@ -191,7 +191,10 @@ async def test_read_only_surface_omits_mutation_tools_and_repair(
         rejected_repair = await client.call_tool("check", {"fix": True})
     assert checked["fixed"] is False
     assert rejected_repair.is_error
-    assert set(by_name["crossref"].input_schema.get("properties", {})) == {"ref"}
+    assert set(by_name["crossref"].input_schema.get("properties", {})) == {
+        "ref",
+        "body",
+    }
 
 
 async def test_surface_instructions_name_the_tools_and_version(

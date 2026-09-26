@@ -248,6 +248,10 @@ def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
         return []
 
     tracked = [line.strip() for line in ls_result.stdout.splitlines() if line.strip()]
+    from ..config.local_env import is_local_environment_path
+
+    # A credential in the index needs explicit remediation, never auto-untracking.
+    tracked = [name for name in tracked if not is_local_environment_path(name)]
     if not tracked:
         return []
 
@@ -377,11 +381,14 @@ def per_machine_paths(root: Path, paths: Iterable[str]) -> list[str]:
         The per-machine paths among *paths*, in their given spelling.
     """
     declined_configs = {f"/{name}" for name in PRECOMMIT_CONFIG_NAMES}
+    from ..config.local_env import is_local_environment_path
+
     entries = [e for e in get_recommended_entries(root) if e not in declined_configs]
     return [
         path
         for path in paths
-        if any(_covered_by_entry(path.replace("\\", "/"), entry) for entry in entries)
+        if is_local_environment_path(path)
+        or any(_covered_by_entry(path.replace("\\", "/"), entry) for entry in entries)
     ]
 
 

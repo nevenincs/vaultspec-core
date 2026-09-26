@@ -260,7 +260,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
         # Backward compatibility for tests passing a Path root
         layout = resolve_workspace(target_override=layout)
 
-    cfg = get_config()
+    cfg = get_config(root=layout.target_dir)
 
     target = layout.target_dir
     vaultspec = layout.vaultspec_dir

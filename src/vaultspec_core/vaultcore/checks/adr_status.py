@@ -10,10 +10,10 @@ the supersession frontmatter. The canonical encoding is::
 Surfaces, all as warnings so the suite never hard-fails an existing corpus:
 
 - a status token outside the canonical set, or no parseable status at all;
-- status declared in a legacy ``## Status`` section instead of the H1;
+- status declared in a legacy ``## Status`` section, even alongside the H1;
 - a bare (unquoted) H1 token, which ``--fix`` normalizes to the quoted form;
 - ``superseded_by`` set in frontmatter while the body status is not
-  ``superseded`` (an unpropagated supersession).
+  ``superseded`` (an unpropagated supersession), or the reverse mismatch.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from ...core.enums import AdrStatus
 from ...core.helpers import atomic_write
 from ..markdown import iter_headings
 from ..models import refresh_modified_stamp, vault_today
+from ..parser import split_frontmatter
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -65,7 +66,7 @@ def _normalize_h1_quote(doc_path: Path, root_dir: Path, token: str) -> bool:
     Args:
         doc_path: Absolute path to the ADR document.
         root_dir: Project root owning the document's ``.vault/``.
-        token: The canonical status value to write.
+        token: The canonical status value observed in the snapshot.
 
     Returns:
         ``True`` when the file was modified.
@@ -81,7 +82,7 @@ def _normalize_h1_quote_locked(doc_path: Path, token: str) -> bool:
 
     Args:
         doc_path: Absolute path to the ADR document.
-        token: The canonical status value to write.
+        token: The canonical status value observed in the snapshot.
 
     Returns:
         ``True`` when the file was modified.
@@ -92,7 +93,16 @@ def _normalize_h1_quote_locked(doc_path: Path, token: str) -> bool:
         return False
 
     newline = "\r\n" if "\r\n" in raw else "\n"
-    rendered = rewrite_adr_status(raw.replace("\r\n", "\n"), token, quoted=True)
+    normalized = raw.replace("\r\n", "\n")
+    marker = adr_status_marker(split_frontmatter(normalized).body)
+    # A quoting repair cannot restore snapshot authority over a later decision.
+    if (
+        marker is None
+        or marker.quoted
+        or AdrStatus.from_token(marker.token) != AdrStatus.from_token(token)
+    ):
+        return False
+    rendered = rewrite_adr_status(normalized, token, quoted=True)
     if rendered is None:
         return False
 
@@ -138,31 +148,33 @@ def check_adr_status(
 
         rel_path = path.relative_to(root_dir)
         marker = adr_status_marker(body)
+        legacy = _has_legacy_status_section(body)
+        if legacy:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel_path,
+                    message=(
+                        "ADR has a legacy '## Status' section; "
+                        "status belongs in the canonical H1 token only"
+                    ),
+                    severity=Severity.WARNING,
+                    fix_description=(
+                        "Reconcile the status declarations against recorded "
+                        "authority before removing the legacy declaration"
+                    ),
+                )
+            )
 
         if marker is None:
-            if _has_legacy_status_section(body):
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=rel_path,
-                        message=(
-                            "ADR status is declared in a legacy '## Status' "
-                            "section, not the canonical H1 status token"
-                        ),
-                        severity=Severity.WARNING,
-                        fix_description=(
-                            "Move the status into the H1 as "
-                            "(**status:** `<value>`) per the ADR template"
-                        ),
-                    )
-                )
-            else:
+            if not legacy:
                 result.diagnostics.append(
                     CheckDiagnostic(
                         path=rel_path,
                         message="ADR has no parseable status in its H1",
                         severity=Severity.WARNING,
                         fix_description=(
-                            "Add (**status:** `<value>`) to the H1; one of "
+                            "Establish the authorized status before adding "
+                            "(**status:** `<value>`) to the H1; one of "
                             f"{_CANONICAL_TOKENS}"
                         ),
                     )
@@ -181,7 +193,10 @@ def check_adr_status(
                         f"({_CANONICAL_TOKENS})"
                     ),
                     severity=Severity.WARNING,
-                    fix_description="Set the H1 status to a canonical value",
+                    fix_description=(
+                        "Establish the authorized status before setting "
+                        "the H1 to a canonical value"
+                    ),
                 )
             )
             continue
@@ -219,8 +234,20 @@ def check_adr_status(
                     ),
                     severity=Severity.WARNING,
                     fix_description=(
-                        "Re-run vault adr supersede, or set the H1 status to "
-                        "`superseded` to match the frontmatter"
+                        "Inspect both records' supersession edges and authority; "
+                        "repair the H1 only when the recorded transition is clear"
+                    ),
+                )
+            )
+        elif status is AdrStatus.SUPERSEDED and not meta.superseded_by:
+            result.diagnostics.append(
+                CheckDiagnostic(
+                    path=rel_path,
+                    message="ADR status is 'superseded' but has no 'superseded_by'",
+                    severity=Severity.WARNING,
+                    fix_description=(
+                        "Find the authorized successor or correct the status "
+                        "from recorded authority; do not infer a replacement"
                     ),
                 )
             )

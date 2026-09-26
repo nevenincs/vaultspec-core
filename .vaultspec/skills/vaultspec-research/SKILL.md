@@ -18,9 +18,9 @@ before creating more. This skill terminates within one run.
 - Scaffold: `vaultspec-core vault add research --feature {feature}` (or the `create`
   tool). Read `.vaultspec/templates/research.md`; its hint blocks fix the body shape:
   answer-first lead, claim-first `## Findings`, closing `## Sources`.
-- Research in this run, or dispatch the `vaultspec-adr-researcher` persona (and
-  `vaultspec-researcher` for parallel threads) with "Conduct research on `{topic}`", and
-  transfer the returned findings into the body without diluting their locators.
+- Research in this run, or dispatch `vaultspec-researcher` with the question and
+  existing evidence. Preserve the returned findings' locators. The ADR persona drafts
+  decisions from evidence; do not dispatch it for research-only work.
 - When the decision needs grounding in real code, branch to `vaultspec-code-research`
   for a Reference record and link it in `related:`.
 - Fill every section this session; never leave or present an unfilled record.

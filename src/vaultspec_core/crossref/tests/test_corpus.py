@@ -52,7 +52,7 @@ def test_a_record_reads_as_header_decision_and_links(tmp_path: Path) -> None:
         status="superseded",
         problem="Rebuilding the graph costs seconds.\n\nA second paragraph.",
         related=("2026-01-01-other-adr", "2026-01-05-some-research"),
-        extra="## Considerations\n\nNot part of the decision state.",
+        extra="## Considerations\n\nScope includes external writers.",
     )
 
     record = {r.stem: r for r in load_adrs(tmp_path)}["2026-01-02-cache-adr"]
@@ -65,7 +65,8 @@ def test_a_record_reads_as_header_decision_and_links(tmp_path: Path) -> None:
         "[graph-cache] keep the graph cache fresh. Rebuilding the graph costs seconds."
     )
     assert "## Implementation" in record.decision
-    assert "Not part of the decision state" not in record.decision
+    assert "Scope includes external writers" in record.decision
+    assert not record.input_truncated
     # A research record is no ADR link.
     assert record.declared == ("2026-01-01-other-adr",)
     assert record.rel_path == ".vault/adr/2026-01-02-cache-adr.md"
@@ -77,6 +78,53 @@ def test_the_decision_state_is_bounded(tmp_path: Path) -> None:
     (record,) = load_adrs(tmp_path)
 
     assert len(record.decision) <= DECISION_CHARS
+    assert record.input_truncated
+
+
+def test_decision_sections_and_custom_amendments_are_not_silently_omitted(
+    tmp_path: Path,
+) -> None:
+    write_adr(
+        tmp_path,
+        "2026-01-02-durable-adr",
+        extra=(
+            "## Decision\n\nNever acknowledge uncommitted writes.\n\n"
+            "## Scope amendment\n\nThis also binds the external writer.\n\n"
+            "## Scope amendment\n\nThe read-only importer is exempt."
+        ),
+    )
+    (record,) = load_adrs(tmp_path)
+    assert "Never acknowledge uncommitted writes" in record.decision
+    assert "external writer" in record.decision
+    assert "read-only importer is exempt" in record.decision
+    assert not record.input_truncated
+
+
+def test_long_context_cannot_displace_a_short_constraint(tmp_path: Path) -> None:
+    write_adr(
+        tmp_path,
+        "2026-01-02-durable-adr",
+        problem="History and motivation. " * 500,
+        implementation="A tentative implementation approach. " * 500,
+        extra=(
+            "## Constraints\n\n### Durability\n\nNever acknowledge uncommitted writes."
+        ),
+    )
+    (record,) = load_adrs(tmp_path)
+    assert "Never acknowledge uncommitted writes" in record.decision
+    assert len(record.decision) <= DECISION_CHARS
+    assert record.input_truncated
+
+
+def test_pathological_section_count_stays_bounded(tmp_path: Path) -> None:
+    write_adr(
+        tmp_path,
+        "2026-01-02-many-adr",
+        extra="\n\n".join(f"## Clause {i}\n\nObligation." for i in range(4000)),
+    )
+    (record,) = load_adrs(tmp_path)
+    assert len(record.decision) <= DECISION_CHARS
+    assert record.input_truncated
 
 
 def test_the_fingerprint_names_artifacts_not_prose() -> None:

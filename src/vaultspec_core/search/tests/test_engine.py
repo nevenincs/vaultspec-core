@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.search._corpus import SECTION_BYTES, TITLE_BYTES, Record
 from vaultspec_core.search._engine import (
     MAX_CHOICE_OPTIONS,
@@ -28,7 +29,6 @@ from vaultspec_core.search._engine import (
 from vaultspec_core.search._models import EXCERPT_BYTES, SUPPORTING_BYTES
 from vaultspec_core.search._questions import (
     KIND_WEIGHT,
-    MODEL,
     NO_RECORD,
     NONE_KEY,
     SECOND_BLOCK_FLOOR,
@@ -441,5 +441,5 @@ class TestMeter:
         )
         assert usage.elapsed_ms >= 0
 
-    def test_model_defaults_to_the_pinned_version(self) -> None:
-        assert Meter().usage().model == MODEL
+    def test_model_defaults_to_the_requested_alias_before_any_reply(self) -> None:
+        assert Meter().usage().model == TypeSafeModel.JEV

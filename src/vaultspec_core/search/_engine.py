@@ -60,6 +60,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, cast
 
+from vaultspec_core.core.enums import TypeSafeModel
+
 from ..core.windowing import clip_lines, clip_text
 from ._corpus import (
     SECTION_BYTES,
@@ -80,7 +82,6 @@ from ._questions import (
     KIND_CRITERIA,
     KIND_TO_TYPE,
     KIND_WEIGHT,
-    MODEL,
     NO_BLOCK,
     NO_RECORD,
     NONE_KEY,
@@ -215,12 +216,12 @@ class Meter:
         """Report the search so far.
 
         Returns:
-            The usage, with the model the provider reported, or the pinned
+            The usage, with the model the provider reported, or the requested
             model when no request was answered.
         """
         with self._lock:
             return SearchUsage(
-                model=self._model or MODEL,
+                model=self._model or TypeSafeModel.JEV,
                 requests=self._requests,
                 input_tokens=self._input_tokens,
                 # Rounded up: a search that sent anything took some time.

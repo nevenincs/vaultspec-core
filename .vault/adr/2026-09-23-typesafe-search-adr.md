@@ -5,7 +5,7 @@ tags:
 date: '2026-09-23'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:cda9b2357e966a73f44aa523aa675af17fec624fc515c90ad075bcca5e3b6095'
+body_hash: 'sha256:1be26d91ac85683675f630723e0fdf5191f3b2e04e04b65811ef7579869d6579'
 related:
   - "[[2026-09-23-typesafe-search-research]]"
   - '[[2026-08-26-rag-search-exposure-adr]]'
@@ -14,6 +14,8 @@ related:
   - '[[2026-08-23-envelope-optimization-adr]]'
   - '[[2026-02-16-environment-variable-adr]]'
   - '[[2026-09-23-typesafe-search-audit]]'
+  - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
+  - '[[2026-09-25-environment-provisioning-adr]]'
 ---
 
 # `typesafe-search` adr: `hosted vault search on TypeSafe Jev, with rag as the agent-level fallback` | (**status:** `accepted`)
@@ -105,23 +107,27 @@ search feature as drafted.
   supply credentials to a globally installed tool.
 - The process environment only. Rejected: it fails the requested development-
   dependency workflow.
-- The process environment, then the workspace `.env` in DEPENDENCY or DEV mode.
-  **Chosen.**
+- The process environment, explicitly provisioned private local settings, then the
+  workspace `.env` in DEPENDENCY or DEV mode. **Chosen.** The explicit provisioning
+  contract is governed by `2026-09-25-environment-provisioning-adr`.
 
 ## Constraints
 
 - **Credential.** Enrollment is `VAULTSPEC_CORE_TYPESAFE_API_KEY` alone.
   - The generic `TYPESAFE_API_KEY` and rag's variable never enrol core.
-  - The key is read from the process environment. Only when it is absent there, core
-    runs from the workspace's own environment (the running interpreter lives inside
-    the workspace), and core's resolved install mode for the workspace is DEPENDENCY
-    or DEV, is it read from the workspace-root `.env`, and only that one variable.
-    The mode is resolved as the install verbs resolve it: declared in
-    `.vaultspec/workspace.json`, otherwise detected from `pyproject.toml`. Neither
-    alone ever suffices, because the repository writes both; the interpreter test is
-    the trust boundary.
-  - The endpoint, model and every other setting are code constants that no `.env`
-    can change.
+  - The key is read from the process environment, then from the explicitly provisioned
+    project store in any install mode. A blank value is unset at every source and falls
+    through. Only when both sources omit it, core runs from the workspace's own
+    environment (the running interpreter lives inside the workspace), and core's
+    resolved install mode for the workspace is DEPENDENCY or DEV, is it read from the
+    workspace-root `.env`, and only that one variable. The mode is resolved as the
+    install verbs resolve it: declared in `.vaultspec/workspace.json`, otherwise
+    detected from `pyproject.toml`. Neither alone ever suffices, because the repository
+    writes both; the interpreter test is the trust boundary.
+  - The endpoint and model remain code constants that no environment file can change.
+    The project store admits only registry-approved runtime settings under
+    `2026-09-25-environment-provisioning-adr`; the root `.env` remains a
+    credential-only fallback.
   - The key never appears in output, logs, diagnostics or errors. Surfaces report only
     whether it is configured and from which source.
 - **No rag.** Core still calls no rag API, imports no rag module and opens no socket to
@@ -132,8 +138,11 @@ search feature as drafted.
   code before any model call. The model never widens or overrides them.
 - **Verbatim excerpts.** Returned excerpts are the record's own text, addressed by
   local block identifiers. The model never authors returned text.
-- **Pinned model.** The model is pinned by version ID (`jev-1.13.0` at adoption), not
-  a moving alias. Question texts, weights and thresholds live in one module.
+- **Canonical model selector.** All Jev requests use `TypeSafeModel.JEV` from the
+  core enum, whose stable API alias is resolved by TypeSafe. Production and test code
+  contain no numbered Jev identifiers. The API response supplies the actual model
+  identity retained in usage. Question texts, weights and thresholds remain explicit
+  policy in their owning modules.
 - **Sanitised requests.** Model-facing text maps backticks and angle brackets to
   typographic equivalents. Every request is size-checked against the published request
   bounds before sending.
@@ -165,8 +174,8 @@ A search package in core owns five layers, top to bottom.
 - **Corpus.** It reads vault records from disk per query. From each record it derives
   a summary (title, lead, distinctive headings) and fenced-code-aware paragraph blocks
   with line ranges.
-- **Question set.** One module holds every question text, option, weight, threshold and
-  the pinned model ID.
+- **Question set.** One module holds every question text, option, weight and threshold.
+  Model selection comes from the core enum shared by every TypeSafe caller.
 - **Engine.** Hard filters are applied first.
   - Stage 1 sends the query as state. There is one Choice per record type over
     summaries, each with a `none` option, packed into bounded requests run
@@ -226,9 +235,9 @@ the engine, credential and constraints are unchanged.
   requested record types when the companion probe reports rag provisioned, and
   otherwise the core listing verbs (`find`, `vault list`) plus grep. The resolved next
   step is a typed part of the backend result, not surface prose.
-- **State-free guidance.** Guidance prose carries no runtime condition. Vault questions
-  go to `search`; when it declines, agents run what its reply names. There is no
-  `status` gate.
+- **Vault-question guidance.** Vault questions go to `search`; when it declines, agents
+  run what its reply names. Discovery requires no preliminary `status` gate. The
+  separate ADR authoring pass follows the conditional cross-reference contract.
 - **Thin surfaces.** The CLI and MCP are renderers over one backend result, with
   identical fields and semantics. Neither holds search or status business logic.
 - **ADR listing stays.** Listing `.vault/adr/` beside search stays mandatory until
@@ -253,6 +262,13 @@ bullet above; nothing else changes.
 - **Revisit trigger.** Measured hosted-search recall remains the trigger for revisiting
   the listing at discovery.
 
+**Amendment, 2026-09-25:** The user explicitly required API-resolved Jev selection
+from one canonical core enum, with no numbered model identifiers in production or
+tests, and reaffirmed credential-only opt-in. This replaces the model pin above.
+Evidence: `2026-09-25-skill-audit-adr-authoring-audit`; API contract:
+https://docs.typesafe.ai/api and https://docs.typesafe.ai/models. The request uses the
+stable alias directly; no separate model-list request is needed per evaluation.
+
 **Amendment note, 2026-09-26, credential gate wording**: The Credential constraint
 above said the workspace must *declare* DEPENDENCY or DEV mode. The resolver has always
 gated on the *resolved* mode, which includes detection from `pyproject.toml`
@@ -261,6 +277,13 @@ gated on the *resolved* mode, which includes detection from `pyproject.toml`
 Evidence: `2026-09-26-env-parity-research`, env files. The boundary is unchanged:
 declaration and detection are both repository content, and the interpreter-inside-
 workspace test is what keeps a globally installed tool from reading the file.
+
+**Amendment note, 2026-09-26, blank credential**: The 2026-09-25 provisioning
+refinement let an explicit blank in the process environment disable the lower
+sources. `2026-09-26-env-parity-adr` makes a blank value unset for every
+product-owned variable, falling through to the next rung, so a blank key now falls
+through to the project store and then the gated `.env`. The Credential constraint
+above states the reconciled rule.
 
 ## Rationale
 
@@ -312,8 +335,9 @@ key, never redirect one.
 - **Blocking rule.** Correctness depends on a third party's blocking rule staying
   within what the sanitiser covers. A new trigger would surface as unscored records,
   not a wrong answer.
-- **Model upgrades.** Each Jev upgrade is a deliberate re-evaluation, not a silent
-  change.
+- **Model upgrades.** The stable API alias follows provider releases. Recorded results
+  identify the serving model; observed regressions inform evaluation and threshold
+  changes without routine source or test edits for release numbers.
 
 **Pathways.**
 

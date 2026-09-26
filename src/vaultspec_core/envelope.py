@@ -27,7 +27,7 @@ from .config import (
     env_flag,
     env_present,
 )
-from .core.exceptions import ConfigurationError
+from .core.exceptions import VaultSpecError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -83,17 +83,19 @@ def error_format_kwargs() -> dict[str, Any]:
     """Return the formatting keywords for an error report.
 
     Reporting a failure must not be able to fail: the indentation switch may
-    itself be the unusable value being reported, and a refusal raised while
-    rendering one would replace the error the operator needs to see. The
-    compact form is the answer whenever the switch cannot be read.
+    itself be the unusable value being reported, or the project store that
+    supplies it may be the one refused, and a refusal raised while rendering
+    either would replace the error the operator needs to see. The compact
+    form is the answer whenever the switch cannot be read.
 
     Returns:
         The same keywords as :func:`json_format_kwargs`, or the compact form
-        when the switch carries a value it cannot take.
+        when the switch carries a value it cannot take or its store cannot be
+        trusted.
     """
     try:
         return json_format_kwargs()
-    except ConfigurationError:
+    except VaultSpecError:
         return dict(_COMPACT)
 
 

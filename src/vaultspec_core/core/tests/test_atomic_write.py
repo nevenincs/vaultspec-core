@@ -10,12 +10,31 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from vaultspec_core.core.helpers import atomic_write
+from vaultspec_core.core.helpers import atomic_write, atomic_write_bytes
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
+
+
+def test_permission_setup_precedes_content_and_failure_preserves_destination(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "private.env"
+    destination.write_bytes(b"original")
+
+    def refuse(descriptor: int, temporary: Path) -> None:
+        assert os.fstat(descriptor).st_size == 0
+        assert temporary.read_bytes() == b""
+        raise PermissionError("Permission setup refused")
+
+    with pytest.raises(PermissionError, match="setup refused"):
+        atomic_write_bytes(
+            destination, b"private content", prepare_temp=refuse, temp_prefix=".env."
+        )
+    assert destination.read_bytes() == b"original"
+    assert not list(tmp_path.glob(".env.*"))
 
 
 def _legacy_temp(path: Path) -> Path:

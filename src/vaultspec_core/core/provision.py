@@ -12,7 +12,10 @@ import shutil
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..config.provisioning import EnvironmentImport
 
 from . import types as _t
 from .enums import InstallMode, ManagedState, Tool
@@ -683,6 +686,39 @@ def _manifest_rollback(path: Path) -> Generator[None]:
 
 
 def install_run(
+    path: Path,
+    provider: str = "all",
+    upgrade: bool = False,
+    dry_run: bool = False,
+    force: bool = False,
+    skip: set[str] | None = None,
+    mode: InstallMode | None = None,
+    adopt: bool = False,
+    environment: EnvironmentImport | None = None,
+) -> dict[str, Any]:
+    """Install resources and merge explicit local settings only after success.
+
+    ``environment`` is prepared by the config package before CLI preflight.
+    Unmentioned settings survive every install mode, upgrade and force.
+    """
+    from ..config.local_env import read_local_environment, reject_tracked_store
+    from ..config.provisioning import apply_environment, validate_values
+
+    reject_tracked_store(path)
+    if environment is not None:
+        validate_values(environment.values)
+        if environment.values:
+            reject_tracked_store(path, provisioning=True)
+        read_local_environment(path)
+    result = _install_resources(
+        path, provider, upgrade, dry_run, force, skip, mode, adopt
+    )
+    if environment is not None and not result.get("errors"):
+        result["environment"] = apply_environment(path, environment, dry_run=dry_run)
+    return result
+
+
+def _install_resources(
     path: Path,
     provider: str = "all",
     upgrade: bool = False,
