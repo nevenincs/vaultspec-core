@@ -512,8 +512,11 @@ VAULTSPEC_LOG_LEVEL: Final = ConfigVariable(
     var_type=str,
     default="INFO",
     description=(
-        "Root log level when no --debug, --quiet or explicit level is given, "
-        "for example DEBUG, INFO or WARNING. An unknown name means INFO."
+        "Root log level when neither --debug nor --verbose is given: one of "
+        "DEBUG, INFO, WARNING, ERROR, CRITICAL, case-insensitive. An unknown "
+        "name is refused. Below it stands each surface's own default - "
+        "WARNING for the CLI, INFO for the MCP server, whose output is a log "
+        "rather than a terminal."
     ),
 )
 
@@ -1093,6 +1096,16 @@ def check_environment(environ: Mapping[str, str] | None = None) -> None:
         _, problem = _parse_field(var, str(raw).strip())
         if problem is not None:
             problems.append(problem)
+
+    # The level name is the one product value whose vocabulary lives with the
+    # logging setup rather than in a type, so it is asked rather than parsed.
+    from ..logging_config import resolve_log_level
+
+    try:
+        resolve_log_level(environ=env)
+    except ConfigurationError as refusal:
+        problems.append(str(refusal))
+
     if problems:
         raise ConfigurationError(_collected(problems))
 

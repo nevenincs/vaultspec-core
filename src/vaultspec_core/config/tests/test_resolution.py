@@ -20,6 +20,7 @@ from vaultspec_core.config import (
     CONFIG_REGISTRY,
     PACKAGE,
     VAULTSPEC_CORE_TYPESAFE_API_KEY,
+    VAULTSPEC_LOG_LEVEL,
     VAULTSPEC_STDIO_WATCHDOG,
     VAULTSPEC_TARGET_DIR,
     ConfigVariable,
@@ -49,6 +50,7 @@ from vaultspec_core.env_values import (
     parse_bool,
     rejection,
 )
+from vaultspec_core.logging_config import LOG_LEVELS, resolve_log_level
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -620,3 +622,80 @@ class TestStartupRefusal:
 
     def test_an_external_convention_is_not_the_products_to_refuse(self) -> None:
         check_environment({"CI": "whatever", "NO_COLOR": "yes please"})
+
+
+class TestLogLevel:
+    """The level a process logs at, resolved over the one ladder."""
+
+    def test_debug_outranks_everything(self) -> None:
+        assert (
+            resolve_log_level(
+                debug=True, verbose=True, environ={"VAULTSPEC_LOG_LEVEL": "ERROR"}
+            )
+            == "DEBUG"
+        )
+
+    def test_verbose_asks_for_info(self) -> None:
+        assert (
+            resolve_log_level(verbose=True, environ={"VAULTSPEC_LOG_LEVEL": "ERROR"})
+            == "INFO"
+        )
+
+    def test_the_variable_answers_when_the_invocation_does_not(self) -> None:
+        assert resolve_log_level(environ={"VAULTSPEC_LOG_LEVEL": "error"}) == "ERROR"
+
+    def test_the_callers_own_default_stands_below_the_variable(self) -> None:
+        assert resolve_log_level(environ={}) == "WARNING"
+        assert resolve_log_level(environ={}, default="INFO") == "INFO"
+
+    def test_a_blank_variable_is_unset(self) -> None:
+        assert resolve_log_level(environ={"VAULTSPEC_LOG_LEVEL": "  "}) == "WARNING"
+
+    def test_a_package_level_chains_to_the_framework_name(self) -> None:
+        companion = ConfigVariable(
+            env_name="VAULTSPEC_RESOLUTION_COMPANION_LOG_LEVEL",
+            attr_name=None,
+            var_type=str,
+            default=None,
+            description="The companion's own level, chained to the framework name.",
+            fallback=VAULTSPEC_LOG_LEVEL,
+        )
+        register_registry(COMPANION, [companion])
+        try:
+            assert (
+                resolve_log_level(
+                    variable=companion, environ={"VAULTSPEC_LOG_LEVEL": "debug"}
+                )
+                == "DEBUG"
+            )
+            assert (
+                resolve_log_level(
+                    variable=companion,
+                    environ={
+                        companion.env_name: "critical",
+                        "VAULTSPEC_LOG_LEVEL": "debug",
+                    },
+                )
+                == "CRITICAL"
+            )
+        finally:
+            _forget_registry(COMPANION, [companion])
+
+    def test_an_unknown_level_is_refused_by_name(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            resolve_log_level(environ={"VAULTSPEC_LOG_LEVEL": "chatty"})
+
+        reported = str(refusal.value)
+        assert "VAULTSPEC_LOG_LEVEL" in reported
+        for level in LOG_LEVELS:
+            assert level in reported
+
+    def test_an_unknown_level_joins_the_startup_report(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            check_environment(
+                {"VAULTSPEC_LOG_LEVEL": "chatty", "VAULTSPEC_NO_HINTS": "maybe"}
+            )
+
+        reported = str(refusal.value)
+        assert reported.startswith("2 unusable settings:")
+        assert "VAULTSPEC_LOG_LEVEL" in reported

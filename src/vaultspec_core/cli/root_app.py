@@ -1,7 +1,8 @@
 """The shared root Typer app instance and global callback.
 
 Defines :data:`app`, the top-level Typer application for the
-``vaultspec-core`` executable, plus the ``--version``/``--target``/``--debug``
+``vaultspec-core`` executable, plus the
+``--version``/``--target``/``--debug``/``--verbose``
 global callback (:func:`main`). Split out from :mod:`vaultspec_core.cli.root`
 so the top-level command modules (:mod:`.root_install`, :mod:`.root_sync`,
 :mod:`.root_doctor`) can import and mount onto it without a circular import
@@ -11,7 +12,6 @@ back through :mod:`vaultspec_core.cli.root`, which re-exports this module's
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path  # noqa: TC003 - Typer evaluates the root --target annotation.
 from typing import Annotated
 
@@ -62,6 +62,9 @@ def main(
     debug: Annotated[
         bool, typer.Option("--debug", "-d", help="Enable debug logging")
     ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Enable verbose logging")
+    ] = False,
     _version: Annotated[
         bool,
         typer.Option(
@@ -76,14 +79,16 @@ def main(
     """Initialize workspace and logging."""
     from vaultspec_core.cli._target import reset, set_root_target
     from vaultspec_core.config import check_environment
-    from vaultspec_core.logging_config import configure_logging
+    from vaultspec_core.logging_config import configure_logging, resolve_log_level
 
     # Before any command runs: a switch read at output time would otherwise
     # refuse the run after it had already written everything it wrote.
     check_environment()
 
-    log_level = logging.DEBUG if debug else logging.WARNING
-    configure_logging(level=log_level, debug=debug)
+    configure_logging(
+        level=resolve_log_level(debug=debug, verbose=verbose),
+        debug=debug,
+    )
 
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())
