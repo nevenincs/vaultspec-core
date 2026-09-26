@@ -84,6 +84,8 @@ def _console_kwargs(
     kwargs: dict[str, Any] = {
         "highlight": False,
         "soft_wrap": True,
+        # no-color.org defines the convention as set *and non-empty*: an
+        # empty value is explicitly not a request for monochrome output.
         "no_color": env_value(NO_COLOR, environ) is not None,
         "safe_box": not utf8,
     }

@@ -5,13 +5,17 @@ adds ``--target / -t`` to any Typer command  - and :func:`apply_target`,
 which initializes the workspace exactly once.
 
 Priority for target resolution:
-    subcommand ``--target`` > root ``-t`` > current working directory
+    subcommand ``--target`` > root ``-t`` > ``VAULTSPEC_TARGET_DIR`` >
+    discovery from the current working directory
 
 The root callback (:func:`root.main`) stores the root-level target via
 :func:`set_root_target` but does **not** resolve the workspace.  Each
 subcommand calls :func:`apply_target` with its own ``--target`` value.
 If the subcommand target is ``None``, the root target is used as
-fallback.  If both are ``None``, the current working directory is used.
+fallback.  The rungs below the invocation belong to
+:func:`~vaultspec_core.config.resolve_target`, which every vaultspec
+package shares, so a root named in the environment reaches the CLI and an
+importing package the same way.
 """
 
 from __future__ import annotations
@@ -21,8 +25,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
-
-from vaultspec_core.cli.json_output import json_format_kwargs
 
 if TYPE_CHECKING:
     from vaultspec_core.vaultcore.query import VaultDocument
@@ -73,6 +75,21 @@ def reset() -> None:
 # ---------------------------------------------------------------------------
 # Subcommand initialization
 # ---------------------------------------------------------------------------
+
+
+def _effective_target(target: Path | None) -> Path | None:
+    """Return the root named for this call, or ``None`` to discover one.
+
+    Args:
+        target: Subcommand-level ``--target`` value (may be ``None``).
+
+    Returns:
+        The invocation's target, the root-level one behind it, then whatever
+        the session environment names; ``None`` when nothing names a root.
+    """
+    from vaultspec_core.config.workspace import resolve_target
+
+    return resolve_target(target or _root_target).path
 
 
 def _resolve_framework_root(effective_target: Path | None) -> Path | None:
@@ -137,14 +154,26 @@ def apply_target(
     """
     global _workspace_initialized
 
-    effective = target or _root_target  # None means "use cwd" in resolve_workspace
     if _workspace_initialized and target is None:
         # Already initialized by a prior call (e.g. root-level target) and
         # no subcommand override  - skip redundant work.
         return
 
+    from vaultspec_core.cli._errors import handle_error
     from vaultspec_core.config.workspace import WorkspaceError, resolve_workspace
+    from vaultspec_core.core.exceptions import ConfigurationError
     from vaultspec_core.core.types import init_paths
+
+    try:
+        # None means "discover" in resolve_workspace.
+        effective = _effective_target(target)
+    except ConfigurationError as e:
+        # A bad VAULTSPEC_TARGET_DIR is refused here, with the caller's own
+        # already-known json_output - unlike the root callback's own startup
+        # check, this call site has it, so there is no need to guess from
+        # argv.
+        handle_error(e, json_output=json_output)
+        return  # unreachable, but satisfies type checker
 
     fw_root = _resolve_framework_root(effective) if split_source else None
 
@@ -155,14 +184,9 @@ def apply_target(
     except WorkspaceError as e:
         hint = _nearest_vaultspec_hint(effective or Path.cwd())
         if json_output:
-            import json
+            from vaultspec_core.cli.rendering import render_error_envelope
 
-            from vaultspec_core.cli.rendering import json_envelope
-
-            envelope = json_envelope(
-                "error", "failed", {"message": str(e), "hint": hint}
-            )
-            print(json.dumps(envelope, **json_format_kwargs()))
+            print(render_error_envelope(str(e), hint=hint))
         else:
             typer.echo(f"Error: {e}\n{hint}", err=True)
         raise typer.Exit(code=1) from e
@@ -173,8 +197,8 @@ def resolve_effective_target(target: Path | None) -> Path:
 
     Applies the same priority as :func:`apply_target`  - *target*
     (subcommand ``--target``) > the root-level ``-t`` captured by
-    :func:`set_root_target` > the current working directory  - without
-    resolving or validating a workspace.
+    :func:`set_root_target` > ``VAULTSPEC_TARGET_DIR`` > the current working
+    directory  - without resolving or validating a workspace.
 
     Commands that require a workspace read
     :attr:`~vaultspec_core.core.types.WorkspaceContext.target_dir` after
@@ -189,7 +213,7 @@ def resolve_effective_target(target: Path | None) -> Path:
     Returns:
         The resolved effective target directory.
     """
-    return (target or _root_target or Path.cwd()).resolve()
+    return _effective_target(target) or Path.cwd().resolve()
 
 
 def _nearest_vaultspec_hint(start: Path) -> str:
@@ -232,10 +256,11 @@ def _vault_base() -> Path:
     """Return the base directory whose ``.vault/`` holds the plan documents.
 
     Resolution uses the root ``-t`` target captured by :func:`set_root_target`
-    when present, else the current working directory. Plan commands operate
-    on the local repository, so this matches how an operator invokes them.
+    when present, then the session environment, else the current working
+    directory. Plan commands operate on the local repository, so this matches
+    how an operator invokes them.
     """
-    return _root_target or Path.cwd()
+    return _effective_target(None) or Path.cwd()
 
 
 def _plan_documents(base: Path) -> list[VaultDocument]:
@@ -336,7 +361,8 @@ PlanPathArg = Annotated[
 def apply_target_install(target: Path | None) -> Path:
     """Resolve target for install / uninstall (no workspace resolution).
 
-    Priority: *target* (subcommand) > :func:`set_root_target` > cwd.
+    Priority: *target* (subcommand) > :func:`set_root_target` >
+    ``VAULTSPEC_TARGET_DIR`` > cwd.
 
     Returns the resolved target path.
     """
@@ -344,8 +370,7 @@ def apply_target_install(target: Path | None) -> Path:
 
     from vaultspec_core.core.types import WorkspaceContext, get_context, set_context
 
-    effective = target or _root_target or Path.cwd()
-    effective = effective.resolve()
+    effective = _effective_target(target) or Path.cwd().resolve()
 
     # Create or update the context with the resolved target_dir.
     # install/uninstall operate before full workspace resolution, so we

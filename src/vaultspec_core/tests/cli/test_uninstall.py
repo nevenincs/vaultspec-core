@@ -1,5 +1,6 @@
 """Tests for uninstall command behavior."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,24 @@ pytestmark = [pytest.mark.unit]
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
+
+
+class TestUninstallJson:
+    def test_uninstall_json_matches_the_canonical_install_envelope(
+        self, tmp_path: Path, runner: CliRunner
+    ) -> None:
+        """uninstall's --json output shares the same envelope install's does."""
+        runner.invoke(app, ["-t", str(tmp_path), "install", "--json"])
+
+        result = runner.invoke(
+            app, ["-t", str(tmp_path), "uninstall", "--dry-run", "--json"]
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["schema"] == "vaultspec.uninstall.v1"
+        assert payload["status"] == "unchanged"
+        assert "hints" not in payload
 
 
 class TestUninstallForce:

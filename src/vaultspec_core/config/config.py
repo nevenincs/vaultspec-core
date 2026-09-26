@@ -12,13 +12,20 @@ is declared in it exactly once, including the external conventions it honours
 own child processes. This module is the only place the process environment is
 touched. Settings that load once become :class:`VaultSpecConfig` fields;
 variables whose meaning is decided where they are used are read at call time
-through :func:`env_value`, and child processes get their environment from
-:func:`child_environment`. Both take registry entries, never names.
+through :func:`env_value` and :func:`env_flag`, and child processes get their
+environment from :func:`child_environment`. All take registry entries, never
+names.
+
+Another vaultspec package declares its own entries through
+:func:`register_registry` and then uses the same accessors, so the resolution
+order lives here once rather than once per package. A package-scoped entry may
+chain to a framework-scoped one through its ``fallback``: the package's own
+name is read first, and the shared name behind it supplies the value when it
+does not.
 """
 
 from __future__ import annotations
 
-import logging
 import os
 import threading
 from dataclasses import dataclass, field
@@ -27,11 +34,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from ..core.enums import DirName
+from ..core.exceptions import ConfigurationError
+from ..env_values import BOOL_SHAPE, is_blank, parse_bool, rejection
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
 
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "CI",
@@ -42,6 +50,7 @@ __all__ = [
     "EDITOR",
     "GIT_INDEX_FILE",
     "NO_COLOR",
+    "PACKAGE",
     "VAULTSPEC_CORE_TYPESAFE_API_KEY",
     "VAULTSPEC_EDITOR",
     "VAULTSPEC_JSON_PRETTY",
@@ -55,14 +64,22 @@ __all__ = [
     "ConfigVariable",
     "VariableScope",
     "VaultSpecConfig",
+    "check_environment",
     "child_environment",
+    "env_flag",
+    "env_present",
+    "env_source",
     "env_value",
     "get_config",
     "parse_csv_list",
     "parse_float_or_none",
     "parse_int_or_none",
+    "register_registry",
     "reset_config",
 ]
+
+#: The package whose registry this module declares.
+PACKAGE: Final = "vaultspec-core"
 
 
 def parse_csv_list(value: str) -> list[str]:
@@ -133,7 +150,6 @@ class VaultSpecConfig:
         lock_timeout_seconds: Total budget, in seconds, that a single
             :func:`~vaultspec_core.core.helpers.advisory_lock` acquisition may
             spend waiting before it reports a timeout instead of blocking on.
-        editor: Default editor command for creating rules/skills.
         typesafe_api_key: The hosted vault search credential, or ``None``.
             A secret: it is excluded from ``repr`` and redacted from every
             configuration log line. Hosted search resolves it through
@@ -162,9 +178,6 @@ class VaultSpecConfig:
     # -- Concurrency -----------------------------------------------------------
     lock_timeout_seconds: float = 120.0
 
-    # -- Editor ----------------------------------------------------------------
-    editor: str = "zed -w"
-
     # -- Vault search ----------------------------------------------------------
     typesafe_api_key: str | None = field(default=None, repr=False)
 
@@ -172,64 +185,65 @@ class VaultSpecConfig:
     def from_environment(
         cls,
         overrides: dict[str, Any] | None = None,
+        environ: Mapping[str, str] | None = None,
     ) -> VaultSpecConfig:
         """Create a config from environment variables and optional overrides.
 
         Resolution order per attribute:
 
         1. *overrides* dict (keyed by ``attr_name``)
-        2. ``VAULTSPEC_*`` env var
+        2. ``VAULTSPEC_*`` env var, blank counting as unset
         3. Dataclass default
+
+        A value that cannot be used does not fall back to the default: a
+        mistyped setting that silently does nothing is the failure this
+        refusal exists to end. Every problem is collected first, so one run
+        reports all of them rather than one per attempt.
 
         Args:
             overrides: Optional mapping of attribute name to value that takes
                 precedence over environment variables and defaults.
+            environ: The environment to read; ``None`` reads the process's
+                own.
 
         Returns:
             A fully-populated ``VaultSpecConfig`` instance.
 
         Raises:
-            ValueError: If a required variable has no value from any source.
+            ConfigurationError: If any variable carries a value the field
+                cannot take, or a required one supplies nothing.
         """
         overrides = overrides or {}
+        env = os.environ if environ is None else environ
         kwargs: dict[str, Any] = {}
+        problems: list[str] = []
 
         for var in CONFIG_REGISTRY:
             # Variables read at call time are not configuration fields.
             if var.attr_name is None:
                 continue
 
-            # 1. Explicit override
             if var.attr_name in overrides:
                 kwargs[var.attr_name] = overrides[var.attr_name]
                 continue
 
-            # 2. VAULTSPEC_* env var
-            raw: str | None = os.environ.get(var.env_name)
-            source: str | None = var.env_name if raw is not None else None
-
-            # 3. Default
-            if raw is None:
+            raw = env.get(var.env_name)
+            if is_blank(raw):
                 if var.required:
-                    raise ValueError(
-                        f"Required config variable {var.env_name} "
-                        f"(attr: {var.attr_name}) is not set and no "
-                        f"override was provided."
+                    problems.append(
+                        f"{var.env_name} is required and no value was supplied"
                     )
-                # Skip  - dataclass default will apply
                 continue
 
-            # Parse the raw string value into the target type
-            parsed = _parse_raw(var, raw, source)
-            if parsed is _SENTINEL:
-                continue  # parse failed, fall back to default
-            kwargs[var.attr_name] = parsed
+            value, problem = _parse_field(var, str(raw).strip())
+            if problem is not None:
+                problems.append(problem)
+                continue
+            kwargs[var.attr_name] = value
 
+        if problems:
+            raise ConfigurationError(_collected(problems))
         return cls(**kwargs)
-
-
-# Sentinel for parse failures
-_SENTINEL = object()
 
 
 # Type sentinels for Optional[int] / Optional[float]  - we cannot use
@@ -245,162 +259,89 @@ class _OptionalFloat:
     """Sentinel type for registry entries that parse to ``float | None``."""
 
 
-def _parse_bool(raw: str) -> bool:
-    """Parse a boolean environment variable value."""
-    return raw.lower() in ("1", "true", "yes")
+def _require_bool(raw: str) -> bool:
+    """Return the boolean *raw* denotes, refusing a word outside the table."""
+    parsed = parse_bool(raw)
+    if parsed is None:
+        raise ValueError(BOOL_SHAPE)
+    return parsed
 
 
-# Maps a registry ``var_type`` to its ``(converter, skip_validation)`` pair.
-# ``skip_validation`` is ``True`` for types (``bool``, ``Path``, ``list``)
-# whose values bypass the options/range validation applied to the rest.
-# Types absent from this table (``str`` / ``Optional[str]``) need no
-# conversion and are handled by the ``_convert_raw_value`` fallback.
-_TYPE_CONVERTERS: dict[type, tuple[Any, bool]] = {
-    bool: (_parse_bool, True),
-    int: (int, False),
-    float: (float, False),
-    Path: (Path, True),
-    list: (parse_csv_list, True),
-    _OptionalInt: (parse_int_or_none, False),
-    _OptionalFloat: (parse_float_or_none, False),
+# Maps a registry ``var_type`` to its ``(converter, shape)`` pair. The shape
+# is what a rejection message names as the accepted form, and it is also the
+# marker for the types (``bool``, ``Path``, ``list``) that carry no options
+# or range constraints. Types absent from this table (``str`` /
+# ``Optional[str]``) need no conversion at all.
+_TYPE_CONVERTERS: dict[type, tuple[Any, str]] = {
+    bool: (_require_bool, BOOL_SHAPE),
+    int: (int, "a whole number"),
+    float: (float, "a number"),
+    Path: (Path, "a path"),
+    list: (parse_csv_list, "a comma-separated list"),
+    _OptionalInt: (parse_int_or_none, "a whole number"),
+    _OptionalFloat: (parse_float_or_none, "a number"),
 }
 
 
-def _convert_raw_value(var: ConfigVariable, raw: str) -> tuple[Any, bool]:
-    """Convert *raw* into the type expected by *var*.
+def _refused(var: ConfigVariable, shape: str, value: object) -> str:
+    """Render one problem, withholding the value when *var* is a secret.
+
+    A rejected secret is still a secret: the line that says a credential is
+    malformed must not be the line that leaks it.
+    """
+    return str(rejection(var.env_name, shape, value, secret=var.secret))
+
+
+def _constraint_problem(var: ConfigVariable, value: Any) -> str | None:
+    """Return why *value* fails *var*'s options or range, or ``None``."""
+    if var.options is not None and value not in var.options:
+        return _refused(var, "one of " + ", ".join(var.options), value)
+    if not isinstance(value, (int, float)):
+        return None
+    if var.min_value is not None and value < var.min_value:
+        return _refused(var, f"at least {var.min_value}", value)
+    if var.max_value is not None and value > var.max_value:
+        return _refused(var, f"at most {var.max_value}", value)
+    return None
+
+
+def _parse_field(var: ConfigVariable, raw: str) -> tuple[Any, str | None]:
+    """Parse *raw* into the type *var* declares, or say why it cannot be.
 
     Args:
-        var: The ``ConfigVariable`` metadata that describes the expected type.
-        raw: The raw string value read from the environment variable.
+        var: The entry describing the expected type and its constraints.
+        raw: The value read from the environment, already stripped and known
+            to be non-blank.
 
     Returns:
-        A ``(value, skip_validation)`` tuple. ``skip_validation`` is ``True``
-        for types (``bool``, ``Path``, ``list``) whose values bypass the
-        options/range validation applied to the remaining types; ``value``
-        is ``None`` for ``_OptionalInt``/``_OptionalFloat`` when parsing
-        failed.
-
-    Raises:
-        ValueError: Propagated from ``int()``/``float()`` on malformed input.
-        TypeError: Propagated from the underlying conversion call.
+        The parsed value paired with ``None``, or ``None`` paired with the
+        one-line problem to report. Exactly one of the two is meaningful.
     """
     converter_entry = _TYPE_CONVERTERS.get(var.var_type)
     if converter_entry is None:
         # str or Optional[str]  - no conversion needed
-        return raw, False
-    converter, skip_validation = converter_entry
-    return converter(raw), skip_validation
+        return raw, _constraint_problem(var, raw)
 
-
-#: What a log line shows in place of a secret variable's value.
-_REDACTED = "<redacted>"
-
-
-def _shown(var: ConfigVariable, value: object) -> str:
-    """Render *value* for a log line, withholding it when *var* is secret.
-
-    A rejected secret is still a secret: the line that says a credential was
-    malformed must not be the line that leaks it.
-    """
-    return _REDACTED if var.secret else repr(value)
-
-
-def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool:
-    """Validate an already-converted *value* against *var*'s constraints.
-
-    Args:
-        var: The ``ConfigVariable`` metadata describing the options/range
-            constraints.
-        value: The converted value to validate.
-        source: Human-readable source label for error messages.
-
-    Returns:
-        ``True`` if *value* satisfies every configured constraint, ``False``
-        otherwise (a matching error has already been logged).
-    """
-    if var.options is not None and value not in var.options:
-        logger.error(
-            "%s=%s is not one of %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, value),
-            var.options,
-            source,
-        )
-        return False
-
-    if (
-        var.min_value is not None
-        and isinstance(value, (int, float))
-        and value < var.min_value
-    ):
-        logger.error(
-            "%s=%s is below minimum %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, value),
-            var.min_value,
-            source,
-        )
-        return False
-
-    if (
-        var.max_value is not None
-        and isinstance(value, (int, float))
-        and value > var.max_value
-    ):
-        logger.error(
-            "%s=%s exceeds maximum %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, value),
-            var.max_value,
-            source,
-        )
-        return False
-
-    return True
-
-
-def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
-    """Parse a raw env-var string into the type expected by *var*.
-
-    Args:
-        var: The ``ConfigVariable`` metadata that describes the expected type
-            and validation constraints.
-        raw: The raw string value read from the environment variable.
-        source: Human-readable source label for error messages (typically the
-            env var name), or ``None``.
-
-    Returns:
-        The parsed and validated value, or ``_SENTINEL`` if parsing or
-        validation fails (caller should fall back to the dataclass default).
-    """
+    converter, shape = converter_entry
     try:
-        value, skip_validation = _convert_raw_value(var, raw)
-    except (ValueError, TypeError) as exc:
-        # A converter's own message and traceback quote the input verbatim,
-        # so a secret's failure is reported without either.
-        logger.error(
-            "Failed to parse %s=%s (source: %s): %s; using default",
-            var.attr_name,
-            _shown(var, raw),
-            source,
-            _REDACTED if var.secret else exc,
-            exc_info=not var.secret,
-        )
-        return _SENTINEL
+        value = converter(raw)
+    except (ValueError, TypeError):
+        # A converter's own message quotes the input verbatim, so it is the
+        # declared shape that is reported, never the exception's text.
+        return None, _refused(var, shape, raw)
 
-    if var.var_type in (_OptionalInt, _OptionalFloat) and value is None:
-        logger.error(
-            "Could not parse %s=%s as %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, raw),
-            "int" if var.var_type is _OptionalInt else "float",
-            source,
-        )
-        return _SENTINEL
+    # The optional converters answer None rather than raising.
+    if value is None:
+        return None, _refused(var, shape, raw)
+    return value, _constraint_problem(var, value)
 
-    if skip_validation or _validate_value(var, value, source):
-        return value
-    return _SENTINEL
+
+def _collected(problems: list[str]) -> str:
+    """Render every problem as one message, so one run reports them all."""
+    if len(problems) == 1:
+        return problems[0]
+    listed = "\n".join(f"  - {problem}" for problem in problems)
+    return f"{len(problems)} unusable settings:\n{listed}"
 
 
 class VariableScope(StrEnum):
@@ -450,14 +391,26 @@ class ConfigVariable:
             report only whether it is set.
         scope: Who owns the variable; see :class:`VariableScope`.
         workspace_dotenv: If ``True``, a workspace-root ``.env`` may supply
-            the value when the workspace runs core from its own environment
-            (see :mod:`vaultspec_core.config.credential`). Only a secret may
-            be so marked: the file is repository content, and it supplies
-            credentials, never settings.
+            the value when the workspace runs the owning package from its own
+            environment (see :mod:`vaultspec_core.config.credential`). Only a
+            secret may be so marked: the file is repository content, and it
+            supplies credentials, never settings.
+        fail_safe: If ``True``, the variable is a protective switch: an
+            unusable value leaves the guard in its protective state and warns
+            rather than refusing the process. The one exception to
+            reject-on-invalid, because refusing to start is not a safer
+            outcome than running guarded.
+        fallback: The framework-scoped entry this one chains to. A
+            package-scoped name is read first; when it supplies nothing, the
+            shared name behind it is read. A credential never chains, and an
+            external convention is not the framework's to chain.
+        package: Which package declared the entry. Set by
+            :func:`register_registry`, never by the caller that builds it.
 
     Raises:
-        ValueError: If the name's prefix does not match the scope, or a
-            non-secret variable is marked ``workspace_dotenv``.
+        ValueError: If the name's prefix does not match the scope, a
+            non-secret variable is marked ``workspace_dotenv``, or a
+            credential or external convention declares a fallback.
     """
 
     env_name: str
@@ -472,6 +425,9 @@ class ConfigVariable:
     secret: bool = False
     scope: VariableScope = VariableScope.PRODUCT
     workspace_dotenv: bool = False
+    fail_safe: bool = False
+    fallback: ConfigVariable | None = None
+    package: str | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         owned = self.scope is not VariableScope.EXTERNAL
@@ -484,6 +440,16 @@ class ConfigVariable:
         if self.workspace_dotenv and not self.secret:
             raise ValueError(
                 f"{self.env_name}: only a secret may be read from a workspace .env"
+            )
+        if self.fallback is None:
+            return
+        # A credential is enrolled by one name, so that a key provisioned for
+        # one package never reaches another. Chaining would give it a second.
+        if self.secret or self.fallback.secret:
+            raise ValueError(f"{self.env_name}: a credential never chains")
+        if self.scope is VariableScope.EXTERNAL:
+            raise ValueError(
+                f"{self.env_name}: an external convention declares no fallback"
             )
 
 
@@ -498,20 +464,25 @@ VAULTSPEC_TARGET_DIR: Final = ConfigVariable(
     attr_name="target_dir",
     var_type=Path,
     default=None,
-    description="The root directory for the workspace (where .vault/ and "
-    ".vaultspec/ live).",
+    description=(
+        "The root directory for the workspace (where .vault/ and .vaultspec/ "
+        "live), for every process kind. Ranked below an explicit --target and "
+        "above discovery from the working directory; blank means unset. A "
+        "directory that does not exist is refused rather than discovered past."
+    ),
 )
 
 VAULTSPEC_EDITOR: Final = ConfigVariable(
     env_name="VAULTSPEC_EDITOR",
-    attr_name="editor",
+    attr_name=None,
     var_type=str,
-    default="zed -w",
+    default=None,
     description=(
-        "Editor command. Interactive creation of a rule, skill, agent or "
-        "trigger opens it, or zed -w when unset. The edit verbs consult it "
-        "after the --editor flag and the project config key, before VISUAL "
-        "and EDITOR."
+        "Editor command every surface that opens an editor consults - the "
+        "edit verbs and interactive creation of a rule, skill, agent or "
+        "trigger alike. Read after the --editor flag and before the project "
+        "config key, VISUAL and EDITOR; vi is the last rung when none of "
+        "them answers."
     ),
 )
 
@@ -538,54 +509,62 @@ VAULTSPEC_LOG_LEVEL: Final = ConfigVariable(
     var_type=str,
     default="INFO",
     description=(
-        "Root log level when no --debug, --quiet or explicit level is given, "
-        "for example DEBUG, INFO or WARNING. An unknown name means INFO."
+        "Root log level when neither --debug nor --verbose is given: one of "
+        "DEBUG, INFO, WARNING, ERROR, CRITICAL, case-insensitive. An unknown "
+        "name is refused. Below it stands each surface's own default - "
+        "WARNING for the CLI, INFO for the MCP server, whose output is a log "
+        "rather than a terminal."
     ),
 )
 
 VAULTSPEC_JSON_PRETTY: Final = ConfigVariable(
     env_name="VAULTSPEC_JSON_PRETTY",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
-        "Indents --json output. Any value other than 0, false, no, off or "
-        "blank turns it on; unset, the envelope is one compact line."
+        "Indents --json output. A true word turns it on; unset, blank or a "
+        "false word leaves the envelope one compact line."
     ),
 )
 
 VAULTSPEC_NO_HINTS: Final = ConfigVariable(
     env_name="VAULTSPEC_NO_HINTS",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
-        "Set to 1 to drop the Next actions block commands print after their "
-        "report; equivalent to --no-hints. Only the exact value 1 counts."
+        "Set to a true word to drop the Next actions block commands print "
+        "after their report; equivalent to --no-hints. Unset, blank or a "
+        "false word leaves the hints in place."
     ),
 )
 
 VAULTSPEC_NON_INTERACTIVE: Final = ConfigVariable(
     env_name="VAULTSPEC_NON_INTERACTIVE",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
-        "Set to any value, even blank, to declare that no operator is "
-        "watching, as CI does: repository triggers awaiting approval are "
-        "skipped instead of prompted for."
+        "Set to a true word to declare that no operator is watching: "
+        "repository triggers awaiting approval are skipped instead of "
+        "prompted for. Unset, blank or a false word leaves the terminal and "
+        "CI to decide."
     ),
 )
 
 VAULTSPEC_STDIO_WATCHDOG: Final = ConfigVariable(
     env_name="VAULTSPEC_STDIO_WATCHDOG",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
-        "Lifetime watchdog of the MCP server, on by default. 0, false, off or "
-        "no disables it, leaving stdin EOF as the only exit path."
+        "Lifetime watchdog of the MCP server, on by default. A false word "
+        "disables it, leaving stdin EOF as the only exit path. Unset, blank "
+        "or an unrecognised word leaves it armed: it is a protective switch, "
+        "so a typo warns rather than turning the guard off."
     ),
+    fail_safe=True,
 )
 
 VAULTSPEC_MCP_GATEWAY_INVOCATION: Final = ConfigVariable(
@@ -618,7 +597,11 @@ NO_COLOR: Final = ConfigVariable(
     attr_name=None,
     var_type=str,
     default=None,
-    description="Set to any value, even blank, to disable colour in console output.",
+    description=(
+        "Set to any non-empty value to disable colour in console output, as "
+        "the no-color.org convention defines it. Set but empty is not a "
+        "request for monochrome output."
+    ),
     scope=VariableScope.EXTERNAL,
 )
 
@@ -795,39 +778,275 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
 ]
 
 
-#: Identities of the registered entries, so the accessors below refuse a
-#: variable that was built somewhere else instead of declared here.
-_REGISTERED: Final = frozenset(id(var) for var in CONFIG_REGISTRY)
+#: Which package declared each registered entry, keyed by the entry's
+#: identity, so the accessors below refuse a variable that was built somewhere
+#: else instead of declared in a registry.
+_DECLARED_BY: Final[dict[int, str]] = {}
+
+#: Which package declared each registered *name*. Identity alone cannot
+#: protect a credential: a second package could otherwise build its own entry
+#: carrying another package's variable name and read that package's key from
+#: a workspace .env under its own mode gate.
+_DECLARED_NAMES: Final[dict[str, str]] = {}
+
+#: The registries themselves, which also keep every registered entry alive:
+#: identities are only unique while the objects behind them are.
+_REGISTRIES: Final[dict[str, list[ConfigVariable]]] = {}
+
+#: Guards the registries. Registration happens at import, which is normally
+#: single-threaded, but a package imported lazily from a worker thread would
+#: otherwise interleave its validation with another's mutation.
+_REGISTRATION_LOCK: Final = threading.Lock()
+
+
+def _name_conflict(var: ConfigVariable, package: str) -> str | None:
+    """Return why *var*'s name is not *package*'s to declare, or ``None``."""
+    owner = _DECLARED_NAMES.get(var.env_name)
+    if owner is None or (owner == package and _DECLARED_BY.get(id(var)) == package):
+        return None
+    return (
+        f"{var.env_name} is already declared by {owner}; "
+        f"an entry belongs to one package"
+    )
+
+
+def _fallback_problem(var: ConfigVariable, package: str, batch: set[int]) -> str | None:
+    """Return why *var*'s fallback cannot be chained to, or ``None``."""
+    if var.fallback is None:
+        return None
+    owner = _DECLARED_BY.get(id(var.fallback))
+    if owner is None and id(var.fallback) in batch:
+        owner = package
+    if owner is None:
+        return (
+            f"{var.env_name} falls back to {var.fallback.env_name}, "
+            f"which no registry declares"
+        )
+    if owner != PACKAGE:
+        # The chain runs package-scoped name -> framework name, and the
+        # framework is core. A chain into a third package would let one
+        # package's variable answer for another's.
+        return (
+            f"{var.env_name} falls back to {var.fallback.env_name}, which "
+            f"{owner} declares; a fallback names a {PACKAGE} variable"
+        )
+    return None
+
+
+def register_registry(package: str, entries: Iterable[ConfigVariable]) -> None:
+    """Declare *package*'s environment variables, opening the accessors to them.
+
+    A package that wants :func:`env_value`, :func:`env_flag`,
+    :func:`child_environment` and
+    :func:`~vaultspec_core.config.credential.resolve_credential` for its own
+    variables registers them once, at import. Registration is what binds an
+    entry to the package whose install mode gates its credentials, so an
+    entry belongs to exactly one package - by name as well as by identity.
+
+    Args:
+        package: The distribution name declaring the entries.
+        entries: The entries to register. Registering the same entries again
+            under the same package is a no-op.
+
+    Raises:
+        ValueError: If an entry, or an entry's name, is already declared by
+            another package; if an entry chains to one no registry declares;
+            or if it chains to a variable outside the framework's own.
+    """
+    declared = list(entries)
+    batch = {id(var) for var in declared}
+    with _REGISTRATION_LOCK:
+        for var in declared:
+            problem = _name_conflict(var, package) or _fallback_problem(
+                var, package, batch
+            )
+            if problem is not None:
+                raise ValueError(problem)
+
+        registry = _REGISTRIES.setdefault(package, [])
+        for var in declared:
+            if id(var) in _DECLARED_BY:
+                continue
+            var.package = package
+            _DECLARED_BY[id(var)] = package
+            _DECLARED_NAMES[var.env_name] = package
+            registry.append(var)
+
+
+def forget_registry_for_tests(
+    package: str, entries: Iterable[ConfigVariable] | None = None
+) -> None:
+    """Undeclare *package*'s entries, or just *entries* of them.
+
+    A testing hook, not a production entry point: production code registers
+    once at import and never undeclares, so nothing outside a test ever calls
+    this. It exists for a test that declares a companion package - without
+    it, the entries that test invented outlive the module that invented
+    them, and the next test sees a registry no code under test ever built.
+    The ``_for_tests`` suffix is the contract: import it directly from this
+    module (``vaultspec_core.config.config``), never through the public
+    ``vaultspec_core.config`` package, which does not re-export it. A
+    leading underscore was rejected for the same name a module-private
+    helper would carry: this one is called only from outside the module, by
+    every test file above, and a private name whose only callers live
+    elsewhere is exactly the shape a dead-code check exists to catch.
+
+    Args:
+        package: The distribution whose entries to drop.
+        entries: The entries to drop; ``None`` drops all of *package*'s.
+    """
+    with _REGISTRATION_LOCK:
+        registry = _REGISTRIES.get(package)
+        if registry is None:
+            return
+        dropped = list(registry if entries is None else entries)
+        for var in dropped:
+            if _DECLARED_BY.get(id(var)) != package:
+                continue
+            del _DECLARED_BY[id(var)]
+            _DECLARED_NAMES.pop(var.env_name, None)
+            registry.remove(var)
+            var.package = None
+        if not registry:
+            del _REGISTRIES[package]
+
+
+register_registry(PACKAGE, CONFIG_REGISTRY)
 
 
 def _registered(var: ConfigVariable) -> ConfigVariable:
-    """Return *var*, refusing one that is not a :data:`CONFIG_REGISTRY` entry."""
-    if id(var) not in _REGISTERED:
-        raise ValueError(f"{var.env_name} is not declared in CONFIG_REGISTRY")
+    """Return *var*, refusing one that no registry declares."""
+    if id(var) not in _DECLARED_BY:
+        raise ValueError(f"{var.env_name} is not declared in a registry")
     return var
+
+
+def _supplied(
+    var: ConfigVariable, environ: Mapping[str, str] | None
+) -> tuple[ConfigVariable, str] | None:
+    """Return the entry along *var*'s chain that supplies a value, and it.
+
+    Args:
+        var: A registered entry, possibly chaining to a framework entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        The supplying entry and its value, stripped, or ``None`` when no rung
+        of the chain is set to anything but blank.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
+    """
+    env = os.environ if environ is None else environ
+    entry: ConfigVariable | None = _registered(var)
+    while entry is not None:
+        raw = env.get(entry.env_name)
+        if not is_blank(raw):
+            # is_blank has already ruled None out.
+            return entry, str(raw).strip()
+        entry = entry.fallback
+    return None
 
 
 def env_value(
     var: ConfigVariable, environ: Mapping[str, str] | None = None
 ) -> str | None:
-    """Return the raw value of registered variable *var*, read now.
+    """Return the value of registered variable *var*, read now.
 
-    For variables whose meaning is decided where they are used - presence
-    alone, one exact token, a set of off values - and which must track the
-    environment at call time rather than when the configuration loaded.
+    For variables whose meaning is decided where they are used, and which
+    must track the environment at call time rather than when the
+    configuration loaded. A blank value is unset: it falls through to the
+    entry's framework fallback, and then reads as nothing at all, so a
+    variable cleared in a shell profile means the same as one never set.
 
     Args:
-        var: A :data:`CONFIG_REGISTRY` entry.
+        var: A registered entry.
         environ: The environment to read; ``None`` reads the process's own.
 
     Returns:
-        The value as set, which may be blank, or ``None`` when unset.
+        The value, stripped of surrounding whitespace, from the first rung of
+        the chain that supplies one; ``None`` when none does.
 
     Raises:
-        ValueError: If *var* is not a registry entry.
+        ValueError: If *var* is not a registered entry.
+    """
+    supplied = _supplied(var, environ)
+    return None if supplied is None else supplied[1]
+
+
+def env_source(
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
+) -> ConfigVariable | None:
+    """Return which entry along *var*'s chain supplied its value.
+
+    A message about an unusable value must name the variable the operator
+    actually set, which is *var* itself or the framework entry behind it.
+
+    Args:
+        var: A registered entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        The supplying entry, or ``None`` when the chain supplies nothing.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
+    """
+    supplied = _supplied(var, environ)
+    return None if supplied is None else supplied[0]
+
+
+def env_present(var: ConfigVariable, environ: Mapping[str, str] | None = None) -> bool:
+    """Return whether *var* is set at all, blank included.
+
+    For the external conventions whose owners define them by presence alone -
+    ``CI`` and ``GIT_INDEX_FILE`` - which keep their owners' meanings rather
+    than the product's blank-is-unset rule. A convention whose owner requires
+    a non-empty value, ``NO_COLOR``, is read with :func:`env_value`; a
+    product-owned switch with :func:`env_flag`.
+
+    Args:
+        var: A registered entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        ``True`` when the environment sets the name, whatever its value.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
     """
     env = os.environ if environ is None else environ
-    return env.get(_registered(var).env_name)
+    return _registered(var).env_name in env
+
+
+def env_flag(
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
+) -> bool | None:
+    """Return the switch *var* carries, in the one boolean vocabulary.
+
+    Args:
+        var: A registered entry.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        ``True`` or ``False`` from the first rung of the chain that supplies a
+        value; ``None`` when none does, leaving the default to the caller.
+
+    Raises:
+        ValueError: If *var* is not a registered entry.
+        ConfigurationError: If a rung supplies a word the vocabulary does not
+            recognise.
+    """
+    supplied = _supplied(var, environ)
+    if supplied is None:
+        return None
+    entry, raw = supplied
+    parsed = parse_bool(raw)
+    if parsed is None:
+        raise ConfigurationError(
+            str(rejection(entry.env_name, BOOL_SHAPE, raw, secret=entry.secret))
+        )
+    return parsed
 
 
 def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str]:
@@ -843,12 +1062,102 @@ def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str
         A fresh mapping the caller may hand to :mod:`subprocess`.
 
     Raises:
-        ValueError: If a variable is not a registry entry.
+        ValueError: If a variable is not a registered entry.
     """
     env = dict(os.environ)
     for var, value in assignments:
         env[_registered(var).env_name] = value
     return env
+
+
+def check_environment(
+    environ: Mapping[str, str] | None = None,
+    *,
+    package: str = PACKAGE,
+    include_framework: bool = True,
+) -> None:
+    """Refuse every unusable product value in *environ*, together.
+
+    :meth:`VaultSpecConfig.from_environment` covers the variables that load
+    into configuration fields. The rest are read where they are used, which
+    is often after the work is done: a mistyped ``VAULTSPEC_NO_HINTS`` would
+    otherwise refuse a command at the moment it prints its report, having
+    already written everything it was going to write. An entry point calls
+    this first, so a value nobody can use stops the run before it starts.
+
+    *package*'s own registered entries are checked, plus the framework entry
+    each one falls back to. By default the framework's own product entries
+    are checked too, because a companion package reads them directly and
+    without a chain: ``VAULTSPEC_NO_HINTS``, ``VAULTSPEC_JSON_PRETTY`` and
+    ``VAULTSPEC_NON_INTERACTIVE`` are shared switches with no package-scoped
+    name in front of them, so a startup check that skipped them would pass
+    and then refuse late, at the moment the report is printed. Pass
+    ``include_framework=False`` to check only *package*'s own chains - for a
+    process that reads none of the shared switches, or one whose host has
+    already checked them.
+
+    The framework's internal markers and the external conventions it honours
+    are never checked for another package: they are not that package's
+    settings to refuse over. A protective switch is exempt in either set:
+    leaving its guard armed is the safer reading of a typo, and refusing to
+    start is not safer still.
+
+    Args:
+        environ: The environment to read; ``None`` reads the process's own.
+        package: The distribution whose registered entries to check.
+        include_framework: Whether to also check vaultspec-core's own
+            product-scoped entries. Ignored when *package* is the framework
+            itself, whose entries are already the ones being checked.
+
+    Raises:
+        ConfigurationError: If any product-owned variable carries a value it
+            cannot take. Every problem is reported in one message.
+    """
+    env = os.environ if environ is None else environ
+    problems: list[str] = []
+
+    # Snapshot under the lock: a package registering from a worker thread
+    # would otherwise append to the very list being walked.
+    with _REGISTRATION_LOCK:
+        registered = list(_REGISTRIES.get(package, []))
+        if include_framework and package != PACKAGE:
+            registered += _REGISTRIES.get(PACKAGE, [])
+
+    chain: dict[int, ConfigVariable] = {}
+    for var in registered:
+        chain[id(var)] = var
+        if var.fallback is not None:
+            chain[id(var.fallback)] = var.fallback
+
+    for var in chain.values():
+        if var.scope is not VariableScope.PRODUCT or var.fail_safe:
+            continue
+        raw = env.get(var.env_name)
+        if is_blank(raw):
+            continue
+        _, problem = _parse_field(var, str(raw).strip())
+        if problem is not None:
+            problems.append(problem)
+
+    # The level name is the one product value whose vocabulary lives with the
+    # logging setup rather than in a type, so it is asked rather than parsed.
+    # Every entry in the chain that is, or falls back to, the shared level
+    # variable is checked through it, package-scoped names included.
+    from ..logging_config import resolve_log_level
+
+    level_vars = (
+        var
+        for var in chain.values()
+        if var is VAULTSPEC_LOG_LEVEL or var.fallback is VAULTSPEC_LOG_LEVEL
+    )
+    for level_var in level_vars:
+        try:
+            resolve_log_level(variable=level_var, environ=env)
+        except ConfigurationError as refusal:
+            problems.append(str(refusal))
+
+    if problems:
+        raise ConfigurationError(_collected(problems))
 
 
 _cached_config: VaultSpecConfig | None = None

@@ -84,11 +84,13 @@ class TestRegistryShape:
 
 
 class TestEditorDefault:
-    def test_editor_default_does_not_depend_on_visual_or_editor(self) -> None:
-        # VISUAL and EDITOR are rungs of the edit verbs' ladder, read at call
-        # time; they are not the default of VAULTSPEC_EDITOR.
-        assert VAULTSPEC_EDITOR.default == "zed -w"
-        assert VaultSpecConfig().editor == VAULTSPEC_EDITOR.default
+    def test_the_editor_has_no_shipped_default_and_no_loaded_field(self) -> None:
+        # Every rung of the editor ladder is read where the editor is opened,
+        # so there is nothing for the configuration to carry, and no product
+        # default above the last rung the ladder itself declares.
+        assert VAULTSPEC_EDITOR.default is None
+        assert VAULTSPEC_EDITOR.attr_name is None
+        assert not hasattr(VaultSpecConfig(), "editor")
 
 
 class TestEnvValue:
@@ -97,14 +99,18 @@ class TestEnvValue:
 
         assert env_value(VAULTSPEC_NO_HINTS, environ) == "1"
 
-    def test_unset_is_none_and_blank_is_kept(self) -> None:
+    def test_unset_and_blank_both_read_as_nothing(self) -> None:
         assert env_value(NO_COLOR, {}) is None
-        assert env_value(NO_COLOR, {"NO_COLOR": ""}) == ""
+        assert env_value(NO_COLOR, {"NO_COLOR": ""}) is None
+        assert env_value(NO_COLOR, {"NO_COLOR": "   "}) is None
+
+    def test_surrounding_whitespace_is_not_part_of_the_value(self) -> None:
+        assert env_value(VAULTSPEC_NO_HINTS, {"VAULTSPEC_NO_HINTS": " 1 "}) == "1"
 
     def test_an_unregistered_variable_is_refused(self) -> None:
         stray = _stray()
 
-        with pytest.raises(ValueError, match="not declared in CONFIG_REGISTRY"):
+        with pytest.raises(ValueError, match="not declared in a registry"):
             env_value(stray, {stray.env_name: "x"})
 
     def test_an_equal_copy_of_an_entry_is_still_refused(self) -> None:
@@ -114,10 +120,11 @@ class TestEnvValue:
             **{
                 f.name: getattr(VAULTSPEC_NO_HINTS, f.name)
                 for f in fields(ConfigVariable)
+                if f.init
             }
         )
 
-        with pytest.raises(ValueError, match="not declared in CONFIG_REGISTRY"):
+        with pytest.raises(ValueError, match="not declared in a registry"):
             env_value(copy, {"VAULTSPEC_NO_HINTS": "1"})
 
 
@@ -142,5 +149,5 @@ class TestChildEnvironment:
         assert "VAULTSPEC_UNDECLARED_CHILD_ONLY" not in os.environ
 
     def test_an_unregistered_assignment_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="not declared in CONFIG_REGISTRY"):
+        with pytest.raises(ValueError, match="not declared in a registry"):
             child_environment((_stray(), "1"))

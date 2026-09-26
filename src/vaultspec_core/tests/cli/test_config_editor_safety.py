@@ -137,7 +137,7 @@ class TestConfigCli:
 class TestEditorResolution:
     """Verify editor resolution precedence ladder.
 
-    Order: flag -> config -> VISUAL -> EDITOR -> vi.
+    Order: flag -> VAULTSPEC_EDITOR -> config -> VISUAL -> EDITOR -> vi.
 
     The flag and config rungs are untrusted channels, so their probe editors
     are named after real editors on the allowlist; the environment rungs are
@@ -189,19 +189,19 @@ class TestEditorResolution:
             os.environ["VISUAL"] = ed_visual
             assert resolve_editor(target_dir=tmp_path) == ed_visual
 
-            # 4. VAULTSPEC_EDITOR env var should take precedence over VISUAL
-            os.environ["VAULTSPEC_EDITOR"] = ed_vaultspec
-            assert resolve_editor(target_dir=tmp_path) == ed_vaultspec
-
-            # 5. Local config should take precedence over VAULTSPEC_EDITOR
+            # 4. The committed config key should take precedence over VISUAL
             from vaultspec_core.core.local_config import set_config_value
 
-            # Write local config
             get_local_config_path(tmp_path)
             set_config_value("editor", ed_config, target_dir=tmp_path)
             assert resolve_editor(target_dir=tmp_path) == ed_config
 
-            # 6. Editor override flag should take precedence over local config
+            # 5. The operator's own variable outranks the committed file, as
+            # git ranks GIT_EDITOR over core.editor.
+            os.environ["VAULTSPEC_EDITOR"] = ed_vaultspec
+            assert resolve_editor(target_dir=tmp_path) == ed_vaultspec
+
+            # 6. Editor override flag should take precedence over everything
             assert (
                 resolve_editor(editor_override=ed_flag, target_dir=tmp_path) == ed_flag
             )

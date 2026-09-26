@@ -2,18 +2,33 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.core.exceptions import ConfigurationError
+
+from ..config import (
+    VAULTSPEC_TARGET_DIR,
+    ConfigVariable,
+    forget_registry_for_tests,
+    register_registry,
+)
 from ..workspace import (
     LayoutMode,
+    ResolvedTarget,
+    TargetSource,
     discover_git,
+    resolve_target,
     resolve_workspace,
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from collections.abc import Iterator
 
 pytestmark = [pytest.mark.unit]
 
@@ -299,3 +314,242 @@ class TestResolveWorkspace:
         attr = "target_dir"
         with pytest.raises(AttributeError):
             setattr(layout, attr, tmp_path / "changed")
+
+
+#: A companion package's own root entry, chained to the framework name, so
+#: the chain a real importing package declares is what is exercised here.
+TARGET_COMPANION = "vaultspec-target-companion"
+
+COMPANION_ROOT = ConfigVariable(
+    env_name="VAULTSPEC_TARGET_COMPANION_ROOT",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="The companion's own root, chained to the framework name.",
+    fallback=VAULTSPEC_TARGET_DIR,
+)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _target_companion_registry() -> Iterator[None]:
+    """Declare the companion for this module only, and withdraw it after.
+
+    The registries are process-global, so a package invented by a test that
+    outlived the test would be state no code under test put there.
+    """
+    register_registry(TARGET_COMPANION, [COMPANION_ROOT])
+    yield
+    forget_registry_for_tests(TARGET_COMPANION)
+
+
+class TestResolvedTargetInvariant:
+    """A variable is carried if and only if the source is ENVIRONMENT."""
+
+    def test_environment_without_a_variable_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="ENVIRONMENT"):
+            ResolvedTarget(Path("/srv"), TargetSource.ENVIRONMENT, None)
+
+    def test_a_variable_outside_environment_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="ENVIRONMENT"):
+            ResolvedTarget(
+                Path("/srv"), TargetSource.INVOCATION, "VAULTSPEC_TARGET_DIR"
+            )
+
+    def test_invocation_and_discovery_carry_no_variable(self) -> None:
+        ResolvedTarget(Path("/srv"), TargetSource.INVOCATION, None)
+        ResolvedTarget(None, TargetSource.DISCOVERY, None)
+
+    def test_environment_with_a_variable_is_accepted(self) -> None:
+        ResolvedTarget(Path("/srv"), TargetSource.ENVIRONMENT, "VAULTSPEC_TARGET_DIR")
+
+
+class TestResolveTarget:
+    """Tests for the two rungs that name a workspace root."""
+
+    def test_invocation_outranks_the_environment(self, tmp_path: Path) -> None:
+        named = tmp_path / "named"
+        named.mkdir()
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+
+        resolved = resolve_target(
+            named,
+            environ={"VAULTSPEC_TARGET_DIR": str(elsewhere)},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == named
+        assert resolved.source == TargetSource.INVOCATION
+        assert resolved.variable is None
+
+    def test_framework_variable_supplies_the_root(self, tmp_path: Path) -> None:
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": str(tmp_path)},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == tmp_path
+        assert resolved.source == TargetSource.ENVIRONMENT
+        assert resolved.variable == "VAULTSPEC_TARGET_DIR"
+
+    def test_package_variable_outranks_the_framework_name(self, tmp_path: Path) -> None:
+        own = tmp_path / "own"
+        own.mkdir()
+        shared = tmp_path / "shared"
+        shared.mkdir()
+
+        resolved = resolve_target(
+            package_root=COMPANION_ROOT,
+            environ={
+                "VAULTSPEC_TARGET_COMPANION_ROOT": str(own),
+                "VAULTSPEC_TARGET_DIR": str(shared),
+            },
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == own
+        assert resolved.variable == "VAULTSPEC_TARGET_COMPANION_ROOT"
+
+    def test_package_variable_falls_back_to_the_framework_name(
+        self, tmp_path: Path
+    ) -> None:
+        resolved = resolve_target(
+            package_root=COMPANION_ROOT,
+            environ={"VAULTSPEC_TARGET_DIR": str(tmp_path)},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == tmp_path
+        assert resolved.variable == "VAULTSPEC_TARGET_DIR"
+
+    def test_nothing_named_means_discovery(self, tmp_path: Path) -> None:
+        resolved = resolve_target(environ={}, cwd=tmp_path)
+
+        assert resolved.path is None
+        assert resolved.source == TargetSource.DISCOVERY
+
+    def test_blank_variable_is_unset(self, tmp_path: Path) -> None:
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": "   "},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path is None
+        assert resolved.source == TargetSource.DISCOVERY
+
+    def test_relative_root_is_taken_against_the_working_directory(
+        self, tmp_path: Path
+    ) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": "nested"},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == nested
+
+    def test_missing_directory_is_refused_by_name(self, tmp_path: Path) -> None:
+        missing = tmp_path / "gone"
+
+        with pytest.raises(ConfigurationError) as excinfo:
+            resolve_target(
+                package_root=COMPANION_ROOT,
+                environ={"VAULTSPEC_TARGET_COMPANION_ROOT": str(missing)},
+                cwd=tmp_path,
+            )
+
+        assert "VAULTSPEC_TARGET_COMPANION_ROOT" in str(excinfo.value)
+
+    def test_a_file_is_not_a_workspace_root(self, tmp_path: Path) -> None:
+        not_a_dir = tmp_path / "root.txt"
+        not_a_dir.write_text("", encoding="utf-8")
+
+        with pytest.raises(ConfigurationError):
+            resolve_target(
+                environ={"VAULTSPEC_TARGET_DIR": str(not_a_dir)},
+                cwd=tmp_path,
+            )
+
+
+class TestHomeShorthand:
+    """A root the environment names may use the operator's home shorthand."""
+
+    def test_the_framework_variable_expands_it(self, tmp_path: Path) -> None:
+        # No shell stands between an exported variable and this process, so
+        # the tilde arrives verbatim and is this code's to expand.
+        resolved = resolve_target(
+            environ={"VAULTSPEC_TARGET_DIR": "~"},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == Path.home().resolve()
+        assert resolved.source == TargetSource.ENVIRONMENT
+
+    def test_a_package_variable_expands_it_too(self, tmp_path: Path) -> None:
+        resolved = resolve_target(
+            package_root=COMPANION_ROOT,
+            environ={"VAULTSPEC_TARGET_COMPANION_ROOT": "  ~  "},
+            cwd=tmp_path,
+        )
+
+        assert resolved.path == Path.home().resolve()
+        assert resolved.variable == "VAULTSPEC_TARGET_COMPANION_ROOT"
+
+    def test_an_invocation_root_is_taken_as_given(self, tmp_path: Path) -> None:
+        # The shell and the CLI framework have already expanded whatever they
+        # were going to; a tilde that survives that is a directory name.
+        resolved = resolve_target(Path("~"), cwd=tmp_path)
+
+        assert resolved.source == TargetSource.INVOCATION
+        assert resolved.path is not None
+        assert resolved.path.name == "~"
+
+    def test_an_undeterminable_home_is_refused_by_variable_name(
+        self, tmp_path: Path
+    ) -> None:
+        """Proven in a subprocess: home comes from the interpreter's own env.
+
+        ``Path.expanduser`` reads the platform's home variables from the
+        running process, not from the mapping handed to ``resolve_target``,
+        so the only honest way to run without one is to start an interpreter
+        that has none. The shorthand names a user no account database knows:
+        POSIX falls back to that database when ``HOME`` is unset, so a bare
+        ``~`` would still resolve there, while an unknown user resolves
+        nowhere once the Windows profile variables are gone as well.
+        """
+        probe = (
+            "from pathlib import Path\n"
+            "from vaultspec_core.config import resolve_target\n"
+            "from vaultspec_core.core.exceptions import ConfigurationError\n"
+            "try:\n"
+            "    resolve_target(\n"
+            "        environ={\n"
+            "            'VAULTSPEC_TARGET_DIR': '~vaultspec-no-such-user/workspace',\n"
+            "        },\n"
+            "        cwd=Path.cwd(),\n"
+            "    )\n"
+            "except ConfigurationError as refusal:\n"
+            "    print(refusal)\n"
+            "else:\n"
+            "    print('NO REFUSAL')\n"
+        )
+        homeless = {
+            name: value
+            for name, value in os.environ.items()
+            if name.upper() not in {"HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH"}
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", probe],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+            cwd=tmp_path,
+            env=homeless,
+        )
+
+        reported = result.stdout.strip()
+        assert "VAULTSPEC_TARGET_DIR" in reported
+        assert "home directory" in reported

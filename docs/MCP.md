@@ -171,14 +171,22 @@ each with a `blob_hash` ready for a later `edit` call.
 
 ## Environment
 
-| Variable                          | Default                   | Controls                                                                                                                                |
-| --------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`            | current working directory | The workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI.                                         |
-| `VAULTSPEC_STDIO_WATCHDOG`        | enabled                   | Set to `0`, `false`, `off`, or `no` to disable the stdio lifetime watchdog. See [Server lifetime](#server-lifetime).                    |
-| `VAULTSPEC_CORE_TYPESAFE_API_KEY` | unset                     | The key that enables hosted vault search for `search`. It is secret: no response, log, or error ever shows it. See [`search`](#search). |
+The MCP server resolves its settings through the same order every vaultspec-core surface
+shares - the invocation, then the session environment, then the workspace `.env` for a
+credential, then persisted configuration, then a shipped default. See
+[Settings resolution](./CLI.md#settings-resolution) for the full order and vocabulary.
 
-Those are the three `VAULTSPEC_` variables the MCP server reads directly. See
-[CLI reference](./CLI.md) for the full `VAULTSPEC_` variable family.
+| Variable                          | Default       | Controls                                                                                                                                |
+| --------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`            | discovered    | The workspace root containing `.vault/` and `.vaultspec/`. Equivalent to `--target` on the CLI.                                         |
+| `VAULTSPEC_LOG_LEVEL`             | `INFO`        | Root log level when nothing else names one; the server's output is a log, not a terminal a person is watching.                          |
+| `VAULTSPEC_STDIO_WATCHDOG`        | unset (armed) | A false word disables the stdio lifetime watchdog; an unrecognised word warns and stays armed. See [Server lifetime](#server-lifetime). |
+| `VAULTSPEC_CORE_TYPESAFE_API_KEY` | unset         | The key that enables hosted vault search for `search`. It is secret: no response, log, or error ever shows it. See [`search`](#search). |
+
+Those are the four `VAULTSPEC_` variables the MCP server reads directly. See the
+[CLI reference](./CLI.md#environment-variables) for the full `VAULTSPEC_` variable
+family, and for the workspace `.env` credential rule that also governs the key above
+when the server runs from the workspace's own environment.
 
 ## Verification
 
@@ -1235,8 +1243,9 @@ serve does it write a `"stdio_watchdog_disarmed"` event and then exit as an orph
 
 Two knobs control it:
 
-- `VAULTSPEC_STDIO_WATCHDOG` - set to `0`, `false`, `off`, or `no` to disable the
-  watchdog entirely; the server then exits only on stdin EOF.
+- `VAULTSPEC_STDIO_WATCHDOG` - a false word (`0`, `false`, `off`, `no`) disables the
+  watchdog entirely; the server then exits only on stdin EOF. Unset, blank, or an
+  unrecognised word leaves it armed.
 - `--parent-pid <PID>` - names an explicit client process to watch in addition to the
   detected one. Useful for hosts that spawn the server through wrappers the detection
   cannot see through.

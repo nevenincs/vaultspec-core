@@ -1,10 +1,13 @@
 """Canonical outcome vocabulary and the ``--json`` envelope shape.
 
 Split out of :mod:`.rendering`: the ``Outcome`` taxonomy, the per-item
-:class:`OutcomeItem` shape, aggregation/counting helpers, the
-``--json`` envelope builder (:func:`json_envelope`), and the shared
-sync-outcome adapter (:func:`sync_outcomes`). Re-exported from
-:mod:`.rendering` so no import site outside the package needs to change.
+:class:`OutcomeItem` shape, aggregation/counting helpers, and the shared
+sync-outcome adapter (:func:`sync_outcomes`). The envelope builder
+(:func:`json_envelope`) and its renderers (:func:`render_envelope`,
+:func:`render_install_envelope`, :func:`render_error_envelope`) now live in
+:mod:`vaultspec_core.envelope`, which an importing package can use without
+the CLI command tree; they are re-exported here so no import site outside
+the package needs to change. Re-exported in turn from :mod:`.rendering`.
 """
 
 from __future__ import annotations
@@ -13,8 +16,22 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from vaultspec_core.cli.json_output import json_format_kwargs
 from vaultspec_core.console import get_console
+from vaultspec_core.envelope import (
+    json_envelope as json_envelope,
+)
+from vaultspec_core.envelope import (
+    json_format_kwargs,
+)
+from vaultspec_core.envelope import (
+    render_envelope as render_envelope,
+)
+from vaultspec_core.envelope import (
+    render_error_envelope as render_error_envelope,
+)
+from vaultspec_core.envelope import (
+    render_install_envelope as render_install_envelope,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -29,9 +46,7 @@ class Outcome(StrEnum):
     shared across every sync-shaped surface (``install``, ``sync``, the
     ``spec * sync`` family, ``migrations run``, ``vault repair``,
     ``vault check ... --fix``) so operators and tooling read a single
-    taxonomy instead of the five divergent vocabularies the CLI UX
-    audit documented (findings S2, S8, S10). See the
-    ``cli-sync-vocabulary`` ADR.
+    taxonomy instead of a divergent vocabulary per command.
 
     Members:
         CREATED: A destination that did not exist now exists.
@@ -220,57 +235,6 @@ def render_outcomes(items: Sequence[OutcomeItem], *, title: str = "Result") -> N
             parts.append(f"[{colour}]{n} {outcome.value}[/{colour}]")
     if parts:
         console.print("  " + "  ".join(parts))
-
-
-def json_envelope(
-    command: str,
-    status: str,
-    data: Mapping[str, object],
-    *,
-    version: int = 1,
-    hints: Mapping[str, object] | None = None,
-) -> dict[str, object]:
-    """Wrap a command payload in the canonical ``--json`` envelope.
-
-    Per the ``cli-json-consistency`` ADR every ``--json`` output shares
-    one shape - ``{schema, status, data, hints}`` - so a CI consumer
-    matches a single pattern across every verb.
-
-    Args:
-        command: Dotted command identifier (e.g. ``"sync"``,
-            ``"spec.rules.sync"``); forms the ``schema`` string.
-        status: The invocation's aggregate canonical outcome word.
-        data: The command's own payload, nested unmodified.
-        version: Schema version suffix appended to the ``schema`` string
-            (e.g. ``1`` yields ``vaultspec.{command}.v1``). Defaults to
-            ``1``; all existing callers inherit ``v1`` unchanged. Pass
-            ``version=2`` when a command's payload shape has been bumped
-            and the consuming contract must be versioned (e.g.
-            :func:`cmd_graph` after the v2 envelope bump).
-        hints: Optional structured next-step hint; omitted when absent.
-
-    Returns:
-        The envelope mapping ``{schema, status, data}`` plus ``hints``
-        when supplied.
-
-    Example::
-
-        # Default v1 - all existing callers unchanged
-        json_envelope("vault.check", "unchanged", {...})
-        # => {"schema": "vaultspec.vault.check.v1", ...}
-
-        # Explicit v2 for the graph command after its schema bump
-        json_envelope("vault.graph", "unchanged", {...}, version=2)
-        # => {"schema": "vaultspec.vault.graph.v2", ...}
-    """
-    envelope: dict[str, object] = {
-        "schema": f"vaultspec.{command}.v{version}",
-        "status": str(status),
-        "data": dict(data),
-    }
-    if hints is not None:
-        envelope["hints"] = dict(hints)
-    return envelope
 
 
 def emit_outcomes(

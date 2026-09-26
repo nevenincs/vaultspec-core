@@ -98,9 +98,9 @@ def triggers_add(
             }
             body_content = yaml.safe_dump(scaffold_dict, sort_keys=False)
             atomic_write(file_path, body_content)
-            from ..config import get_config
+            from .local_config import resolve_editor
 
-            editor = get_config().editor
+            editor = resolve_editor()
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
                 launch_editor(editor, str(file_path))

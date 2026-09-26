@@ -13,30 +13,23 @@ question here means the enforcement path has no branch that could ever answer it
 automatically: when this module cannot reach a human it explains the refusal and
 returns, and the triggers simply do not run.
 
-Key exports: :func:`consent_gate`, :func:`describe_trigger`,
-:func:`operator_present`.
+Key exports: :func:`consent_gate`, :func:`describe_trigger`.
 """
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING
 
 import typer
 
-from vaultspec_core.config import CI, VAULTSPEC_NON_INTERACTIVE, env_value
+from vaultspec_core.config import is_unattended
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from vaultspec_core.triggers import Trigger
 
-__all__ = ["consent_gate", "describe_trigger", "operator_present"]
-
-#: Environment variables whose mere presence means no operator is watching.
-#: ``CI`` is the near-universal convention; the VaultSpec-specific name lets an
-#: operator assert the same thing for a wrapper script that CI does not set.
-_NON_INTERACTIVE_ENV = (CI, VAULTSPEC_NON_INTERACTIVE)
+__all__ = ["consent_gate", "describe_trigger"]
 
 #: Why a trigger needs approval, in the terms that make the decision answerable:
 #: what runs, as whom, and why the repository itself cannot vouch for it. A
@@ -127,7 +120,7 @@ def consent_gate(
     for trig in untrusted:
         detail.extend(describe_trigger(trig, ctx.target_dir))
 
-    if json_output or not operator_present():
+    if is_unattended(json_output=json_output):
         _explain_refusal(names, detail)
         return names
 
@@ -157,23 +150,6 @@ def consent_gate(
 
     grant([h.source_path for h in untrusted if h.source_path is not None], home)
     return []
-
-
-def operator_present() -> bool:
-    """Report whether there is a human at a terminal who could answer.
-
-    Three independent signals must all agree before this module will ask a
-    question: an interactive stdin to read the answer from, an interactive
-    stdout to show the trigger commands on, and no environment marker declaring an
-    unattended run. Any one of them dissenting means the answer is no, because
-    a prompt nobody sees is a prompt nobody consented to.
-    """
-    if any(env_value(var) is not None for var in _NON_INTERACTIVE_ENV):
-        return False
-    try:
-        return sys.stdin.isatty() and sys.stdout.isatty()
-    except (AttributeError, ValueError):
-        return False
 
 
 def _explain_refusal(names: list[str], detail: list[str]) -> None:

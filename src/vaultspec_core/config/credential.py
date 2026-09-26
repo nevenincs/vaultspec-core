@@ -8,18 +8,21 @@ sends vault content anywhere by accident.
 
 Precedence is the process environment first, then the workspace-root ``.env``
 for an entry marked ``workspace_dotenv``. The ``.env`` is repository content,
-so it is consulted only when core is running from the workspace's own
-environment: the running interpreter lives inside the workspace (its project
-virtual environment) and the workspace declares that it runs core as a
-project dependency (``dependency`` or ``dev`` install mode). The declaration
-alone is not enough, because the repository writes it: a globally installed
-core - a uv tool, a pipx install, a release binary - pointed at a freshly
-cloned repository has its interpreter outside that repository, so it never
-picks up a credential the repository supplies. Running a project's own
-environment is already a decision to trust that project's code. From the file
-only the one named variable is read, so repository content can at most supply
-a key, never a setting. A workspace declaration that cannot be read counts as
-no declaration: the ``.env`` stays closed rather than opening on a guess.
+so it is consulted only when the package that owns the credential is running
+from the workspace's own environment: the running interpreter lives inside
+the workspace (its project virtual environment) and the workspace runs that
+package as a project dependency (``dependency`` or ``dev`` install mode).
+Each package's mode is resolved separately, so a workspace that takes one
+vaultspec package as a dependency does not thereby open its ``.env`` to
+another. The mode alone is not enough, because the repository writes what it
+is resolved from: a globally installed package - a uv tool, a pipx install, a
+release binary - pointed at a freshly cloned repository has its interpreter
+outside that repository, so it never picks up a credential the repository
+supplies. Running a project's own environment is already a decision to trust
+that project's code. From the file only the one named variable is read, so
+repository content can at most supply a key, never a setting. A workspace
+mode that cannot be resolved counts as none: the ``.env`` stays closed rather
+than opening on a guess.
 
 The key is held in a :class:`Credential` whose ``repr`` omits it, and it is
 never logged. Status surfaces carry :class:`HostedSearchConfig`, the
@@ -55,8 +58,9 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-#: Install modes in which the workspace runs core from its own environment,
-#: and so owns the workspace ``.env`` that core may read a credential from.
+#: Install modes in which the workspace runs the owning package from its own
+#: environment, and so owns the workspace ``.env`` a credential may be read
+#: from.
 _DOTENV_MODES: Final = frozenset({InstallMode.DEPENDENCY, InstallMode.DEV})
 
 #: The workspace-root file consulted in those modes.
@@ -109,22 +113,24 @@ def _runs_inside(root: Path, interpreter_prefix: Path) -> bool:
         return False
 
 
-def _workspace_owns_dotenv(root: Path, interpreter_prefix: Path) -> bool:
-    """Return whether core runs from *root*'s own environment, opening its ``.env``.
+def _workspace_owns_dotenv(root: Path, interpreter_prefix: Path, package: str) -> bool:
+    """Return whether *package* runs from *root*'s own environment.
 
     Args:
         root: The workspace root.
         interpreter_prefix: The running interpreter's prefix.
+        package: The distribution whose install mode for *root* decides
+            whether the workspace runs it as a project dependency.
 
     Returns:
-        ``True`` when the interpreter lives inside the workspace and the
-        workspace declares dependency or dev install mode; ``False``
-        otherwise, including when the declaration cannot be read.
+        ``True`` when the interpreter lives inside the workspace and
+        *package*'s resolved install mode there is dependency or dev;
+        ``False`` otherwise, including when the mode cannot be resolved.
     """
     if not _runs_inside(root, interpreter_prefix):
         return False
     try:
-        mode = resolve_install_mode(root)
+        mode = resolve_install_mode(root, package=package)
     except VaultSpecError:
         logger.debug(
             "workspace install mode unreadable; the workspace .env is not consulted"
@@ -143,10 +149,10 @@ def resolve_credential(
     """Resolve the credential *var* declares for the workspace at *root*.
 
     Args:
-        var: A secret :data:`~vaultspec_core.config.CONFIG_REGISTRY` entry.
+        var: A secret registered entry, of any package's registry.
         root: The workspace root, whose ``.env`` may be read only when *var*
-            is marked ``workspace_dotenv`` and core runs from the workspace's
-            own environment.
+            is marked ``workspace_dotenv`` and the package that declared it
+            runs from the workspace's own environment.
         environ: The process environment to read; ``None`` reads the
             process's own.
         interpreter_prefix: The running interpreter's prefix; ``None`` reads
@@ -157,17 +163,24 @@ def resolve_credential(
         non-blank key.
 
     Raises:
-        ValueError: If *var* is not a secret registry entry.
+        ValueError: If *var* is not a secret registered entry.
     """
     if not var.secret:
         raise ValueError(f"{var.env_name} is not a credential")
-    key = (env_value(var, environ) or "").strip()
+    key = env_value(var, environ)
     if key:
         return Credential(key=key, source=CredentialSource.ENVIRONMENT)
     if not var.workspace_dotenv:
         return None
+    # env_value has already refused an entry no registry declares, so the
+    # declaring package is known by the time the gate needs it. The gate has
+    # no override: a caller that could name another package would open that
+    # package's mode on a credential that is not its own.
+    owner = var.package
+    if owner is None:
+        raise ValueError(f"{var.env_name} is not declared in a registry")
     prefix = Path(sys.prefix) if interpreter_prefix is None else interpreter_prefix
-    if not _workspace_owns_dotenv(root, prefix):
+    if not _workspace_owns_dotenv(root, prefix, owner):
         return None
     value = read_dotenv_value(root / _DOTENV_NAME, var.env_name)
     if value is None:
