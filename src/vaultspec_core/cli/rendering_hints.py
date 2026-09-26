@@ -82,21 +82,23 @@ def hints_suppressed(no_hints: bool = False) -> bool:
 
     Hints are advisory and must be silenceable for scripted contexts, per
     the cli-next-step-hints ADR. They are off when the caller passes
-    ``--no-hints`` or the ``VAULTSPEC_NO_HINTS=1`` environment variable is
-    set. They are also off inside a git commit hook, detected by the
-    ``GIT_INDEX_FILE`` git exports to every commit hook: hook output is often
-    acted on without review, so a hook that runs a command must not propose a
-    follow-up that rewrites documents the commit never touched. This is the
-    one predicate every hint surface consults so the suppression contract
-    cannot drift per command.
-    """
-    from ..config import GIT_INDEX_FILE, VAULTSPEC_NO_HINTS, env_value
+    ``--no-hints`` or ``VAULTSPEC_NO_HINTS`` carries a true word. They are
+    also off inside a git commit hook, detected by the ``GIT_INDEX_FILE`` git
+    exports to every commit hook: hook output is often acted on without
+    review, so a hook that runs a command must not propose a follow-up that
+    rewrites documents the commit never touched. Git owns that name and
+    defines it by presence, so it is read by presence; the product's own
+    switch is a boolean like every other. This is the one predicate every
+    hint surface consults so the suppression contract cannot drift per
+    command.
 
-    return (
-        no_hints
-        or env_value(VAULTSPEC_NO_HINTS) == "1"
-        or env_value(GIT_INDEX_FILE) is not None
-    )
+    Raises:
+        ConfigurationError: If the switch carries a word the boolean
+            vocabulary does not recognise.
+    """
+    from ..config import GIT_INDEX_FILE, VAULTSPEC_NO_HINTS, env_flag, env_present
+
+    return no_hints or bool(env_flag(VAULTSPEC_NO_HINTS)) or env_present(GIT_INDEX_FILE)
 
 
 def render_next_actions(pairs: Sequence[tuple[str, str]]) -> None:

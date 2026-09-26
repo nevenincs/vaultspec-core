@@ -586,8 +586,8 @@ VAULTSPEC_JSON_PRETTY: Final = ConfigVariable(
     var_type=str,
     default=None,
     description=(
-        "Indents --json output. Any value other than 0, false, no, off or "
-        "blank turns it on; unset, the envelope is one compact line."
+        "Indents --json output. A true word turns it on; unset, blank or a "
+        "false word leaves the envelope one compact line."
     ),
 )
 
@@ -597,8 +597,9 @@ VAULTSPEC_NO_HINTS: Final = ConfigVariable(
     var_type=str,
     default=None,
     description=(
-        "Set to 1 to drop the Next actions block commands print after their "
-        "report; equivalent to --no-hints. Only the exact value 1 counts."
+        "Set to a true word to drop the Next actions block commands print "
+        "after their report; equivalent to --no-hints. Unset, blank or a "
+        "false word leaves the hints in place."
     ),
 )
 
@@ -608,9 +609,10 @@ VAULTSPEC_NON_INTERACTIVE: Final = ConfigVariable(
     var_type=str,
     default=None,
     description=(
-        "Set to any value, even blank, to declare that no operator is "
-        "watching, as CI does: repository triggers awaiting approval are "
-        "skipped instead of prompted for."
+        "Set to a true word to declare that no operator is watching: "
+        "repository triggers awaiting approval are skipped instead of "
+        "prompted for. Unset, blank or a false word leaves the terminal and "
+        "CI to decide."
     ),
 )
 
@@ -620,8 +622,10 @@ VAULTSPEC_STDIO_WATCHDOG: Final = ConfigVariable(
     var_type=str,
     default=None,
     description=(
-        "Lifetime watchdog of the MCP server, on by default. 0, false, off or "
-        "no disables it, leaving stdin EOF as the only exit path."
+        "Lifetime watchdog of the MCP server, on by default. A false word "
+        "disables it, leaving stdin EOF as the only exit path. Unset, blank "
+        "or an unrecognised word leaves it armed: it is a protective switch, "
+        "so a typo warns rather than turning the guard off."
     ),
 )
 

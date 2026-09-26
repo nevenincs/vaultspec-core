@@ -24,7 +24,12 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from vaultspec_core.config import CI, VAULTSPEC_NON_INTERACTIVE, env_value
+from vaultspec_core.config import (
+    CI,
+    VAULTSPEC_NON_INTERACTIVE,
+    env_flag,
+    env_present,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,11 +37,6 @@ if TYPE_CHECKING:
     from vaultspec_core.triggers import Trigger
 
 __all__ = ["consent_gate", "describe_trigger", "operator_present"]
-
-#: Environment variables whose mere presence means no operator is watching.
-#: ``CI`` is the near-universal convention; the VaultSpec-specific name lets an
-#: operator assert the same thing for a wrapper script that CI does not set.
-_NON_INTERACTIVE_ENV = (CI, VAULTSPEC_NON_INTERACTIVE)
 
 #: Why a trigger needs approval, in the terms that make the decision answerable:
 #: what runs, as whom, and why the repository itself cannot vouch for it. A
@@ -167,8 +167,17 @@ def operator_present() -> bool:
     stdout to show the trigger commands on, and no environment marker declaring an
     unattended run. Any one of them dissenting means the answer is no, because
     a prompt nobody sees is a prompt nobody consented to.
+
+    ``CI`` is the near-universal convention, owned by the systems that set it
+    and defined by presence. The product's own marker is a boolean the
+    operator can also turn off, for a wrapper script that runs under CI but
+    does have someone watching.
+
+    Raises:
+        ConfigurationError: If the product marker carries a word the boolean
+            vocabulary does not recognise.
     """
-    if any(env_value(var) is not None for var in _NON_INTERACTIVE_ENV):
+    if env_present(CI) or env_flag(VAULTSPEC_NON_INTERACTIVE):
         return False
     try:
         return sys.stdin.isatty() and sys.stdout.isatty()

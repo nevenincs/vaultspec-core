@@ -78,13 +78,13 @@ def _console_kwargs(
     stdout: TextIO | None = None, environ: dict[str, str] | None = None
 ) -> dict[str, Any]:
     """Build Rich Console kwargs from real stream and environment inputs."""
-    from .config import COLUMNS, NO_COLOR, env_value
+    from .config import COLUMNS, NO_COLOR, env_present, env_value
 
     utf8 = _is_utf8_capable(stdout)
     kwargs: dict[str, Any] = {
         "highlight": False,
         "soft_wrap": True,
-        "no_color": env_value(NO_COLOR, environ) is not None,
+        "no_color": env_present(NO_COLOR, environ),
         "safe_box": not utf8,
     }
     if not utf8:

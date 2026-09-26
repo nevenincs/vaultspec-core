@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config import VAULTSPEC_JSON_PRETTY, env_value
+from ..config import VAULTSPEC_JSON_PRETTY, env_flag
 
 __all__ = ["json_format_kwargs", "pretty_enabled"]
 
@@ -49,8 +49,6 @@ _COMPACT: dict[str, Any] = {"separators": (",", ":"), "ensure_ascii": False}
 #: Indented form, for a human reading a payload directly.
 _PRETTY: dict[str, Any] = {"indent": 2, "ensure_ascii": False}
 
-_FALSEY = frozenset({"", "0", "false", "no", "off"})
-
 
 def pretty_enabled() -> bool:
     """Report whether indented JSON was explicitly requested.
@@ -60,9 +58,12 @@ def pretty_enabled() -> bool:
 
     Returns:
         ``True`` when the environment opts into indentation.
+
+    Raises:
+        ConfigurationError: If the switch carries a word the boolean
+            vocabulary does not recognise.
     """
-    raw = env_value(VAULTSPEC_JSON_PRETTY) or ""
-    return raw.strip().lower() not in _FALSEY
+    return bool(env_flag(VAULTSPEC_JSON_PRETTY))
 
 
 def json_format_kwargs() -> dict[str, Any]:

@@ -251,10 +251,12 @@ def _serve(
     # (pipe creator primary, ancestor chain fallback, POSIX reparent poll).
     # Fails open to EOF-only behavior when it cannot arm.
     from ..config import VAULTSPEC_STDIO_WATCHDOG, env_value
+    from .kill_switch import watchdog_disabled
     from .watchdog import arm_client_watchdog
 
     if arm_client_watchdog(
-        parent_pid=parent_pid, kill_switch=env_value(VAULTSPEC_STDIO_WATCHDOG)
+        parent_pid=parent_pid,
+        disabled=watchdog_disabled(env_value(VAULTSPEC_STDIO_WATCHDOG)),
     ):
         logger.debug("Client watchdog armed")
     else:

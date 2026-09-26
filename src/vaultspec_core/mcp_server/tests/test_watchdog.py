@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import gc
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -36,11 +37,11 @@ if TYPE_CHECKING:
     from typing import IO
 
 from vaultspec_core.config import VAULTSPEC_STDIO_WATCHDOG
+from vaultspec_core.mcp_server.kill_switch import watchdog_disabled
 from vaultspec_core.mcp_server.watchdog import (
     _POSIX_POLL_SECONDS,
     arm_client_watchdog,
     resolve_stdin_client_pid,
-    watchdog_disabled,
 )
 
 from .conftest import EXPECTED_TOOLS
@@ -233,12 +234,26 @@ def test_kill_switch_disables_arming_in_process(value: str) -> None:
     ever spawned inside the test runner.
     """
     assert watchdog_disabled(value) is True
-    assert arm_client_watchdog(kill_switch=value) is False
+    assert arm_client_watchdog(disabled=watchdog_disabled(value)) is False
 
 
-@pytest.mark.parametrize("value", [None, "", "1", "on"])
+@pytest.mark.parametrize("value", [None, "", "   ", "1", "on", " TRUE "])
 def test_kill_switch_is_off_unless_set_to_an_off_value(value: str | None) -> None:
     assert watchdog_disabled(value) is False
+
+
+def test_an_unrecognised_kill_switch_warns_and_leaves_the_guard_armed(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A typo must not be what turns a protective switch off."""
+    with caplog.at_level(
+        logging.WARNING, logger="vaultspec_core.mcp_server.kill_switch"
+    ):
+        disabled = watchdog_disabled("disabled")
+
+    assert disabled is False
+    assert "VAULTSPEC_STDIO_WATCHDOG" in caplog.text
+    assert "'disabled'" in caplog.text
 
 
 def test_kill_switch_disables_arming_in_worker() -> None:
@@ -251,8 +266,10 @@ def test_kill_switch_disables_arming_in_worker() -> None:
         """
         import time
         from vaultspec_core.config import VAULTSPEC_STDIO_WATCHDOG, env_value
+        from vaultspec_core.mcp_server.kill_switch import watchdog_disabled
         from vaultspec_core.mcp_server.watchdog import arm_client_watchdog
-        armed = arm_client_watchdog(kill_switch=env_value(VAULTSPEC_STDIO_WATCHDOG))
+        disabled = watchdog_disabled(env_value(VAULTSPEC_STDIO_WATCHDOG))
+        armed = arm_client_watchdog(disabled=disabled)
         print(f"armed={armed}", flush=True)
         time.sleep(2)
         print("still-alive", flush=True)
