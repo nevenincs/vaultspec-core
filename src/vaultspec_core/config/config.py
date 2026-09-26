@@ -150,7 +150,6 @@ class VaultSpecConfig:
         lock_timeout_seconds: Total budget, in seconds, that a single
             :func:`~vaultspec_core.core.helpers.advisory_lock` acquisition may
             spend waiting before it reports a timeout instead of blocking on.
-        editor: Default editor command for creating rules/skills.
         typesafe_api_key: The hosted vault search credential, or ``None``.
             A secret: it is excluded from ``repr`` and redacted from every
             configuration log line. Hosted search resolves it through
@@ -178,9 +177,6 @@ class VaultSpecConfig:
 
     # -- Concurrency -----------------------------------------------------------
     lock_timeout_seconds: float = 120.0
-
-    # -- Editor ----------------------------------------------------------------
-    editor: str = "zed -w"
 
     # -- Vault search ----------------------------------------------------------
     typesafe_api_key: str | None = field(default=None, repr=False)
@@ -478,14 +474,15 @@ VAULTSPEC_TARGET_DIR: Final = ConfigVariable(
 
 VAULTSPEC_EDITOR: Final = ConfigVariable(
     env_name="VAULTSPEC_EDITOR",
-    attr_name="editor",
+    attr_name=None,
     var_type=str,
-    default="zed -w",
+    default=None,
     description=(
-        "Editor command. Interactive creation of a rule, skill, agent or "
-        "trigger opens it, or zed -w when unset. The edit verbs consult it "
-        "after the --editor flag and the project config key, before VISUAL "
-        "and EDITOR."
+        "Editor command every surface that opens an editor consults - the "
+        "edit verbs and interactive creation of a rule, skill, agent or "
+        "trigger alike. Read after the --editor flag and before the project "
+        "config key, VISUAL and EDITOR; vi is the last rung when none of "
+        "them answers."
     ),
 )
 

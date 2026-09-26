@@ -84,11 +84,13 @@ class TestRegistryShape:
 
 
 class TestEditorDefault:
-    def test_editor_default_does_not_depend_on_visual_or_editor(self) -> None:
-        # VISUAL and EDITOR are rungs of the edit verbs' ladder, read at call
-        # time; they are not the default of VAULTSPEC_EDITOR.
-        assert VAULTSPEC_EDITOR.default == "zed -w"
-        assert VaultSpecConfig().editor == VAULTSPEC_EDITOR.default
+    def test_the_editor_has_no_shipped_default_and_no_loaded_field(self) -> None:
+        # Every rung of the editor ladder is read where the editor is opened,
+        # so there is nothing for the configuration to carry, and no product
+        # default above the last rung the ladder itself declares.
+        assert VAULTSPEC_EDITOR.default is None
+        assert VAULTSPEC_EDITOR.attr_name is None
+        assert not hasattr(VaultSpecConfig(), "editor")
 
 
 class TestEnvValue:

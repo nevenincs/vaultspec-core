@@ -785,9 +785,9 @@ def agents_add(
             fm = {"name": name, "description": description}
             content = build_file(fm, body_content)
             atomic_write(file_path, content)
-            from ..config import get_config
+            from .local_config import resolve_editor
 
-            editor = get_config().editor
+            editor = resolve_editor()
             logger.info("Opening editor (%s) for %s...", editor, file_path)
             try:
                 launch_editor(editor, str(file_path))
