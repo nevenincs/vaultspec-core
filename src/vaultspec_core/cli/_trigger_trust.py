@@ -13,8 +13,7 @@ question here means the enforcement path has no branch that could ever answer it
 automatically: when this module cannot reach a human it explains the refusal and
 returns, and the triggers simply do not run.
 
-Key exports: :func:`consent_gate`, :func:`describe_trigger`,
-:func:`operator_present`.
+Key exports: :func:`consent_gate`, :func:`describe_trigger`.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ if TYPE_CHECKING:
 
     from vaultspec_core.triggers import Trigger
 
-__all__ = ["consent_gate", "describe_trigger", "operator_present"]
+__all__ = ["consent_gate", "describe_trigger"]
 
 #: Why a trigger needs approval, in the terms that make the decision answerable:
 #: what runs, as whom, and why the repository itself cannot vouch for it. A
@@ -121,7 +120,7 @@ def consent_gate(
     for trig in untrusted:
         detail.extend(describe_trigger(trig, ctx.target_dir))
 
-    if json_output or not operator_present():
+    if is_unattended(json_output=json_output):
         _explain_refusal(names, detail)
         return names
 
@@ -151,26 +150,6 @@ def consent_gate(
 
     grant([h.source_path for h in untrusted if h.source_path is not None], home)
     return []
-
-
-def operator_present() -> bool:
-    """Report whether there is a human at a terminal who could answer.
-
-    Three independent signals must all agree before this module will ask a
-    question: an interactive stdin to read the answer from, an interactive
-    stdout to show the trigger commands on, and no environment marker declaring an
-    unattended run. Any one of them dissenting means the answer is no, because
-    a prompt nobody sees is a prompt nobody consented to.
-
-    The rule itself is
-    :func:`~vaultspec_core.config.session.is_unattended`, shared with every
-    other surface that decides whether it may ask a question.
-
-    Raises:
-        ConfigurationError: If the product marker carries a word the boolean
-            vocabulary does not recognise.
-    """
-    return not is_unattended()
 
 
 def _explain_refusal(names: list[str], detail: list[str]) -> None:
