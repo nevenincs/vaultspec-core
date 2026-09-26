@@ -273,6 +273,97 @@ def json_envelope(
     return envelope
 
 
+def render_envelope(
+    command: str,
+    status: str,
+    data: Mapping[str, object],
+    *,
+    version: int = 1,
+    hints: Mapping[str, object] | None = None,
+) -> str:
+    """Render the canonical envelope as the one JSON line a caller prints.
+
+    :func:`json_envelope` builds the shape; this renders it on the wire, in
+    the channel's own formatting. Every package that reports through the
+    envelope calls this rather than dumping its own, so a payload cannot
+    arrive compact from one command and indented from another.
+
+    Args:
+        command: Dotted command identifier; forms the ``schema`` string.
+        status: The invocation's aggregate canonical outcome word.
+        data: The command's own payload.
+        version: Schema version suffix.
+        hints: Optional structured next-step hint; omitted when absent.
+
+    Returns:
+        The serialised envelope, without a trailing newline.
+    """
+    import json
+
+    return json.dumps(
+        json_envelope(command, status, data, version=version, hints=hints),
+        **json_format_kwargs(),
+        default=str,
+    )
+
+
+def render_install_envelope(
+    schema: str,
+    status: str,
+    data: Mapping[str, object],
+    hints: Sequence[str] | None = None,
+) -> str:
+    """Render an install or uninstall report as the canonical JSON line.
+
+    The report shape every package's install surface shares: the verb's own
+    schema, one canonical status word, the package's payload, and whatever
+    advisory lines it would otherwise have printed, carried as
+    ``hints.next`` so a machine consumer reads them without parsing prose. A
+    caller that has nothing to advise passes nothing.
+
+    Args:
+        schema: The verb, ``install`` or ``uninstall``, forming the schema.
+        status: The canonical outcome word for the run.
+        data: The verb's own payload.
+        hints: Advisory next-step lines, in display order.
+
+    Returns:
+        The serialised envelope, without a trailing newline.
+    """
+    listed = list(hints or ())
+    return render_envelope(
+        schema, status, data, hints={"next": listed} if listed else None
+    )
+
+
+def render_error_envelope(message: str, *, hint: str | None = None) -> str:
+    """Render a failure as the canonical ``vaultspec.error.v1`` JSON line.
+
+    The counterpart of :func:`render_install_envelope` for the run that did
+    not get that far, so a ``--json`` consumer parses failures rather than
+    inferring them from an exit code. It formats through the error-safe
+    keywords: the indentation switch may itself be what failed, and a second
+    refusal raised while reporting the first would replace it.
+
+    Args:
+        message: What went wrong, as the operator needs to read it.
+        hint: Optional guidance; omitted when absent.
+
+    Returns:
+        The serialised envelope, without a trailing newline.
+    """
+    import json
+
+    from vaultspec_core.cli.json_output import error_format_kwargs
+
+    data: dict[str, object] = {"message": message}
+    if hint:
+        data["hint"] = hint
+    return json.dumps(
+        json_envelope("error", "failed", data), **error_format_kwargs(), default=str
+    )
+
+
 def emit_outcomes(
     items: Sequence[OutcomeItem],
     *,

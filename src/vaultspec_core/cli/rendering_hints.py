@@ -11,7 +11,14 @@ from typing import TYPE_CHECKING
 from vaultspec_core.console import get_console
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
+
+__all__ = [
+    "SafeDict",
+    "emit_next_step_hint",
+    "hints_suppressed",
+    "render_next_actions",
+]
 
 _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
     ("vault.add.research", "created"): (
@@ -77,7 +84,9 @@ class SafeDict(dict[str, str]):
         return f"{{{key}}}"
 
 
-def hints_suppressed(no_hints: bool = False) -> bool:
+def hints_suppressed(
+    no_hints: bool = False, *, environ: Mapping[str, str] | None = None
+) -> bool:
     """Report whether next-step hints are suppressed for this invocation.
 
     Hints are advisory and must be silenceable for scripted contexts, per
@@ -90,7 +99,14 @@ def hints_suppressed(no_hints: bool = False) -> bool:
     defines it by presence, so it is read by presence; the product's own
     switch is a boolean like every other. This is the one predicate every
     hint surface consults so the suppression contract cannot drift per
-    command.
+    command - in any package, not only this one.
+
+    Args:
+        no_hints: Whether the invocation passed ``--no-hints``.
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Returns:
+        ``True`` when no hint may be printed.
 
     Raises:
         ConfigurationError: If the switch carries a word the boolean
@@ -98,7 +114,11 @@ def hints_suppressed(no_hints: bool = False) -> bool:
     """
     from ..config import GIT_INDEX_FILE, VAULTSPEC_NO_HINTS, env_flag, env_present
 
-    return no_hints or bool(env_flag(VAULTSPEC_NO_HINTS)) or env_present(GIT_INDEX_FILE)
+    return (
+        no_hints
+        or bool(env_flag(VAULTSPEC_NO_HINTS, environ))
+        or env_present(GIT_INDEX_FILE, environ)
+    )
 
 
 def render_next_actions(pairs: Sequence[tuple[str, str]]) -> None:

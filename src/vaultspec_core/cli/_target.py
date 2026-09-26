@@ -26,8 +26,6 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from vaultspec_core.cli.json_output import error_format_kwargs
-
 if TYPE_CHECKING:
     from vaultspec_core.vaultcore.query import VaultDocument
 
@@ -175,14 +173,9 @@ def apply_target(
     except WorkspaceError as e:
         hint = _nearest_vaultspec_hint(effective or Path.cwd())
         if json_output:
-            import json
+            from vaultspec_core.cli.rendering import render_error_envelope
 
-            from vaultspec_core.cli.rendering import json_envelope
-
-            envelope = json_envelope(
-                "error", "failed", {"message": str(e), "hint": hint}
-            )
-            print(json.dumps(envelope, **error_format_kwargs()))
+            print(render_error_envelope(str(e), hint=hint))
         else:
             typer.echo(f"Error: {e}\n{hint}", err=True)
         raise typer.Exit(code=1) from e

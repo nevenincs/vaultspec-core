@@ -992,16 +992,17 @@ order and bumps the manifest version.
 
 ## Exit codes
 
-| Command                             | Codes                                                                                                                                          |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vaultspec-core vault check`        | `0` clean, `1` errors found.                                                                                                                   |
-| `vaultspec-core vault plan check`   | `0` clean, `1` at least one ERROR-severity finding.                                                                                            |
-| `vaultspec-core spec doctor`        | `0` all ok, `1` warnings, `2` errors (`--gate-errors` folds `1` to `0`).                                                                       |
-| `vaultspec-core spec mcps status`   | `0` config status ok, `1` otherwise.                                                                                                           |
-| `vaultspec-core migrations status`  | `0` up to date or no manifest, `1` migrations pending.                                                                                         |
-| `vaultspec-core migrations run`     | `0` success (including no-op), `1` a migration failed.                                                                                         |
-| `vaultspec-core vault search`       | `0` searched, or not configured (`skipped`); `1` configured but unavailable; `2` invalid input.                                                |
-| `vaultspec-core vault adr crossref` | `0` judged, or not configured (`skipped`); `1` configured but a source could not be judged, or a link could not be written; `2` invalid input. |
+| Command                                | Codes                                                                                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vaultspec-core install` / `uninstall` | `0` success, `1` failure, `2` completed with a required step skipped. Shared by every vaultspec package's install surface; core has no step that reports `2` today. |
+| `vaultspec-core vault check`           | `0` clean, `1` errors found.                                                                                                                                        |
+| `vaultspec-core vault plan check`      | `0` clean, `1` at least one ERROR-severity finding.                                                                                                                 |
+| `vaultspec-core spec doctor`           | `0` all ok, `1` warnings, `2` errors (`--gate-errors` folds `1` to `0`).                                                                                            |
+| `vaultspec-core spec mcps status`      | `0` config status ok, `1` otherwise.                                                                                                                                |
+| `vaultspec-core migrations status`     | `0` up to date or no manifest, `1` migrations pending.                                                                                                              |
+| `vaultspec-core migrations run`        | `0` success (including no-op), `1` a migration failed.                                                                                                              |
+| `vaultspec-core vault search`          | `0` searched, or not configured (`skipped`); `1` configured but unavailable; `2` invalid input.                                                                     |
+| `vaultspec-core vault adr crossref`    | `0` judged, or not configured (`skipped`); `1` configured but a source could not be judged, or a link could not be written; `2` invalid input.                      |
 
 ## Environment variables
 

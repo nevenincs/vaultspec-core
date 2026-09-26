@@ -6,8 +6,6 @@ CLI error exits with optional hint messages.
 
 import typer
 
-from vaultspec_core.cli.json_output import error_format_kwargs
-
 
 def handle_error(exc: Exception, *, json_output: bool = False) -> None:
     """Convert a domain or OS exception to a CLI error exit.
@@ -26,18 +24,9 @@ def handle_error(exc: Exception, *, json_output: bool = False) -> None:
     if isinstance(exc, (VaultSpecError, OSError)):
         hint = getattr(exc, "hint", None)
         if json_output:
-            import json
+            from vaultspec_core.cli.rendering import render_error_envelope
 
-            from vaultspec_core.cli.rendering import json_envelope
-
-            data: dict[str, str] = {"message": str(exc)}
-            if hint:
-                data["hint"] = hint
-            print(
-                json.dumps(
-                    json_envelope("error", "failed", data), **error_format_kwargs()
-                )
-            )
+            print(render_error_envelope(str(exc), hint=hint))
         else:
             typer.echo(f"Error: {exc}", err=True)
             if hint:
