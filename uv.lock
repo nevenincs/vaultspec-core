@@ -1805,6 +1805,7 @@ name = "vaultspec-core"
 version = "0.2.6"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "mcp" },
     { name = "networkx" },
     { name = "phart", version = "1.1.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
@@ -1837,7 +1838,6 @@ dev = [
     { name = "basedpyright" },
     { name = "complexipy" },
     { name = "deptry" },
-    { name = "httpx" },
     { name = "identify" },
     { name = "mdformat" },
     { name = "mdformat-frontmatter" },
@@ -1858,6 +1858,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.10" },
     { name = "identify", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "mcp", specifier = ">=2.0.0" },
     { name = "mdformat", marker = "extra == 'dev'", specifier = ">=1.0.0" },
@@ -1886,7 +1887,6 @@ dev = [
     { name = "basedpyright", specifier = ">=1.39" },
     { name = "complexipy", specifier = ">=6.2" },
     { name = "deptry", specifier = ">=0.25.1" },
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "identify", specifier = ">=2.0.0" },
     { name = "mdformat", specifier = ">=1.0.0" },
     { name = "mdformat-frontmatter", specifier = ">=2.0.10" },
