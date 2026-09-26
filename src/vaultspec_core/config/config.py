@@ -195,8 +195,7 @@ class VaultSpecConfig:
 
         1. *overrides* dict (keyed by ``attr_name``)
         2. ``VAULTSPEC_*`` env var, blank counting as unset
-        3. Explicitly provisioned project settings, for a persistable entry
-           and only when the process's own environment is read
+        3. The project store, for a persistable entry, when *environ* is None
         4. Dataclass default
 
         A value that cannot be used does not fall back to the default: a
@@ -222,11 +221,9 @@ class VaultSpecConfig:
         env = os.environ if environ is None else environ
         kwargs: dict[str, Any] = {}
         problems: list[str] = []
-        local: Mapping[str, str] = {}
-        if environ is None:
-            from .local_env import read_local_environment
+        from .local_env import read_local_environment, store_root
 
-            local = read_local_environment(_config_root(root))
+        stored = {} if environ is not None else read_local_environment(store_root(root))
 
         for var in CONFIG_REGISTRY:
             # Variables read at call time are not configuration fields.
@@ -239,7 +236,7 @@ class VaultSpecConfig:
 
             raw = env.get(var.env_name)
             if is_blank(raw) and var.persistable:
-                raw = local.get(var.env_name)
+                raw = stored.get(var.env_name)
             if is_blank(raw):
                 if var.required:
                     problems.append(
@@ -349,19 +346,7 @@ def _parse_field(var: ConfigVariable, raw: str) -> tuple[Any, str | None]:
 
 
 def value_accepted(var: ConfigVariable, raw: str) -> bool:
-    """Return whether *var* can take *raw*, as its own reader would decide.
-
-    For a caller that must judge a value without quoting it back, such as an
-    import into the project store: only the verdict of :func:`_parse_field`
-    is returned, never its message.
-
-    Args:
-        var: The entry describing the expected type and its constraints.
-        raw: The candidate value; surrounding whitespace is ignored.
-
-    Returns:
-        ``True`` when the value parses and meets the entry's constraints.
-    """
+    """Return whether *var* can take *raw* (stripped), never quoting it back."""
     return _parse_field(var, raw.strip())[1] is None
 
 
@@ -424,10 +409,8 @@ class ConfigVariable:
             environment (see :mod:`vaultspec_core.config.credential`). Only a
             secret may be so marked: the file is repository content, and it
             supplies credentials, never settings.
-        persistable: Whether installation may import this variable into the
-            protected project-local store (see
-            :mod:`vaultspec_core.config.local_env`), which then supplies it
-            after the session environment. Only a product setting may be.
+        persistable: Whether ``install --env`` may import it into the project
+            store (:mod:`.local_env`); only a product setting may be.
         fail_safe: If ``True``, the variable is a protective switch: an
             unusable value leaves the guard in its protective state and warns
             rather than refusing the process. The one exception to
@@ -441,10 +424,10 @@ class ConfigVariable:
             :func:`register_registry`, never by the caller that builds it.
 
     Raises:
-        ValueError: If the name's prefix does not match the scope, a
-            non-secret variable is marked ``workspace_dotenv``, a variable
-            that is not a product setting is marked ``persistable``, or a
-            credential or external convention declares a fallback.
+        ValueError: If the name's prefix does not match the scope, a non-secret
+            variable is marked ``workspace_dotenv``, a non-product one
+            ``persistable``, or a credential or external convention declares a
+            fallback.
     """
 
     env_name: str
@@ -529,13 +512,12 @@ VAULTSPEC_CORE_TYPESAFE_API_KEY: Final = ConfigVariable(
     var_type=str,
     default=None,
     description=(
-        "TypeSafe key for optional hosted search and context ranking. Read from the "
-        "process environment first, then explicitly provisioned local settings. "
-        "A workspace-root .env supplies it only "
-        "when vaultspec-core runs from the workspace's own environment (its "
-        "project virtual environment) in dependency or dev mode, never for "
-        "a globally installed tool. Blank counts as unset at every source; "
-        "with no key from any of them, hosted search is not configured."
+        "TypeSafe key for optional hosted search and context ranking. Read from "
+        "the process environment, then the project store. A workspace-root .env "
+        "supplies it only when vaultspec-core runs from the workspace's own "
+        "environment (its project virtual environment) in dependency or dev "
+        "mode, never for a globally installed tool. Blank counts as unset at "
+        "every source; with no key, hosted search is not configured."
     ),
     secret=True,
     workspace_dotenv=True,
@@ -970,13 +952,8 @@ def _supplied(
 ) -> tuple[ConfigVariable, str] | None:
     """Return the entry along *var*'s chain that supplies a value, and it.
 
-    The session environment is read along the whole chain first. Only when
-    no rung of it supplies a value, and the process's own environment is the
-    one being read, does the explicitly provisioned project store answer for
-    a persistable entry of the chain: it is persisted configuration, so it
-    ranks after every environment name. An explicit *environ* reads only
-    that mapping, so a caller that passes one sees exactly what it passed.
-    The store read is the current context's workspace.
+    Only when no rung supplies one and *environ* is the process's own does
+    the project store answer (:func:`.local_env.stored_setting`).
 
     Args:
         var: A registered entry, possibly chaining to a framework entry.
@@ -1000,49 +977,29 @@ def _supplied(
             return entry, str(raw).strip()
         chain.append(entry)
         entry = entry.fallback
-    persistable = [link for link in chain if link.persistable]
-    if environ is not None or not persistable:
+    if environ is not None:
         return None
-    from .local_env import read_local_environment
+    from .local_env import stored_setting
 
-    stored = read_local_environment(_config_root(None))
-    for link in persistable:
-        raw = stored.get(link.env_name)
-        if not is_blank(raw):
-            return link, str(raw).strip()
-    return None
-
-
-def _config_root(root: Path | None) -> Path:
-    """Return the workspace whose project store a read consults."""
-    if root is not None:
-        return root.resolve()
-    from ..core.types import get_context
-
-    try:
-        return get_context().target_dir.resolve()
-    except LookupError:
-        return Path.cwd().resolve()
+    return stored_setting(chain)
 
 
 def env_value(
-    var: ConfigVariable,
-    environ: Mapping[str, str] | None = None,
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
 ) -> str | None:
     """Return the value of registered variable *var*, read now.
 
     For variables whose meaning is decided where they are used, and which
     must track the environment at call time rather than when the
     configuration loaded. A blank value is unset: it falls through to the
-    entry's framework fallback, then to the project store for a persistable
-    entry, and then reads as nothing at all, so a variable cleared in a shell
-    profile means the same as one never set.
+    entry's framework fallback and the project store, then reads as nothing
+    at all, so a variable cleared in a shell profile means the same as one
+    never set.
 
     Args:
         var: A registered entry.
-        environ: The environment to read; ``None`` reads the process's own
-            and then the project store. An explicit mapping reads only that
-            mapping.
+        environ: The environment to read; ``None`` reads the process's own,
+            then the project store. An explicit mapping reads only itself.
 
     Returns:
         The value, stripped of surrounding whitespace, from the first rung of
@@ -1056,8 +1013,7 @@ def env_value(
 
 
 def env_source(
-    var: ConfigVariable,
-    environ: Mapping[str, str] | None = None,
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
 ) -> ConfigVariable | None:
     """Return which entry along *var*'s chain supplied its value.
 
@@ -1066,8 +1022,7 @@ def env_source(
 
     Args:
         var: A registered entry.
-        environ: The environment to read; ``None`` reads the process's own
-            and then the project store.
+        environ: The environment to read; ``None``: the process's own, then the store.
 
     Returns:
         The supplying entry, or ``None`` when the chain supplies nothing.
@@ -1103,15 +1058,13 @@ def env_present(var: ConfigVariable, environ: Mapping[str, str] | None = None) -
 
 
 def env_flag(
-    var: ConfigVariable,
-    environ: Mapping[str, str] | None = None,
+    var: ConfigVariable, environ: Mapping[str, str] | None = None
 ) -> bool | None:
     """Return the switch *var* carries, in the one boolean vocabulary.
 
     Args:
         var: A registered entry.
-        environ: The environment to read; ``None`` reads the process's own
-            and then the project store.
+        environ: The environment to read; ``None``: the process's own, then the store.
 
     Returns:
         ``True`` or ``False`` from the first rung of the chain that supplies a
@@ -1264,17 +1217,16 @@ def get_config(
         overrides: Optional attribute overrides passed directly to
             :meth:`VaultSpecConfig.from_environment`. When provided, the
             result is not cached.
-        root: Workspace whose project store may supply settings; defaults to
-            the current context.
+        root: Workspace whose project store is read; defaults to the context's.
 
     Returns:
         The current (or freshly created) ``VaultSpecConfig`` singleton.
     """
     global _cached_config, _cached_inputs
 
-    from .local_env import read_local_environment
+    from .local_env import read_local_environment, store_root
 
-    root = _config_root(root)
+    root = store_root(root)
 
     if overrides is not None:
         return VaultSpecConfig.from_environment(overrides, root=root)

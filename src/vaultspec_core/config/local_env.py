@@ -12,10 +12,15 @@ import stat
 import subprocess
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from ..core.exceptions import VaultSpecError
 from .dotenv import format_dotenv, parse_dotenv
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .config import ConfigVariable
 
 LOCAL_ENV: Final = ".vaultspec/.env"
 ENV_IGNORE_ENTRIES: Final = ("/.vaultspec/.env", "/.vaultspec/.env.*")
@@ -167,6 +172,47 @@ def read_local_environment(root: Path) -> dict[str, str]:
         _stamp(parent / ".gitignore") for parent in (path.parent, root, *root.parents)
     )
     return dict(_read_cached(root, _stamp(path), ignores, _stamp(index_path)))
+
+
+def store_root(root: Path | None = None) -> Path:
+    """Return the workspace whose store a read consults: *root*, else the context's."""
+    if root is not None:
+        return root.resolve()
+    from ..core.types import get_context
+
+    try:
+        return get_context().target_dir.resolve()
+    except LookupError:
+        return Path.cwd().resolve()
+
+
+def stored_setting(
+    chain: Sequence[ConfigVariable], root: Path | None = None
+) -> tuple[ConfigVariable, str] | None:
+    """Return the first persistable entry of *chain* the store sets, and its value.
+
+    The store is persisted configuration, so the settings resolver asks it only
+    after the session environment. Blank is unset here as there.
+
+    Args:
+        chain: Entries in resolution order; only persistable ones are looked up.
+        root: Workspace whose store is read; ``None`` is the current context's.
+
+    Returns:
+        The entry and its stripped value, or ``None`` when none is set.
+
+    Raises:
+        VaultSpecError: If the store exists but cannot be trusted.
+    """
+    persistable = [var for var in chain if var.persistable]
+    if not persistable:
+        return None
+    values = read_local_environment(store_root(root))
+    for var in persistable:
+        value = values.get(var.env_name, "").strip()
+        if value:
+            return var, value
+    return None
 
 
 @lru_cache(maxsize=16)
