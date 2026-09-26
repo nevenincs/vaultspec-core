@@ -26,7 +26,6 @@ does not.
 
 from __future__ import annotations
 
-import logging
 import os
 import threading
 from dataclasses import dataclass, field
@@ -41,7 +40,6 @@ from ..env_values import BOOL_SHAPE, is_blank, parse_bool, rejection
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "CI",
@@ -190,64 +188,65 @@ class VaultSpecConfig:
     def from_environment(
         cls,
         overrides: dict[str, Any] | None = None,
+        environ: Mapping[str, str] | None = None,
     ) -> VaultSpecConfig:
         """Create a config from environment variables and optional overrides.
 
         Resolution order per attribute:
 
         1. *overrides* dict (keyed by ``attr_name``)
-        2. ``VAULTSPEC_*`` env var
+        2. ``VAULTSPEC_*`` env var, blank counting as unset
         3. Dataclass default
+
+        A value that cannot be used does not fall back to the default: a
+        mistyped setting that silently does nothing is the failure this
+        refusal exists to end. Every problem is collected first, so one run
+        reports all of them rather than one per attempt.
 
         Args:
             overrides: Optional mapping of attribute name to value that takes
                 precedence over environment variables and defaults.
+            environ: The environment to read; ``None`` reads the process's
+                own.
 
         Returns:
             A fully-populated ``VaultSpecConfig`` instance.
 
         Raises:
-            ValueError: If a required variable has no value from any source.
+            ConfigurationError: If any variable carries a value the field
+                cannot take, or a required one supplies nothing.
         """
         overrides = overrides or {}
+        env = os.environ if environ is None else environ
         kwargs: dict[str, Any] = {}
+        problems: list[str] = []
 
         for var in CONFIG_REGISTRY:
             # Variables read at call time are not configuration fields.
             if var.attr_name is None:
                 continue
 
-            # 1. Explicit override
             if var.attr_name in overrides:
                 kwargs[var.attr_name] = overrides[var.attr_name]
                 continue
 
-            # 2. VAULTSPEC_* env var
-            raw: str | None = os.environ.get(var.env_name)
-            source: str | None = var.env_name if raw is not None else None
-
-            # 3. Default
-            if raw is None:
+            raw = env.get(var.env_name)
+            if is_blank(raw):
                 if var.required:
-                    raise ValueError(
-                        f"Required config variable {var.env_name} "
-                        f"(attr: {var.attr_name}) is not set and no "
-                        f"override was provided."
+                    problems.append(
+                        f"{var.env_name} is required and no value was supplied"
                     )
-                # Skip  - dataclass default will apply
                 continue
 
-            # Parse the raw string value into the target type
-            parsed = _parse_raw(var, raw, source)
-            if parsed is _SENTINEL:
-                continue  # parse failed, fall back to default
-            kwargs[var.attr_name] = parsed
+            value, problem = _parse_field(var, str(raw).strip())
+            if problem is not None:
+                problems.append(problem)
+                continue
+            kwargs[var.attr_name] = value
 
+        if problems:
+            raise ConfigurationError(_collected(problems))
         return cls(**kwargs)
-
-
-# Sentinel for parse failures
-_SENTINEL = object()
 
 
 # Type sentinels for Optional[int] / Optional[float]  - we cannot use
@@ -263,162 +262,89 @@ class _OptionalFloat:
     """Sentinel type for registry entries that parse to ``float | None``."""
 
 
-def _parse_bool(raw: str) -> bool:
-    """Parse a boolean environment variable value."""
-    return raw.lower() in ("1", "true", "yes")
+def _require_bool(raw: str) -> bool:
+    """Return the boolean *raw* denotes, refusing a word outside the table."""
+    parsed = parse_bool(raw)
+    if parsed is None:
+        raise ValueError(BOOL_SHAPE)
+    return parsed
 
 
-# Maps a registry ``var_type`` to its ``(converter, skip_validation)`` pair.
-# ``skip_validation`` is ``True`` for types (``bool``, ``Path``, ``list``)
-# whose values bypass the options/range validation applied to the rest.
-# Types absent from this table (``str`` / ``Optional[str]``) need no
-# conversion and are handled by the ``_convert_raw_value`` fallback.
-_TYPE_CONVERTERS: dict[type, tuple[Any, bool]] = {
-    bool: (_parse_bool, True),
-    int: (int, False),
-    float: (float, False),
-    Path: (Path, True),
-    list: (parse_csv_list, True),
-    _OptionalInt: (parse_int_or_none, False),
-    _OptionalFloat: (parse_float_or_none, False),
+# Maps a registry ``var_type`` to its ``(converter, shape)`` pair. The shape
+# is what a rejection message names as the accepted form, and it is also the
+# marker for the types (``bool``, ``Path``, ``list``) that carry no options
+# or range constraints. Types absent from this table (``str`` /
+# ``Optional[str]``) need no conversion at all.
+_TYPE_CONVERTERS: dict[type, tuple[Any, str]] = {
+    bool: (_require_bool, BOOL_SHAPE),
+    int: (int, "a whole number"),
+    float: (float, "a number"),
+    Path: (Path, "a path"),
+    list: (parse_csv_list, "a comma-separated list"),
+    _OptionalInt: (parse_int_or_none, "a whole number"),
+    _OptionalFloat: (parse_float_or_none, "a number"),
 }
 
 
-def _convert_raw_value(var: ConfigVariable, raw: str) -> tuple[Any, bool]:
-    """Convert *raw* into the type expected by *var*.
+def _refused(var: ConfigVariable, shape: str, value: object) -> str:
+    """Render one problem, withholding the value when *var* is a secret.
+
+    A rejected secret is still a secret: the line that says a credential is
+    malformed must not be the line that leaks it.
+    """
+    return str(rejection(var.env_name, shape, value, secret=var.secret))
+
+
+def _constraint_problem(var: ConfigVariable, value: Any) -> str | None:
+    """Return why *value* fails *var*'s options or range, or ``None``."""
+    if var.options is not None and value not in var.options:
+        return _refused(var, "one of " + ", ".join(var.options), value)
+    if not isinstance(value, (int, float)):
+        return None
+    if var.min_value is not None and value < var.min_value:
+        return _refused(var, f"at least {var.min_value}", value)
+    if var.max_value is not None and value > var.max_value:
+        return _refused(var, f"at most {var.max_value}", value)
+    return None
+
+
+def _parse_field(var: ConfigVariable, raw: str) -> tuple[Any, str | None]:
+    """Parse *raw* into the type *var* declares, or say why it cannot be.
 
     Args:
-        var: The ``ConfigVariable`` metadata that describes the expected type.
-        raw: The raw string value read from the environment variable.
+        var: The entry describing the expected type and its constraints.
+        raw: The value read from the environment, already stripped and known
+            to be non-blank.
 
     Returns:
-        A ``(value, skip_validation)`` tuple. ``skip_validation`` is ``True``
-        for types (``bool``, ``Path``, ``list``) whose values bypass the
-        options/range validation applied to the remaining types; ``value``
-        is ``None`` for ``_OptionalInt``/``_OptionalFloat`` when parsing
-        failed.
-
-    Raises:
-        ValueError: Propagated from ``int()``/``float()`` on malformed input.
-        TypeError: Propagated from the underlying conversion call.
+        The parsed value paired with ``None``, or ``None`` paired with the
+        one-line problem to report. Exactly one of the two is meaningful.
     """
     converter_entry = _TYPE_CONVERTERS.get(var.var_type)
     if converter_entry is None:
         # str or Optional[str]  - no conversion needed
-        return raw, False
-    converter, skip_validation = converter_entry
-    return converter(raw), skip_validation
+        return raw, _constraint_problem(var, raw)
 
-
-#: What a log line shows in place of a secret variable's value.
-_REDACTED = "<redacted>"
-
-
-def _shown(var: ConfigVariable, value: object) -> str:
-    """Render *value* for a log line, withholding it when *var* is secret.
-
-    A rejected secret is still a secret: the line that says a credential was
-    malformed must not be the line that leaks it.
-    """
-    return _REDACTED if var.secret else repr(value)
-
-
-def _validate_value(var: ConfigVariable, value: Any, source: str | None) -> bool:
-    """Validate an already-converted *value* against *var*'s constraints.
-
-    Args:
-        var: The ``ConfigVariable`` metadata describing the options/range
-            constraints.
-        value: The converted value to validate.
-        source: Human-readable source label for error messages.
-
-    Returns:
-        ``True`` if *value* satisfies every configured constraint, ``False``
-        otherwise (a matching error has already been logged).
-    """
-    if var.options is not None and value not in var.options:
-        logger.error(
-            "%s=%s is not one of %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, value),
-            var.options,
-            source,
-        )
-        return False
-
-    if (
-        var.min_value is not None
-        and isinstance(value, (int, float))
-        and value < var.min_value
-    ):
-        logger.error(
-            "%s=%s is below minimum %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, value),
-            var.min_value,
-            source,
-        )
-        return False
-
-    if (
-        var.max_value is not None
-        and isinstance(value, (int, float))
-        and value > var.max_value
-    ):
-        logger.error(
-            "%s=%s exceeds maximum %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, value),
-            var.max_value,
-            source,
-        )
-        return False
-
-    return True
-
-
-def _parse_raw(var: ConfigVariable, raw: str, source: str | None) -> Any:
-    """Parse a raw env-var string into the type expected by *var*.
-
-    Args:
-        var: The ``ConfigVariable`` metadata that describes the expected type
-            and validation constraints.
-        raw: The raw string value read from the environment variable.
-        source: Human-readable source label for error messages (typically the
-            env var name), or ``None``.
-
-    Returns:
-        The parsed and validated value, or ``_SENTINEL`` if parsing or
-        validation fails (caller should fall back to the dataclass default).
-    """
+    converter, shape = converter_entry
     try:
-        value, skip_validation = _convert_raw_value(var, raw)
-    except (ValueError, TypeError) as exc:
-        # A converter's own message and traceback quote the input verbatim,
-        # so a secret's failure is reported without either.
-        logger.error(
-            "Failed to parse %s=%s (source: %s): %s; using default",
-            var.attr_name,
-            _shown(var, raw),
-            source,
-            _REDACTED if var.secret else exc,
-            exc_info=not var.secret,
-        )
-        return _SENTINEL
+        value = converter(raw)
+    except (ValueError, TypeError):
+        # A converter's own message quotes the input verbatim, so it is the
+        # declared shape that is reported, never the exception's text.
+        return None, _refused(var, shape, raw)
 
-    if var.var_type in (_OptionalInt, _OptionalFloat) and value is None:
-        logger.error(
-            "Could not parse %s=%s as %s (source: %s); using default",
-            var.attr_name,
-            _shown(var, raw),
-            "int" if var.var_type is _OptionalInt else "float",
-            source,
-        )
-        return _SENTINEL
+    # The optional converters answer None rather than raising.
+    if value is None:
+        return None, _refused(var, shape, raw)
+    return value, _constraint_problem(var, value)
 
-    if skip_validation or _validate_value(var, value, source):
-        return value
-    return _SENTINEL
+
+def _collected(problems: list[str]) -> str:
+    """Render every problem as one message, so one run reports them all."""
+    if len(problems) == 1:
+        return problems[0]
+    listed = "\n".join(f"  - {problem}" for problem in problems)
+    return f"{len(problems)} unusable settings:\n{listed}"
 
 
 class VariableScope(StrEnum):

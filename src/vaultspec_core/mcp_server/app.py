@@ -302,8 +302,16 @@ def main(
 
 
 def run() -> None:
-    """Console-script entrypoint for the packaged MCP executable."""
-    app(prog_name=MCP_PROG_NAME)
+    """Console-script entrypoint for the packaged MCP executable.
+
+    A refusal raised beneath the command - an unusable setting, above all -
+    reaches the host as one stderr line and a non-zero exit, not as a source
+    traceback: the host renders whatever the server writes, and a traceback
+    tells the operator nothing the message does not.
+    """
+    from vaultspec_core.cli._errors import run_app
+
+    run_app(app, prog_name=MCP_PROG_NAME)
 
 
 if __name__ == "__main__":
