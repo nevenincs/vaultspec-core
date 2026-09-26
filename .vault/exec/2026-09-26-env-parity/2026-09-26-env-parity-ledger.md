@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:d4af47a7684f35b9f15c0ac07f2f9285d611a1d68e42d78c3655a3ad4efe6243'
+body_hash: 'sha256:09b67af9fd66c6208b9faf587b66b852879d42427f6bd6e03d0cb1a912834b5c'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -61,6 +61,15 @@ related:
 - `S01` `verify:` `just check-type` -> `pass`
 - `S01` `verify:` `pytest src/vaultspec_core/config/tests src/vaultspec_core/mcp_server/tests/test_tool_surface.py` -> `pass`
 - `S01` `by:` `vaultspec-high-executor`
+- `S02` `M` `src/vaultspec_core/config/config.py`
+- `S02` `M` `src/vaultspec_core/config/__init__.py`
+- `S02` `M` `src/vaultspec_core/core/exceptions.py`
+- `S02` `M` `src/vaultspec_core/config/tests/test_environment.py`
+- `S02` `M` `src/vaultspec_core/config/tests/test_credential.py`
+- `S02` `verify:` `just check-python` -> `pass`
+- `S02` `verify:` `just check-type` -> `pass`
+- `S02` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/mcp_server/tests src/vaultspec_core/triggers/tests` -> `pass`
+- `S02` `by:` `vaultspec-high-executor`
 
 ## Notes
 
