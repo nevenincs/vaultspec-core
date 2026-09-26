@@ -1,0 +1,532 @@
+"""One resolution order, one vocabulary, one refusal, for every package.
+
+The contract another package imports: the word tables, blank as unset, the
+chain from a package-scoped name to the framework name behind it, the
+refusal that names the variable an operator actually set, and the workspace
+``.env`` gate opening on the mode of the package that owns the credential.
+
+Every environment here is an explicit mapping and every workspace a real
+directory, because what is under test is precisely how the code reads the
+world it is given.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import pytest
+
+from vaultspec_core.config import (
+    CONFIG_REGISTRY,
+    PACKAGE,
+    VAULTSPEC_CORE_TYPESAFE_API_KEY,
+    ConfigVariable,
+    Credential,
+    CredentialSource,
+    VariableScope,
+    VaultSpecConfig,
+    env_flag,
+    env_source,
+    env_value,
+    register_registry,
+    resolve_credential,
+)
+from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.exceptions import ConfigurationError
+from vaultspec_core.core.workspace_mode import (
+    PackageDeclaration,
+    write_package_declaration,
+)
+from vaultspec_core.env_values import (
+    BOOL_SHAPE,
+    FALSE_TOKENS,
+    TRUE_TOKENS,
+    is_blank,
+    parse_bool,
+    rejection,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+pytestmark = [pytest.mark.unit]
+
+#: A companion package, declared here exactly as a real one would declare
+#: itself: its own entries, some of them chained to core's framework names.
+COMPANION = "vaultspec-resolution-companion"
+
+FRAMEWORK_ROOT = ConfigVariable(
+    env_name="VAULTSPEC_RESOLUTION_ROOT",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="The framework-scoped root every package falls back to.",
+)
+
+COMPANION_ROOT = ConfigVariable(
+    env_name="VAULTSPEC_RESOLUTION_COMPANION_ROOT",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="The companion's own root, chained to the framework name.",
+    fallback=FRAMEWORK_ROOT,
+)
+
+FRAMEWORK_SWITCH = ConfigVariable(
+    env_name="VAULTSPEC_RESOLUTION_SWITCH",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="The framework-scoped switch every package falls back to.",
+)
+
+COMPANION_SWITCH = ConfigVariable(
+    env_name="VAULTSPEC_RESOLUTION_COMPANION_SWITCH",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="The companion's own switch, chained to the framework name.",
+    fallback=FRAMEWORK_SWITCH,
+)
+
+COMPANION_KEY = ConfigVariable(
+    env_name="VAULTSPEC_RESOLUTION_COMPANION_API_KEY",
+    attr_name=None,
+    var_type=str,
+    default=None,
+    description="The companion's credential, eligible for a workspace .env.",
+    secret=True,
+    workspace_dotenv=True,
+)
+
+register_registry(
+    COMPANION,
+    [
+        FRAMEWORK_ROOT,
+        COMPANION_ROOT,
+        FRAMEWORK_SWITCH,
+        COMPANION_SWITCH,
+        COMPANION_KEY,
+    ],
+)
+
+COMPANION_DOTENV_KEY = "companion-dotenv-4f81a26c9b03"
+
+
+def _unregistered(
+    env_name: str = "VAULTSPEC_RESOLUTION_UNDECLARED",
+    *,
+    secret: bool = False,
+    scope: VariableScope = VariableScope.PRODUCT,
+    fallback: ConfigVariable | None = None,
+) -> ConfigVariable:
+    """An entry built outside any registry, for the refusal paths."""
+    return ConfigVariable(
+        env_name=env_name,
+        attr_name=None,
+        var_type=str,
+        default=None,
+        description="Declared outside any registry.",
+        secret=secret,
+        scope=scope,
+        fallback=fallback,
+    )
+
+
+class TestVocabulary:
+    def test_the_tables_are_the_agreed_words(self) -> None:
+        assert sorted(TRUE_TOKENS) == ["1", "on", "true", "yes"]
+        assert sorted(FALSE_TOKENS) == ["0", "false", "no", "off"]
+
+    def test_no_word_means_both(self) -> None:
+        assert sorted(TRUE_TOKENS & FALSE_TOKENS) == []
+
+    def test_the_shape_names_every_accepted_word(self) -> None:
+        assert BOOL_SHAPE == "one of 0, 1, false, no, off, on, true, yes"
+
+    @pytest.mark.parametrize("word", sorted(TRUE_TOKENS))
+    def test_every_true_word_parses_true(self, word: str) -> None:
+        assert parse_bool(word) is True
+        assert parse_bool(f"  {word.upper()}  ") is True
+
+    @pytest.mark.parametrize("word", sorted(FALSE_TOKENS))
+    def test_every_false_word_parses_false(self, word: str) -> None:
+        assert parse_bool(word) is False
+        assert parse_bool(f"  {word.upper()}  ") is False
+
+    @pytest.mark.parametrize("word", ["", "   ", "maybe", "2", "enabled", "y"])
+    def test_anything_else_parses_to_nothing(self, word: str) -> None:
+        assert parse_bool(word) is None
+
+    @pytest.mark.parametrize("raw", [None, "", " ", "\t\n"])
+    def test_unset_and_whitespace_are_blank(self, raw: str | None) -> None:
+        assert is_blank(raw) is True
+
+    @pytest.mark.parametrize("raw", ["0", "false", " x ", "-"])
+    def test_anything_with_a_character_is_not_blank(self, raw: str) -> None:
+        assert is_blank(raw) is False
+
+
+class TestRejectionMessage:
+    def test_it_names_the_variable_the_value_and_the_shape(self) -> None:
+        error = rejection("VAULTSPEC_EXAMPLE", BOOL_SHAPE, "maybe")
+
+        assert str(error) == (
+            "VAULTSPEC_EXAMPLE must be one of "
+            "0, 1, false, no, off, on, true, yes, got 'maybe'"
+        )
+
+    def test_a_secret_is_named_but_never_quoted(self) -> None:
+        secret = "sk-resolution-6d2f0a8e1c74"
+
+        error = rejection("VAULTSPEC_EXAMPLE_KEY", "a key", secret, secret=True)
+
+        assert "VAULTSPEC_EXAMPLE_KEY" in str(error)
+        assert "<redacted>" in str(error)
+        assert secret not in str(error)
+
+
+class TestBlankIsUnset:
+    @pytest.mark.parametrize("raw", ["", "   "])
+    def test_a_blank_value_supplies_nothing(self, raw: str) -> None:
+        environ = {FRAMEWORK_ROOT.env_name: raw}
+
+        assert env_value(FRAMEWORK_ROOT, environ) is None
+        assert env_source(FRAMEWORK_ROOT, environ) is None
+        assert env_flag(FRAMEWORK_SWITCH, {FRAMEWORK_SWITCH.env_name: raw}) is None
+
+    def test_surrounding_whitespace_is_not_part_of_the_value(self) -> None:
+        environ = {FRAMEWORK_ROOT.env_name: "  /srv/project  "}
+
+        assert env_value(FRAMEWORK_ROOT, environ) == "/srv/project"
+
+
+class TestChainFallback:
+    def test_the_framework_name_answers_when_the_package_name_is_unset(self) -> None:
+        environ = {FRAMEWORK_ROOT.env_name: "/srv/framework"}
+
+        assert env_value(COMPANION_ROOT, environ) == "/srv/framework"
+        assert env_source(COMPANION_ROOT, environ) is FRAMEWORK_ROOT
+
+    def test_the_package_name_wins_when_both_are_set(self) -> None:
+        environ = {
+            COMPANION_ROOT.env_name: "/srv/companion",
+            FRAMEWORK_ROOT.env_name: "/srv/framework",
+        }
+
+        assert env_value(COMPANION_ROOT, environ) == "/srv/companion"
+        assert env_source(COMPANION_ROOT, environ) is COMPANION_ROOT
+
+    def test_a_blank_package_name_falls_through_to_the_framework_name(self) -> None:
+        environ = {
+            COMPANION_ROOT.env_name: "   ",
+            FRAMEWORK_ROOT.env_name: "/srv/framework",
+        }
+
+        assert env_value(COMPANION_ROOT, environ) == "/srv/framework"
+        assert env_source(COMPANION_ROOT, environ) is FRAMEWORK_ROOT
+
+    def test_neither_set_supplies_nothing(self) -> None:
+        assert env_value(COMPANION_ROOT, {}) is None
+        assert env_source(COMPANION_ROOT, {}) is None
+
+    def test_a_flag_follows_the_same_chain(self) -> None:
+        assert env_flag(COMPANION_SWITCH, {FRAMEWORK_SWITCH.env_name: "on"}) is True
+        assert (
+            env_flag(
+                COMPANION_SWITCH,
+                {
+                    COMPANION_SWITCH.env_name: "off",
+                    FRAMEWORK_SWITCH.env_name: "on",
+                },
+            )
+            is False
+        )
+
+    def test_a_credential_never_chains(self) -> None:
+        with pytest.raises(ValueError, match="never chains"):
+            _unregistered(secret=True, fallback=FRAMEWORK_ROOT)
+
+    def test_nothing_chains_to_a_credential(self) -> None:
+        with pytest.raises(ValueError, match="never chains"):
+            _unregistered(fallback=COMPANION_KEY)
+
+    def test_an_external_convention_declares_no_fallback(self) -> None:
+        with pytest.raises(ValueError, match="external convention"):
+            _unregistered(
+                "RESOLUTION_BORROWED",
+                scope=VariableScope.EXTERNAL,
+                fallback=FRAMEWORK_ROOT,
+            )
+
+
+class TestFlagRejection:
+    def test_an_unrecognised_word_is_refused(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            env_flag(FRAMEWORK_SWITCH, {FRAMEWORK_SWITCH.env_name: "maybe"})
+
+        assert str(refusal.value) == (
+            f"{FRAMEWORK_SWITCH.env_name} must be {BOOL_SHAPE}, got 'maybe'"
+        )
+
+    def test_the_refusal_names_the_variable_the_operator_set(self) -> None:
+        # The chain's head is fine; the framework name behind it is not, and
+        # it is the one the operator has to go and fix.
+        with pytest.raises(ConfigurationError) as refusal:
+            env_flag(COMPANION_SWITCH, {FRAMEWORK_SWITCH.env_name: "sure"})
+
+        assert FRAMEWORK_SWITCH.env_name in str(refusal.value)
+        assert COMPANION_SWITCH.env_name not in str(refusal.value)
+
+    def test_the_refusal_names_the_package_variable_when_that_is_the_one_set(
+        self,
+    ) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            env_flag(
+                COMPANION_SWITCH,
+                {
+                    COMPANION_SWITCH.env_name: "sure",
+                    FRAMEWORK_SWITCH.env_name: "on",
+                },
+            )
+
+        assert COMPANION_SWITCH.env_name in str(refusal.value)
+
+    def test_a_refusal_is_a_domain_error_the_surfaces_already_render(self) -> None:
+        from vaultspec_core.core.exceptions import VaultSpecError
+
+        assert issubclass(ConfigurationError, VaultSpecError)
+
+
+class TestRegistration:
+    def test_core_declares_its_own_entries(self) -> None:
+        assert PACKAGE == "vaultspec-core"
+        assert {var.package for var in CONFIG_REGISTRY} == {PACKAGE}
+
+    def test_a_companion_entry_carries_its_own_package(self) -> None:
+        assert COMPANION_ROOT.package == COMPANION
+        assert COMPANION_KEY.package == COMPANION
+
+    def test_registering_the_same_entries_again_is_a_no_op(self) -> None:
+        register_registry(COMPANION, [COMPANION_ROOT])
+
+        assert COMPANION_ROOT.package == COMPANION
+        assert env_value(COMPANION_ROOT, {COMPANION_ROOT.env_name: "x"}) == "x"
+
+    def test_an_entry_cannot_be_declared_by_two_packages(self) -> None:
+        with pytest.raises(ValueError, match="already declared by"):
+            register_registry("vaultspec-resolution-interloper", [COMPANION_ROOT])
+
+    def test_core_cannot_adopt_a_companion_entry(self) -> None:
+        with pytest.raises(ValueError, match="already declared by"):
+            register_registry(PACKAGE, [COMPANION_KEY])
+
+    def test_a_fallback_outside_every_registry_is_refused(self) -> None:
+        stray = _unregistered()
+        chained = _unregistered("VAULTSPEC_RESOLUTION_CHAINED", fallback=stray)
+
+        with pytest.raises(ValueError, match="which no registry declares"):
+            register_registry("vaultspec-resolution-chainer", [chained])
+
+    def test_an_entry_outside_every_registry_is_refused_by_the_accessors(self) -> None:
+        stray = _unregistered()
+
+        with pytest.raises(ValueError, match="not declared in a registry"):
+            env_value(stray, {stray.env_name: "x"})
+
+
+class TestCollectiveRejection:
+    def test_one_problem_reports_itself(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            VaultSpecConfig.from_environment(
+                environ={"VAULTSPEC_IO_BUFFER_SIZE": "plenty"}
+            )
+
+        assert str(refusal.value) == (
+            "VAULTSPEC_IO_BUFFER_SIZE must be a whole number, got 'plenty'"
+        )
+
+    def test_every_problem_is_reported_together(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            VaultSpecConfig.from_environment(
+                environ={
+                    "VAULTSPEC_IO_BUFFER_SIZE": "0",
+                    "VAULTSPEC_TERMINAL_OUTPUT_LIMIT": "lots",
+                    "VAULTSPEC_LOCK_TIMEOUT_SECONDS": "-1",
+                }
+            )
+
+        assert str(refusal.value) == (
+            "3 unusable settings:\n"
+            "  - VAULTSPEC_IO_BUFFER_SIZE must be at least 1, got 0\n"
+            "  - VAULTSPEC_TERMINAL_OUTPUT_LIMIT must be a whole number, got 'lots'\n"
+            "  - VAULTSPEC_LOCK_TIMEOUT_SECONDS must be at least 0.0, got -1.0"
+        )
+
+    def test_a_blank_value_leaves_the_default_standing(self) -> None:
+        config = VaultSpecConfig.from_environment(
+            environ={"VAULTSPEC_IO_BUFFER_SIZE": "   ", "VAULTSPEC_DOCS_DIR": ""}
+        )
+
+        assert config.io_buffer_size == 8192
+        assert config.docs_dir == VaultSpecConfig().docs_dir
+
+    def test_a_usable_value_is_taken(self) -> None:
+        config = VaultSpecConfig.from_environment(
+            environ={"VAULTSPEC_IO_BUFFER_SIZE": " 4096 "}
+        )
+
+        assert config.io_buffer_size == 4096
+
+    def test_an_override_outranks_the_environment(self) -> None:
+        config = VaultSpecConfig.from_environment(
+            overrides={"io_buffer_size": 512},
+            environ={"VAULTSPEC_IO_BUFFER_SIZE": "4096"},
+        )
+
+        assert config.io_buffer_size == 512
+
+    def test_an_override_is_taken_even_where_the_environment_is_unusable(self) -> None:
+        # The override is the higher rung, so the variable it displaces is not
+        # a problem anybody has to fix first.
+        config = VaultSpecConfig.from_environment(
+            overrides={"io_buffer_size": 512},
+            environ={"VAULTSPEC_IO_BUFFER_SIZE": "0"},
+        )
+
+        assert config.io_buffer_size == 512
+
+    def test_a_rejected_secret_is_named_but_never_quoted(self) -> None:
+        secret = "sk-resolution-b3917e5d0a26"
+        numeric_secret = ConfigVariable(
+            env_name="VAULTSPEC_RESOLUTION_NUMERIC_SECRET",
+            attr_name="numeric_secret",
+            var_type=int,
+            default=None,
+            description="A numeric credential, so a bad value is a parse failure.",
+            secret=True,
+        )
+
+        from vaultspec_core.config.config import _parse_field
+
+        _, problem = _parse_field(numeric_secret, secret)
+
+        assert problem is not None
+        assert numeric_secret.env_name in problem
+        assert "<redacted>" in problem
+        assert secret not in problem
+
+
+def _workspace(root: Path, *, package: str | None, mode: InstallMode) -> Path:
+    """A real workspace declaring *mode* for *package*, and nothing for others."""
+    root.mkdir(parents=True, exist_ok=True)
+    if package is not None:
+        write_package_declaration(root, package, PackageDeclaration(install_mode=mode))
+    return root
+
+
+def _dotenv(root: Path, value: str = COMPANION_DOTENV_KEY) -> Path:
+    (root / ".env").write_text(
+        f"# companion credentials\n{COMPANION_KEY.env_name}={value}\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+class TestPerPackageCredentialGate:
+    def test_the_owning_packages_mode_opens_the_file(self, tmp_path: Path) -> None:
+        root = _dotenv(
+            _workspace(tmp_path, package=COMPANION, mode=InstallMode.DEPENDENCY)
+        )
+
+        credential = resolve_credential(
+            COMPANION_KEY, root, {}, interpreter_prefix=root / ".venv"
+        )
+
+        assert credential == Credential(COMPANION_DOTENV_KEY, CredentialSource.DOTENV)
+
+    def test_another_packages_mode_does_not_open_the_file(self, tmp_path: Path) -> None:
+        # The workspace runs core as a dependency and has said nothing about
+        # the companion, so the companion's key stays unread.
+        root = _dotenv(_workspace(tmp_path, package=PACKAGE, mode=InstallMode.DEV))
+
+        assert (
+            resolve_credential(
+                COMPANION_KEY, root, {}, interpreter_prefix=root / ".venv"
+            )
+            is None
+        )
+
+    def test_core_is_unaffected_by_a_companions_declaration(
+        self, tmp_path: Path
+    ) -> None:
+        root = _workspace(tmp_path, package=COMPANION, mode=InstallMode.DEV)
+        (root / ".env").write_text(
+            f"{VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name}=ts-resolution-8c12\n",
+            encoding="utf-8",
+        )
+
+        assert (
+            resolve_credential(
+                VAULTSPEC_CORE_TYPESAFE_API_KEY,
+                root,
+                {},
+                interpreter_prefix=root / ".venv",
+            )
+            is None
+        )
+
+    def test_tool_mode_keeps_the_file_closed(self, tmp_path: Path) -> None:
+        root = _dotenv(_workspace(tmp_path, package=COMPANION, mode=InstallMode.TOOL))
+
+        assert (
+            resolve_credential(
+                COMPANION_KEY, root, {}, interpreter_prefix=root / ".venv"
+            )
+            is None
+        )
+
+    def test_an_interpreter_outside_the_workspace_keeps_the_file_closed(
+        self, tmp_path: Path
+    ) -> None:
+        root = _dotenv(
+            _workspace(tmp_path / "clone", package=COMPANION, mode=InstallMode.DEV)
+        )
+        global_tool = tmp_path / "tools" / "companion"
+
+        assert (
+            resolve_credential(COMPANION_KEY, root, {}, interpreter_prefix=global_tool)
+            is None
+        )
+
+    def test_the_environment_is_read_whatever_the_workspace_says(
+        self, tmp_path: Path
+    ) -> None:
+        root = _dotenv(_workspace(tmp_path, package=PACKAGE, mode=InstallMode.TOOL))
+        supplied = "companion-env-7e01d3a95b62"
+
+        credential = resolve_credential(
+            COMPANION_KEY,
+            root,
+            {COMPANION_KEY.env_name: f"  {supplied}  "},
+            interpreter_prefix=tmp_path.parent,
+        )
+
+        assert credential == Credential(supplied, CredentialSource.ENVIRONMENT)
+
+    def test_an_explicit_package_overrides_the_declaring_one(
+        self, tmp_path: Path
+    ) -> None:
+        # The override exists so a caller resolving on another package's behalf
+        # can say so; it must gate on the package it names, not the entry's.
+        root = _dotenv(_workspace(tmp_path, package=PACKAGE, mode=InstallMode.DEV))
+
+        credential = resolve_credential(
+            COMPANION_KEY,
+            root,
+            {},
+            interpreter_prefix=root / ".venv",
+            package=PACKAGE,
+        )
+
+        assert credential == Credential(COMPANION_DOTENV_KEY, CredentialSource.DOTENV)
