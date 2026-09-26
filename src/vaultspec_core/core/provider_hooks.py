@@ -287,16 +287,40 @@ def _command_from(data: dict[str, Any]) -> str:
     return ""
 
 
+def _foreign_event_message(filename: str, event: object) -> str:
+    """Explain why a file in the provider-hook directory will never render.
+
+    Until 0.2.4 this directory also held lifecycle triggers, so the likeliest
+    foreign event is one that belongs in ``.vaultspec/triggers/``.
+    """
+    from ..triggers import SUPPORTED_EVENTS
+    from .enums import Resource
+
+    if not isinstance(event, str) or not event:
+        return f"Provider hook {filename!r} has no event; skipping."
+    if event in SUPPORTED_EVENTS:
+        return (
+            f"Provider hook {filename!r} has lifecycle event {event!r}; it never "
+            f"runs from .vaultspec/{Resource.HOOKS.value}/. Move it to "
+            f".vaultspec/{Resource.TRIGGERS.value}/."
+        )
+    return (
+        f"Provider hook {filename!r} has event {event!r}, which is not a provider "
+        "hook event; skipping."
+    )
+
+
 def load_provider_hook_specs(
     hooks_dir: Path | None = None, warnings: list[str] | None = None
 ) -> list[HookSpec]:
     """Load provider-hook specs from the hooks source directory.
 
     Reads ``*.yaml``/``*.yml`` files whose ``event`` is a canonical
-    :class:`HookEvent`. Files whose event is not canonical are ignored here -
-    they belong to the CLI-lifecycle hook system in
-    :mod:`vaultspec_core.triggers`. Returns specs sorted by source filename stem
-    for deterministic output.
+    :class:`HookEvent`. A file whose event is not canonical is skipped with a
+    warning: this directory is provider hooks alone, so a foreign event is
+    either a typo or a lifecycle trigger stranded here from before the
+    directories split. Returns specs sorted by source filename stem for
+    deterministic output.
 
     Args:
         hooks_dir: Directory to scan. Defaults to the active context's
@@ -329,6 +353,10 @@ def load_provider_hook_specs(
         data = cast("dict[str, Any]", loaded)
         event = data.get("event", "")
         if not isinstance(event, str) or event not in _CANONICAL_EVENTS:
+            msg = _foreign_event_message(path.name, event)
+            logger.warning(msg)
+            if warnings is not None:
+                warnings.append(msg)
             continue
         command = _command_from(data)
         if not command:
