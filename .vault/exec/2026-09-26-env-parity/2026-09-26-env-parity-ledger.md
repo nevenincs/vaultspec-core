@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:ce8bc58352e503384b613cd6eb75519bc345bc00ba6da74cc5fda6e76f790e16'
+body_hash: 'sha256:e364dc611407a84b31bed322a5382096c459f4fddae99446bde70c6b8b623f5f'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -122,6 +122,14 @@ related:
 - `S09` `verify:` `just check-type` -> `pass`
 - `S09` `verify:` `pytest src/vaultspec_core/tests src/vaultspec_core/core/tests src/vaultspec_core/config` -> `pass`
 - `S09` `by:` `vaultspec-high-executor`
+- `S10` `A` `src/vaultspec_core/config/session.py`
+- `S10` `M` `src/vaultspec_core/config/__init__.py`
+- `S10` `M` `src/vaultspec_core/cli/_trigger_trust.py`
+- `S10` `M` `src/vaultspec_core/config/tests/test_resolution.py`
+- `S10` `verify:` `just check-python` -> `pass`
+- `S10` `verify:` `just check-type` -> `pass`
+- `S10` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/triggers src/vaultspec_core/tests/cli/test_hook_consent.py` -> `pass`
+- `S10` `by:` `vaultspec-high-executor`
 
 ## Notes
 

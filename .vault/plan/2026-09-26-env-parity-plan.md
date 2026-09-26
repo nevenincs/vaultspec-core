@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:2f35e894bca602f3b53c971699d1c985a2e90ccc0493f7eda6c62dd18dde355e'
+body_hash: 'sha256:7bcc67c6bd2a3618896a45a7c82a15df000065744c42073a87d2e55591e501c2'
 ---
 
 # `env-parity` plan
@@ -64,7 +64,7 @@ Route core's own entry points through the public resolution functions: workspace
 - [x] `W01.P02.S07` - Add a public workspace-root resolver ranking the invocation, then VAULTSPEC_TARGET_DIR, then discovery, and use it from the CLI and the MCP server; `src/vaultspec_core/cli/_target.py`.
 - [x] `W01.P02.S08` - Add -v/--verbose to the root callback and honour VAULTSPEC_LOG_LEVEL when neither --debug nor --verbose is given, rejecting an unknown level name; `src/vaultspec_core/cli/root_app.py`.
 - [x] `W01.P02.S09` - Resolve every editor use through one ladder, flag then VAULTSPEC_EDITOR then the committed config key then VISUAL then EDITOR then vi, and declare vi as the registry default; `src/vaultspec_core/core/local_config.py`.
-- [ ] `W01.P02.S10` - Expose unattended detection publicly outside the CLI package: CI or VAULTSPEC_NON_INTERACTIVE, a non-TTY standard input or output, or --json; `src/vaultspec_core/config/session.py`.
+- [x] `W01.P02.S10` - Expose unattended detection publicly outside the CLI package: CI or VAULTSPEC_NON_INTERACTIVE, a non-TTY standard input or output, or --json; `src/vaultspec_core/config/session.py`.
 - [ ] `W01.P02.S11` - Expose legacy upgrade-time mode inference as one public function taking a package name, so rag stops keeping its own variant; `src/vaultspec_core/core/install_mode.py`.
 - [ ] `W01.P02.S12` - Expose the install and uninstall envelope and hint rendering for reuse by other packages, and document the shared exit codes 0, 1 and 2; `src/vaultspec_core/cli/rendering_outcomes.py`.
 
