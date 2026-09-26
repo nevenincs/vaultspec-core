@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:b4513e0c5f8795d1aa3fe4518f7dfffc693df5ab3a747ee60dc823c25f105e87'
+body_hash: 'sha256:faec05d64380c02f1c8c3505702b746f32daf3beaa2ce8857322e1407c4dd464'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -75,6 +75,20 @@ related:
 - `S03` `verify:` `just check-type` -> `pass`
 - `S03` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/search` -> `pass`
 - `S03` `by:` `vaultspec-high-executor`
+- `S04` `M` `src/vaultspec_core/cli/json_output.py`
+- `S04` `M` `src/vaultspec_core/cli/rendering_hints.py`
+- `S04` `M` `src/vaultspec_core/cli/_trigger_trust.py`
+- `S04` `M` `src/vaultspec_core/mcp_server/watchdog.py`
+- `S04` `A` `src/vaultspec_core/mcp_server/kill_switch.py`
+- `S04` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S04` `M` `src/vaultspec_core/config/config.py`
+- `S04` `M` `src/vaultspec_core/console.py`
+- `S04` `M` `src/vaultspec_core/vaultcore/checks/_base.py`
+- `S04` `M` `src/vaultspec_core/mcp_server/tests/test_watchdog.py`
+- `S04` `verify:` `just check-python` -> `pass`
+- `S04` `verify:` `just check-type` -> `pass`
+- `S04` `verify:` `pytest src/vaultspec_core/crossref src/vaultspec_core/config src/vaultspec_core/mcp_server/tests src/vaultspec_core/tests/cli src/vaultspec_core/vaultcore/tests` -> `pass`
+- `S04` `by:` `vaultspec-high-executor`
 
 ## Notes
 

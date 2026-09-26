@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:3bb3ff10d2d9d006ab0c60381cc1f89a2ff2f310f98b3e8725a3c1ce2df23b27'
+body_hash: 'sha256:5e577e849d2d7c1409cd7053ad759a58e6cb7a43253372e074411f2212217401'
 ---
 
 # `env-parity` plan
@@ -53,7 +53,7 @@ Add the public, standard-library-only value vocabulary, open core's registry acc
 - [x] `W01.P01.S01` - Add a standard-library-only public vocabulary module: the true and false word tables, a parser that treats blank as unset, and the one rejection message naming variable, value and expected shape; `src/vaultspec_core/env_values.py`.
 - [x] `W01.P01.S02` - Let a package declare its own registry of ConfigVariable entries, add a framework_fallback field that chains a package-scoped entry to a shared VAULTSPEC_ entry, and make env_value and child_environment accept any registered package entry; `src/vaultspec_core/config/config.py`.
 - [x] `W01.P01.S03` - Add a package parameter to resolve_credential so the workspace .env opens on that package's resolved install mode, keeping the interpreter-inside-workspace test and the one-variable read; `src/vaultspec_core/config/credential.py`.
-- [ ] `W01.P01.S04` - Move the per-site switch readings onto the shared vocabulary, turning VAULTSPEC_NON_INTERACTIVE and VAULTSPEC_NO_HINTS into booleans and keeping the stdio watchdog fail-safe; `src/vaultspec_core/cli/rendering_hints.py`.
+- [x] `W01.P01.S04` - Move the per-site switch readings onto the shared vocabulary, turning VAULTSPEC_NON_INTERACTIVE and VAULTSPEC_NO_HINTS into booleans and keeping the stdio watchdog fail-safe; `src/vaultspec_core/cli/rendering_hints.py`.
 - [ ] `W01.P01.S05` - Reject invalid loaded-field values, reporting every problem together, instead of logging and using the default; `src/vaultspec_core/config/config.py`.
 - [ ] `W01.P01.S06` - Test the vocabulary, the chain fallback, blank-as-unset, collective rejection and the per-package credential gate against real files in temporary workspaces; `src/vaultspec_core/config/tests/test_resolution.py`.
 
