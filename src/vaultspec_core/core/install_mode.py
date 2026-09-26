@@ -14,12 +14,15 @@ from typing import TYPE_CHECKING
 
 from .enums import InstallMode
 from .helpers import package_version, parse_version_tuple
+from .workspace_mode import resolve_install_mode
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from .manifest import ManifestData
     from .workspace_mode import ResolvedMode
 
-__all__ = ["write_mode_declaration"]
+__all__ = ["infer_upgrade_mode", "write_mode_declaration"]
 
 
 def stamp_manifest_version_no_downgrade(mdata: ManifestData) -> None:
@@ -122,18 +125,70 @@ def write_mode_declaration(path: Path, mode: InstallMode) -> str | None:
     return floor
 
 
-def infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMode:
-    """Infer the provisioning mode for an ``install --upgrade`` (ADR Q6).
+def infer_upgrade_mode(
+    target: Path,
+    package: str,
+    *,
+    launch_is_module_run: Callable[[], bool] | bool,
+) -> InstallMode:
+    """Infer *package*'s mode for a legacy workspace that declares none.
+
+    Two signals have to agree. Detection says where the workspace's
+    ``pyproject.toml`` places the package: a runtime dependency resolves to
+    dependency mode, a default dev group to the non-leaking dev mode, and
+    nothing detectable leaves tool mode standing. Deployment says how the
+    workspace actually launches the package today, which is the evidence the
+    caller supplies: ``uv run``-shaped means it launches from the workspace's
+    own environment, anything else means it does not.
+
+    A workspace can list a package and still launch it as a global tool, and
+    upgrading it to dependency mode on the listing alone would rewrite a
+    working deployment into a broken one. So detection only carries when the
+    deployed launch already agrees with it.
+
+    Each package supplies its own evidence because each has its own launch
+    surface: core reads the shape of its committed pre-commit entries, while
+    a package that scaffolds no hooks reads whatever it does own. Passing a
+    callable defers that work to the one branch that needs it.
+
+    Args:
+        target: Workspace root directory.
+        package: The distribution whose mode to infer.
+        launch_is_module_run: Whether the workspace's existing launch entry
+            for *package* is ``uv run``-shaped, or a callable answering that.
+
+    Returns:
+        The inferred mode. Never a declared or requested one: the caller
+        checks for those first, because they outrank inference.
+
+    Raises:
+        VaultSpecError: Propagated from mode resolution when a persisted
+            declaration is malformed.
+    """
+    detected = resolve_install_mode(target, explicit=None, package=package)
+    if detected is InstallMode.TOOL:
+        return InstallMode.TOOL
+    launched = (
+        launch_is_module_run()
+        if callable(launch_is_module_run)
+        else launch_is_module_run
+    )
+    return detected if launched else InstallMode.TOOL
+
+
+def upgrade_mode_with_provenance(
+    target: Path, explicit: InstallMode | None
+) -> ResolvedMode:
+    """Resolve core's provisioning mode for an ``install --upgrade`` (ADR Q6).
 
     Precedence mirrors provision-time resolution at its top: an explicit
     ``--mode`` flag wins (and is validated for impossible combinations), and an
     already-persisted declaration wins next, so a second upgrade is idempotent
     and a deliberate re-mode is honored. A legacy workspace with neither has its
-    mode inferred from its own deployed state: dependency mode only when the
-    canonical hook entries are ``uv run``-shaped *and* the target's
-    ``pyproject.toml`` lists ``vaultspec-core``; tool mode in every other case.
+    mode inferred by :func:`infer_upgrade_mode`, the rule every package shares,
+    with core's own deployed evidence: the shape of its canonical hook entries.
 
-    The hook-shape signal is read through the same ``observed_precommit_mode``
+    That shape is read through the same ``observed_precommit_mode``
     collector the doctor's mode-mismatch check consumes, so migration and
     diagnosis can never disagree on what a deployed artifact shape means - the
     ``install-mode`` constraint against introducing a second comparator.
@@ -157,13 +212,11 @@ def infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMo
             when *explicit* names an impossible combination or a persisted
             declaration is malformed.
     """
-    from .diagnosis.collectors import observed_precommit_mode
     from .workspace_mode import (
         CORE_DISTRIBUTION_NAME,
         ModeProvenance,
         ResolvedMode,
         read_package_declaration,
-        resolve_install_mode,
         resolve_install_mode_with_provenance,
     )
 
@@ -172,8 +225,27 @@ def infer_upgrade_mode(target: Path, explicit: InstallMode | None) -> ResolvedMo
     if read_package_declaration(target, CORE_DISTRIBUTION_NAME) is not None:
         return resolve_install_mode_with_provenance(target, explicit=None)
 
-    detected = resolve_install_mode(target, explicit=None)
+    inferred = infer_upgrade_mode(
+        target,
+        CORE_DISTRIBUTION_NAME,
+        launch_is_module_run=lambda: _hook_entries_are_module_run(target),
+    )
+    return ResolvedMode(inferred, ModeProvenance.INFERRED)
+
+
+def _hook_entries_are_module_run(target: Path) -> bool:
+    """Return whether *target*'s canonical hook entries launch through ``uv run``.
+
+    Dev and dependency modes render one shape and tool mode renders another,
+    so the question is which shape the deployed entries carry, not which mode
+    the collector names.
+    """
+    from .diagnosis.collectors import observed_precommit_mode
+    from .precommit import entry_prefix_for_mode
+
     observed = observed_precommit_mode(target)
-    if detected is InstallMode.DEPENDENCY and observed is InstallMode.DEPENDENCY:
-        return ResolvedMode(InstallMode.DEPENDENCY, ModeProvenance.INFERRED)
-    return ResolvedMode(InstallMode.TOOL, ModeProvenance.INFERRED)
+    if observed is None:
+        return False
+    return entry_prefix_for_mode(observed) == entry_prefix_for_mode(
+        InstallMode.DEPENDENCY
+    )

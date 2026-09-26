@@ -32,9 +32,9 @@ from .gitignore import (
 from .helpers import atomic_write_bytes
 from .install_mode import (
     fresh_install_schema_version,
-    infer_upgrade_mode,
     persist_resolved_mode,
     stamp_manifest_version_no_downgrade,
+    upgrade_mode_with_provenance,
     write_mode_declaration,
 )
 from .manifest import (
@@ -548,7 +548,7 @@ def _run_upgrade(
     # deployed hook shape folded in - so the leak advisory is recomputed from
     # the inferred provenance too: a persisted dependency declaration stays
     # silent, a freshly inferred one warns.
-    inferred = infer_upgrade_mode(path, mode)
+    inferred = upgrade_mode_with_provenance(path, mode)
     resolved_mode = inferred.mode
     leak_warnings = (
         [dependency_leak_advisory()] if newly_establishes_dependency(inferred) else []
