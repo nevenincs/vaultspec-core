@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:f1af744c342e981b56108ff4664b48305b2665a94ad62bbe55eaefdb9c07078e'
+body_hash: 'sha256:06c914f291c914a3c85a39e4cf4bd5e5702dbf5ae8aa33163d9615530a39ebde'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -272,6 +272,12 @@ related:
 - `S15` `by:` `vaultspec-high-executor`
 - `S10` `M` `src/vaultspec_core/cli/_hook_trust.py`
 - `S10` `verify:` `just test-unit` -> `pass`
+- `S42` `M` `src/vaultspec_a2a/telemetry/instrumentation.py`
+- `S42` `M` `src/vaultspec_a2a/worker/app.py`
+- `S42` `M` `src/vaultspec_a2a/testing/session_root.py`
+- `S42` `A` `dev/tests/test_import_time_settings.py`
+- `S42` `A` `src/vaultspec_a2a/control/tests/test_settings_redaction.py`
+- `S42` `verify:` `control, dev and telemetry suites` -> `pass`
 
 ## Notes
 
@@ -309,3 +315,4 @@ related:
 - `S12` pre-release review fix: `vaultspec_core.core` resolves its re-exports through a PEP 562 `__getattr__,` so importing one exception from core.exceptions no longer runs the agent collector, the sync engine and yaml behind it; interleaved -X importtime medians fall from 112.7ms/191 modules to 91.6ms/161 for `vaultspec_core.envelope` and from 108.8ms/190 to 88.4ms/160 for `vaultspec_core.config`
 - `S15` pre-release review fix: --target is documented as discovered (the .gt container root, then the worktree root, then the repository root, the working directory last) rather than defaulting to the working directory; install and uninstall state the three shared exit codes; the workspace copy of the bundled reference is reseeded through install core --upgrade, ending its 0.2.5 against 0.2.6 release-line drift
 - `S10` pre-release review fix: both consent gates call `is_unattended(json_output=json_output)` instead of restating the rule as `json_output` or not `operator_present();` the wrapper that only restated it is gone
+- `S42` review rounds 2 and 3: vaultspec-a2a commits 349b7ba8, 06752993, bfe6131a; final review PASS.

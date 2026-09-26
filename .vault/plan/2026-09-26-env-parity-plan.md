@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:fda733dd83e0cbd84cf8564c79fbfbe1897202fd807a797a2615655bf8512e15'
+body_hash: 'sha256:2542b148c8a7e8f0bb4c77ed048b03e66eb3b3acba9cb15e19931dc1d61dd15e'
 ---
 
 # `env-parity` plan
@@ -143,7 +143,7 @@ Gate on the user's confirmation of the a2a operating-model change, then take cor
 
 - [x] `W03.P09.S40` - Block on the user's confirmation that a2a settings move from the workspace .env to an explicitly named operator file; `src/vaultspec_a2a/control/settings_base.py`.
 - [ ] `W03.P09.S41` - Promote vaultspec-core from the tooling group to a runtime dependency with a floor on the W01 release and no ceiling; `pyproject.toml`.
-- [ ] `W03.P09.S42` - Read only registered credentials from the workspace .env through core's gate, and load settings from an operator file named by the invocation or session environment; `src/vaultspec_a2a/control/settings_base.py`.
+- [x] `W03.P09.S42` - Read only registered credentials from the workspace .env through core's gate, and load settings from an operator file named by the invocation or session environment; `src/vaultspec_a2a/control/settings_base.py`.
 - [x] `W03.P09.S43` - Launch core's MCP server as vaultspec-core-mcp instead of the retired vaultspec-mcp script name; `src/vaultspec_a2a/providers/_harness_mcp_registry.py`.
 
 ### Phase `W03.P10` - vaultspec-dashboard conformance
