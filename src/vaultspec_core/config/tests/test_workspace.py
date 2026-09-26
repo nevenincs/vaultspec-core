@@ -514,7 +514,10 @@ class TestHomeShorthand:
         ``Path.expanduser`` reads the platform's home variables from the
         running process, not from the mapping handed to ``resolve_target``,
         so the only honest way to run without one is to start an interpreter
-        that has none.
+        that has none. The shorthand names a user no account database knows:
+        POSIX falls back to that database when ``HOME`` is unset, so a bare
+        ``~`` would still resolve there, while an unknown user resolves
+        nowhere once the Windows profile variables are gone as well.
         """
         probe = (
             "from pathlib import Path\n"
@@ -522,7 +525,9 @@ class TestHomeShorthand:
             "from vaultspec_core.core.exceptions import ConfigurationError\n"
             "try:\n"
             "    resolve_target(\n"
-            "        environ={'VAULTSPEC_TARGET_DIR': '~/workspace'},\n"
+            "        environ={\n"
+            "            'VAULTSPEC_TARGET_DIR': '~vaultspec-no-such-user/workspace',\n"
+            "        },\n"
             "        cwd=Path.cwd(),\n"
             "    )\n"
             "except ConfigurationError as refusal:\n"
