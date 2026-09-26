@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path  # noqa: TC003 - Typer evaluates the --target annotation.
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import typer
 
@@ -18,6 +18,9 @@ from vaultspec_core.cli._target import TargetOption, apply_target_install
 from vaultspec_core.cli.root_preflight import run_preflight
 from vaultspec_core.core.enums import CliAction, InstallMode
 from vaultspec_core.core.git_artifacts import is_git_repo
+
+if TYPE_CHECKING:
+    from rich.console import Console
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,16 @@ def install_post_errors(result: dict[str, Any]) -> list[str]:
         return []
     entries = cast("list[object]", raw)
     return [str(error) for error in entries]
+
+
+def _print_environment_outcomes(
+    console: Console, result: dict[str, Any], *, dry_run: bool
+) -> None:
+    """Print each provisioned setting's outcome by name; values never appear."""
+    verb = "would be " if dry_run else ""
+    outcomes = cast("dict[str, str]", result.get("environment", {}))
+    for name, outcome in outcomes.items():
+        console.print(f"  {name}: {verb}{outcome} (value hidden)")
 
 
 def cmd_install(
@@ -217,9 +230,7 @@ def cmd_install(
         _console = get_console()
         for warning in result.get("warnings", []):
             _console.print(f"  [yellow]![/yellow] {warning}")
-        for name, outcome in result.get("environment", {}).items():
-            verb = "would be " if dry_run else ""
-            _console.print(f"  {name}: {verb}{outcome} (value hidden)")
+        _print_environment_outcomes(_console, result, dry_run=dry_run)
 
     # The upgrade path re-seeds bundled builtins. Per the
     # cli-sync-vocabulary ADR it reports per-builtin canonical outcomes
