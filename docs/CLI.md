@@ -12,6 +12,8 @@ Complete command-line interface (CLI) reference for `vaultspec-core`. See the
 - [Surface provenance](#surface-provenance) - what is on this branch and not yet in a
   release.
 - [Command index](#command-index) - every command, grouped, with a one-line summary.
+- [Settings resolution](#settings-resolution) - the one rung order every setting
+  resolves through.
 - [Workspace commands](#workspace-commands) - install, uninstall, and sync.
 - [Vault commands](#vault-commands) - create, query, and edit vault documents and plans.
 - [Spec commands](#spec-commands) - manage rules, skills, agents, hooks, triggers, MCPs,
@@ -40,6 +42,8 @@ commands that support JavaScript Object Notation (JSON) output.
 - `--target DIR` (`-t`, default cwd) - Target workspace directory. Overrides
   `VAULTSPEC_TARGET_DIR`. Defaults to the current working directory if neither is set.
 - `--debug` (`-d`, default off) - Enable DEBUG-level logging (top-level flag).
+- `--verbose` (`-v`, default off) - Enable INFO-level logging (top-level flag).
+  `--debug` outranks it when both are given.
 - `--version` (`-V`) - Print version and exit (top-level flag).
 
 ## Outcome vocabulary
@@ -466,7 +470,10 @@ Deploy the vaultspec framework into the target directory.
 
 #### Options
 
-- `--upgrade` (default off) - Re-sync builtins without re-scaffolding.
+- `--upgrade` (default off) - Refresh everything install owns, idempotently:
+  re-scaffolds any missing directory, runs pending migrations, re-infers the
+  provisioning mode for a legacy workspace that declares none, syncs, and migrates the
+  MCP launch shape.
 - `--dry-run` (default off) - Preview without writing.
 - `--force` (default off) - Overwrite existing installation.
 - `--skip` (default `[]`) - Skip specific sync passes (repeatable).
@@ -3394,16 +3401,52 @@ Enumerate all known configuration entries and current values.
 
 ______________________________________________________________________
 
+## Settings resolution
+
+One order holds for every setting, in every process kind (CLI, MCP server, and any
+package that imports vaultspec-core's public resolvers). Earlier rungs win:
+
+1. **Invocation** - a CLI flag or an explicit programmatic override for that call.
+1. **Session environment** - the process's own environment. For a setting the framework
+   shares, a companion package's scoped name is read first - `VAULTSPEC_<PKG>_ROOT`,
+   `VAULTSPEC_<PKG>_LOG_LEVEL`, `VAULTSPEC_<PKG>_STDIO_WATCHDOG`
+   - and falls back to the framework name behind it - `VAULTSPEC_TARGET_DIR`,
+     `VAULTSPEC_LOG_LEVEL`, `VAULTSPEC_STDIO_WATCHDOG` - when it supplies nothing. A
+     credential never chains.
+1. **Workspace `.env`** - credentials only, under the gate below.
+1. **Persisted configuration** - the single store that owns the key:
+   `.vaultspec/config.toml` or `.vaultspec/workspace.json`.
+1. **Derived and external defaults** - `pyproject.toml` mode detection, or a third-party
+   convention with a product equivalent, such as `VISUAL` then `EDITOR`.
+1. **The shipped default**, declared once in the table below.
+
+The workspace `.env` is `<workspace root>/.env`. It is never found by walking up from
+the working directory or from where the package is installed, and no variant
+(`.env.local` and the like) is read. It supplies a credential - today only
+`VAULTSPEC_CORE_TYPESAFE_API_KEY` - one name at a time, and only when both hold: the
+running interpreter lives inside the workspace (its project virtual environment), and
+the owning package's own resolved install mode for that workspace is `dependency` or
+`dev`. A globally installed tool (a uv tool, a pipx install, a release binary) pointed
+at a freshly cloned repository never reads that repository's `.env`.
+
+Booleans read one vocabulary: `1`, `true`, `yes` or `on` against `0`, `false`, `no` or
+`off`, case-folded and stripped. A blank value is unset, not off, and falls through to
+the next rung. An invalid value for a product-owned variable refuses the process and
+names the variable, the value and the expected shape. The stdio watchdog is the one
+protective switch that instead warns and stays armed: refusing to start is not a safer
+outcome than running guarded.
+
 ## Environment variables
 
 vaultspec-core owns the `VAULTSPEC_` variables below and honours a few external
-conventions, listed after them. Environment variables override defaults but are
-overridden by the `--target` flag.
+conventions, listed after them. Environment variables override the default and are
+overridden by the invocation.
 
-- `VAULTSPEC_TARGET_DIR` (path, default cwd) - Root workspace directory (where `.vault/`
-  and `.vaultspec/` live). Equivalent to `--target` on the CLI. Also used by
-  `vaultspec-core-mcp` to locate the workspace. Defaults to the current working
-  directory if unset.
+- `VAULTSPEC_TARGET_DIR` (path, default discovered) - Root workspace directory (where
+  `.vault/` and `.vaultspec/` live), for every process kind: the CLI, the MCP server,
+  and any importing package. Equivalent to `--target` on the CLI. Ranked below an
+  explicit `--target` and above discovery from the working directory; a directory that
+  does not exist is refused rather than discovered past.
 - `VAULTSPEC_DOCS_DIR` (str, default `.vault`) - Vault directory name.
 - `VAULTSPEC_INDEX_DIR` (str, default `index`) - Name of the subdirectory inside the
   vault that holds the auto-generated feature indexes (`<feature>.index.md`).
@@ -3419,51 +3462,54 @@ overridden by the `--target` flag.
   of blocking indefinitely. Covers the in-process and cross-process layers combined.
   Raise it if a large corpus or a slow network volume makes legitimate contention exceed
   the budget.
-- `VAULTSPEC_LOG_LEVEL` (str, default `INFO`) - Root log level for the CLI, for example
-  `DEBUG`, `INFO`, or `WARNING`. Overridden by `--debug` when set.
-- `VAULTSPEC_EDITOR` (str, default `zed -w`) - Editor command. The edit verbs
-  (`vaultspec-core spec {rules|skills|agents} edit`) resolve in order: `--editor` flag,
-  project config `editor`, `VAULTSPEC_EDITOR`, `VISUAL`, `EDITOR`, `vi`. Interactive
-  creation of a rule, skill, agent, or trigger opens `VAULTSPEC_EDITOR`, or `zed -w`
-  when it is unset. Unlike the flag and the config key, an editor named in the
-  environment is not restricted to the recognised set; see
+- `VAULTSPEC_EDITOR` (str, unset by default) - Editor command every surface that opens
+  an editor consults - the edit verbs (`vaultspec-core spec {rules|skills|agents} edit`)
+  and interactive creation of a rule, skill, agent, or trigger alike. Read after the
+  `--editor` flag and before the project config key, `VISUAL` and `EDITOR`; `vi` is the
+  last rung when none of them answers. Unlike the flag and the config key, an editor
+  named in the environment is not restricted to the recognised set; see
   [which editors are accepted](#which-editors-are-accepted).
-- `VAULTSPEC_JSON_PRETTY` (str, unset by default) - Indents `--json` output. Any value
-  other than `0`, `false`, `no`, `off`, or the empty string turns it on; without it the
-  envelope is written as one compact line.
-- `VAULTSPEC_NO_HINTS` (str, unset by default) - Set to `1` to drop the `Next actions`
-  block the commands print after their report. Equivalent to `--no-hints`. Only the
-  exact value `1` counts; anything else leaves the hints in place.
 - `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key that
   enables hosted vault search (`vaultspec-core vault search` and the MCP `search` tool).
-  It is read from the process environment. It is read from the workspace-root `.env`
-  only when it is absent from the environment, core runs from the workspace's own
-  environment (its Python interpreter lives inside the workspace, as a project virtual
-  environment does), and the workspace declares the `dependency` or `dev` install mode.
-  Only this one variable is read from that file. A globally installed core (a uv tool, a
-  pipx install, or a release binary) never reads the workspace `.env`. The generic
-  `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
+  Read from the process environment first. A workspace-root `.env` supplies it only
+  under the credential gate above. Only this one variable is read from that file. The
+  generic `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
   `vaultspec-core status` reports only whether one is configured and from which source.
-- `VAULTSPEC_NON_INTERACTIVE` (presence, unset by default) - Set to any value, even
-  blank, to declare that no operator is watching, as CI does. Repository triggers that
-  await approval are then skipped instead of prompted for.
-- `VAULTSPEC_STDIO_WATCHDOG` (str, default on) - Lifetime watchdog for the MCP server.
-  Set it to `0`, `false`, `off`, or `no` to disable it, which leaves the server to exit
-  on stdin EOF alone. Read by `vaultspec-core-mcp` rather than by the CLI; see the
-  [MCP reference](./MCP.md).
+- `VAULTSPEC_LOG_LEVEL` (str, default `WARNING` for the CLI, `INFO` for the MCP server)
+  - Root log level when neither `--debug` nor `--verbose` is given, for example `DEBUG`,
+    `INFO`, or `WARNING`. An unknown name is refused.
+- `VAULTSPEC_JSON_PRETTY` (bool, unset by default) - Indents `--json` output. A true
+  word turns it on; unset, blank or a false word leaves the envelope one compact line.
+- `VAULTSPEC_NO_HINTS` (bool, unset by default) - Set to a true word to drop the
+  `Next actions` block the commands print after their report. Equivalent to
+  `--no-hints`. Unset, blank or a false word leaves the hints in place.
+- `VAULTSPEC_NON_INTERACTIVE` (bool, unset by default) - Set to a true word to declare
+  that no operator is watching: repository triggers awaiting approval are skipped
+  instead of prompted for. Outranks `CI` in both directions, so a wrapper script running
+  under CI with somebody watching can say so with `VAULTSPEC_NON_INTERACTIVE=0`.
+- `VAULTSPEC_STDIO_WATCHDOG` (bool, unset by default; armed) - Lifetime watchdog for the
+  MCP server, on by default. A false word disables it, which leaves the server to exit
+  on stdin EOF alone. Unset, blank, or an unrecognised word leaves it armed: it is a
+  protective switch, so a typo warns rather than turning the guard off. Read by
+  `vaultspec-core-mcp` rather than by the CLI; see the [MCP reference](./MCP.md).
+- `VAULTSPEC_MCP_GATEWAY_INVOCATION` (str, unset by default) - Internal, set by
+  vaultspec-core itself: the MCP invoke gateway sets it on every CLI process it spawns.
+  Any non-empty value marks the process as having no terminal, so it refuses to open an
+  editor. Not an operator setting.
 
 vaultspec-core also honours these external variables. It does not own them.
 
 - `CI` (presence) - Set by CI systems. Same effect as `VAULTSPEC_NON_INTERACTIVE`.
-- `NO_COLOR` (presence) - Set to any value, even blank, to disable colour in console
-  output.
+- `NO_COLOR` (non-empty string) - Set to any non-empty value to disable colour in
+  console output, as the no-color.org convention defines it. Set but empty is not a
+  request for monochrome output.
 - `GIT_INDEX_FILE` (presence) - Set by git for every commit hook it runs. While it is
   set, commands print no `Next actions` block and no `--fix` suggestion for a finding,
   because hook output is often acted on without review.
 - `COLUMNS` (int) - Console width. When unset, the width is read from the terminal once
   at startup.
 - `VISUAL`, `EDITOR` (str) - Editor commands the edit verbs consult after
-  `VAULTSPEC_EDITOR`, in that order.
+  `VAULTSPEC_EDITOR` and the project config key, in that order.
 - `CLAUDE_CONFIG_DIR` (path, default home directory) - Claude Code's configuration home,
   whose `.claude.json` holds user-scope MCP servers.
 - `CODEX_HOME` (path, default `~/.codex`) - Codex's home, whose `config.toml` holds
