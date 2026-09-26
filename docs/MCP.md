@@ -249,7 +249,7 @@ from the recorded surface of that release, so it empties itself when the next on
 
 <!-- vaultspec:generated:begin unreleased-mcp-surface -->
 
-The latest published release is `0.2.6`, and every tool above is in it.
+The latest published release is `0.3.0`, and every tool above is in it.
 
 <!-- vaultspec:generated:end unreleased-mcp-surface -->
 
