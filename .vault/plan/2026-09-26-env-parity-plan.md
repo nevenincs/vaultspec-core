@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:2d5e3a02ad299cfd646b701795214cf954f447e30461548c9bd377c0832cd0d3'
+body_hash: 'sha256:039c1ea7d32550a5c0d24f3f70bcbb9e8f7ebf7489ed5bd20cf425639b7e1b00'
 ---
 
 # `env-parity` plan
@@ -25,6 +25,7 @@ Approved 2026-09-26. The user approved `2026-09-26-env-parity-adr` and this plan
 This plan executes `2026-09-26-env-parity-adr`, grounded by `2026-09-26-env-parity-research`. The ADR governs every Wave:
 
 - **W01** gives vaultspec-core the public contract:
+
   - the resolution order and the chain fallback;
   - one value vocabulary and reject-on-invalid;
   - the per-package workspace `.env` credential gate;
@@ -32,8 +33,11 @@ This plan executes `2026-09-26-env-parity-adr`, grounded by `2026-09-26-env-pari
   - the install envelope.
 
   Core's own CLI and MCP server are brought onto it in the same Wave.
+
 - **W02** deletes vaultspec-rag's mirrors of that contract and imports it. vaultspec-core stays a floor-only runtime dependency, as it already is.
+
 - **W03** does the same for vaultspec-a2a, and pins the dashboard's core calls to their target.
+
 - **W04** aligns the site-authored guides.
 
 `2026-09-23-typesafe-search-adr` and `2026-07-14-install-parity-adr` constrain W01 and W02: the credential boundary holds unchanged, and a rag parity wave is gated on a core release.
@@ -51,7 +55,7 @@ Give vaultspec-core a public, importable implementation of the one resolution or
 Add the public, standard-library-only value vocabulary, open core's registry accessors to package registries with a framework fallback, open the workspace .env gate per package, and move core's own call sites and loaded fields onto one vocabulary and reject-on-invalid.
 
 - [x] `W01.P01.S01` - Add a standard-library-only public vocabulary module: the true and false word tables, a parser that treats blank as unset, and the one rejection message naming variable, value and expected shape; `src/vaultspec_core/env_values.py`.
-- [x] `W01.P01.S02` - Let a package declare its own registry of ConfigVariable entries, add a framework_fallback field that chains a package-scoped entry to a shared VAULTSPEC_ entry, and make env_value and child_environment accept any registered package entry; `src/vaultspec_core/config/config.py`.
+- [x] `W01.P01.S02` - Let a package declare its own registry of ConfigVariable entries, add a framework_fallback field that chains a package-scoped entry to a shared VAULTSPEC\_ entry, and make env_value and child_environment accept any registered package entry; `src/vaultspec_core/config/config.py`.
 - [x] `W01.P01.S03` - Add a package parameter to resolve_credential so the workspace .env opens on that package's resolved install mode, keeping the interpreter-inside-workspace test and the one-variable read; `src/vaultspec_core/config/credential.py`.
 - [x] `W01.P01.S04` - Move the per-site switch readings onto the shared vocabulary, turning VAULTSPEC_NON_INTERACTIVE and VAULTSPEC_NO_HINTS into booleans and keeping the stdio watchdog fail-safe; `src/vaultspec_core/cli/rendering_hints.py`.
 - [x] `W01.P01.S05` - Reject invalid loaded-field values, reporting every problem together, instead of logging and using the default; `src/vaultspec_core/config/config.py`.
@@ -92,12 +96,12 @@ Block the wave on a released vaultspec-core that carries W01, raise rag's floor 
 
 Remove the package-relative dotenv load and its dependency, declare rag's variables as a core package registry with credentials and framework fallbacks, resolve credentials through core's gate and pass them to the daemon, and interpret every value with core's vocabulary.
 
-- [ ] `W02.P05.S19` - Remove the import-time load_dotenv call and drop python-dotenv from the runtime dependencies; `src/vaultspec_rag/cli/_core.py`.
+- [x] `W02.P05.S19` - Remove the import-time load_dotenv call and drop python-dotenv from the runtime dependencies; `src/vaultspec_rag/cli/_core.py`.
 - [ ] `W02.P05.S20` - Declare rag's variables as a core package registry: the classifier key and HF_TOKEN as workspace-.env-eligible credentials, and ROOT, LOG_LEVEL and STDIO_WATCHDOG chained to the framework names; `src/vaultspec_rag/config/_types.py`.
 - [ ] `W02.P05.S21` - Resolve rag's credentials in the CLI through core's gate with package vaultspec-rag and hand them to the daemon it spawns through the child environment; `src/vaultspec_rag/cli/_process.py`.
 - [ ] `W02.P05.S22` - Read the classifier key through the registry accessor rather than a bare environment lookup; `src/vaultspec_rag/search/_typesafe_transport.py`.
 - [ ] `W02.P05.S23` - Replace the mirrored boolean table with core's vocabulary, treat a blank boolean as unset, and make the preprocess kill switch a boolean; `src/vaultspec_rag/_env_values.py`.
-- [ ] `W02.P05.S24` - Drop the base-config rung that never matches a rag key from the settings chain; `src/vaultspec_rag/config/_settings.py`.
+- [x] `W02.P05.S24` - Drop the base-config rung that never matches a rag key from the settings chain; `src/vaultspec_rag/config/_settings.py`.
 - [ ] `W02.P05.S25` - Declare the stray production reads (uv cache and tool dirs, the MPS fallback, the junction and preprocess markers, the memory probe literal) as registry members; `src/vaultspec_rag/config/_types.py`.
 
 ### Phase `W02.P06` - root, log level, watchdog and unattended detection
@@ -114,11 +118,11 @@ Resolve the workspace root, log level and stdio watchdog through the framework c
 Make every flag rag shares with core carry the same name, short form, default and meaning, emit core's envelope and exit codes, and infer the legacy upgrade mode through core.
 
 - [ ] `W02.P07.S30` - Add --no-hints and VAULTSPEC_NO_HINTS, and emit core's envelope for install and uninstall under --json, errors included; `src/vaultspec_rag/cli/_install.py`.
-- [ ] `W02.P07.S31` - Validate --skip against rag's component set and fail on an unknown value with the valid list; `src/vaultspec_rag/commands/_install.py`.
-- [ ] `W02.P07.S32` - Stop --force from implying consent to the torch configuration prompt; consent comes only from --yes; `src/vaultspec_rag/commands/_torch_flow.py`.
-- [ ] `W02.P07.S33` - Make uninstall without --force an error pointing at --dry-run, and retire the no-op uninstall --yes behind a deprecation warning; `src/vaultspec_rag/commands/_uninstall.py`.
+- [x] `W02.P07.S31` - Validate --skip against rag's component set and fail on an unknown value with the valid list; `src/vaultspec_rag/commands/_install.py`.
+- [x] `W02.P07.S32` - Stop --force from implying consent to the torch configuration prompt; consent comes only from --yes; `src/vaultspec_rag/commands/_torch_flow.py`.
+- [x] `W02.P07.S33` - Make uninstall without --force an error pointing at --dry-run, and retire the no-op uninstall --yes behind a deprecation warning; `src/vaultspec_rag/commands/_uninstall.py`.
 - [ ] `W02.P07.S34` - Infer the legacy upgrade mode through core's public function with package vaultspec-rag and delete rag's variant; `src/vaultspec_rag/commands/_mode.py`.
-- [ ] `W02.P07.S35` - Make server doctor honour --target and the root chain instead of the working directory; `src/vaultspec_rag/cli/_service_doctor.py`.
+- [x] `W02.P07.S35` - Make server doctor honour --target and the root chain instead of the working directory; `src/vaultspec_rag/cli/_service_doctor.py`.
 
 ### Phase `W02.P08` - rag records, documentation and parity tests
 
@@ -146,8 +150,8 @@ Gate on the user's confirmation of the a2a operating-model change, then take cor
 
 Keep the dashboard's core CLI calls pinned to the worktree it inspects now that the CLI honours VAULTSPEC_TARGET_DIR, and correct its example file.
 
-- [ ] `W03.P10.S44` - Pass --target explicitly on every core CLI invocation so an exported VAULTSPEC_TARGET_DIR cannot redirect the worktree being inspected; `engine/crates/ingest-core/src/runner.rs`.
-- [ ] `W03.P10.S45` - Correct the example file: no .env.local, and name the variables the dashboard actually reads; `.env.example`.
+- [x] `W03.P10.S44` - Pass --target explicitly on every core CLI invocation so an exported VAULTSPEC_TARGET_DIR cannot redirect the worktree being inspected; `engine/crates/ingest-core/src/runner.rs`.
+- [x] `W03.P10.S45` - Correct the example file: no .env.local, and name the variables the dashboard actually reads; `.env.example`.
 
 ## Wave `W04` - documentation site alignment
 
@@ -184,15 +188,20 @@ Rewrite the site-authored pages that describe settings, credentials and MCP laun
 **Behaviour.**
 
 - The same process environment gives the same answer in both packages. That covers:
+
   - the root, from `VAULTSPEC_TARGET_DIR` alone and with `VAULTSPEC_RAG_ROOT` set;
   - the log level;
   - the watchdog;
   - unattended detection.
 
   Tests in each repository run against the released core.
+
 - No rag process reads any `.env` outside core's gate. A test places `.env` files above the install location and in the working directory, and shows that neither is loaded.
+
 - A workspace `.env` supplies a credential only when the running interpreter lives inside the workspace and the package's resolved mode is dependency or dev. It never supplies a setting.
+
 - An invalid product-owned value refuses to start the process and names the variable. The watchdog is the one exception.
+
 - `python-dotenv` is absent from rag's runtime dependencies. Rag's floor names the W01 release and carries no ceiling.
 
 **Surfaces.**

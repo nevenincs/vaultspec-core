@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:20d1e284ce5359f7226b7b45e6d0b9d32d3c5ece677ac0ff93f4d65acd599dfd'
+body_hash: 'sha256:034f920c34d9c0bf448696b9bdc2bd2479f2bec1d0541ecc66df65dd1121e406'
 related:
   - "[[2026-09-26-env-parity-research]]"
   - "[[2026-02-16-environment-variable-adr]]"
@@ -88,28 +88,28 @@ Accepted 2026-09-26. The user approved this record and its plan in session ("app
 **Resolution and override order.** One order holds for every setting of every package, in every process kind (CLI, MCP server, daemon, child process). Earlier rungs win.
 
 1. **Invocation**: a CLI flag, an MCP tool argument, or an explicit programmatic override for that call.
-2. **Session environment**: the process environment the process was started with.
+1. **Session environment**: the process environment the process was started with.
    - For a setting the framework shares, the package-scoped name `VAULTSPEC_<PKG>_<NAME>` is read first. The framework name `VAULTSPEC_<NAME>` is read next: this is the chain fallback.
    - Credentials never chain.
-3. **Workspace `.env`**: credentials only, under the gate below.
-4. **Persisted configuration**: the single store that owns the key.
+1. **Workspace `.env`**: credentials only, under the gate below.
+1. **Persisted configuration**: the single store that owns the key.
    - The committed stores are `.vaultspec/config.toml` and `.vaultspec/workspace.json`; the host store is rag's local-only marker.
    - A key has exactly one persisted home, so stores never compete.
-5. **Derived and external defaults**:
+1. **Derived and external defaults**:
    - `pyproject.toml` mode detection;
    - a third-party convention with a product equivalent, such as `VISUAL` and then `EDITOR`.
-6. **The shipped default**, declared once in the owning registry. A daemon whose output is a managed log may declare its own default log level there.
+1. **The shipped default**, declared once in the owning registry. A daemon whose output is a managed log may declare its own default log level there.
 
 **Framework-shared variables.** Every package reads these, and each package's scoped overrides fall back to them:
 
-| Framework variable | Package-scoped override that falls back to it |
-| --- | --- |
-| `VAULTSPEC_TARGET_DIR` | rag's `VAULTSPEC_RAG_ROOT` |
-| `VAULTSPEC_LOG_LEVEL` | rag's `VAULTSPEC_RAG_LOG_LEVEL` |
-| `VAULTSPEC_STDIO_WATCHDOG` | rag's `VAULTSPEC_RAG_STDIO_WATCHDOG` |
-| `VAULTSPEC_NON_INTERACTIVE` | — |
-| `VAULTSPEC_NO_HINTS` | — |
-| `VAULTSPEC_JSON_PRETTY` | — |
+| Framework variable          | Package-scoped override that falls back to it |
+| --------------------------- | --------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`      | rag's `VAULTSPEC_RAG_ROOT`                    |
+| `VAULTSPEC_LOG_LEVEL`       | rag's `VAULTSPEC_RAG_LOG_LEVEL`               |
+| `VAULTSPEC_STDIO_WATCHDOG`  | rag's `VAULTSPEC_RAG_STDIO_WATCHDOG`          |
+| `VAULTSPEC_NON_INTERACTIVE` | —                                             |
+| `VAULTSPEC_NO_HINTS`        | —                                             |
+| `VAULTSPEC_JSON_PRETTY`     | —                                             |
 
 - External conventions (`CI`, `NO_COLOR`, `GIT_INDEX_FILE`, and the Hugging Face and uv variables) keep their owners' meanings.
 - Core's CLI reads `VAULTSPEC_TARGET_DIR` and `VAULTSPEC_LOG_LEVEL` as its documentation already says. `-v/--verbose` joins `--debug` on every root callback.
@@ -153,7 +153,9 @@ Rag deletes its mirrors of each and imports them. a2a promotes core from its too
 **The shared install surface.** A flag present in more than one package has the same name, short form, default and meaning. A package-specific flag never reuses a shared name.
 
 - **Shared root options:** `-t/--target`, `-d/--debug`, `-v/--verbose`, `-V/--version`.
+
 - **Shared on install:**
+
   - `--upgrade`: refresh everything install owns, idempotently, re-inferring the mode through one core function;
   - `--dry-run`;
   - `--force`: overwrite only, never consent;
@@ -161,15 +163,21 @@ Rag deletes its mirrors of each and imports them. a2a promotes core from its too
   - `--mode`;
   - `--json`, in the core envelope;
   - `--no-hints`.
+
 - **`-y/--yes`** answers configuration prompts only, and exists only where a package has one.
+
 - **Uninstall without `--force`** errors in every package and points at `--dry-run`.
+
 - **Unattended detection is one rule:**
+
   - `CI` or `VAULTSPEC_NON_INTERACTIVE`;
   - a non-TTY standard input or output;
   - or `--json`.
 
   An unattended run never prompts. A configuration step it skips for lack of consent is reported as skipped, naming the flag that enables it.
+
 - **Exit codes** are shared: 0 success, 1 failure, 2 completed with a required step skipped.
+
 - **Package extensions stay:** core's `PROVIDER` argument and `--remove-vault`; rag's provisioning flags, `--remove-data` and data-path options.
 
 **Record reconciliation.** Each record the research lists as contradicting the code is amended in its own vault with a dated note. The amendment points at this record, or corrects the claim to what the code does.

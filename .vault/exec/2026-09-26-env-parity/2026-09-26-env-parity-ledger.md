@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:aa8b495cfce0dbefa7208129a1d561a72135c05ccb49819bc50c1bdcdb2ddec0'
+body_hash: 'sha256:9ad30813ab4545e39cc46090cb83aedac81ab9332c1de1da4edd43b0c25b5ff5'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -152,6 +152,54 @@ related:
 - `S12` `verify:` `just framework-reference-check` -> `pass`
 - `S12` `verify:` `pytest src/vaultspec_core/tests src/vaultspec_core/config src/vaultspec_core/mcp_server/tests` -> `pass`
 - `S12` `by:` `vaultspec-high-executor`
+- `S19` `M` `src/vaultspec_rag/cli/_core.py`
+- `S19` `M` `pyproject.toml`
+- `S19` `M` `uv.lock`
+- `S19` `M` `conftest.py`
+- `S19` `M` `src/vaultspec_rag/tests/test_install_torch_config.py`
+- `S19` `M` `src/vaultspec_rag/tests/test_packaging_metadata.py`
+- `S19` `A` `src/vaultspec_rag/tests/test_cli_no_dotenv_load.py`
+- `S19` `verify:` `just test-fast` -> `pass`
+- `S19` `by:` `vaultspec-standard-executor`
+- `S24` `M` `src/vaultspec_rag/config/_settings.py`
+- `S24` `verify:` `just test-fast` -> `pass`
+- `S24` `by:` `vaultspec-standard-executor`
+- `S31` `A` `src/vaultspec_rag/commands/_skip.py`
+- `S31` `M` `src/vaultspec_rag/commands/_install.py`
+- `S31` `M` `src/vaultspec_rag/commands/_uninstall.py`
+- `S31` `A` `src/vaultspec_rag/tests/test_install_skip_validation.py`
+- `S31` `M` `src/vaultspec_rag/tests/test_process_probe_source_structure.py`
+- `S31` `verify:` `just test-fast` -> `pass`
+- `S31` `by:` `vaultspec-standard-executor`
+- `S32` `M` `src/vaultspec_rag/commands/_torch_flow.py`
+- `S32` `M` `src/vaultspec_rag/commands/_install.py`
+- `S32` `M` `src/vaultspec_rag/commands/_provision.py`
+- `S32` `M` `src/vaultspec_rag/cli/_install.py`
+- `S32` `M` `docs/cli.md`
+- `S32` `M` `src/vaultspec_rag/tests/test_install_torch_config.py`
+- `S32` `verify:` `just test-fast` -> `pass`
+- `S32` `by:` `vaultspec-standard-executor`
+- `S33` `M` `src/vaultspec_rag/commands/_uninstall.py`
+- `S33` `M` `src/vaultspec_rag/cli/_install.py`
+- `S33` `M` `docs/cli.md`
+- `S33` `A` `src/vaultspec_rag/tests/test_uninstall_safety.py`
+- `S33` `M` `src/vaultspec_rag/tests/test_install_mode.py`
+- `S33` `M` `src/vaultspec_rag/tests/test_install_mcp_extra.py`
+- `S33` `M` `src/vaultspec_rag/tests/test_install_torch_config.py`
+- `S33` `verify:` `just test-fast` -> `pass`
+- `S33` `by:` `vaultspec-standard-executor`
+- `S35` `M` `src/vaultspec_rag/cli/_service_doctor.py`
+- `S35` `M` `src/vaultspec_rag/tests/test_server_doctor.py`
+- `S35` `verify:` `just test-fast` -> `pass`
+- `S35` `by:` `vaultspec-standard-executor`
+- `S44` `M` `engine/crates/ingest-core/src/runner.rs`
+- `S44` `M` `engine/crates/vaultspec-api/src/authoring/core_adapter.rs`
+- `S44` `verify:` `cargo test -p ingest-core -p vaultspec-api --lib` -> `pass`
+- `S44` `verify:` `cargo clippy --all-targets -D warnings` -> `pass`
+- `S44` `by:` `vaultspec-standard-executor`
+- `S45` `M` `.env.example`
+- `S45` `by:` `vaultspec-standard-executor`
+- `S43` `by:` `orchestrator`
 
 ## Notes
 
@@ -165,3 +213,12 @@ related:
 - `S09` The level-fallback test carried over from the log-level Step is corrected here to the refusal the policy requires.
 - `S11` A dev-group workspace launched through uv run now resolves DEV where it resolved TOOL.
 - `S12` just check-markdown fails only on three unformatted env-parity records and a duplicate frontmatter key in an unrelated feature's ledger, all untouched here.
+- `S19` vaultspec-rag commits dcfdf822 and review fix 116f13ef. Workspace .env credentials stop reaching rag until S20-S23 land; no release may be cut before them.
+- `S24` vaultspec-rag commit 73817813.
+- `S31` vaultspec-rag commits 6243b629, 2d37d99d and review fix 584fde28 (vocabulary derived from core).
+- `S32` vaultspec-rag commit 7d561e41.
+- `S33` vaultspec-rag commits 86530609 and review fix 2e903220. Three GPU-gated integration test files were edited but not run on this host; the JSON refusal shape waits on S30.
+- `S35` vaultspec-rag commits f809b9e5 and review fix f0c811c2.
+- `S44` vaultspec-dashboard commits 802bcde1 and review fix abb84961.
+- `S45` vaultspec-dashboard commit b096f45e.
+- `S43` review fix: vaultspec-a2a commit 22a02be1 names the core release that serves the launch command.

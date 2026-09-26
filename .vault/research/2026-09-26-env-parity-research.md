@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:12159fdd18d613ba7edac7679fcd2b08bb8014218c9b12e2a2b04540475168bf'
+body_hash: 'sha256:6b5083a73bebe3332203d07ae8c9b7cc6915e4e7cbaa7f1be25a2b1fc8b75adf'
 related:
   - "[[2026-02-16-environment-variable-adr]]"
   - "[[2026-09-23-typesafe-search-adr]]"
@@ -71,10 +71,10 @@ Evidence was read at vaultspec-core `89455a12` (its `src/` is identical to `orig
 **Rag, settings.** `_raw_rag_setting` resolves in this order (`config/_settings.py:905-953`):
 
 1. CLI overrides, of which only `--data-dir`, `--storage-dir`, `--status-dir` and `--log-file` exist (`cli/_app.py:509-519`).
-2. A core base-config attribute of the same name. None exists, so this rung never returns a value.
-3. The `VAULTSPEC_RAG_*` variable.
-4. The persisted `local-only.json` marker, for `local_only` only (`config/_paths.py:76-101`).
-5. The default.
+1. A core base-config attribute of the same name. None exists, so this rung never returns a value.
+1. The `VAULTSPEC_RAG_*` variable.
+1. The persisted `local-only.json` marker, for `local_only` only (`config/_paths.py:76-101`).
+1. The default.
 
 Construction resolves every bounded and boolean key and rejects all invalid values together (`config/_settings.py:959-1012`).
 
@@ -131,14 +131,14 @@ Exceptions to that order:
 
 ### Shared concepts under different names, some never read
 
-| Concept | vaultspec-core | vaultspec-rag | Others |
-| --- | --- | --- | --- |
+| Concept        | vaultspec-core                                                                                                                                                                                                                                                                   | vaultspec-rag                                                                                                                                                                                                   | Others                                                                                                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Workspace root | `VAULTSPEC_TARGET_DIR` is honoured only by the standalone MCP server (`mcp_server/app.py:237`). The CLI resolves `--target`, then git or cwd discovery, and never reads the variable (`cli/_target.py:117-152`), although `docs/CLI.md:40-41` and `.env.example:22` say it does. | `--target`, then `VAULTSPEC_RAG_ROOT`, then discovery (`cli/_app.py:534-554`). MCP: the tool's `project_root`, then `VAULTSPEC_RAG_ROOT`, then cwd (`mcp/_roots.py:34-79`). `VAULTSPEC_TARGET_DIR` is not read. | a2a sets both variables on the MCP processes it launches (a2a `providers/_harness_mcp_registry.py:276,312`). The dashboard documents `VAULTSPEC_TARGET_DIR` and reads nothing. |
-| Log level | `VAULTSPEC_LOG_LEVEL` is honoured only when no level is passed (`logging_config.py:74-89`). The CLI always passes one (`cli/root_app.py:80-81`), so only the MCP server reads it. An unknown name silently becomes INFO. There is no `--verbose` or `--quiet`. | `VAULTSPEC_RAG_LOG_LEVEL` is read by the CLI when neither `-v` nor `-d` is given (`cli/_app.py:504`). The daemon hard-codes INFO (`server/_main.py:140`), and the stdio MCP server configures nothing. | — |
-| Stdio watchdog | `VAULTSPEC_STDIO_WATCHDOG` | `VAULTSPEC_RAG_STDIO_WATCHDOG` | — |
-| Hints | `--no-hints` or `VAULTSPEC_NO_HINTS=1`, also suppressed inside git hooks (`cli/rendering_hints.py:80-99`) | None | — |
-| JSON indent | `VAULTSPEC_JSON_PRETTY` | Rich pretty-prints always | — |
-| Unattended | `CI`, `VAULTSPEC_NON_INTERACTIVE`, non-TTY stdin or stdout, or `--json` (`cli/_trigger_trust.py:36-39,162-176`) | `sys.stdin.isatty()` only (`cli/_install.py:373`). `CI` and `VAULTSPEC_NON_INTERACTIVE` are ignored, and under `--json` with a TTY it still prompts. | — |
+| Log level      | `VAULTSPEC_LOG_LEVEL` is honoured only when no level is passed (`logging_config.py:74-89`). The CLI always passes one (`cli/root_app.py:80-81`), so only the MCP server reads it. An unknown name silently becomes INFO. There is no `--verbose` or `--quiet`.                   | `VAULTSPEC_RAG_LOG_LEVEL` is read by the CLI when neither `-v` nor `-d` is given (`cli/_app.py:504`). The daemon hard-codes INFO (`server/_main.py:140`), and the stdio MCP server configures nothing.          | —                                                                                                                                                                              |
+| Stdio watchdog | `VAULTSPEC_STDIO_WATCHDOG`                                                                                                                                                                                                                                                       | `VAULTSPEC_RAG_STDIO_WATCHDOG`                                                                                                                                                                                  | —                                                                                                                                                                              |
+| Hints          | `--no-hints` or `VAULTSPEC_NO_HINTS=1`, also suppressed inside git hooks (`cli/rendering_hints.py:80-99`)                                                                                                                                                                        | None                                                                                                                                                                                                            | —                                                                                                                                                                              |
+| JSON indent    | `VAULTSPEC_JSON_PRETTY`                                                                                                                                                                                                                                                          | Rich pretty-prints always                                                                                                                                                                                       | —                                                                                                                                                                              |
+| Unattended     | `CI`, `VAULTSPEC_NON_INTERACTIVE`, non-TTY stdin or stdout, or `--json` (`cli/_trigger_trust.py:36-39,162-176`)                                                                                                                                                                  | `sys.stdin.isatty()` only (`cli/_install.py:373`). `CI` and `VAULTSPEC_NON_INTERACTIVE` are ignored, and under `--json` with a TTY it still prompts.                                                            | —                                                                                                                                                                              |
 
 ### Session environment propagation
 
@@ -214,15 +214,19 @@ Rag already imports core from 21 production modules. The most frequent imports a
 **What blocks importing core today.**
 
 - **Core's reusable pieces are private or closed to other packages.**
+
   - Unattended detection lives in `cli/_trigger_trust.py`.
   - `env_value()` and `resolve_credential()` refuse any variable that is not a core registry entry (`config/config.py:803-807`).
   - The credential gate reads core's own package mode.
+
 - **Import cost.** Measured cold with `python -X importtime` on this workstation:
+
   - `import vaultspec_core` costs about 0.16 s, almost all of it `importlib.metadata`;
   - `vaultspec_core.config` costs about 0.31 s cumulative;
   - rag's stdlib-only `_env_values` costs about 0.01 s.
 
   `_env_values.py` is stdlib-only because spawn workers re-import their chain. A shared vocabulary must therefore live in a core module with no package-level imports beyond the stdlib.
+
 - **Floor-only risk.** A floor without a ceiling against a 0.x core means any core minor release can change an imported name. No test in either repository pins the core API that rag uses.
 
 ### Records that contradict the code
