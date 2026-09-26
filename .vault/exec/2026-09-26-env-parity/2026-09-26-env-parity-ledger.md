@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:607d09dd92cc1ef18ed73e49ffa0b86e9c8b80fff392a6429231d4ae7ef7da8a'
+body_hash: 'sha256:896092bf682ec76e72258f19b57bea54c803936040696ffca2efb166020f87f3'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -75,7 +75,15 @@ related:
 - `S06` `verify:` `just check-type` -> `pass`
 - `S06` `verify:` `just test-unit` -> `pass`
 - `S06` `by:` `vaultspec-high-executor`
+- `S40` `by:` `orchestrator`
+- `S43` `M` `src/vaultspec_a2a/providers/_harness_mcp_registry.py`
+- `S43` `M` `src/vaultspec_a2a/providers/tests/test_acp_mcp.py`
+- `S43` `verify:` `pytest src/vaultspec_a2a/providers/tests/test_acp_mcp.py` -> `pass`
+- `S43` `verify:` `ruff check` -> `pass`
+- `S43` `by:` `vaultspec-low-executor`
 
 ## Notes
 
 - `S36` Paths are in the vaultspec-rag repository, commit aeddb984 on its feat/env-parity branch.
+- `S40` The user approved the decision, the plan and the a2a operating-model change together in session on 2026-09-26; no file changed.
+- `S43` Paths are in the vaultspec-a2a repository, commit 368b64f6 on its feat/env-parity branch.

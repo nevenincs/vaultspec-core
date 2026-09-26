@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:02dfc3945d6983b445fd8aef584efccf32eb498c95046d5a089da43f3323222d'
+body_hash: 'sha256:627ec06b04d64845d5c09070bb4668e701facc2baf06bb4d9c854fd67234198e'
 ---
 
 # `env-parity` plan
@@ -137,10 +137,10 @@ Bring the other two packages onto the contract: a2a imports core's resolver as a
 
 Gate on the user's confirmation of the a2a operating-model change, then take core as a runtime dependency, read only registered credentials from the workspace .env under core's gate, take settings from an explicitly named operator file, and fix the stale MCP script name.
 
-- [ ] `W03.P09.S40` - Block on the user's confirmation that a2a settings move from the workspace .env to an explicitly named operator file; `src/vaultspec_a2a/control/settings_base.py`.
+- [x] `W03.P09.S40` - Block on the user's confirmation that a2a settings move from the workspace .env to an explicitly named operator file; `src/vaultspec_a2a/control/settings_base.py`.
 - [ ] `W03.P09.S41` - Promote vaultspec-core from the tooling group to a runtime dependency with a floor on the W01 release and no ceiling; `pyproject.toml`.
 - [ ] `W03.P09.S42` - Read only registered credentials from the workspace .env through core's gate, and load settings from an operator file named by the invocation or session environment; `src/vaultspec_a2a/control/settings_base.py`.
-- [ ] `W03.P09.S43` - Launch core's MCP server as vaultspec-core-mcp instead of the retired vaultspec-mcp script name; `src/vaultspec_a2a/providers/_harness_mcp_registry.py`.
+- [x] `W03.P09.S43` - Launch core's MCP server as vaultspec-core-mcp instead of the retired vaultspec-mcp script name; `src/vaultspec_a2a/providers/_harness_mcp_registry.py`.
 
 ### Phase `W03.P10` - vaultspec-dashboard conformance
 
