@@ -8,11 +8,11 @@ that pins every name, parameter, kind and default the resolution contract
 promises. A change to any of them - a rename, a reordered parameter, a
 default that moves - fails here first.
 
-Every name is checked three ways: it exists where it is meant to be
-imported from, it appears in the defining module's own ``__all__`` where
-that module declares one, and its call signature - parameter names, kinds
-and defaults, in order - matches exactly. A class or dataclass is checked
-by its field set instead of a call signature.
+Every pinned callable is checked three ways: it exists where it is meant to
+be imported from, it appears in its defining module's own ``__all__``, and
+its call signature - parameter names, kinds and defaults, in order -
+matches exactly. A class, dataclass or enum is checked by its field or
+member set instead of a call signature, in its own dedicated test.
 
 One entry, :mod:`vaultspec_core.env_values`, carries an additional promise:
 a spawn worker re-imports it per worker, so it must import nothing beyond
@@ -294,8 +294,10 @@ class TestPinnedCallableSignatures:
     def test_is_listed_in_the_defining_modules_all(self, pinned: _Pinned) -> None:
         defining = _import(pinned.defining_module)
         declared = getattr(defining, "__all__", None)
-        if declared is None:
-            pytest.skip(f"{pinned.defining_module} declares no __all__")
+        assert declared is not None, (
+            f"{pinned.defining_module} declares no __all__; every pinned "
+            f"callable's home module is expected to have one"
+        )
         assert pinned.name in declared
 
     @pytest.mark.parametrize(
