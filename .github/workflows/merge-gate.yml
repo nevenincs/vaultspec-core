@@ -76,8 +76,10 @@ jobs:
   lint:
     name: "Check: Lint (Linux)"
     if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' || github.event.label.name == 'ci:full')) }}
-    timeout-minutes: 30
+    timeout-minutes: 150
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 30
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -144,8 +146,10 @@ jobs:
   test-linux:
     name: "Test: Full suite (Linux)"
     if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
-    timeout-minutes: 120
+    timeout-minutes: 240
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 120
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -282,6 +286,7 @@ jobs:
       checks: read
       pull-requests: write
     env:
+      CI_RESOURCE_CLASS: verdict
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       EVENT: ${{ github.event_name }}
       DRAFT: ${{ github.event.pull_request.draft }}
