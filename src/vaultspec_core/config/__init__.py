@@ -7,7 +7,8 @@ its named entries, :func:`register_registry` for another package's entries, the
 :class:`ConfigurationError` every one of them refuses with, from
 :mod:`.config`; :func:`resolve_credential`
 and its types from :mod:`.credential`; :func:`read_dotenv_value` from
-:mod:`.dotenv`; and :class:`WorkspaceLayout`, :class:`LayoutMode`,
+:mod:`.dotenv`; :func:`is_unattended` and :func:`unattended_declared`
+from :mod:`.session`; and :class:`WorkspaceLayout`, :class:`LayoutMode`,
 :func:`resolve_target`, :class:`ResolvedTarget`, :class:`TargetSource`,
 :func:`resolve_workspace`, :func:`discover_git`, and :class:`WorkspaceError`
 from :mod:`.workspace`. Consumed by nearly every subpackage that needs
@@ -58,6 +59,8 @@ from .credential import CredentialSource as CredentialSource
 from .credential import HostedSearchConfig as HostedSearchConfig
 from .credential import resolve_credential as resolve_credential
 from .dotenv import read_dotenv_value as read_dotenv_value
+from .session import is_unattended as is_unattended
+from .session import unattended_declared as unattended_declared
 from .workspace import GitInfo as GitInfo
 from .workspace import LayoutMode as LayoutMode
 from .workspace import ResolvedTarget as ResolvedTarget

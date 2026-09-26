@@ -19,17 +19,11 @@ Key exports: :func:`consent_gate`, :func:`describe_trigger`,
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING
 
 import typer
 
-from vaultspec_core.config import (
-    CI,
-    VAULTSPEC_NON_INTERACTIVE,
-    env_flag,
-    env_present,
-)
+from vaultspec_core.config import is_unattended
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -168,26 +162,15 @@ def operator_present() -> bool:
     unattended run. Any one of them dissenting means the answer is no, because
     a prompt nobody sees is a prompt nobody consented to.
 
-    ``CI`` is the near-universal convention, owned by the systems that set it
-    and defined by presence. The product's own marker is a boolean, and it
-    outranks ``CI`` in both directions: a product-owned variable set
-    deliberately for this tool is a later word than the environment the tool
-    happens to run in, so a wrapper script that runs under CI with someone
-    watching can say so.
+    The rule itself is
+    :func:`~vaultspec_core.config.session.is_unattended`, shared with every
+    other surface that decides whether it may ask a question.
 
     Raises:
         ConfigurationError: If the product marker carries a word the boolean
             vocabulary does not recognise.
     """
-    declared = env_flag(VAULTSPEC_NON_INTERACTIVE)
-    if declared is True:
-        return False
-    if declared is None and env_present(CI):
-        return False
-    try:
-        return sys.stdin.isatty() and sys.stdout.isatty()
-    except (AttributeError, ValueError):
-        return False
+    return not is_unattended()
 
 
 def _explain_refusal(names: list[str], detail: list[str]) -> None:

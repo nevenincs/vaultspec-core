@@ -12,6 +12,7 @@ world it is given.
 
 from __future__ import annotations
 
+import io
 from typing import TYPE_CHECKING
 
 import pytest
@@ -32,8 +33,10 @@ from vaultspec_core.config import (
     env_flag,
     env_source,
     env_value,
+    is_unattended,
     register_registry,
     resolve_credential,
+    unattended_declared,
 )
 from vaultspec_core.config.config import _forget_registry
 from vaultspec_core.core.enums import InstallMode
@@ -699,3 +702,59 @@ class TestLogLevel:
         reported = str(refusal.value)
         assert reported.startswith("2 unusable settings:")
         assert "VAULTSPEC_LOG_LEVEL" in reported
+
+
+class TestUnattendedDetection:
+    """One rule for whether anybody is there to answer a prompt."""
+
+    def test_the_product_marker_outranks_ci(self) -> None:
+        # A wrapper script running under CI with somebody watching says so
+        # with the product's own variable, which is the later word.
+        assert unattended_declared({"CI": "true"}) is True
+        assert unattended_declared(
+            {"CI": "true", "VAULTSPEC_NON_INTERACTIVE": "0"}
+        ) is (False)
+        assert unattended_declared({"VAULTSPEC_NON_INTERACTIVE": "1"}) is True
+
+    def test_nothing_declared_is_not_a_declaration(self) -> None:
+        assert unattended_declared({}) is None
+        assert unattended_declared({"VAULTSPEC_NON_INTERACTIVE": "  "}) is None
+
+    def test_ci_is_present_even_when_blank(self) -> None:
+        assert unattended_declared({"CI": ""}) is True
+
+    def test_an_unreadable_marker_is_refused(self) -> None:
+        with pytest.raises(ConfigurationError):
+            unattended_declared({"VAULTSPEC_NON_INTERACTIVE": "maybe"})
+
+    def test_a_declared_unattended_run_never_prompts(self) -> None:
+        assert is_unattended(
+            environ={"VAULTSPEC_NON_INTERACTIVE": "yes"},
+            stdin=io.StringIO(),
+            stdout=io.StringIO(),
+        )
+
+    def test_a_machine_envelope_is_unattended_whatever_the_session_says(
+        self,
+    ) -> None:
+        assert is_unattended(
+            json_output=True,
+            environ={"VAULTSPEC_NON_INTERACTIVE": "0"},
+            stdin=io.StringIO(),
+            stdout=io.StringIO(),
+        )
+
+    def test_a_stream_that_is_not_a_terminal_is_unattended(self) -> None:
+        # Declaring an operator present does not conjure one: a pipeline is
+        # still a pipeline.
+        assert is_unattended(
+            environ={"VAULTSPEC_NON_INTERACTIVE": "0"},
+            stdin=io.StringIO(),
+            stdout=io.StringIO(),
+        )
+
+    def test_a_closed_stream_is_nobody(self) -> None:
+        closed = io.StringIO()
+        closed.close()
+
+        assert is_unattended(environ={}, stdin=closed, stdout=io.StringIO())
