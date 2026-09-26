@@ -3,8 +3,7 @@
 Centralizes the small set of helpers that stamp manifest schema versions
 without downgrading them, persist a resolved
 :class:`~vaultspec_core.core.enums.InstallMode` to the committed workspace
-declaration, and infer the mode for a legacy workspace being upgraded
-(ADR Q6).
+declaration, and infer the mode for a legacy workspace being upgraded.
 """
 
 from __future__ import annotations
@@ -179,7 +178,7 @@ def infer_upgrade_mode(
 def upgrade_mode_with_provenance(
     target: Path, explicit: InstallMode | None
 ) -> ResolvedMode:
-    """Resolve core's provisioning mode for an ``install --upgrade`` (ADR Q6).
+    """Resolve core's provisioning mode for an ``install --upgrade``.
 
     Precedence mirrors provision-time resolution at its top: an explicit
     ``--mode`` flag wins (and is validated for impossible combinations), and an
