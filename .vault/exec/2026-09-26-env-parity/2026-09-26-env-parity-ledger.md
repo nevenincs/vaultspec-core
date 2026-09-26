@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:faec05d64380c02f1c8c3505702b746f32daf3beaa2ce8857322e1407c4dd464'
+body_hash: 'sha256:aceb013015fcc5cf84d111bd967002ac8501d48d0c14baea5eed8e90c5e90f5b'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -89,6 +89,13 @@ related:
 - `S04` `verify:` `just check-type` -> `pass`
 - `S04` `verify:` `pytest src/vaultspec_core/crossref src/vaultspec_core/config src/vaultspec_core/mcp_server/tests src/vaultspec_core/tests/cli src/vaultspec_core/vaultcore/tests` -> `pass`
 - `S04` `by:` `vaultspec-high-executor`
+- `S05` `M` `src/vaultspec_core/config/config.py`
+- `S05` `M` `src/vaultspec_core/mcp_server/app.py`
+- `S05` `M` `src/vaultspec_core/config/tests/test_config.py`
+- `S05` `verify:` `just check-python` -> `pass`
+- `S05` `verify:` `just check-type` -> `pass`
+- `S05` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/mcp_server/tests` -> `pass`
+- `S05` `by:` `vaultspec-high-executor`
 
 ## Notes
 
