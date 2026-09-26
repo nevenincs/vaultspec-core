@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:aa8da25ceb7f3c74ad5865bd4cb3249834ab6a569d18872d7d3d4184013f52a6'
+body_hash: 'sha256:20d1e284ce5359f7226b7b45e6d0b9d32d3c5ece677ac0ff93f4d65acd599dfd'
 related:
   - "[[2026-09-26-env-parity-research]]"
   - "[[2026-02-16-environment-variable-adr]]"
@@ -16,7 +16,7 @@ related:
   - "[[2026-02-19-workspace-path-decoupling-adr]]"
 ---
 
-# `env-parity` adr: `one resolution order, one env-file rule and one install surface, owned by core and imported by every package` | (**status:** `proposed`)
+# `env-parity` adr: `one resolution order, one env-file rule and one install surface, owned by core and imported by every package` | (**status:** `accepted`)
 
 ## Problem Statement
 
@@ -37,6 +37,8 @@ The user directed on 2026-09-26 that:
 The user also proposed that packages import vaultspec-core's modules as a real, floor-only runtime dependency instead of reimplementing them.
 
 ## Considerations
+
+Accepted 2026-09-26. The user approved this record and its plan in session ("approve!"), covering the a2a operating-model change named under Consequences.
 
 - vaultspec-rag already depends on vaultspec-core at runtime with a floor and no ceiling, and imports it from 21 modules. The drift sits in what rag mirrors (`2026-09-26-env-parity-research`, reuse by import).
 - Core's reusable pieces are private or closed to other packages' variables, and `vaultspec_core.config` is too heavy for rag's spawn workers (same research, reuse by import).

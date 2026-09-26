@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:613b96ce776b7940751b2987b16cc62f7f7fe3889df2b2d36f959dee1aab7945'
+body_hash: 'sha256:85584bc6b1d51858599c7338112ff1aec9895ede9daf2a6985e65370b03f5aa5'
 ---
 
 # `env-parity` plan
@@ -19,6 +19,8 @@ body_hash: 'sha256:613b96ce776b7940751b2987b16cc62f7f7fe3889df2b2d36f959dee1aab7
 Make every vaultspec package resolve settings, env files and credentials in one order and expose one install surface, owned by vaultspec-core and imported rather than mirrored.
 
 ## Description
+
+Approved 2026-09-26. The user approved `2026-09-26-env-parity-adr` and this plan in session ("approve!"), in reply to a request that named both and the a2a operating-model change gated by `W03.P09.S40`. Pushing branches, opening pull requests and cutting releases stay separate outward-facing actions confirmed when reached.
 
 This plan executes `2026-09-26-env-parity-adr`, grounded by `2026-09-26-env-parity-research`. The ADR governs every Wave:
 
