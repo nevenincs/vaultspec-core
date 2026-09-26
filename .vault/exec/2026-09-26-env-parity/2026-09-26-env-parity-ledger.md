@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:fcb5dfcdf47a56ef77ac390a4efc7ab89e6631b65422b159522715c006e5082b'
+body_hash: 'sha256:730ef9e7d8af313b4f8fe1a6bcccbaca51ec8a890bd304947cd8d4c6c457c32d'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -408,3 +408,4 @@ related:
 - `S37` commits 256baf48, dd09dc67, dd6bb16a. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
 - `S38` commits 7571d824, 63fb1762, 3e747ebe, 84201194. Found: `vaultspec_core.cli` rebinds typer.main.TyperArgument process-wide at import, so help metavars depend on import order in any process importing both CLIs; rag tests assert the argument name; the rebinding itself is a vaultspec-core follow-up. vaultspec-rag branch feat/env-parity; reviewed (three rounds, final PASS at 84201194).
 - `S39` 5305 passed, 0 failed at 84201194. Release pending: core 0.3.0 publication, S18 floor raise, and the merge of main after vaultspec-rag PR 548 lands (resolution map from the session owning 548).
+- `S17` PR 566 also carries fix/skills, fix/sweep-cancel-flake and chore/dependency-audit (user direction, 2026-09-26). fix/skills merged as d08a17ff: its environment-provisioning store sits on the env-parity order after the session environment; blank-is-unset and the editor ladder stay env-parity's (user decision). Recorded in the 2026-09-26 amendment notes on the env-parity, environment-provisioning and typesafe-search ADRs. Four tests fix/skills already failed were fixed in 39d0c544, 0a5d85cb and cad06130, with its skill prose kept as written.
