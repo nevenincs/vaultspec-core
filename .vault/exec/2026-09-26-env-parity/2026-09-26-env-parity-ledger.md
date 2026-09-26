@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:6cec324b0d1ef56088b7b721a6882f839261fa5feeae0d95458964e6b50cab12'
+body_hash: 'sha256:ce8bc58352e503384b613cd6eb75519bc345bc00ba6da74cc5fda6e76f790e16'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -106,6 +106,22 @@ related:
 - `S08` `verify:` `just check-type` -> `pass`
 - `S08` `verify:` `pytest src/vaultspec_core/config src/vaultspec_core/tests/cli/test_global_options.py` -> `pass`
 - `S08` `by:` `vaultspec-high-executor`
+- `S09` `M` `src/vaultspec_core/core/local_config.py`
+- `S09` `M` `src/vaultspec_core/core/agents.py`
+- `S09` `M` `src/vaultspec_core/core/rules.py`
+- `S09` `M` `src/vaultspec_core/core/skills.py`
+- `S09` `M` `src/vaultspec_core/core/triggers.py`
+- `S09` `M` `src/vaultspec_core/config/config.py`
+- `S09` `M` `src/vaultspec_core/cli/spec_cmd_agents.py`
+- `S09` `M` `src/vaultspec_core/cli/spec_cmd_rules.py`
+- `S09` `M` `src/vaultspec_core/cli/spec_cmd_skills.py`
+- `S09` `M` `src/vaultspec_core/config/tests/test_environment.py`
+- `S09` `M` `src/vaultspec_core/tests/cli/test_config_editor_safety.py`
+- `S09` `M` `src/vaultspec_core/tests/test_logging_config.py`
+- `S09` `verify:` `just check-python` -> `pass`
+- `S09` `verify:` `just check-type` -> `pass`
+- `S09` `verify:` `pytest src/vaultspec_core/tests src/vaultspec_core/core/tests src/vaultspec_core/config` -> `pass`
+- `S09` `by:` `vaultspec-high-executor`
 
 ## Notes
 
@@ -116,3 +132,4 @@ related:
 - `S03` review fix: the workspace .env gate takes no caller-supplied package; the declaring package's mode is the only one consulted
 - `S04` review fix: every product value is refused at startup in one report, an error report never re-reads the switch that failed, the product marker outranks CI, and `NO_COLOR` follows set-and-non-empty
 - `S08` The test pinning the absence of --verbose is replaced by one pinning its effect.
+- `S09` The level-fallback test carried over from the log-level Step is corrected here to the refusal the policy requires.
