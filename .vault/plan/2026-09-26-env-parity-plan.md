@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:85584bc6b1d51858599c7338112ff1aec9895ede9daf2a6985e65370b03f5aa5'
+body_hash: 'sha256:926ddf5f1d193d2959ea19b6b6e6dc5d1ea20d5bed558c34fba412864d606601'
 ---
 
 # `env-parity` plan
@@ -72,7 +72,7 @@ Route core's own entry points through the public resolution functions: workspace
 
 Correct the example file and documentation to the contract, record the reconciliation of core's records that contradicted the code, pin the public surface other packages import, and run the full gate before release.
 
-- [ ] `W01.P03.S13` - Amend the core records that contradict the code: environment-variable, typesafe-search, workspace-path-decoupling, cli-spec-edit-safety, install-mode and install-parity; `.vault/adr/2026-02-16-environment-variable-adr.md`.
+- [x] `W01.P03.S13` - Amend the core records that contradict the code: environment-variable, typesafe-search, workspace-path-decoupling, cli-spec-edit-safety, install-mode and install-parity; `.vault/adr/2026-02-16-environment-variable-adr.md`.
 - [ ] `W01.P03.S14` - State the resolution order and the workspace .env credential rule in the example file, and stop pointing at .env.local; `.env.example`.
 - [ ] `W01.P03.S15` - Document the resolution order, the framework variables and the chain fallback in the CLI guide and the bundled reference, including every registry entry; `docs/CLI.md`.
 - [ ] `W01.P03.S16` - Add a contract test pinning the public names and signatures other packages import for resolution, credentials, unattended detection and the install envelope; `src/vaultspec_core/tests/test_public_resolution_api.py`.
@@ -124,7 +124,7 @@ Make every flag rag shares with core carry the same name, short form, default an
 
 Record the reconciliation of rag's records, correct the example file and guides, prove parity against the released core, and run the full gate.
 
-- [ ] `W02.P08.S36` - Amend the rag records that contradict the code: typesafe-classifier, test-and-paths, vaultspec-rag-install, mcp-service-client and index-drift-hardening; `.vault/adr/2026-09-21-typesafe-classifier-adr.md`.
+- [x] `W02.P08.S36` - Amend the rag records that contradict the code: typesafe-classifier, test-and-paths, vaultspec-rag-install, mcp-service-client and index-drift-hardening; `.vault/adr/2026-09-21-typesafe-classifier-adr.md`.
 - [ ] `W02.P08.S37` - Correct the example file header and the configuration, installation and CLI guides to the contract, including the resolution order and the .env credential rule; `docs/configuration.md`.
 - [ ] `W02.P08.S38` - Add parity tests: rag resolves the framework variables and chain as core does, reads no .env outside the gate, and its shared install flags match core's help surface; `src/vaultspec_rag/tests/test_env_parity.py`.
 - [ ] `W02.P08.S39` - Run rag's full gate and cut the release; `src/vaultspec_rag/tests`.
