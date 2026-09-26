@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:be7da20bcfb82188e722fafb53969b96db157ded260d20ed1366d04b41dcf776'
+body_hash: 'sha256:debcf6bcf49a50162443f4e911af5b99e552e75018c85a4da705ceb39fbed054'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -231,6 +231,10 @@ related:
 - `S11` `M` `src/vaultspec_core/tests/cli/test_install.py`
 - `S11` `verify:` `pytest src/vaultspec_core/tests/cli/test_install.py -k TestUpgradeInfersDevModeForALegacyWorkspace` -> `pass`
 - `S11` `by:` `vaultspec-standard-executor`
+- `S16` `A` `src/vaultspec_core/tests/test_public_resolution_api.py`
+- `S16` `verify:` `pytest src/vaultspec_core/tests/test_public_resolution_api.py` -> `pass`
+- `S16` `verify:` `just check-type` -> `pass`
+- `S16` `by:` `vaultspec-standard-executor`
 
 ## Notes
 
