@@ -148,6 +148,7 @@ _CONFIG_CALLABLES: tuple[_Pinned, ...] = (
         (
             _param("environ", _POK, None),
             _param("package", _KW, "vaultspec-core"),
+            _param("include_framework", _KW, True),
         ),
     ),
     _Pinned(

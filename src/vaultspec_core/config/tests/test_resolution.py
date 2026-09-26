@@ -628,12 +628,45 @@ class TestStartupRefusal:
 
 
 class TestCheckEnvironmentPerPackage:
-    """A companion checks its own entries, not core's whole registry."""
+    """A companion checks its own entries, plus the framework's shared ones."""
 
-    def test_a_companion_is_blind_to_a_bad_value_that_is_not_its_own(self) -> None:
-        # VAULTSPEC_IO_BUFFER_SIZE belongs to core alone; a companion's own
-        # startup check must not trip over a variable it never declared.
-        check_environment({"VAULTSPEC_IO_BUFFER_SIZE": "plenty"}, package=COMPANION)
+    def test_a_companion_alone_is_blind_to_a_value_that_is_not_its_own(self) -> None:
+        # VAULTSPEC_IO_BUFFER_SIZE belongs to core alone; asked for the
+        # companion's own chains only, the check never sees it.
+        check_environment(
+            {"VAULTSPEC_IO_BUFFER_SIZE": "plenty"},
+            package=COMPANION,
+            include_framework=False,
+        )
+
+    def test_a_shared_switch_the_companion_reads_is_refused_by_default(self) -> None:
+        # VAULTSPEC_NO_HINTS carries no package-scoped name in front of it:
+        # an importer reads the framework name itself, so its startup check
+        # must refuse a bad value there rather than at report time.
+        with pytest.raises(ConfigurationError) as refusal:
+            check_environment({"VAULTSPEC_NO_HINTS": "maybe"}, package=COMPANION)
+
+        assert "VAULTSPEC_NO_HINTS" in str(refusal.value)
+
+    def test_the_framework_set_can_be_left_out(self) -> None:
+        check_environment(
+            {"VAULTSPEC_NO_HINTS": "maybe"},
+            package=COMPANION,
+            include_framework=False,
+        )
+
+    def test_the_frameworks_internals_and_conventions_stay_exempt(self) -> None:
+        # Included or not, a marker core sets on its own children and a
+        # convention another tool owns are never a companion's to refuse.
+        check_environment(
+            {
+                "VAULTSPEC_MCP_GATEWAY_INVOCATION": "anything",
+                "CI": "whatever",
+                "NO_COLOR": "yes please",
+                "VAULTSPEC_STDIO_WATCHDOG": "maybe",
+            },
+            package=COMPANION,
+        )
 
     def test_a_companions_own_bad_value_is_refused(self) -> None:
         companion_level = ConfigVariable(

@@ -1071,7 +1071,10 @@ def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str
 
 
 def check_environment(
-    environ: Mapping[str, str] | None = None, *, package: str = PACKAGE
+    environ: Mapping[str, str] | None = None,
+    *,
+    package: str = PACKAGE,
+    include_framework: bool = True,
 ) -> None:
     """Refuse every unusable product value in *environ*, together.
 
@@ -1082,18 +1085,29 @@ def check_environment(
     already written everything it was going to write. An entry point calls
     this first, so a value nobody can use stops the run before it starts.
 
-    Only *package*'s own registered entries are checked, plus the framework
-    entry each one falls back to: a companion package calling this validates
-    its own variables and the shared ones its chain reaches, not core's
-    entire registry. vaultspec-core's own entry points call it with the
-    default; an importing package passes its own distribution name.
+    *package*'s own registered entries are checked, plus the framework entry
+    each one falls back to. By default the framework's own product entries
+    are checked too, because a companion package reads them directly and
+    without a chain: ``VAULTSPEC_NO_HINTS``, ``VAULTSPEC_JSON_PRETTY`` and
+    ``VAULTSPEC_NON_INTERACTIVE`` are shared switches with no package-scoped
+    name in front of them, so a startup check that skipped them would pass
+    and then refuse late, at the moment the report is printed. Pass
+    ``include_framework=False`` to check only *package*'s own chains - for a
+    process that reads none of the shared switches, or one whose host has
+    already checked them.
 
-    A protective switch is exempt: leaving its guard armed is the safer
-    reading of a typo, and refusing to start is not safer still.
+    The framework's internal markers and the external conventions it honours
+    are never checked for another package: they are not that package's
+    settings to refuse over. A protective switch is exempt in either set:
+    leaving its guard armed is the safer reading of a typo, and refusing to
+    start is not safer still.
 
     Args:
         environ: The environment to read; ``None`` reads the process's own.
         package: The distribution whose registered entries to check.
+        include_framework: Whether to also check vaultspec-core's own
+            product-scoped entries. Ignored when *package* is the framework
+            itself, whose entries are already the ones being checked.
 
     Raises:
         ConfigurationError: If any product-owned variable carries a value it
@@ -1102,8 +1116,15 @@ def check_environment(
     env = os.environ if environ is None else environ
     problems: list[str] = []
 
+    # Snapshot under the lock: a package registering from a worker thread
+    # would otherwise append to the very list being walked.
+    with _REGISTRATION_LOCK:
+        registered = list(_REGISTRIES.get(package, []))
+        if include_framework and package != PACKAGE:
+            registered += _REGISTRIES.get(PACKAGE, [])
+
     chain: dict[int, ConfigVariable] = {}
-    for var in _REGISTRIES.get(package, []):
+    for var in registered:
         chain[id(var)] = var
         if var.fallback is not None:
             chain[id(var.fallback)] = var.fallback
