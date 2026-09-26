@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#framework'
 date: '2026-02-16'
-modified: '2026-06-28'
-body_hash: 'sha256:ba966d619c12294b14f05d58de0110272d15731cdd0d43b3f906d8351195967f'
+modified: '2026-09-26'
+body_hash: 'sha256:9d0e288aa6252f35ac69b27db995b3c386182665366da438c5e8b9f4bc65d059'
 related:
   - '[[2026-02-16-env-var-research]]'
   - '[[2026-02-16-hardcoded-constants-research]]'
@@ -12,6 +12,22 @@ related:
 ---
 
 # `framework` adr: `Environment Variable Standardization` | (**status:** `accepted`)
+
+**Amendment note, 2026-09-26**: `2026-09-26-env-parity-research` found that the blueprint below no longer describes the code. Where the two differ, the code as listed here is authoritative. The centralisation decision itself stands.
+
+- **Registry.** `CONFIG_REGISTRY` in `src/vaultspec_core/config/config.py:693-795` is the canonical and total list of every variable core reads or sets: 26 entries in three scopes (product, internal, external). It replaces the 33-row table below. `.env.example` mirrors it, and `dev/guards/test_environment_registry.py` enforces that parity. No other module reads the process environment; call-time reads go through `env_value()` and child processes through `child_environment()` (`config/config.py:810-851`).
+- **Names.** Only `VAULTSPEC_*` names are read for core's own variables. External conventions keep their own names (`CI`, `NO_COLOR`, `VISUAL`, `EDITOR`, `GIT_INDEX_FILE`, `COLUMNS`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`). `VS_*` aliases were never shipped. The workspace root variable is `VAULTSPEC_TARGET_DIR`, not `VAULTSPEC_ROOT_DIR`.
+- **Other packages.** The rows naming rag, A2A, Lance, MCP-port and agent variables are not core variables. Each package owns its own prefixed registry; rag's is `VAULTSPEC_RAG_*`.
+- **Precedence.** Loaded fields resolve override, then environment variable, then default (`config/config.py:178-228`).
+- **Invalid values.** An invalid value is logged at ERROR, secrets redacted, and the default is used (`config/config.py:321-403`). Only a missing required variable raises, and none is required. The `pytest.raises(ValueError)` examples below do not describe this.
+- **Booleans.** The `_ENABLED` and `_DISABLED` suffix convention was not adopted, and no registry entry is boolean-typed. The switches that exist each parse at their call site:
+  - `VAULTSPEC_JSON_PRETTY` is off for blank, `0`, `false`, `no` or `off`;
+  - `VAULTSPEC_NO_HINTS` is on only for `1`;
+  - `VAULTSPEC_STDIO_WATCHDOG` is off for `0`, `false`, `off` or `no`;
+  - `VAULTSPEC_NON_INTERACTIVE`, `CI` and `NO_COLOR` count on presence.
+- **Env files.** Core loads no dotenv file into its process, and never reads `.env.local`. The one exception is a secret entry marked `workspace_dotenv`, today only `VAULTSPEC_CORE_TYPESAFE_API_KEY`. That one variable is read from `<workspace root>/.env` under the gate recorded in `2026-09-23-typesafe-search-adr`. Operators set everything else in the process environment.
+
+`2026-09-26-env-parity-adr` proposes a single resolution order, value vocabulary and invalid-value policy shared by every vaultspec package. Until it is accepted, the bullets above are the current contract.
 
 ## Environment Variable Standardization Blueprint
 
