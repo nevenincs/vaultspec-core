@@ -64,6 +64,7 @@ __all__ = [
     "ConfigVariable",
     "VariableScope",
     "VaultSpecConfig",
+    "check_environment",
     "child_environment",
     "env_flag",
     "env_present",
@@ -398,6 +399,11 @@ class ConfigVariable:
             environment (see :mod:`vaultspec_core.config.credential`). Only a
             secret may be so marked: the file is repository content, and it
             supplies credentials, never settings.
+        fail_safe: If ``True``, the variable is a protective switch: an
+            unusable value leaves the guard in its protective state and warns
+            rather than refusing the process. The one exception to
+            reject-on-invalid, because refusing to start is not a safer
+            outcome than running guarded.
         fallback: The framework-scoped entry this one chains to. A
             package-scoped name is read first; when it supplies nothing, the
             shared name behind it is read. A credential never chains, and an
@@ -423,6 +429,7 @@ class ConfigVariable:
     secret: bool = False
     scope: VariableScope = VariableScope.PRODUCT
     workspace_dotenv: bool = False
+    fail_safe: bool = False
     fallback: ConfigVariable | None = None
     package: str | None = field(default=None, init=False)
 
@@ -513,7 +520,7 @@ VAULTSPEC_LOG_LEVEL: Final = ConfigVariable(
 VAULTSPEC_JSON_PRETTY: Final = ConfigVariable(
     env_name="VAULTSPEC_JSON_PRETTY",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
         "Indents --json output. A true word turns it on; unset, blank or a "
@@ -524,7 +531,7 @@ VAULTSPEC_JSON_PRETTY: Final = ConfigVariable(
 VAULTSPEC_NO_HINTS: Final = ConfigVariable(
     env_name="VAULTSPEC_NO_HINTS",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
         "Set to a true word to drop the Next actions block commands print "
@@ -536,7 +543,7 @@ VAULTSPEC_NO_HINTS: Final = ConfigVariable(
 VAULTSPEC_NON_INTERACTIVE: Final = ConfigVariable(
     env_name="VAULTSPEC_NON_INTERACTIVE",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
         "Set to a true word to declare that no operator is watching: "
@@ -549,7 +556,7 @@ VAULTSPEC_NON_INTERACTIVE: Final = ConfigVariable(
 VAULTSPEC_STDIO_WATCHDOG: Final = ConfigVariable(
     env_name="VAULTSPEC_STDIO_WATCHDOG",
     attr_name=None,
-    var_type=str,
+    var_type=bool,
     default=None,
     description=(
         "Lifetime watchdog of the MCP server, on by default. A false word "
@@ -557,6 +564,7 @@ VAULTSPEC_STDIO_WATCHDOG: Final = ConfigVariable(
         "or an unrecognised word leaves it armed: it is a protective switch, "
         "so a typo warns rather than turning the guard off."
     ),
+    fail_safe=True,
 )
 
 VAULTSPEC_MCP_GATEWAY_INVOCATION: Final = ConfigVariable(
@@ -589,7 +597,11 @@ NO_COLOR: Final = ConfigVariable(
     attr_name=None,
     var_type=str,
     default=None,
-    description="Set to any value, even blank, to disable colour in console output.",
+    description=(
+        "Set to any non-empty value to disable colour in console output, as "
+        "the no-color.org convention defines it. Set but empty is not a "
+        "request for monochrome output."
+    ),
     scope=VariableScope.EXTERNAL,
 )
 
@@ -771,9 +783,54 @@ CONFIG_REGISTRY: list[ConfigVariable] = [
 #: else instead of declared in a registry.
 _DECLARED_BY: Final[dict[int, str]] = {}
 
+#: Which package declared each registered *name*. Identity alone cannot
+#: protect a credential: a second package could otherwise build its own entry
+#: carrying another package's variable name and read that package's key from
+#: a workspace .env under its own mode gate.
+_DECLARED_NAMES: Final[dict[str, str]] = {}
+
 #: The registries themselves, which also keep every registered entry alive:
 #: identities are only unique while the objects behind them are.
 _REGISTRIES: Final[dict[str, list[ConfigVariable]]] = {}
+
+#: Guards the registries. Registration happens at import, which is normally
+#: single-threaded, but a package imported lazily from a worker thread would
+#: otherwise interleave its validation with another's mutation.
+_REGISTRATION_LOCK: Final = threading.Lock()
+
+
+def _name_conflict(var: ConfigVariable, package: str) -> str | None:
+    """Return why *var*'s name is not *package*'s to declare, or ``None``."""
+    owner = _DECLARED_NAMES.get(var.env_name)
+    if owner is None or (owner == package and _DECLARED_BY.get(id(var)) == package):
+        return None
+    return (
+        f"{var.env_name} is already declared by {owner}; "
+        f"an entry belongs to one package"
+    )
+
+
+def _fallback_problem(var: ConfigVariable, package: str, batch: set[int]) -> str | None:
+    """Return why *var*'s fallback cannot be chained to, or ``None``."""
+    if var.fallback is None:
+        return None
+    owner = _DECLARED_BY.get(id(var.fallback))
+    if owner is None and id(var.fallback) in batch:
+        owner = package
+    if owner is None:
+        return (
+            f"{var.env_name} falls back to {var.fallback.env_name}, "
+            f"which no registry declares"
+        )
+    if owner != PACKAGE:
+        # The chain runs package-scoped name -> framework name, and the
+        # framework is core. A chain into a third package would let one
+        # package's variable answer for another's.
+        return (
+            f"{var.env_name} falls back to {var.fallback.env_name}, which "
+            f"{owner} declares; a fallback names a {PACKAGE} variable"
+        )
+    return None
 
 
 def register_registry(package: str, entries: Iterable[ConfigVariable]) -> None:
@@ -784,7 +841,7 @@ def register_registry(package: str, entries: Iterable[ConfigVariable]) -> None:
     :func:`~vaultspec_core.config.credential.resolve_credential` for its own
     variables registers them once, at import. Registration is what binds an
     entry to the package whose install mode gates its credentials, so an
-    entry belongs to exactly one package.
+    entry belongs to exactly one package - by name as well as by identity.
 
     Args:
         package: The distribution name declaring the entries.
@@ -792,32 +849,58 @@ def register_registry(package: str, entries: Iterable[ConfigVariable]) -> None:
             under the same package is a no-op.
 
     Raises:
-        ValueError: If an entry is already registered by another package, or
-            chains to an entry no registry declares.
+        ValueError: If an entry, or an entry's name, is already declared by
+            another package; if an entry chains to one no registry declares;
+            or if it chains to a variable outside the framework's own.
     """
     declared = list(entries)
-    for var in declared:
-        owner = _DECLARED_BY.get(id(var))
-        if owner is not None and owner != package:
-            raise ValueError(
-                f"{var.env_name} is already declared by {owner}; "
-                f"an entry belongs to one package"
+    batch = {id(var) for var in declared}
+    with _REGISTRATION_LOCK:
+        for var in declared:
+            problem = _name_conflict(var, package) or _fallback_problem(
+                var, package, batch
             )
-    known = _DECLARED_BY.keys() | {id(var) for var in declared}
-    for var in declared:
-        if var.fallback is not None and id(var.fallback) not in known:
-            raise ValueError(
-                f"{var.env_name} falls back to {var.fallback.env_name}, "
-                f"which no registry declares"
-            )
+            if problem is not None:
+                raise ValueError(problem)
 
-    registry = _REGISTRIES.setdefault(package, [])
-    for var in declared:
-        if id(var) in _DECLARED_BY:
-            continue
-        var.package = package
-        _DECLARED_BY[id(var)] = package
-        registry.append(var)
+        registry = _REGISTRIES.setdefault(package, [])
+        for var in declared:
+            if id(var) in _DECLARED_BY:
+                continue
+            var.package = package
+            _DECLARED_BY[id(var)] = package
+            _DECLARED_NAMES[var.env_name] = package
+            registry.append(var)
+
+
+def _forget_registry(
+    package: str, entries: Iterable[ConfigVariable] | None = None
+) -> None:
+    """Undeclare *package*'s entries, or just *entries* of them.
+
+    Production code registers once at import and never undeclares. This is
+    for a test that declares a companion package: without it the entries it
+    invented outlive the module that invented them, and the next test sees a
+    registry no code under test ever built.
+
+    Args:
+        package: The distribution whose entries to drop.
+        entries: The entries to drop; ``None`` drops all of *package*'s.
+    """
+    with _REGISTRATION_LOCK:
+        registry = _REGISTRIES.get(package)
+        if registry is None:
+            return
+        dropped = list(registry if entries is None else entries)
+        for var in dropped:
+            if _DECLARED_BY.get(id(var)) != package:
+                continue
+            del _DECLARED_BY[id(var)]
+            _DECLARED_NAMES.pop(var.env_name, None)
+            registry.remove(var)
+            var.package = None
+        if not registry:
+            del _REGISTRIES[package]
 
 
 register_registry(PACKAGE, CONFIG_REGISTRY)
@@ -908,10 +991,11 @@ def env_source(
 def env_present(var: ConfigVariable, environ: Mapping[str, str] | None = None) -> bool:
     """Return whether *var* is set at all, blank included.
 
-    For the external conventions whose owners define them by presence -
-    ``CI``, ``NO_COLOR``, ``GIT_INDEX_FILE`` - which keep their owners'
-    meanings rather than the product's blank-is-unset rule. A product-owned
-    switch is read with :func:`env_flag` instead.
+    For the external conventions whose owners define them by presence alone -
+    ``CI`` and ``GIT_INDEX_FILE`` - which keep their owners' meanings rather
+    than the product's blank-is-unset rule. A convention whose owner requires
+    a non-empty value, ``NO_COLOR``, is read with :func:`env_value`; a
+    product-owned switch with :func:`env_flag`.
 
     Args:
         var: A registered entry.
@@ -976,6 +1060,41 @@ def child_environment(*assignments: tuple[ConfigVariable, str]) -> dict[str, str
     for var, value in assignments:
         env[_registered(var).env_name] = value
     return env
+
+
+def check_environment(environ: Mapping[str, str] | None = None) -> None:
+    """Refuse every unusable product value in *environ*, together.
+
+    :meth:`VaultSpecConfig.from_environment` covers the variables that load
+    into configuration fields. The rest are read where they are used, which
+    is often after the work is done: a mistyped ``VAULTSPEC_NO_HINTS`` would
+    otherwise refuse a command at the moment it prints its report, having
+    already written everything it was going to write. An entry point calls
+    this first, so a value nobody can use stops the run before it starts.
+
+    A protective switch is exempt: leaving its guard armed is the safer
+    reading of a typo, and refusing to start is not safer still.
+
+    Args:
+        environ: The environment to read; ``None`` reads the process's own.
+
+    Raises:
+        ConfigurationError: If any product-owned variable carries a value it
+            cannot take. Every problem is reported in one message.
+    """
+    env = os.environ if environ is None else environ
+    problems: list[str] = []
+    for var in CONFIG_REGISTRY:
+        if var.scope is not VariableScope.PRODUCT or var.fail_safe:
+            continue
+        raw = env.get(var.env_name)
+        if is_blank(raw):
+            continue
+        _, problem = _parse_field(var, str(raw).strip())
+        if problem is not None:
+            problems.append(problem)
+    if problems:
+        raise ConfigurationError(_collected(problems))
 
 
 _cached_config: VaultSpecConfig | None = None

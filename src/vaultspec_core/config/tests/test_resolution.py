@@ -20,17 +20,21 @@ from vaultspec_core.config import (
     CONFIG_REGISTRY,
     PACKAGE,
     VAULTSPEC_CORE_TYPESAFE_API_KEY,
+    VAULTSPEC_STDIO_WATCHDOG,
+    VAULTSPEC_TARGET_DIR,
     ConfigVariable,
     Credential,
     CredentialSource,
     VariableScope,
     VaultSpecConfig,
+    check_environment,
     env_flag,
     env_source,
     env_value,
     register_registry,
     resolve_credential,
 )
+from vaultspec_core.config.config import _forget_registry
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.exceptions import ConfigurationError
 from vaultspec_core.core.workspace_mode import (
@@ -47,21 +51,19 @@ from vaultspec_core.env_values import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
 
 #: A companion package, declared here exactly as a real one would declare
-#: itself: its own entries, some of them chained to core's framework names.
+#: itself: its own entries, chained to the framework names core owns.
 COMPANION = "vaultspec-resolution-companion"
 
-FRAMEWORK_ROOT = ConfigVariable(
-    env_name="VAULTSPEC_RESOLUTION_ROOT",
-    attr_name=None,
-    var_type=str,
-    default=None,
-    description="The framework-scoped root every package falls back to.",
-)
+#: The framework rungs the companion's own names fall back to. They are core's
+#: real entries, because a fallback may name nothing else.
+FRAMEWORK_ROOT = VAULTSPEC_TARGET_DIR
+FRAMEWORK_SWITCH = VAULTSPEC_STDIO_WATCHDOG
 
 COMPANION_ROOT = ConfigVariable(
     env_name="VAULTSPEC_RESOLUTION_COMPANION_ROOT",
@@ -70,14 +72,6 @@ COMPANION_ROOT = ConfigVariable(
     default=None,
     description="The companion's own root, chained to the framework name.",
     fallback=FRAMEWORK_ROOT,
-)
-
-FRAMEWORK_SWITCH = ConfigVariable(
-    env_name="VAULTSPEC_RESOLUTION_SWITCH",
-    attr_name=None,
-    var_type=str,
-    default=None,
-    description="The framework-scoped switch every package falls back to.",
 )
 
 COMPANION_SWITCH = ConfigVariable(
@@ -99,18 +93,20 @@ COMPANION_KEY = ConfigVariable(
     workspace_dotenv=True,
 )
 
-register_registry(
-    COMPANION,
-    [
-        FRAMEWORK_ROOT,
-        COMPANION_ROOT,
-        FRAMEWORK_SWITCH,
-        COMPANION_SWITCH,
-        COMPANION_KEY,
-    ],
-)
-
 COMPANION_DOTENV_KEY = "companion-dotenv-4f81a26c9b03"
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _companion_registry() -> Iterator[None]:
+    """Declare the companion for this module only.
+
+    A package registers at import and never withdraws, but a package invented
+    by a test must not outlive it: the registries are process-global, and an
+    entry left behind is state no code under test put there.
+    """
+    register_registry(COMPANION, [COMPANION_ROOT, COMPANION_SWITCH, COMPANION_KEY])
+    yield
+    _forget_registry(COMPANION)
 
 
 def _unregistered(
@@ -321,6 +317,36 @@ class TestRegistration:
         with pytest.raises(ValueError, match="already declared by"):
             register_registry(PACKAGE, [COMPANION_KEY])
 
+    def test_a_name_another_package_declared_cannot_be_redeclared(self) -> None:
+        # Identity is not the boundary a credential needs: an interloper that
+        # built its own entry under core's key name would otherwise read that
+        # key from a workspace .env under its own install mode.
+        impostor = ConfigVariable(
+            env_name=VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name,
+            attr_name=None,
+            var_type=str,
+            default=None,
+            description="Core's credential name, claimed by someone else.",
+            secret=True,
+            workspace_dotenv=True,
+        )
+
+        with pytest.raises(ValueError, match="already declared by"):
+            register_registry("vaultspec-resolution-interloper", [impostor])
+
+    def test_a_fallback_into_another_package_is_refused(self) -> None:
+        borrower = ConfigVariable(
+            env_name="VAULTSPEC_RESOLUTION_BORROWER_ROOT",
+            attr_name=None,
+            var_type=str,
+            default=None,
+            description="A third package chaining to the companion's name.",
+            fallback=COMPANION_ROOT,
+        )
+
+        with pytest.raises(ValueError, match=f"a fallback names a {PACKAGE} variable"):
+            register_registry("vaultspec-resolution-borrower", [borrower])
+
     def test_a_fallback_outside_every_registry_is_refused(self) -> None:
         stray = _unregistered()
         chained = _unregistered("VAULTSPEC_RESOLUTION_CHAINED", fallback=stray)
@@ -333,6 +359,29 @@ class TestRegistration:
 
         with pytest.raises(ValueError, match="not declared in a registry"):
             env_value(stray, {stray.env_name: "x"})
+
+
+#: A typed credential, so that an unusable value is a parse failure the
+#: loader has to report. Core's own secret takes any text, so nothing it
+#: carries could exercise the redaction the message owes a credential.
+_NUMERIC_SECRET = ConfigVariable(
+    env_name="VAULTSPEC_RESOLUTION_NUMERIC_SECRET",
+    attr_name="typesafe_api_key",
+    var_type=int,
+    default=None,
+    description="A numeric credential, so a bad value is a parse failure.",
+    secret=True,
+)
+
+
+@pytest.fixture
+def numeric_secret_entry() -> Iterator[None]:
+    """Load-bearing for one test: a typed credential core's loader reads."""
+    CONFIG_REGISTRY.append(_NUMERIC_SECRET)
+    register_registry(PACKAGE, [_NUMERIC_SECRET])
+    yield
+    _forget_registry(PACKAGE, [_NUMERIC_SECRET])
+    CONFIG_REGISTRY.remove(_NUMERIC_SECRET)
 
 
 class TestCollectiveRejection:
@@ -396,25 +445,17 @@ class TestCollectiveRejection:
 
         assert config.io_buffer_size == 512
 
+    @pytest.mark.usefixtures("numeric_secret_entry")
     def test_a_rejected_secret_is_named_but_never_quoted(self) -> None:
         secret = "sk-resolution-b3917e5d0a26"
-        numeric_secret = ConfigVariable(
-            env_name="VAULTSPEC_RESOLUTION_NUMERIC_SECRET",
-            attr_name="numeric_secret",
-            var_type=int,
-            default=None,
-            description="A numeric credential, so a bad value is a parse failure.",
-            secret=True,
-        )
 
-        from vaultspec_core.config.config import _parse_field
+        with pytest.raises(ConfigurationError) as refusal:
+            VaultSpecConfig.from_environment(environ={_NUMERIC_SECRET.env_name: secret})
 
-        _, problem = _parse_field(numeric_secret, secret)
-
-        assert problem is not None
-        assert numeric_secret.env_name in problem
-        assert "<redacted>" in problem
-        assert secret not in problem
+        reported = str(refusal.value)
+        assert _NUMERIC_SECRET.env_name in reported
+        assert "<redacted>" in reported
+        assert secret not in reported
 
 
 def _workspace(root: Path, *, package: str | None, mode: InstallMode) -> Path:
@@ -514,19 +555,68 @@ class TestPerPackageCredentialGate:
 
         assert credential == Credential(supplied, CredentialSource.ENVIRONMENT)
 
-    def test_an_explicit_package_overrides_the_declaring_one(
+    def test_only_the_declaring_packages_mode_is_consulted(
         self, tmp_path: Path
     ) -> None:
-        # The override exists so a caller resolving on another package's behalf
-        # can say so; it must gate on the package it names, not the entry's.
+        # The workspace runs core as a dev dependency, which says nothing
+        # about the companion. No caller can nominate the mode the gate
+        # consults: the entry's declaring package is the only answer.
         root = _dotenv(_workspace(tmp_path, package=PACKAGE, mode=InstallMode.DEV))
 
-        credential = resolve_credential(
-            COMPANION_KEY,
-            root,
-            {},
-            interpreter_prefix=root / ".venv",
-            package=PACKAGE,
+        assert (
+            resolve_credential(
+                COMPANION_KEY, root, {}, interpreter_prefix=root / ".venv"
+            )
+            is None
         )
 
-        assert credential == Credential(COMPANION_DOTENV_KEY, CredentialSource.DOTENV)
+        write_package_declaration(
+            root, COMPANION, PackageDeclaration(install_mode=InstallMode.DEV)
+        )
+
+        assert resolve_credential(
+            COMPANION_KEY, root, {}, interpreter_prefix=root / ".venv"
+        ) == Credential(COMPANION_DOTENV_KEY, CredentialSource.DOTENV)
+
+
+class TestStartupRefusal:
+    """Every product value is refused before the work, not after it."""
+
+    def test_a_switch_read_at_output_time_is_checked_up_front(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            check_environment({"VAULTSPEC_NO_HINTS": "maybe"})
+
+        assert str(refusal.value) == (
+            f"VAULTSPEC_NO_HINTS must be {BOOL_SHAPE}, got 'maybe'"
+        )
+
+    def test_a_field_and_a_switch_are_reported_together(self) -> None:
+        with pytest.raises(ConfigurationError) as refusal:
+            check_environment(
+                {
+                    "VAULTSPEC_IO_BUFFER_SIZE": "plenty",
+                    "VAULTSPEC_JSON_PRETTY": "sometimes",
+                }
+            )
+
+        reported = str(refusal.value)
+        assert reported.startswith("2 unusable settings:")
+        assert "VAULTSPEC_IO_BUFFER_SIZE" in reported
+        assert "VAULTSPEC_JSON_PRETTY" in reported
+
+    def test_usable_and_blank_values_pass(self) -> None:
+        check_environment(
+            {
+                "VAULTSPEC_NO_HINTS": "yes",
+                "VAULTSPEC_NON_INTERACTIVE": "  ",
+                "VAULTSPEC_IO_BUFFER_SIZE": "4096",
+            }
+        )
+
+    def test_the_protective_switch_is_exempt(self) -> None:
+        # A typo leaves the watchdog armed and warns; refusing to start is
+        # not a safer outcome than running guarded.
+        check_environment({"VAULTSPEC_STDIO_WATCHDOG": "maybe"})
+
+    def test_an_external_convention_is_not_the_products_to_refuse(self) -> None:
+        check_environment({"CI": "whatever", "NO_COLOR": "yes please"})

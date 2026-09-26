@@ -220,8 +220,13 @@ def _serve(
     Raises:
         typer.Exit: If ``root_dir`` cannot be resolved in standalone mode.
     """
+    from ..config import check_environment
     from ..core.types import init_paths
     from ..logging_config import configure_logging
+
+    # Before serving anything: a value nobody can use stops the server here,
+    # not in the middle of a tool call that has already changed the vault.
+    check_environment()
 
     # Ensure MCP uses stderr for everything to protect JSON-RPC on stdout
     configure_logging()

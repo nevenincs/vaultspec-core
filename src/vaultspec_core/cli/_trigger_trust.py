@@ -169,15 +169,20 @@ def operator_present() -> bool:
     a prompt nobody sees is a prompt nobody consented to.
 
     ``CI`` is the near-universal convention, owned by the systems that set it
-    and defined by presence. The product's own marker is a boolean the
-    operator can also turn off, for a wrapper script that runs under CI but
-    does have someone watching.
+    and defined by presence. The product's own marker is a boolean, and it
+    outranks ``CI`` in both directions: a product-owned variable set
+    deliberately for this tool is a later word than the environment the tool
+    happens to run in, so a wrapper script that runs under CI with someone
+    watching can say so.
 
     Raises:
         ConfigurationError: If the product marker carries a word the boolean
             vocabulary does not recognise.
     """
-    if env_present(CI) or env_flag(VAULTSPEC_NON_INTERACTIVE):
+    declared = env_flag(VAULTSPEC_NON_INTERACTIVE)
+    if declared is True:
+        return False
+    if declared is None and env_present(CI):
         return False
     try:
         return sys.stdin.isatty() and sys.stdout.isatty()

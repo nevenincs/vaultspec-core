@@ -75,6 +75,26 @@ def json_format_kwargs() -> dict[str, Any]:
     return dict(_PRETTY) if pretty_enabled() else dict(_COMPACT)
 
 
+def error_format_kwargs() -> dict[str, Any]:
+    """Return the formatting keywords for an error report.
+
+    Reporting a failure must not be able to fail: the indentation switch may
+    itself be the unusable value being reported, and a refusal raised while
+    rendering one would replace the error the operator needs to see. The
+    compact form is the answer whenever the switch cannot be read.
+
+    Returns:
+        The same keywords as :func:`json_format_kwargs`, or the compact form
+        when the switch carries a value it cannot take.
+    """
+    from vaultspec_core.core.exceptions import ConfigurationError
+
+    try:
+        return json_format_kwargs()
+    except ConfigurationError:
+        return dict(_COMPACT)
+
+
 #: Spread into every CLI ``json.dumps`` call as
 #: ``json.dumps(payload, **json_format_kwargs())``. It is a function call
 #: rather than a module-level mapping on purpose: ``**`` unpacking of a

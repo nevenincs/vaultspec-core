@@ -78,13 +78,15 @@ def _console_kwargs(
     stdout: TextIO | None = None, environ: dict[str, str] | None = None
 ) -> dict[str, Any]:
     """Build Rich Console kwargs from real stream and environment inputs."""
-    from .config import COLUMNS, NO_COLOR, env_present, env_value
+    from .config import COLUMNS, NO_COLOR, env_value
 
     utf8 = _is_utf8_capable(stdout)
     kwargs: dict[str, Any] = {
         "highlight": False,
         "soft_wrap": True,
-        "no_color": env_present(NO_COLOR, environ),
+        # no-color.org defines the convention as set *and non-empty*: an
+        # empty value is explicitly not a request for monochrome output.
+        "no_color": env_value(NO_COLOR, environ) is not None,
         "safe_box": not utf8,
     }
     if not utf8:

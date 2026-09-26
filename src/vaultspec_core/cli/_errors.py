@@ -6,7 +6,7 @@ CLI error exits with optional hint messages.
 
 import typer
 
-from vaultspec_core.cli.json_output import json_format_kwargs
+from vaultspec_core.cli.json_output import error_format_kwargs
 
 
 def handle_error(exc: Exception, *, json_output: bool = False) -> None:
@@ -35,7 +35,7 @@ def handle_error(exc: Exception, *, json_output: bool = False) -> None:
                 data["hint"] = hint
             print(
                 json.dumps(
-                    json_envelope("error", "failed", data), **json_format_kwargs()
+                    json_envelope("error", "failed", data), **error_format_kwargs()
                 )
             )
         else:

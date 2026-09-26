@@ -8,7 +8,12 @@ import pytest
 
 from vaultspec_core.core.exceptions import ConfigurationError
 
-from ..config import VAULTSPEC_TARGET_DIR, ConfigVariable, register_registry
+from ..config import (
+    VAULTSPEC_TARGET_DIR,
+    ConfigVariable,
+    _forget_registry,
+    register_registry,
+)
 from ..workspace import (
     LayoutMode,
     TargetSource,
@@ -18,6 +23,7 @@ from ..workspace import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 pytestmark = [pytest.mark.unit]
@@ -319,7 +325,17 @@ COMPANION_ROOT = ConfigVariable(
     fallback=VAULTSPEC_TARGET_DIR,
 )
 
-register_registry(TARGET_COMPANION, [COMPANION_ROOT])
+
+@pytest.fixture(autouse=True, scope="module")
+def _target_companion_registry() -> Iterator[None]:
+    """Declare the companion for this module only, and withdraw it after.
+
+    The registries are process-global, so a package invented by a test that
+    outlived the test would be state no code under test put there.
+    """
+    register_registry(TARGET_COMPANION, [COMPANION_ROOT])
+    yield
+    _forget_registry(TARGET_COMPANION)
 
 
 class TestResolveTarget:

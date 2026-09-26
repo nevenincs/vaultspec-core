@@ -75,7 +75,12 @@ def main(
 ) -> None:
     """Initialize workspace and logging."""
     from vaultspec_core.cli._target import reset, set_root_target
+    from vaultspec_core.config import check_environment
     from vaultspec_core.logging_config import configure_logging
+
+    # Before any command runs: a switch read at output time would otherwise
+    # refuse the run after it had already written everything it wrote.
+    check_environment()
 
     log_level = logging.DEBUG if debug else logging.WARNING
     configure_logging(level=log_level, debug=debug)

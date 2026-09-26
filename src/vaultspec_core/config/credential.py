@@ -145,7 +145,6 @@ def resolve_credential(
     environ: Mapping[str, str] | None = None,
     *,
     interpreter_prefix: Path | None = None,
-    package: str | None = None,
 ) -> Credential | None:
     """Resolve the credential *var* declares for the workspace at *root*.
 
@@ -158,9 +157,6 @@ def resolve_credential(
             process's own.
         interpreter_prefix: The running interpreter's prefix; ``None`` reads
             :data:`sys.prefix`.
-        package: The distribution whose install mode gates the workspace
-            ``.env``; ``None`` uses the package that declared *var*, which is
-            what a caller outside a test wants.
 
     Returns:
         The credential and its source, or ``None`` when no source supplies a
@@ -177,8 +173,10 @@ def resolve_credential(
     if not var.workspace_dotenv:
         return None
     # env_value has already refused an entry no registry declares, so the
-    # declaring package is known by the time the gate needs it.
-    owner = var.package if package is None else package
+    # declaring package is known by the time the gate needs it. The gate has
+    # no override: a caller that could name another package would open that
+    # package's mode on a credential that is not its own.
+    owner = var.package
     if owner is None:
         raise ValueError(f"{var.env_name} is not declared in a registry")
     prefix = Path(sys.prefix) if interpreter_prefix is None else interpreter_prefix
