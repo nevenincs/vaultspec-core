@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:debcf6bcf49a50162443f4e911af5b99e552e75018c85a4da705ceb39fbed054'
+body_hash: 'sha256:07b842ffd5a49181b7f66ce6c007541531635090fdcd9681ee1d3608cb111202'
 related:
   - "[[2026-09-26-env-parity-plan]]"
 ---
@@ -235,6 +235,8 @@ related:
 - `S16` `verify:` `pytest src/vaultspec_core/tests/test_public_resolution_api.py` -> `pass`
 - `S16` `verify:` `just check-type` -> `pass`
 - `S16` `by:` `vaultspec-standard-executor`
+- `S05` `M` `src/vaultspec_core/config/tests/test_workspace.py`
+- `S05` `verify:` `basedpyright src/vaultspec_core/config` -> `pass`
 
 ## Notes
 
@@ -263,3 +265,4 @@ related:
 - `S08` review fix: a startup refusal from the root callback, which fires before Click parses the subcommand's own --json flag, now renders the canonical envelope when --json appears anywhere in argv, proven with a real subprocess
 - `S12` review fix: `render_envelope,` `render_install_envelope,` `render_error_envelope` and `hints_suppressed` moved to the CLI-free `vaultspec_core.envelope,` cutting import `vaultspec_core.envelope` to about 134ms/192 modules against 229ms/397 for the old `vaultspec_core.cli.rendering_outcomes` path; `render_install_envelope's` hints now take the same structured mapping every other envelope carries, keyword-only, and core's own install/uninstall render through it
 - `S11` review fix: dropped the internal decision-record identifier from `infer_upgrade_mode's` and `upgrade_mode_with_provenance's` docstrings; added an end-to-end install --upgrade test against a real legacy dev-group workspace with deployed uv-run hooks, asserting the persisted dev declaration and the rendered hook entries
+- `S05` review fix: `_forget_registry` renamed to `forget_registry_for_tests` because basedpyright's reportUnusedFunction reads a leading underscore with no in-module caller as dead code; the `not-in-__all__,` not-re-exported boundary is unchanged
