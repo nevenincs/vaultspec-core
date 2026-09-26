@@ -153,18 +153,13 @@ DISCOVERY_CANONICAL_SENTENCES = (
     VAULT_SEARCH_ROUTING,
 )
 
-#: Entry points allowed to name ``vaultspec-rag`` outside the home. Each keeps
-#: rag's code index current before a reconciliation, a step no other role
-#: takes; for the search itself and the fallback it cites :data:`DISCOVERY_RULE`
-#: like everything else. No builtin restates the code-search invocation or the
-#: fallback: both live in the home alone. Paths are relative to the builtins
-#: root.
-RAG_INDEX_CHECKERS = frozenset(
-    {
-        "agents/vaultspec-docs-curator.md",
-        "skills/vaultspec-curate/SKILL.md",
-    }
-)
+#: Entry points allowed to name ``vaultspec-rag`` outside the home, each to
+#: keep rag's code index current before its own work; for the search itself
+#: and the fallback it cites :data:`DISCOVERY_RULE` like everything else. No
+#: builtin restates the code-search invocation or the fallback: both live in
+#: the home alone. Paths are relative to the builtins root. Empty since the
+#: curation roles stopped checking the index before a bounded reconciliation.
+RAG_INDEX_CHECKERS: frozenset[str] = frozenset()
 
 #: Vocabulary that marks a restatement of the sequence rather than a citation.
 #: A file using it without citing the rule has grown a second definition.
