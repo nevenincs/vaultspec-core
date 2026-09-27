@@ -162,9 +162,8 @@ jobs:
   #
   # ON THE FLEET, like everything else. This job needs no fleet capability,
   # and putting it on a shared runner does add a queue in front of every leg -
-  # that argument is real and it does not buy an exception. This fleet runs no
-  # GitHub-hosted jobs, so the answer to the queue is capacity or admission
-  # weighting, not a job that opts out of the rule.
+  # that argument is real and it does not buy an exception. The answer to the
+  # queue is fleet capacity or admission weighting.
   wheel:
     timeout-minutes: 180
     name: "Build: Wheel (Linux)"
@@ -312,10 +311,9 @@ jobs:
           # aarch64-unknown-linux-gnu` on every release. That warning should
           # now stop by itself; if it does not, the asset name and the formula
           # disagree and that is a real defect, not a leftover.
-    # Every artifact build runs on the shared self-hosted fleet, and no job in
-    # this repository runs on a GitHub-hosted runner. A leg whose selector no
-    # online runner serves is refused by `preflight` rather than moved off the
-    # fleet; the remedy is the host, never a hosted fallback.
+    # Every artifact build runs on the shared self-hosted fleet. A leg whose
+    # selector no online runner serves is refused by `preflight`; the remedy
+    # is bringing that host up.
     runs-on: ${{ matrix.runner }}
     env:
       CI_EXEC_BUDGET_MINUTES: 90
