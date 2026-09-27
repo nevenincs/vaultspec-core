@@ -139,4 +139,4 @@ def test_release_withholds_publication_until_target_bundles_are_complete() -> No
         "seal the release without it"
     )
     verification = workflow.index("verify-release-assets:")
-    assert "runs-on: ubuntu-latest" in workflow[verification:]
+    assert "runs-on: [self-hosted, Linux, X64, build]" in workflow[verification:]
