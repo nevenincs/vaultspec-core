@@ -454,34 +454,44 @@ def runner_placement(path: Path, text: str) -> list[Finding]:
         if not match or not _meaningful(line):
             continue
         value = _strip_comment(match.group(2))
-        if not value:
-            if not _names_self_hosted(_nested_labels(lines, index)):
-                refuse(index, "runs-on names no self-hosted label")
-            continue
-        if value.startswith("{"):
-            listed = re.search(r"labels:\s*(\[[^\]]*\]|[^,}]+)", value)
-            if not listed or not _names_self_hosted(_labels(listed.group(1))):
-                refuse(index, "runs-on names no self-hosted label")
-            continue
-        if value.startswith("[") or "${{" not in value:
-            if not _names_self_hosted(_labels(value)):
-                refuse(index, f"runs-on `{value[:60]}` names no self-hosted label")
-            continue
-        if _GUARDED_MATRIX.fullmatch(value) or _closed_mapping(value):
-            continue
-        only = _MATRIX_ONLY.fullmatch(value)
-        legs = _matrix_values(lines, index, {only.group(1)}) if only else []
-        if not legs:
-            refuse(
+        for number, detail in _runs_on_refusals(lines, index, value):
+            refuse(number, detail)
+    return findings
+
+
+def _runs_on_refusals(
+    lines: list[str], index: int, value: str
+) -> list[tuple[int, str]]:
+    """Return `(line index, detail)` for each part of one `runs-on:` not self-hosted."""
+    unlabelled = [(index, "runs-on names no self-hosted label")]
+    if not value:
+        return [] if _names_self_hosted(_nested_labels(lines, index)) else unlabelled
+    if value.startswith("{"):
+        listed = re.search(r"labels:\s*(\[[^\]]*\]|[^,}]+)", value)
+        if listed and _names_self_hosted(_labels(listed.group(1))):
+            return []
+        return unlabelled
+    if value.startswith("[") or "${{" not in value:
+        if _names_self_hosted(_labels(value)):
+            return []
+        return [(index, f"runs-on `{value[:60]}` names no self-hosted label")]
+    if _GUARDED_MATRIX.fullmatch(value) or _closed_mapping(value):
+        return []
+    only = _MATRIX_ONLY.fullmatch(value)
+    legs = _matrix_values(lines, index, {only.group(1)}) if only else []
+    if not legs:
+        return [
+            (
                 index,
                 f"runs-on `{value[:60]}` is an unresolved expression; "
                 "it cannot be proven self-hosted",
             )
-            continue
-        for number, leg in legs:
-            if not _names_self_hosted(_labels(leg)):
-                refuse(number, f"matrix leg `{leg[:60]}` names no self-hosted label")
-    return findings
+        ]
+    return [
+        (number, f"matrix leg `{leg[:60]}` names no self-hosted label")
+        for number, leg in legs
+        if not _names_self_hosted(_labels(leg))
+    ]
 
 
 def audit(root: Path) -> list[Finding]:
