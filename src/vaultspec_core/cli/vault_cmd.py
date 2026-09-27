@@ -188,20 +188,14 @@ if TYPE_CHECKING:
 # can mount onto them without importing back through this module. They are
 # re-exported here because this module is the family's public surface.
 
+from vaultspec_core.cli.archive_cmd import archive_app
+from vaultspec_core.cli.exec_cmd import exec_app
+from vaultspec_core.cli.link_cmd import link_app
 from vaultspec_core.cli.plan_cmd import plan_app
 
 vault_app.add_typer(plan_app, name="plan")
-
-from vaultspec_core.cli.link_cmd import link_app  # noqa: E402
-
 vault_app.add_typer(link_app, name="link")
-
-from vaultspec_core.cli.exec_cmd import exec_app  # noqa: E402
-
 vault_app.add_typer(exec_app, name="exec")
-
-from vaultspec_core.cli.archive_cmd import archive_app  # noqa: E402
-
 vault_app.add_typer(archive_app, name="archive")
 
 
