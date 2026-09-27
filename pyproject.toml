@@ -322,7 +322,7 @@ force-exclude = true
     # Cyclomatic census (production blocks):
     #     over 25:  10      over 15:  72      over 10: 196   <- the default
     [tool.ruff.lint.mccabe]
-    max-complexity = 25 # RATCHETED 58 -> 57 -> 35 -> 28 -> 27 -> 25
+    max-complexity = 18 # RATCHETED 58 -> 57 -> 35 -> 28 -> 27 -> 25 -> 18
 
     # Worst gated value per rule at the census: returns 8, branches 27,
     # args 13, statements 90.
@@ -350,9 +350,9 @@ force-exclude = true
     # dimension to finish its burndown; the rest are still above default.
     [tool.ruff.lint.pylint]
     max-args = 13       # RATCHETED 20 -> 17 -> 13 (AT the Typer-command floor)
-    max-branches = 24   # RATCHETED 63 -> 62 -> 34 -> 28 -> 27 -> 24
+    max-branches = 18   # RATCHETED 63 -> 62 -> 34 -> 28 -> 27 -> 24 -> 18
     max-returns = 8     # RATCHETED 13 -> 10 -> 8 (at its floor)
-    max-statements = 72 # RATCHETED 214 -> 142 -> 93 -> 90 -> 72
+    max-statements = 69 # RATCHETED 214 -> 142 -> 93 -> 90 -> 72 -> 69
 
     [tool.ruff.lint.per-file-ignores]
     "**/test_*.py" = ["ARG"]
