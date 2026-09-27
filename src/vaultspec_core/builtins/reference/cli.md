@@ -51,19 +51,8 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.3.0`. What follows is on this branch and not in that
-release, so it cannot be installed yet. This list is generated from the recorded surface
-of that release; it is never hand-maintained.
-
-Commands:
-
-- `vaultspec-core project context`
-- `vaultspec-core review context`
-
-Flags on commands the release already has:
-
-- `vaultspec-core install` - `--env`, `--env-file`
-- `vaultspec-core vault adr crossref` - `--body-file`
+The latest published release is `0.3.1`, and every command, flag, and tool documented
+here is in it.
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
