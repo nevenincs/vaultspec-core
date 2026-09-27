@@ -44,11 +44,24 @@ REQUIREMENTS: Final[tuple[Requirement, ...]] = (
 #: belongs here rather than in `init-tools` because a worktree without one is
 #: under-configured for tools that read it, including `just` itself in the
 #: repositories that set `dotenv-load`. The rule is uniform across the fleet.
+#: A linked worktree also carries the values already set in the main
+#: worktree's `.env`, so a fresh worktree has the operator's hosted-search key
+#: instead of a blank placeholder.
 PREFLIGHT: Final[tuple[Step, ...]] = (
     Step(
         name="dotenv",
-        argv=(PY, "-m", "dev.init.dotenv", ".env.example", ".env"),
-        summary="Provision .env from .env.example when it is absent.",
+        argv=(
+            PY,
+            "-m",
+            "dev.init.dotenv",
+            ".env.example",
+            ".env",
+            "--from-main-worktree",
+        ),
+        summary=(
+            "Provision .env from .env.example when it is absent, carrying the "
+            "values set in the main worktree's .env."
+        ),
     ),
 )
 
