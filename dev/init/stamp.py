@@ -7,7 +7,8 @@ all call it unconditionally. It cannot get there by making each step fast -
 by not running the steps at all when nothing that feeds them has changed.
 
 What decides that is a digest over the phase's declared inputs - the lockfiles,
-the version pins, the manifests - plus this package's own source, so a change
+the version pins, the manifests, and whole directories of sources a phase
+renders from - plus this package's own source, so a change
 to what `init` DOES invalidates every stamp that was written by the old
 behaviour. The digest is per phase, so editing ``uv.lock`` re-runs
 ``init-python`` and still skips ``init-node``.
@@ -96,6 +97,31 @@ def _digest_file(path: Path) -> str:
         return "absent"
 
 
+def _digest_input(path: Path) -> str:
+    """Return a content digest for one declared input, a file or a directory.
+
+    Args:
+        path: The input to digest.
+
+    Returns:
+        For a directory, a hex digest over every file beneath it, each keyed by
+        its relative path, so a file that is edited, added, removed or renamed
+        all make the phase stale. For anything else, :func:`_digest_file`.
+    """
+    if not path.is_dir():
+        return _digest_file(path)
+    members = sorted(
+        (member.relative_to(path).as_posix(), member)
+        for member in path.rglob("*")
+        if member.is_file()
+    )
+    digest = hashlib.sha256()
+    for relative, member in members:
+        digest.update(relative.encode("utf-8") + b"\0")
+        digest.update(_digest_file(member).encode("ascii") + b"\0")
+    return digest.hexdigest()
+
+
 def _own_source_digest() -> str:
     """Return a digest over this package's own source.
 
@@ -131,7 +157,7 @@ def phase_digest(repo_root: Path, phase: Phase) -> str:
     digest.update(phase.name.encode("utf-8"))
     for relative in sorted(phase.inputs):
         digest.update(relative.encode("utf-8"))
-        digest.update(_digest_file(repo_root / relative).encode("ascii"))
+        digest.update(_digest_input(repo_root / relative).encode("ascii"))
     return digest.hexdigest()
 
 

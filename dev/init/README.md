@@ -97,5 +97,6 @@ from the rest of the harness.
 Edit `plan.py` and nothing else. Add a `Step` to the right phase, and — this is
 the part that is easy to forget — add whatever file decides that step's outcome
 to that phase's `inputs`, and whatever the step produces to its `artifacts`.
+An input may be a directory, which counts every file beneath it.
 A step whose input is not declared will be skipped after that input changes; a
 step whose artifact is not declared will be skipped after somebody deletes it.
