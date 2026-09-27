@@ -11,6 +11,7 @@ modified: '2026-09-27'
 body_schema: 'body-v2'
 body_hash: 'sha256:9d84d1155193689889ac30541ced33b72a34a8797e56948dd747e925ef06c3b2'
 ---
+
 # `reference-publication-contract` adr: `candidate-versus-published reference provenance` | (**status:** `superseded`)
 
 ## Problem Statement

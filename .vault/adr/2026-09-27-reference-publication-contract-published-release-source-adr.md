@@ -15,6 +15,7 @@ modified: '2026-09-27'
 body_schema: 'body-v2'
 body_hash: 'sha256:27620661ccf680b57ae786c4fca20f3a7e52f305ba3959883f1940d138036c0a'
 ---
+
 # `reference-publication-contract` adr: `published-release reference provenance` | (**status:** `accepted`)
 
 ## Problem Statement

@@ -43,16 +43,29 @@ repository root, and the working directory itself only when none of those is fou
 
 ## Surface provenance
 
-Which of the commands below you can install, as against which exist on the branch this
-was generated from. This block is generator-owned: run
-`vaultspec-core spec reference generate` to refresh it, and
-`vaultspec-core spec reference snapshot` to move the release it is measured against. Do
-not hand-edit between the markers.
+Which of the commands below are absent from the latest published release at the time
+this reference was generated. The block is computed from the surface recorded from that
+release's published distribution, which is written after publication through
+`vaultspec-core spec reference snapshot --record` and never by hand. The block is
+generator-owned: run `vaultspec-core spec reference generate` to refresh it. Do not
+hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.2.6`, and every command, flag, and tool documented
-here is in it.
+Measured against `0.2.6`, the latest published release when this reference was
+generated. What follows is not in that release. The list is computed from the surface
+recorded from that release's published distribution; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core project context`
+- `vaultspec-core review context`
+
+Flags on commands the release already has:
+
+- `vaultspec-core install` - `--env`, `--env-file`
+- `vaultspec-core spec reference snapshot` - `--record`
+- `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -364,8 +377,8 @@ hand-edit between the markers.
 
 - `vaultspec-core spec reference generate` - Regenerate the generator-owned regions of
   the bundled CLI reference.
-- `vaultspec-core spec reference snapshot` - Record the published command and MCP tool
-  surface.
+- `vaultspec-core spec reference snapshot` - Record or report the published command and
+  MCP tool surface.
 
 ### Migrations
 
@@ -421,8 +434,8 @@ names and outcomes only. Full framework uninstall removes the store.
 
 Runtime order: explicit command flags, process environment, provisioned local settings,
 trusted root `.env` credentials, defaults. Blank is unset in every source and falls
-through. CLI and MCP share workspace-scoped resolution. Importable names: the TypeSafe key,
-`VAULTSPEC_IO_BUFFER_SIZE`, `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`,
+through. CLI and MCP share workspace-scoped resolution. Importable names: the TypeSafe
+key, `VAULTSPEC_IO_BUFFER_SIZE`, `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`,
 `VAULTSPEC_LOCK_TIMEOUT_SECONDS`, `VAULTSPEC_JSON_PRETTY`, `VAULTSPEC_NO_HINTS`.
 
 ### vaultspec-core uninstall
@@ -1042,15 +1055,15 @@ to render in memory and diff against the committed files, exiting non-zero on mi
 without writing, plus `--json`.
 
 `vaultspec-core spec reference snapshot` maintains `reference/published-surface.json`,
-the record of the command and MCP tool surface of the latest published release. The
-generated unreleased-surface regions are the difference between that record and the live
-surface, which is why no version caveat in these documents is hand-written. Without a
-flag it refreshes the record from the live surface, and only when the tree declares a
-different version from the one recorded: the record belongs to a release, so the release
-candidate branch is the only place it may move. `--check` reports that state without
-writing. `--emit` prints this build's own surface, which is how a published distribution
-is read back inside an isolated install; `--verify FILE` compares such a document
-against the committed record and exits non-zero when they differ. `--json` applies
+the record of the command and MCP tool surface of the latest published release, not a
+draft or a prerelease. The generated unreleased-surface regions are the difference
+between that record and the live surface, which is why no version caveat in these
+documents is hand-written. The record is never captured from a source tree. `--emit`
+prints this build's own surface, which is how the published distribution is read back
+inside an isolated install after publication; `--record FILE` writes such a document as
+the record, refusing a malformed one; `--verify FILE` compares such a document against
+the committed record and exits non-zero when they differ. Without a flag the verb only
+reports the recorded version. The three modes are mutually exclusive. `--json` applies
 throughout.
 
 ### vaultspec-core spec mcps
@@ -1138,26 +1151,26 @@ protective switch that instead warns and stays armed.
 All prefixed `VAULTSPEC_`, except the honoured external conventions listed after them.
 Env vars override defaults but are overridden by an explicit flag.
 
-| Variable                           | Type   | Default       | Description                                                                                                                                                                                    |
-| ---------------------------------- | ------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`             | path   | discovered    | Root workspace directory, for every process kind.                                                                                                                                              |
-| `VAULTSPEC_DOCS_DIR`               | str    | `.vault`      | Vault directory name.                                                                                                                                                                          |
-| `VAULTSPEC_INDEX_DIR`              | str    | `index`       | Subdirectory of the vault holding the auto-generated feature indexes (`<feature>.index.md`).                                                                                                   |
-| `VAULTSPEC_FRAMEWORK_DIR`          | str    | `.vaultspec`  | Framework directory name.                                                                                                                                                                      |
-| `VAULTSPEC_CLAUDE_DIR`             | str    | `.claude`     | Claude tool directory name.                                                                                                                                                                    |
-| `VAULTSPEC_GEMINI_DIR`             | str    | `.gemini`     | Gemini tool directory name.                                                                                                                                                                    |
-| `VAULTSPEC_ANTIGRAVITY_DIR`        | str    | `.agents`     | Antigravity directory name.                                                                                                                                                                    |
-| `VAULTSPEC_IO_BUFFER_SIZE`         | int    | `8192`        | I/O read buffer size in bytes.                                                                                                                                                                 |
-| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`  | int    | `1000000`     | Subprocess stdout capture limit.                                                                                                                                                               |
-| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`   | float  | `120.0`       | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                             |
-| `VAULTSPEC_EDITOR`                 | str    | unset         | Editor command every surface that opens an editor consults. Read after `--editor` and before the project config key, `VISUAL` and `EDITOR`; `vi` is the last rung.                             |
+| Variable                           | Type   | Default       | Description                                                                                                                                                                                                    |
+| ---------------------------------- | ------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`             | path   | discovered    | Root workspace directory, for every process kind.                                                                                                                                                              |
+| `VAULTSPEC_DOCS_DIR`               | str    | `.vault`      | Vault directory name.                                                                                                                                                                                          |
+| `VAULTSPEC_INDEX_DIR`              | str    | `index`       | Subdirectory of the vault holding the auto-generated feature indexes (`<feature>.index.md`).                                                                                                                   |
+| `VAULTSPEC_FRAMEWORK_DIR`          | str    | `.vaultspec`  | Framework directory name.                                                                                                                                                                                      |
+| `VAULTSPEC_CLAUDE_DIR`             | str    | `.claude`     | Claude tool directory name.                                                                                                                                                                                    |
+| `VAULTSPEC_GEMINI_DIR`             | str    | `.gemini`     | Gemini tool directory name.                                                                                                                                                                                    |
+| `VAULTSPEC_ANTIGRAVITY_DIR`        | str    | `.agents`     | Antigravity directory name.                                                                                                                                                                                    |
+| `VAULTSPEC_IO_BUFFER_SIZE`         | int    | `8192`        | I/O read buffer size in bytes.                                                                                                                                                                                 |
+| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`  | int    | `1000000`     | Subprocess stdout capture limit.                                                                                                                                                                               |
+| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`   | float  | `120.0`       | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                                             |
+| `VAULTSPEC_EDITOR`                 | str    | unset         | Editor command every surface that opens an editor consults. Read after `--editor` and before the project config key, `VISUAL` and `EDITOR`; `vi` is the last rung.                                             |
 | `VAULTSPEC_CORE_TYPESAFE_API_KEY`  | secret | unset         | Enables hosted search, ADR checks and context ranking; read from the environment, then the provisioned `.vaultspec/.env` store, else the workspace `.env` under the gate above. Blank is unset. Never printed. |
-| `VAULTSPEC_LOG_LEVEL`              | str    | see below     | Root log level when neither `--debug` nor `--verbose` is given. `WARNING` for the CLI, `INFO` for the MCP server. An unknown name is refused.                                                  |
-| `VAULTSPEC_JSON_PRETTY`            | bool   | unset (off)   | Indents `--json` output.                                                                                                                                                                       |
-| `VAULTSPEC_NO_HINTS`               | bool   | unset (off)   | Drops the `Next actions` block; equivalent to `--no-hints`.                                                                                                                                    |
-| `VAULTSPEC_NON_INTERACTIVE`        | bool   | unset         | Declares that no operator is watching; repository triggers awaiting approval are skipped instead of prompted for. Outranks `CI` in both directions.                                            |
-| `VAULTSPEC_STDIO_WATCHDOG`         | bool   | unset (armed) | MCP server lifetime watchdog; a false word disables it (EOF-only exit); an unrecognised word warns and stays armed.                                                                            |
-| `VAULTSPEC_MCP_GATEWAY_INVOCATION` | str    | unset         | Internal: set by the MCP invoke gateway on every CLI process it spawns. Any non-empty value marks the process as having no terminal, so it refuses to open an editor. Not an operator setting. |
+| `VAULTSPEC_LOG_LEVEL`              | str    | see below     | Root log level when neither `--debug` nor `--verbose` is given. `WARNING` for the CLI, `INFO` for the MCP server. An unknown name is refused.                                                                  |
+| `VAULTSPEC_JSON_PRETTY`            | bool   | unset (off)   | Indents `--json` output.                                                                                                                                                                                       |
+| `VAULTSPEC_NO_HINTS`               | bool   | unset (off)   | Drops the `Next actions` block; equivalent to `--no-hints`.                                                                                                                                                    |
+| `VAULTSPEC_NON_INTERACTIVE`        | bool   | unset         | Declares that no operator is watching; repository triggers awaiting approval are skipped instead of prompted for. Outranks `CI` in both directions.                                                            |
+| `VAULTSPEC_STDIO_WATCHDOG`         | bool   | unset (armed) | MCP server lifetime watchdog; a false word disables it (EOF-only exit); an unrecognised word warns and stays armed.                                                                                            |
+| `VAULTSPEC_MCP_GATEWAY_INVOCATION` | str    | unset         | Internal: set by the MCP invoke gateway on every CLI process it spawns. Any non-empty value marks the process as having no terminal, so it refuses to open an editor. Not an operator setting.                 |
 
 vaultspec-core also honours these external conventions; it does not own them.
 

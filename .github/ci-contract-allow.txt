@@ -43,6 +43,11 @@ merge-gate.yml:Judge the merge readiness
 release-please.yml:Regenerate and push uv.lock onto the release branch
 release-please.yml:Open a reconciling pull request when the lockfile drifted
 publish.yml:Ask the acquisition check to try this release
+surface.yml:Open a pull request recording the published surface
+# Compares the attached wheel with the built one byte for byte. It runs in the
+# job that holds `id-token: write` and has no checkout, so it must not run a
+# recipe: a recipe there is project code from whatever the runner left behind.
+publish.yml:Verify the attached wheel is the one this run built
 binaries.yml:Require every declared target on the draft release
 binaries.yml:Assert every declared target attached
 

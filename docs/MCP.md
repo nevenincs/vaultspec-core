@@ -244,12 +244,15 @@ The server exposes 12 tools.
 
 ### Surface provenance
 
-Which of the tools above a host installing the published server actually sees. Generated
-from the recorded surface of that release, so it empties itself when the next one ships.
+Which of the tools above are absent from the latest published release at the time this
+handbook was generated. Computed from the surface recorded from that release's published
+distribution, which is written after publication through
+`vaultspec-core spec reference snapshot --record` and never by hand.
 
 <!-- vaultspec:generated:begin unreleased-mcp-surface -->
 
-The latest published release is `0.3.0`, and every tool above is in it.
+Measured against `0.2.6`, the latest published release when this reference was
+generated: every tool above is in it.
 
 <!-- vaultspec:generated:end unreleased-mcp-surface -->
 
