@@ -18,6 +18,7 @@ patches, no skips.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -194,7 +195,7 @@ class TestRefusesRatherThanDegrades:
         assert outsider.exists()
 
     def test_vault_outside_the_workspace_records_its_absolute_origin(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path
     ) -> None:
         workspace = tmp_path / "ws"
         workspace.mkdir()
@@ -202,10 +203,17 @@ class TestRefusesRatherThanDegrades:
         doc = vault / "exec" / "rec-a.md"
         doc.parent.mkdir(parents=True)
         doc.write_bytes(b"a\n")
-        monkeypatch.setenv("VAULTSPEC_DOCS_DIR", str(vault))
+        previous = os.environ.get("VAULTSPEC_DOCS_DIR")
+        os.environ["VAULTSPEC_DOCS_DIR"] = str(vault)
         reset_config()
-
-        snapshot = snapshot_paths(workspace, [doc], label="probe")
+        try:
+            snapshot = snapshot_paths(workspace, [doc], label="probe")
+        finally:
+            if previous is None:
+                os.environ.pop("VAULTSPEC_DOCS_DIR", None)
+            else:
+                os.environ["VAULTSPEC_DOCS_DIR"] = previous
+            reset_config()
 
         assert snapshot is not None
         assert (snapshot.root / "exec" / "rec-a.md").read_bytes() == b"a\n"
