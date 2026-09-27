@@ -13,16 +13,12 @@
 # hand-written re-implementation of it. Replacing it with the render is a
 # one-commit change and is the next thing to do here.
 binaries.yml:Every matrix selector has an online runner
-binaries.yml:Trust the runner's workspace
-binaries.yml:Return the workspace to the runner's user
 binaries.yml:Clear evidence left by an earlier run on this machine
 binaries.yml:Restore the execute bit
 binaries.yml:Start from an empty artifact directory
 binaries.yml:Drop the downloaded artifacts
-acquisition.yml:Install what acquisition itself needs
 acquisition.yml:Provision a private Homebrew
 acquisition.yml:Confirm the acquisition starts cold
-acquisition.yml:Return the workspace to the runner's user
 acquisition.yml:Clean up
 
 # --- CI-plane bookkeeping ---------------------------------------------------
@@ -75,7 +71,7 @@ publish.yml:Verify bundled builtins present
 # reachable. ~150 lines of bash that cannot be run anywhere but here. Recipe
 # needed: `test-offline`.
 binaries.yml:Write the Linux offline check
-binaries.yml:Run it with no network at all
+binaries.yml:Run it with every route to an index black-holed on Linux
 binaries.yml:Run it in an empty network namespace
 binaries.yml:Run it with the network denied to the process
 binaries.yml:Run it with every route to an index black-holed

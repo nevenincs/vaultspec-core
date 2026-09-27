@@ -7,8 +7,7 @@ name: Core Acquisition
 #
 # It cannot run before publication, so it runs after - and on a schedule,
 # because the ways acquisition rots are not caused by any commit: a yanked
-# release, a renamed asset, a distribution whose glibc is older than the floor
-# the artifact was built against.
+# release, a renamed asset, a channel pointer that no longer installs.
 
 on:
   release:
@@ -43,80 +42,34 @@ concurrency:
 jobs:
   acquire:
     timeout-minutes: 180
-    name: "Test: Release acquisition (Linux ${{ matrix.arch }}, ${{ matrix.image }})"
+    name: "Test: Release acquisition (Linux ${{ matrix.arch }})"
     strategy:
       fail-fast: false
       matrix:
-        # Distributions OLDER than the build host, because the Linux artifact
-        # links against whatever glibc built it and the floor is only proven by
-        # running somewhere that has less. The rows come in two bands: one AT
-        # the declared floor, which is the only band that can fail when a
-        # container pin stops working, and one above it in the range a user is
-        # most likely to be running.
-        #
         # BOTH Linux architectures, because a published bundle nobody executes
         # is an untested bundle. aarch64 was built, attached and shipped in
         # v0.1.71 while this matrix still fetched only the x86_64 file, so that
         # binary reached users having never been started anywhere. The coverage
         # guard in dev/guards is what stops this recurring silently.
         #
-        # The arm64 legs run on the SAME self-hosted ARM64 host that BUILDS
-        # that target. Every image here publishes an arm64 variant, so the
-        # older-libc property holds identically on each architecture. These
-        # legs set `container:`, which needs that host's runner home
-        # bind-mounted; see the note beside `linux-aarch64` in binaries.yml.
+        # NATIVE, on the fleet host that builds each target. No fleet host
+        # exposes a container runtime to a job, so the older-libc distribution
+        # images this lane used to run cannot run here. The glibc floor is held
+        # by the build: build_pyapp.py links every Linux target with zig against
+        # GLIBC_FLOOR and re-reads it off the artifact. What this lane proves is
+        # that the PUBLISHED bundle, fetched the way a user fetches it, starts
+        # cold and completes a user's first install.
         include:
-          # AT the declared floor, on both architectures. Nothing else here
-          # tests 2.28 itself: the Debian and Ubuntu images below sit
-          # comfortably above it, so they would keep passing if the floor
-          # slipped a version or two. RHEL 8's glibc is 2.28 exactly, which
-          # makes these the two legs that can actually fail when a container
-          # pin in binaries.yml stops doing its job.
-          #
-          # Package manager differs, so the install command travels with the
-          # row rather than being branched on inside the step.
-          - image: almalinux:8
-            setup: dnf install -y -q curl git
-            arch: x86_64
+          - arch: x86_64
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
-          - image: almalinux:8
-            setup: dnf install -y -q curl git
-            arch: aarch64
-            runner: [self-hosted, ARM64, Linux]
-            target: aarch64-unknown-linux-gnu
-          # Above the floor and below the build host, which is the band a user
-          # is most likely to be in. bookworm is 2.36, jammy is 2.35.
-          - image: debian:bookworm-slim
-            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
-            arch: x86_64
-            runner: [self-hosted, Linux, X64, build]
-            target: x86_64-unknown-linux-gnu
-          - image: ubuntu:22.04
-            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
-            arch: x86_64
-            runner: [self-hosted, Linux, X64, build]
-            target: x86_64-unknown-linux-gnu
-          - image: debian:bookworm-slim
-            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
-            arch: aarch64
-            runner: [self-hosted, ARM64, Linux]
-            target: aarch64-unknown-linux-gnu
-          - image: ubuntu:22.04
-            setup: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl git ca-certificates
-            arch: aarch64
-            runner: [self-hosted, ARM64, Linux]
+          - arch: aarch64
+            runner: [self-hosted, Linux, ARM64]
             target: aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.image }}
     env:
       CI_EXEC_BUDGET_MINUTES: 60
     steps:
-      - name: Install what acquisition itself needs
-        run: |
-          set -eux
-          ${{ matrix.setup }}
-
       - name: Acquire the published binary
         env:
           REPO: ${{ github.repository }}
@@ -131,70 +84,58 @@ jobs:
                   | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
           fi
           [ -n "${tag}" ] || { echo "::error::could not resolve a release tag"; exit 1; }
+
+          # A directory of this job's own, not the shared work tree: a reused
+          # self-hosted checkout is exactly the warm state this check exists to
+          # avoid.
+          acq="${RUNNER_TEMP}/acq"
+          rm -rf "${acq}"; mkdir -p "${acq}/bundle"
+          echo "ACQ=${acq}" >> "$GITHUB_ENV"
           version="${tag#vaultspec-core-v}"
           archive="vaultspec-core-v${version}-${TARGET}.tar.gz"
-          mkdir -p /opt/acq
-          curl -fsSL -o "/opt/acq/${archive}" \
+          curl -fsSL -o "${acq}/${archive}" \
             "https://github.com/${REPO}/releases/download/${tag}/${archive}"
-          mkdir -p /opt/acq/bundle
-          tar -xzf "/opt/acq/${archive}" -C /opt/acq/bundle
-          chmod +x /opt/acq/bundle/vaultspec-core
+          tar -xzf "${acq}/${archive}" -C "${acq}/bundle"
+          chmod +x "${acq}/bundle/vaultspec-core"
 
       # A COLD START, once, with no retry, and the retry's absence is the
-      # assertion rather than a tidy-up.
-      #
-      # This step used to loop for ten minutes. The binary bootstrapped its
-      # application from PyPI at first launch, so a freshly tagged release was
-      # not resolvable until publish.yml had propagated to the CDN edge this
-      # machine reads: v0.1.67 failed three legs of four on exactly that, and
-      # the fourth passed only because it happened to be scheduled a minute
-      # later. The loop waited that race out, and #386 established that
-      # waiting on the binary itself was the only honest way to observe it.
-      #
-      # The binary now carries its application and its whole dependency
-      # closure, so there is nothing left to propagate and nothing to wait
-      # for. Keeping the loop would be worse than redundant: it would turn
-      # "this artifact still reaches for the network" into a slow pass, and a
-      # real failure into a ten-minute one whose message blames an index the
-      # artifact no longer consults. A single cold start that must succeed is
-      # now the stronger check, because the property being observed changed.
-      #
-      # The probe gets its OWN home so a warm cache left by an earlier job on
-      # this machine cannot make a broken release look acquirable.
+      # assertion rather than a tidy-up: the binary carries its application
+      # and its whole dependency closure, so there is nothing to propagate and
+      # nothing to wait for. The probe gets its OWN home so a warm cache left
+      # by an earlier job on this machine cannot make a broken release look
+      # acquirable.
       - name: The published binary starts on a machine that has never run it
         run: |
           set -eu
-          export HOME=/tmp/bootstrap-probe
+          export HOME="${RUNNER_TEMP}/bootstrap-probe"
           rm -rf "$HOME"; mkdir -p "$HOME"
-          /opt/acq/bundle/vaultspec-core --version
+          "${ACQ}/bundle/vaultspec-core" --version
 
       - name: Use it the way a new user would
         run: |
           set -eux
-          # A user's machine has none of this job's state. Give the binary a
-          # home of its own so a warm cache cannot make a broken acquisition
-          # look like a working one.
-          export HOME=/tmp/fresh-home
-          rm -rf "$HOME" /tmp/proj
-          mkdir -p "$HOME" /tmp/proj
+          export HOME="${RUNNER_TEMP}/fresh-home"
+          proj="${RUNNER_TEMP}/proj"
+          rm -rf "$HOME" "${proj}"
+          mkdir -p "$HOME" "${proj}"
 
-          /opt/acq/bundle/vaultspec-core --version
+          "${ACQ}/bundle/vaultspec-core" --version
 
-          cd /tmp/proj
+          cd "${proj}"
           git init -q
           git config user.email acquisition@example.invalid
           git config user.name "Acquisition Check"
 
-          /opt/acq/bundle/vaultspec-core install
+          "${ACQ}/bundle/vaultspec-core" install
 
           # Behaviour, not exit codes: the install has to leave a vault behind,
           # and the tool has to be able to read back what it just wrote.
           [ -d .vault ] || { echo "::error::install exited zero but scaffolded no .vault/"; exit 1; }
-          /opt/acq/bundle/vaultspec-core vault check all
+          "${ACQ}/bundle/vaultspec-core" vault check all
 
-      - name: Return the workspace to the runner's user
+      - name: Clean up
         if: always()
-        run: chown -R --reference=/__w "$GITHUB_WORKSPACE" || true
+        run: rm -rf "${RUNNER_TEMP}/acq" "${RUNNER_TEMP}/bootstrap-probe" "${RUNNER_TEMP}/fresh-home" "${RUNNER_TEMP}/proj" || true
 
   acquire-macos:
     timeout-minutes: 60
