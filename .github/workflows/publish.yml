@@ -27,9 +27,7 @@ jobs:
   build:
     timeout-minutes: 210
     name: "Build: Distribution (Linux)"
-    # On the fleet. Every job in this repository runs there except the two
-    # the fleet declares as hosted cells - binaries.yml's linux-aarch64 build
-    # and offline legs - and the wheel build, which needs no fleet capability.
+    # On the fleet, like every job in this repository.
     #
     # The distribution is a py3-none-any wheel, so the build host cannot affect
     # the artifact - but availability still matters, and this is the path that

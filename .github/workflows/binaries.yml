@@ -38,8 +38,8 @@ jobs:
   # discovering it. Dispatch again once the host is on AC, or set
   # `allow_queue` to wait deliberately.
   #
-  # Runs on the fleet, like all but the hosted cells the fleet declares. That
-  # costs this preflight its independence - if the
+  # Runs on the fleet, like every job in this repository. That costs this
+  # preflight its independence - if the
   # Linux/X64 runner is itself down, this job QUEUES rather than reporting the
   # outage, and the guard is silent exactly when the fleet is worst. It still
   # catches the common case it was built for, a fleet that is up but missing
@@ -162,9 +162,8 @@ jobs:
   #
   # ON THE FLEET, like everything else. This job needs no fleet capability,
   # and putting it on a shared runner does add a queue in front of every leg -
-  # that argument is real and it does not buy an exception. This fleet runs no
-  # GitHub-hosted jobs, so the answer to the queue is capacity or admission
-  # weighting, not a job that opts out of the rule.
+  # that argument is real and it does not buy an exception. The answer to the
+  # queue is fleet capacity or admission weighting.
   wheel:
     timeout-minutes: 180
     name: "Build: Wheel (Linux)"
@@ -234,31 +233,18 @@ jobs:
           # Pinned by digest: the build environment is downloaded and executed,
           # so a mutable tag is not an acceptable input.
           #
-          # HOSTED, and the only build leg that is. This is not an oversight
-          # in the migration below - the runner fleet declares this target's
-          # selector as the hosted `ubuntu-24.04-arm`, deliberately not a label
-          # set the fleet serves, named verbatim so the declaration and the
-          # workflow can be compared by eye.
-          #
-          # The fleet's ARM64 host cannot serve it. Its containerised runner
-          # mounts /home/runner from a NAMED VOLUME, so a job container it
-          # creates is a sibling on the container VM and every path the runner
-          # passes - `/home/runner/externals` as `/__e` - resolves against a
-          # filesystem where those paths do not exist. Measured with a path
-          # probe. The leg dies in `Initialize containers` before checkout,
-          # which is how vaultspec-core-v0.1.61 published zero assets.
-          #
-          # Note this is NOT the reason this file used to give. "The
-          # colima-hosted ARM64 runner has no reachable docker daemon" was never
-          # probed and is false - the daemon answers `client=29.6.1
-          # server=29.5.2` from inside that container. The distinction matters
-          # because the false reason implies an unfixable gap and the real one
-          # names a fix: bind-mount the runner's home from a VM path identical
-          # to the container path. That is an operator action on that host and
-          # is not blocked by anything in this file.
+          # On the fleet's self-hosted ARM64 host, a colima VM. This leg sets
+          # `container:`, so that runner's `/home/runner` must be bind-mounted
+          # from a VM path identical to the container path. From a NAMED
+          # VOLUME a job container is a sibling on the VM, every path the
+          # runner passes - `/home/runner/externals` as `/__e` - resolves to
+          # nothing, and the leg dies in `Initialize containers` before
+          # checkout, which is how vaultspec-core-v0.1.61 published zero
+          # assets. That is an operator action on that host, never a reason
+          # to leave the fleet.
           - name: linux-aarch64
             os: Linux ARM64
-            runner: ubuntu-24.04-arm
+            runner: [self-hosted, ARM64, Linux]
             target: aarch64-unknown-linux-gnu
             container: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
           - name: windows-x86_64
@@ -320,36 +306,14 @@ jobs:
           # uncontainerised route stays closed too - a build there produces an
           # artifact requiring GLIBC_2.39 against a declared floor of 2.28.
           #
-          # The standing note said to restore it "the moment this label is
-          # served by a host that can run the pinned image". That host is
-          # `ubuntu-24.04-arm`, free for public repositories, and this leg uses
-          # it. It is the one exception to the fleet-only rule below, and it is
-          # the exception the fleet DECLARES rather than one this file takes:
-          # the target's selector is the hosted runner, and v0.1.73's
-          # published aarch64 asset measures GLIBC_2.28 against the declared
-          # floor - the proof recorded beside that declaration.
-          #
           # `HOMEBREW_TARGETS` already named this triple and `generate.py` has
           # been printing `::warning::no Homebrew coverage for:
           # aarch64-unknown-linux-gnu` on every release. That warning should
           # now stop by itself; if it does not, the asset name and the formula
           # disagree and that is a real defect, not a leftover.
-    # Every artifact build runs on the shared self-hosted fleet, with ONE
-    # exception: linux-aarch64, which builds on `ubuntu-24.04-arm`. That is not
-    # a fallback this file chose. The runner fleet declares this target's
-    # selector as the hosted runner, deliberately not a label set it serves -
-    # so a self-hosted leg here would put the workflow out of conformance with
-    # the declaration that governs it.
-    #
-    # It is also the only shape that works today. That leg asks for a
-    # `container:`, and the fleet's ARM64 host is itself a container on colima
-    # whose `/home/runner` is a NAMED VOLUME with no matching path in the VM;
-    # the sibling job container mounts an empty directory and the leg dies in
-    # `Initialize containers` before checkout. Re-enrolling that runner with a
-    # bind-mounted home would fix it. Whether that happens is decided with the
-    # runner fleet, not here.
-    #
-    # acquisition.yml's three aarch64 legs are hosted for the same reason.
+    # Every artifact build runs on the shared self-hosted fleet. A leg whose
+    # selector no online runner serves is refused by `preflight`; the remedy
+    # is bringing that host up.
     runs-on: ${{ matrix.runner }}
     env:
       CI_EXEC_BUDGET_MINUTES: 90
@@ -519,7 +483,7 @@ jobs:
             image: ""
           - name: linux-aarch64
             os: Linux ARM64
-            runner: ubuntu-24.04-arm
+            runner: [self-hosted, ARM64, Linux]
             target: aarch64-unknown-linux-gnu
             isolation: netns
             image: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
@@ -920,34 +884,14 @@ jobs:
     # would only mean the surviving assets ship with less provenance than a
     # release that lost nothing.
     if: ${{ !cancelled() }}
-    # ON THE FLEET, and that makes one field of the record knowingly wrong.
-    #
-    # The SLSA predicate `actions/attest` produces carries
+    # ON THE FLEET, like every leg it attests. The SLSA predicate
+    # `actions/attest` produces carries
     # `internalParameters.github.runner_environment`, which reports the runner
-    # that executed THIS step - not the runner that built each subject. The
-    # matrix is mixed: `linux-aarch64` builds on the GitHub-hosted
-    # `ubuntu-24.04-arm`, every other leg on the fleet. Each leg emits two
-    # binaries, so attesting from a self-hosted job stamps `self-hosted` on the
-    # two that were actually built on a hosted runner.
-    #
-    # That is accepted deliberately, not overlooked. Attesting from
-    # `ubuntu-latest` would make the same field wrong for the other six instead
-    # of those two - an overstatement about six rather than an understatement
-    # about two. Attesting inside each build leg is the only shape under which
-    # the field is true for every artifact, and it pays for that by spreading
-    # `id-token: write` across four jobs, two of which run as root in a reused
-    # container workspace and compile a third-party crate tree with `cargo
-    # install pyapp --locked`. `gh attestation verify` does not read
-    # `runner_environment`; a token-minting capability is real in every job
-    # that holds it.
-    #
-    # The inaccuracy has an independent path to disappearing and the exposure
-    # has none, which is what settles the trade. #481 moves this leg onto the
-    # fleet along with every other hosted job, and that makes this record true
-    # with no further change here. It is blocked on an operator re-enrolling
-    # the ARM64 runner with a bind-mounted home rather than on anything in this
-    # file - so the field is wrong for now, is wrong about a value no verifier
-    # reads, and is not wrong permanently.
+    # that executed THIS step; every build leg is self-hosted too, so the
+    # field is true for every subject. Attesting inside each build leg would
+    # instead spread `id-token: write` across four jobs, two of which run as
+    # root in a reused container workspace and compile a third-party crate
+    # tree with `cargo install pyapp --locked`.
     runs-on: [self-hosted, Linux, X64, build]
     env:
       CI_EXEC_BUDGET_MINUTES: 30
@@ -1386,19 +1330,20 @@ jobs:
   # gone with the state it managed: a draft is already invisible to `latest`,
   # and an incomplete one stays a draft.
   verify-release-assets:
-    timeout-minutes: 30
+    timeout-minutes: 150
     name: "Check: Release proven (Linux)"
     needs: release
     if: ${{ always() }}
-    # This is release bookkeeping only, so keep it independent of the
-    # constrained build fleet. It must be able to judge an incomplete release
-    # even when a build runner is offline or queued.
-    runs-on: ubuntu-latest
+    # Release bookkeeping, on the always-on Linux/X64 host rather than a
+    # power-gated one, so it can judge an incomplete release while a build
+    # runner is offline.
+    runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: write
       # Dispatching the acquisition check is a write to the Actions API.
       actions: write
     env:
+      CI_EXEC_BUDGET_MINUTES: 30
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TAG: ${{ inputs.tag || github.ref_name }}
       RELEASE_RESULT: ${{ needs.release.result }}

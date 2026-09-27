@@ -607,43 +607,81 @@ def test_no_job_names_a_recipe_that_another_named_recipe_subsumes() -> None:
         )
 
 
-def _runner_labels(job: dict[str, Any]) -> list[str]:
-    """Every runner label a job can land on, matrix selectors resolved.
+def _runner_label_sets(job: dict[str, Any]) -> list[list[str]]:
+    """The label set of every runner a job can land on, one per matrix leg.
 
     ``runs-on`` is not always a label list. A matrix job names an expression -
     ``${{ matrix.runner }}`` - and keeps the labels in its ``include:`` entries,
     so reading ``runs-on`` alone reports no labels at all for exactly the job
     that occupies a fleet runner longest. This resolves the expression back to
-    the matrix values it selects from.
+    the matrix values it selects from, leg by leg, so one hosted leg in an
+    otherwise self-hosted matrix is still visible as its own set.
     """
     runs_on: object = job.get("runs-on")
     if isinstance(runs_on, list):
-        return [str(label) for label in cast("list[object]", runs_on)]
+        return [[str(label) for label in cast("list[object]", runs_on)]]
     if not isinstance(runs_on, str):
         return []
     if "${{" not in runs_on:
-        return [runs_on]
+        return [[runs_on]]
     key = runs_on.split("matrix.", 1)[-1].split("}}", 1)[0].strip()
-    labels: list[str] = []
+    sets: list[list[str]] = []
     for entry in _matrix_include(job):
         value: object = entry.get(key)
         if isinstance(value, list):
-            labels += [str(label) for label in cast("list[object]", value)]
+            sets.append([str(label) for label in cast("list[object]", value)])
         elif value is not None:
-            labels.append(str(value))
-    return labels
+            sets.append([str(value)])
+    return sets
+
+
+def _runner_labels(job: dict[str, Any]) -> list[str]:
+    """Every runner label a job can land on, matrix selectors resolved."""
+    return [label for labels in _runner_label_sets(job) for label in labels]
+
+
+def test_no_job_ever_runs_on_a_github_hosted_runner() -> None:
+    """Every job, and every leg of every matrix, lands on the self-hosted fleet.
+
+    Hosted runners were removed once (#481, #502) and came back three times,
+    each with an argument for itself: a fleet declaration naming a hosted
+    ARM64 cell, bookkeeping that wanted independence from the fleet, and a
+    scheduled compatibility check. A stalled leg is fixed on the fleet, never
+    by moving it off. A reusable-workflow call has no runner of its own and is
+    judged by the workflow it calls.
+    """
+    checked: list[str] = []
+    offenders: list[str] = []
+    for path in _workflow_paths():
+        for job_id, job in _workflow_jobs(_load(path)).items():
+            if "uses" in job:
+                continue
+            sets = _runner_label_sets(job)
+            if not sets:
+                offenders.append(f"{path.name}:{job_id} (no resolvable runner)")
+                continue
+            checked.append(f"{path.name}:{job_id}")
+            offenders.extend(
+                f"{path.name}:{job_id} -> {labels}"
+                for labels in sets
+                if "self-hosted" not in {label.lower() for label in labels}
+            )
+    assert checked, (
+        "no job with a runner was found in any workflow; the `runs-on` "
+        "resolution broke and this assertion would pass vacuously"
+    )
+    assert not offenders, (
+        "these jobs can run on a GitHub-hosted runner; every job runs on the "
+        "self-hosted fleet:\n  " + "\n  ".join(offenders)
+    )
 
 
 def test_every_self_hosted_job_declares_a_timeout() -> None:
     """A job on the self-hosted fleet must bound how long it can hold a runner.
 
-    GitHub's default is six hours. On hosted runners that is someone else's
-    capacity; here it is one of two machines the entire estate queues behind,
-    so an unbounded job that hangs stops every other workflow for the rest of
-    the day.
-
-    Scoped to self-hosted jobs on purpose: a hosted runner has its own ceiling
-    and costs no local capacity, so requiring a budget there would be noise.
+    GitHub's default is six hours, and a fleet runner is one of two machines
+    the entire estate queues behind, so an unbounded job that hangs stops every
+    other workflow for the rest of the day.
     """
     checked: list[str] = []
     missing: list[str] = []
