@@ -229,34 +229,22 @@ jobs:
             os: Linux x64
             runner: [self-hosted, Linux, X64, build]
             target: x86_64-unknown-linux-gnu
-            container: ""
-          # Pinned by digest: the build environment is downloaded and executed,
-          # so a mutable tag is not an acceptable input.
-          #
-          # On the fleet's self-hosted ARM64 host, a colima VM. This leg sets
-          # `container:`, so that runner's `/home/runner` must be bind-mounted
-          # from a VM path identical to the container path. From a NAMED
-          # VOLUME a job container is a sibling on the VM, every path the
-          # runner passes - `/home/runner/externals` as `/__e` - resolves to
-          # nothing, and the leg dies in `Initialize containers` before
-          # checkout, which is how vaultspec-core-v0.1.61 published zero
-          # assets. That is an operator action on that host, never a reason
-          # to leave the fleet.
+          # Native on the fleet's ARM64 host, like the x86_64 leg above and
+          # for the same reason: no fleet host exposes a container runtime to
+          # a job. The floor is held the same way - zig links against the
+          # declared GLIBC_2.28 and the build re-reads it off the artifact.
           - name: linux-aarch64
             os: Linux ARM64
-            runner: [self-hosted, ARM64, Linux]
+            runner: [self-hosted, Linux, ARM64]
             target: aarch64-unknown-linux-gnu
-            container: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
           - name: windows-x86_64
             os: Windows x64
             runner: [self-hosted, Windows, X64]
             target: x86_64-pc-windows-msvc
-            container: ""
           - name: macos-aarch64
             os: macOS ARM64
             runner: [self-hosted, macOS, ARM64]
             target: aarch64-apple-darwin
-            container: ""
           # macos-x86_64 IS DROPPED, and the artifact it produced is why.
           #
           # It cross-built on the Apple Silicon runner and attached cleanly for
@@ -294,18 +282,6 @@ jobs:
           # while the laptop is unplugged does not fail, it waits. That is true
           # of the macOS legs above as well; this leg is not special.
           #
-          # THIS HOST STILL CANNOT SERVE linux-aarch64, and the leg above is
-          # now asking it to anyway, because there is nowhere else to ask.
-          #
-          # The docker daemon IS reachable from the colima ARM64 runner
-          # (client 29.6.1, server 29.5.2) - that part of the older note is out
-          # of date. What still closes the containerised route is the runner's
-          # `/home/runner`: it is a NAMED VOLUME with no matching path inside
-          # the colima VM, so a sibling job container mounts an empty directory
-          # and the job dies in `Initialize containers` before checkout. The
-          # uncontainerised route stays closed too - a build there produces an
-          # artifact requiring GLIBC_2.39 against a declared floor of 2.28.
-          #
           # `HOMEBREW_TARGETS` already named this triple and `generate.py` has
           # been printing `::warning::no Homebrew coverage for:
           # aarch64-unknown-linux-gnu` on every release. That warning should
@@ -317,23 +293,12 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       CI_EXEC_BUDGET_MINUTES: 90
-    # Empty for every leg but linux-aarch64, which GitHub reads as
-    # "no container".
-    container: ${{ matrix.container }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
           ref: ${{ inputs.tag || github.ref_name }}
-
-      # A containerised leg runs as root over a workspace the runner's user
-      # owns, so git refuses the tree as dubious and `release-bundle` cannot
-      # read the source revision. Checkout survives it; the first command that
-      # asks git about the repository does not.
-      - name: Trust the runner's workspace
-        if: ${{ matrix.container != '' }}
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
@@ -389,19 +354,6 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      # A containerised leg runs as root, and its workspace is the SAME
-      # directory the runner reuses for every other job on that machine. Left
-      # alone it hands the next non-container job a tree it has no permission
-      # to clean, and that job dies in `Checkout` on `unlink '.git/FETCH_HEAD'`
-      # - which is how `Attach to release` failed after a release built fine.
-      # `/__w` is created by the runner and keeps the runner's ownership, so it
-      # is the reference for what the tree should look like on the way out.
-      # Runs on failure too: a leg that dies mid-build poisons the tree just as
-      # thoroughly as one that succeeds.
-      - name: Return the workspace to the runner's user
-        if: ${{ always() && matrix.container != '' }}
-        run: chown -R --reference=/__w "$GITHUB_WORKSPACE"
-
   # THE GATE. An artifact becomes a release asset only by passing through here.
   #
   # #340 reported binaries advertised as standalone that fail on a host with no
@@ -456,19 +408,6 @@ jobs:
           # they can take away from one process, and pretending otherwise would
           # be the false-assurance shape this repository keeps removing.
           #
-          # `netns` is the real thing: `docker run --network none` gives the
-          # process an empty network namespace with a loopback and nothing else,
-          # so there is no route, no resolver and no proxy to fall back to. It
-          # runs in the SAME pinned manylinux image the artifact was built in,
-          # which means this run also exercises the declared GLIBC_2.28 floor
-          # rather than the runner's newer libc.
-          #
-          # These legs are UNCONTAINERISED on purpose, unlike their build
-          # counterparts: `unshare --net` inside a container job is refused by
-          # the default seccomp profile, so the isolation has to be created by
-          # the docker daemon on the host rather than from inside a container it
-          # already started.
-          #
           # `unshare` is the same empty network namespace without a container
           # runtime: an unprivileged user namespace owns a fresh network
           # namespace, created natively on the fleet's Linux runner, which has
@@ -483,10 +422,10 @@ jobs:
             image: ""
           - name: linux-aarch64
             os: Linux ARM64
-            runner: [self-hosted, ARM64, Linux]
+            runner: [self-hosted, Linux, ARM64]
             target: aarch64-unknown-linux-gnu
-            isolation: netns
-            image: quay.io/pypa/manylinux_2_28_aarch64@sha256:29a6ceb78de5b00494e6e7456a72782a4cb54238de102e7491d15fe47789b4d1
+            isolation: proxy
+            image: ""
           # `sandbox` is macOS's per-process equivalent: a seatbelt profile that
           # allows everything except `network*`, applied to this one process
           # without touching the host. `sandbox-exec` is documented as
@@ -499,8 +438,11 @@ jobs:
             target: aarch64-apple-darwin
             isolation: sandbox
             image: ""
-          # `proxy` is the WEAK one and it is labelled weak. Windows has no
-          # unprivileged per-process network isolation - the alternatives are a
+          # `proxy` is the WEAK one and it is labelled weak. Two legs have no
+          # unprivileged per-process network isolation. The ARM64 runner is
+          # itself a container under Docker's default seccomp profile, which
+          # refuses `unshare --net`, and it has no container runtime of its
+          # own. Windows has none either - the alternatives are a
           # firewall rule, which needs administrator rights on a shared fleet
           # host and can outlive a cancelled job, or a Windows container, which
           # nothing in this fleet is known to serve. So this leg black-holes
@@ -537,7 +479,7 @@ jobs:
           path: dist-bin
 
       - name: Extract the Unix release bundle
-        if: ${{ matrix.isolation != 'proxy' }}
+        if: ${{ runner.os != 'Windows' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -551,7 +493,7 @@ jobs:
           tar -xzf "${archive[0]}" -C offline-bundle
 
       - name: Extract the Windows release bundle
-        if: ${{ matrix.isolation == 'proxy' }}
+        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -565,17 +507,15 @@ jobs:
       # this the run below fails as "permission denied" on every Unix leg,
       # which looks exactly like a broken artifact.
       - name: Restore the execute bit
-        if: ${{ matrix.isolation != 'proxy' }}
+        if: ${{ runner.os != 'Windows' }}
         shell: bash
         run: chmod +x offline-bundle/vaultspec-core offline-bundle/vaultspec-core-mcp
 
       # One script for both Linux isolations, so they assert the same things.
-      # The extracted bundle directory differs - mounted at /artifacts in a
-      # container, the workspace path under `unshare` - and is passed in as
-      # ARTIFACTS. `dist-bin` retains the archive and checksum for release
+      # The extracted bundle directory is passed in as ARTIFACTS. `dist-bin` retains the archive and checksum for release
       # bookkeeping; it is not the executable surface the gate runs.
       - name: Write the Linux offline check
-        if: ${{ matrix.isolation == 'netns' || matrix.isolation == 'unshare' }}
+        if: ${{ runner.os == 'Linux' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -619,23 +559,6 @@ jobs:
           fi
           echo "offline run complete: the artifact carried everything it needed"
           CHECK
-
-      - name: Run it with no network at all
-        if: ${{ matrix.isolation == 'netns' }}
-        shell: bash
-        env:
-          IMAGE: ${{ matrix.image }}
-          TARGET: ${{ matrix.target }}
-        run: |
-          set -euo pipefail
-          # Pulled here, WITH network, because `--network none` cannot pull.
-          docker pull "${IMAGE}"
-          docker run --rm --network none \
-            --env "TARGET=${TARGET}" --env "ARTIFACTS=/artifacts" \
-            -v "${PWD}/offline-bundle:/artifacts:ro" \
-            -v "${PWD}/offline-check.sh:/offline-check.sh:ro" \
-            "${IMAGE}" bash /offline-check.sh
-          echo "netns" > offline-verified
 
       # No container runtime on this runner, so the namespace is made here.
       # `--map-root-user` is what lets an unprivileged account own the new
@@ -694,8 +617,26 @@ jobs:
           echo "offline run complete: the artifact carried everything it needed"
           echo "sandbox" > "${GITHUB_WORKSPACE}/offline-verified"
 
+      # The Linux form of the black hole, for the ARM64 container runner. The
+      # shared check's own vacuity guard is what proves it: its probe honours
+      # these variables, so a probe that still reaches the network fails the
+      # step instead of letting the assertions after it pass vacuously.
+      - name: Run it with every route to an index black-holed on Linux
+        if: ${{ matrix.isolation == 'proxy' && runner.os == 'Linux' }}
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          blackhole=http://127.0.0.1:9
+          export HTTP_PROXY="${blackhole}" HTTPS_PROXY="${blackhole}" ALL_PROXY="${blackhole}"
+          export http_proxy="${blackhole}" https_proxy="${blackhole}" all_proxy="${blackhole}"
+          export NO_PROXY= no_proxy=
+          ARTIFACTS="${PWD}/offline-bundle" TARGET="${TARGET}" bash offline-check.sh
+          echo "proxy" > offline-verified
+
       - name: Run it with every route to an index black-holed
-        if: ${{ matrix.isolation == 'proxy' }}
+        if: ${{ matrix.isolation == 'proxy' && runner.os == 'Windows' }}
         shell: pwsh
         env:
           TARGET: ${{ matrix.target }}
