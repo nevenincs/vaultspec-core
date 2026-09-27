@@ -20,7 +20,10 @@ finds both. The ways they can come apart, one check each:
 
 On the product side, test source is out of scope for the last two: a test
 builds environments for the code it exercises, and names undeclared variables
-on purpose to prove they are ignored. Under ``dev/`` nothing is exempt.
+on purpose to prove they are ignored. Under ``dev/`` the only exemption is
+the files the CI fleet deploys, and only from the environment rule: they are
+one implementation shared across repositories, and the fleet fails any copy
+that is adapted to read through this repository's registry.
 """
 
 from __future__ import annotations
@@ -50,6 +53,13 @@ DEV_ROOT = PROJECT_ROOT / "dev"
 
 #: The one harness module allowed to touch the process environment.
 DEV_ENVIRONMENT = DEV_ROOT / "environment.py"
+
+#: The module-docstring opening every file the CI fleet deploys into ``dev/``
+#: carries. The exemption is derived from it, so the next deployed file is
+#: covered without being named here.
+_FLEET_DEPLOYED_HEADER = re.compile(
+    r"THE canonical .+\. One implementation, \w+ repos\."
+)
 
 #: The catalogue of both registries.
 ENV_EXAMPLE = PROJECT_ROOT / ".env.example"
@@ -144,6 +154,22 @@ def _dev_outside_environment() -> list[Path]:
     """Return every harness file except the harness's environment module."""
     found = [path for path in _python_files(DEV_ROOT) if path != DEV_ENVIRONMENT]
     assert found, f"no Python files found under {DEV_ROOT}"
+    return found
+
+
+def _fleet_deployed() -> set[Path]:
+    """Return the harness files the CI fleet deploys, recognised by their header."""
+    found: set[Path] = set()
+    for path in _python_files(DEV_ROOT):
+        docstring = ast.get_docstring(
+            ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        )
+        if docstring and _FLEET_DEPLOYED_HEADER.fullmatch(docstring.splitlines()[0]):
+            found.add(path)
+    assert found, (
+        f"no file under {DEV_ROOT} carries the fleet deployment header; if the "
+        "header changed, update _FLEET_DEPLOYED_HEADER rather than exempting nothing"
+    )
     return found
 
 
@@ -258,12 +284,20 @@ class TestOnlyTheRegistryModulesTouchTheEnvironment:
             "child environment with child_environment():\n  " + "\n  ".join(offenders)
         )
 
+    def test_the_fleet_deployed_files_are_recognised(self) -> None:
+        deployed = _fleet_deployed()
+
+        assert {DEV_ROOT / "actionlint.py", DEV_ROOT / "ci_contract.py"} <= deployed
+        assert DEV_ENVIRONMENT not in deployed
+
     def test_no_harness_module_outside_its_registry_touches_the_environment(
         self,
     ) -> None:
+        deployed = _fleet_deployed()
         offenders = [
             f"{_rel(path)}:{hit}"
             for path in _dev_outside_environment()
+            if path not in deployed
             for hit in _environment_access(path)
         ]
 
