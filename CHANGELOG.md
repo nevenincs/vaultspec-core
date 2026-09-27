@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.0...vaultspec-core-v0.3.1) (2026-09-27)
+
+
+### Features
+
+* provision project settings, add project and review context, and consolidate the open worktrees ([#566](https://github.com/nevenincs/vaultspec-core/issues/566)) ([50639bc](https://github.com/nevenincs/vaultspec-core/commit/50639bca56b09a62c364f05b04aaa06fae626c02))
+
+
+### Bug Fixes
+
+* **ci:** keep the fleet's admission wait out of the execution budget ([#568](https://github.com/nevenincs/vaultspec-core/issues/568)) ([83c377e](https://github.com/nevenincs/vaultspec-core/commit/83c377e9bdc350d3c8817fd7c8fcff66e43e3696))
+* **cli:** scope the canonical argument metavar to core's own command tree ([#569](https://github.com/nevenincs/vaultspec-core/issues/569)) ([25b17d0](https://github.com/nevenincs/vaultspec-core/commit/25b17d086f7d38bd716c400c20870d0d8453f90f))
+
 ## [0.3.0](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.2.6...vaultspec-core-v0.3.0) (2026-09-26)
 
 
