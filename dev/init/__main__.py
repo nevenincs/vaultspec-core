@@ -383,7 +383,7 @@ def _finish(
         try:
             payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
             path.write_text(payload, encoding="utf-8")
-        except OSError as exc:  # pragma: no cover - unwritable filesystem
+        except OSError as exc:
             emitter.say(f"init: could not write the report to {path}: {exc}")
         else:
             emitter.say(f"init: report written to {path}")

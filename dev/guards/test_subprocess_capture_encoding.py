@@ -105,10 +105,7 @@ def test_cli_captures_decode_as_utf8() -> None:
     offenders: list[str] = []
 
     for path in _python_files():
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        except SyntaxError:  # pragma: no cover - a parse failure is its own bug
-            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
