@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from ..exec_ledger import (
@@ -55,6 +56,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import Path
 
+    from ..models import DocumentMetadata
     from ._base import VaultSnapshot
 
 logger = logging.getLogger(__name__)
@@ -118,55 +120,97 @@ def check_exec_mapping(
 
     docs_dir = root_dir / get_config().docs_dir
     plan_dir = docs_dir / "plan"
-    archive_plan_dir = docs_dir / "_archive" / "plan"
+    state = _MappingPass(
+        root_dir=root_dir,
+        plan_dir=plan_dir,
+        archive_plan_dir=docs_dir / "_archive" / "plan",
+        raw_texts=raw_texts,
+        live_plan_names={p.name for p in snapshot if p.parent == plan_dir},
+        result=result,
+    )
     wanted = feature.lstrip("#") if feature else None
-
-    live_plan_names = {p.name for p in snapshot if p.parent == plan_dir}
-    archived_stem_cache: dict[str, bool] = {}
-    plan_ids_cache: dict[Path, _PlanIds | Exception] = {}
-    #: Step ids each live plan has evidence for, from ledgers and per-Step
-    #: records alike, so a closed Step is never reported missing twice over.
-    covered: dict[Path, set[str]] = {}
-    #: Live plans whose ledger carries a verb-written row: execution there is
-    #: being logged, so a closed Step without a row is an error, not legacy
-    #: drift. A ledger folded from history carries only ``T`` rows and does
-    #: not qualify.
-    ledger_plans: set[Path] = set()
-    #: Live plans carrying execution records that predate ``step_id:``, by
-    #: record count. Their evidence is on disk but names no Step, which is a
-    #: different state from having no evidence at all and takes different
-    #: advice (issue #498).
-    unattributable: dict[Path, int] = {}
 
     for doc_path, (metadata, body) in sorted(snapshot.items()):
         if resolve_doc_type(doc_path) is not DocType.EXEC:
             continue
         if wanted and wanted not in extract_feature_tags(metadata.tags):
             continue
+        state.scan_exec_record(doc_path, metadata, body)
 
-        rel_path = doc_path.relative_to(root_dir)
+    for plan_path, (metadata, _body) in sorted(snapshot.items()):
+        if plan_path.parent != plan_dir:
+            continue
+        if wanted and wanted not in extract_feature_tags(metadata.tags):
+            continue
+        state.report_missing_rows(plan_path)
+
+    return result
+
+
+@dataclass
+class _MappingPass:
+    """State shared by the exec-record scan and the closed-Step sweep.
+
+    Per-plan work is memoized for the whole pass: each distinct parent plan
+    is parsed once and archive probes are cached per stem.
+    """
+
+    root_dir: Path
+    plan_dir: Path
+    archive_plan_dir: Path
+    raw_texts: Mapping[Path, tuple[str, bool]] | None
+    live_plan_names: set[str]
+    result: CheckResult
+    archived_stem_cache: dict[str, bool] = field(default_factory=dict)
+    plan_ids_cache: dict[Path, _PlanIds | Exception] = field(default_factory=dict)
+    #: Step ids each live plan has evidence for, from ledgers and per-Step
+    #: records alike, so a closed Step is never reported missing twice over.
+    covered: dict[Path, set[str]] = field(default_factory=dict)
+    #: Live plans whose ledger carries a verb-written row: execution there is
+    #: being logged, so a closed Step without a row is an error, not legacy
+    #: drift. A ledger folded from history carries only ``T`` rows and does
+    #: not qualify.
+    ledger_plans: set[Path] = field(default_factory=set)
+    #: Live plans carrying execution records that predate ``step_id:``, by
+    #: record count. Their evidence is on disk but names no Step, which is a
+    #: different state from having no evidence at all and takes different
+    #: advice (issue #498).
+    unattributable: dict[Path, int] = field(default_factory=dict)
+
+    def step_ids(self, plan_path: Path) -> _PlanIds | Exception:
+        """Return the memoized Step id sets for *plan_path*."""
+        return _resolve_step_ids(
+            plan_path, raw_texts=self.raw_texts, cache=self.plan_ids_cache
+        )
+
+    def scan_exec_record(
+        self, doc_path: Path, metadata: DocumentMetadata, body: str
+    ) -> None:
+        """Record one exec document's evidence and report its row findings."""
+        rel_path = doc_path.relative_to(self.root_dir)
         candidate_stems = [
             stem for link in metadata.related if (stem := link_stem(link))
         ]
         live_plan_path, archived = _resolve_parent_plan(
             candidate_stems,
-            plan_dir=plan_dir,
-            live_plan_names=live_plan_names,
-            archive_plan_dir=archive_plan_dir,
-            archived_stem_cache=archived_stem_cache,
+            plan_dir=self.plan_dir,
+            live_plan_names=self.live_plan_names,
+            archive_plan_dir=self.archive_plan_dir,
+            archived_stem_cache=self.archived_stem_cache,
         )
+        is_ledger = is_ledger_stem(doc_path.stem)
 
-        if is_ledger_stem(doc_path.stem):
+        if is_ledger:
             # Parsed once. ledger_step_ids and _has_native_row each used to
             # parse this same body again, so every ledger was scanned three
             # times over.
             rows = parse_ledger_rows(body)
             step_ids = step_ids_from_rows(rows)
             if live_plan_path is not None and _has_native_row(rows):
-                ledger_plans.add(live_plan_path)
+                self.ledger_plans.add(live_plan_path)
         elif metadata.step_id:
             step_ids = (metadata.step_id,)
-            result.diagnostics.append(
+            self.result.diagnostics.append(
                 _per_step_record_diagnostic(rel_path, metadata.tags)
             )
         else:
@@ -177,36 +221,37 @@ def check_exec_mapping(
             # no Step: unmappable, not a defect, so it raises no finding of
             # its own. It is still counted: a plan whose only evidence cannot
             # be attributed needs different advice from one with no evidence.
-            if live_plan_path is not None and not is_ledger_stem(doc_path.stem):
-                unattributable[live_plan_path] = (
-                    unattributable.get(live_plan_path, 0) + 1
+            if live_plan_path is not None and not is_ledger:
+                self.unattributable[live_plan_path] = (
+                    self.unattributable.get(live_plan_path, 0) + 1
                 )
-            continue
+            return
 
         if live_plan_path is None:
-            if archived:
-                continue
-            result.diagnostics.append(
-                _missing_plan_diagnostic(rel_path, step_ids[0], candidate_stems)
-            )
-            continue
+            if not archived:
+                self.result.diagnostics.append(
+                    _missing_plan_diagnostic(rel_path, step_ids[0], candidate_stems)
+                )
+            return
 
-        covered.setdefault(live_plan_path, set()).update(step_ids)
-        if not is_ledger_stem(doc_path.stem):
-            # The per-Step record's own error is the finding; its Step
-            # mapping is not classified a second time.
-            continue
+        self.covered.setdefault(live_plan_path, set()).update(step_ids)
+        # A per-Step record's own error is the finding; its Step mapping is
+        # not classified a second time.
+        if is_ledger:
+            self._classify_ledger_rows(rel_path, live_plan_path, step_ids)
 
-        ids_or_error = _resolve_step_ids(
-            live_plan_path, raw_texts=raw_texts, cache=plan_ids_cache
-        )
+    def _classify_ledger_rows(
+        self, rel_path: Path, live_plan_path: Path, step_ids: Sequence[str]
+    ) -> None:
+        """Report each ledger Step the live parent plan does not account for."""
+        ids_or_error = self.step_ids(live_plan_path)
         if isinstance(ids_or_error, Exception):
-            result.diagnostics.append(
+            self.result.diagnostics.append(
                 _unparseable_plan_diagnostic(
-                    live_plan_path, root_dir, step_ids[0], ids_or_error
+                    live_plan_path, self.root_dir, step_ids[0], ids_or_error
                 )
             )
-            continue
+            return
 
         live_ids, retired_ids, checked_ids = ids_or_error
         for covered_step_id in step_ids:
@@ -219,33 +264,26 @@ def check_exec_mapping(
                 checked_ids=checked_ids,
             )
             if diagnostic is not None:
-                result.diagnostics.append(diagnostic)
+                self.result.diagnostics.append(diagnostic)
 
-    for plan_path, (metadata, _body) in sorted(snapshot.items()):
-        if plan_path.parent != plan_dir:
-            continue
-        if wanted and wanted not in extract_feature_tags(metadata.tags):
-            continue
-        ids_or_error = _resolve_step_ids(
-            plan_path, raw_texts=raw_texts, cache=plan_ids_cache
-        )
+    def report_missing_rows(self, plan_path: Path) -> None:
+        """Report the closed Steps of a live plan that no evidence covers."""
+        ids_or_error = self.step_ids(plan_path)
         if isinstance(ids_or_error, Exception):
-            # Reported above when a ledger references it; a plan nobody
-            # executes yet is the structure check's concern, not this one's.
-            continue
+            # Reported when a ledger references it; a plan nobody executes
+            # yet is the structure check's concern, not this one's.
+            return
         _live, _retired, checked_ids = ids_or_error
-        missing = sorted(checked_ids - covered.get(plan_path, set()))
+        missing = sorted(checked_ids - self.covered.get(plan_path, set()))
         if missing:
-            result.diagnostics.append(
+            self.result.diagnostics.append(
                 _missing_rows_diagnostic(
-                    plan_path.relative_to(root_dir),
+                    plan_path.relative_to(self.root_dir),
                     missing,
-                    has_ledger=plan_path in ledger_plans,
-                    unattributable=unattributable.get(plan_path, 0),
+                    has_ledger=plan_path in self.ledger_plans,
+                    unattributable=self.unattributable.get(plan_path, 0),
                 )
             )
-
-    return result
 
 
 def _has_native_row(rows: Sequence[LedgerRow]) -> bool:
