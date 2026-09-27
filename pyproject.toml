@@ -267,6 +267,11 @@ tmp_path_retention_policy = "failed"
 [tool.ruff]
 line-length = 88
 target-version = "py313"
+# Ruff formats the Python fences inside Markdown. A .vault/ record's body is
+# fingerprinted, so a fence reformatted there reads as an unstamped hand edit;
+# forcing the exclusion keeps an explicitly named record out of reach too.
+extend-exclude = [".vault"]
+force-exclude = true
 
   [tool.ruff.lint]
   # NOTE: preview is deliberately OFF here - enabling it globally changes the
