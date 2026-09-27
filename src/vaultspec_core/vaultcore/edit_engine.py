@@ -197,7 +197,12 @@ def validate_proposed(
     snapshot = {doc_path: (metadata, body)}
 
     results = [
-        check_frontmatter(root_dir, snapshot=snapshot, fix=False),
+        check_frontmatter(
+            root_dir,
+            snapshot=snapshot,
+            fix=False,
+            raw_texts={doc_path: (new_text, False)},
+        ),
         check_links(root_dir, snapshot=snapshot, fix=False),
         check_body_links(root_dir, snapshot=snapshot),
     ]

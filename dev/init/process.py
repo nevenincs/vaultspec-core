@@ -193,7 +193,7 @@ def run(step: Step, *, cwd: Path, echo: bool = True) -> tuple[StepResult, int]:
     except subprocess.TimeoutExpired:
         output = f"timed out after {step.timeout} seconds"
         code = INIT_STEP_FAILED
-    except OSError as exc:  # pragma: no cover - platform-specific spawn failure
+    except OSError as exc:
         output = f"{step.argv[0]}: {exc}"
         code = INIT_STEP_FAILED
 

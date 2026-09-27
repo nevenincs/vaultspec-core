@@ -81,6 +81,19 @@ class TestRefreshModifiedStamp:
         # computed here independently of the production helper.
         assert digest == "sha256:" + hashlib.sha256(b"Body.").hexdigest()
 
+    def test_collapses_a_repeated_stamp_onto_one_fresh_line(self):
+        text = (
+            "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n"
+            "modified: '2026-01-02'\nmodified: '2026-01-03'\n---\n\nBody.\n"
+        )
+        stripped, _digest = _split_body_hash(
+            refresh_modified_stamp(text, self.TODAY), "\n"
+        )
+        assert stripped == (
+            "---\ntags:\n  - '#x'\ndate: '2026-01-01'\n"
+            "modified: '2026-06-26'\n---\n\nBody.\n"
+        )
+
     def test_crlf_rewrites_existing_preserving_crlf(self):
         text = (
             "---\r\ntags:\r\n  - '#x'\r\ndate: '2026-01-01'\r\n"

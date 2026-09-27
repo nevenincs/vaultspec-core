@@ -22,11 +22,12 @@ command-inventory signature block.
 
 A second region, ``unreleased-surface``, answers the question the inventory
 cannot: which of those commands a reader can actually install. It is the
-difference between the live surface and the recorded surface of the latest
-release (:mod:`vaultspec_core.cli.reference_surface`), per the
-``reference-publication-contract`` ADR, and it exists so that no version caveat
-in these documents is hand-written - a rendered difference has no skipped state
-and cannot expire.
+difference between the live surface and the surface recorded from the latest
+published release's distribution
+(:mod:`vaultspec_core.cli.reference_surface`), and it exists so that no version
+caveat in these documents is hand-written. It names the release it was measured
+against and states that it was the latest published one when the reference was
+generated, which stays true in every frozen copy of the reference.
 
 Everything outside the managed markers
 (entry-point table, global-options narrative, sync-vocabulary section, the
@@ -268,8 +269,9 @@ def render_unreleased_surface(context: RenderContext) -> str:
     This is the region that replaces hand-written per-command version caveats.
     It is a set difference between the live surface and the published-surface
     snapshot, so it covers every affected command rather than the ones somebody
-    remembered, and it empties itself when a release ships instead of naming a
-    version that later becomes wrong.
+    remembered. It names the release it was measured against as the latest
+    published one when the reference was generated, a claim that stays true in
+    a shipped or deployed copy long after a newer release exists.
 
     The empty state is written out rather than left blank: a reader must be able
     to tell "this reference matches the release" from "nobody filled this in".
@@ -281,15 +283,16 @@ def render_unreleased_surface(context: RenderContext) -> str:
 
     if diff.is_empty():
         return (
-            f"The latest published release is `{version}`, and every command, "
-            "flag, and tool documented here is in it."
+            f"Measured against `{version}`, the latest published release when "
+            "this reference was generated: every command, flag, and tool "
+            "documented here is in it."
         )
 
     lines = [
-        f"The latest published release is `{version}`. What follows is on this "
-        "branch and not in that release, so it cannot be installed yet. This "
-        "list is generated from the recorded surface of that release; it is "
-        "never hand-maintained.",
+        f"Measured against `{version}`, the latest published release when this "
+        "reference was generated. What follows is not in that release. The list "
+        "is computed from the surface recorded from that release's published "
+        "distribution; it is never hand-maintained.",
         "",
     ]
     if diff.commands:
@@ -350,14 +353,14 @@ def render_unreleased_mcp_surface(context: RenderContext) -> str:
 
     if not diff.mcp_tools:
         return (
-            f"The latest published release is `{version}`, and every tool above "
-            "is in it."
+            f"Measured against `{version}`, the latest published release when "
+            "this reference was generated: every tool above is in it."
         )
 
     lines = [
-        f"The latest published release is `{version}`. These tools are on this "
-        "branch and not in that release, so a host installing the published "
-        "server will not see them:",
+        f"Measured against `{version}`, the latest published release when this "
+        "reference was generated. These tools are not in that release, so a "
+        "host running it will not see them:",
         "",
     ]
     lines.extend(f"- `{name}`" for name in diff.mcp_tools)
@@ -369,9 +372,9 @@ class RenderContext:
     """Everything a region renderer may read.
 
     ``typer_app`` is the live command tree. ``live`` is that tree's surface
-    together with the MCP tool registry's, and ``published`` is the recorded
-    surface of the latest release; the unreleased-surface region is the
-    difference between them. All three are resolved once by
+    together with the MCP tool registry's, and ``published`` is the surface
+    recorded from the latest published release; the unreleased-surface region
+    is the difference between them. All three are resolved once by
     :func:`build_render_context` and passed in rather than looked up inside a
     renderer, so capturing the MCP surface - which starts a server - happens
     once per run instead of once per file, and so a test can render any region

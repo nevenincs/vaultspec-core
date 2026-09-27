@@ -136,16 +136,6 @@ def cmd_reference_generate(
 
 @reference_app.command("snapshot")
 def cmd_reference_snapshot(
-    check: Annotated[
-        bool,
-        typer.Option(
-            "--check",
-            help=(
-                "Report whether the snapshot is due a refresh; exit non-zero "
-                "when it is, without writing."
-            ),
-        ),
-    ] = False,
     emit: Annotated[
         bool,
         typer.Option(
@@ -166,28 +156,34 @@ def cmd_reference_snapshot(
             ),
         ),
     ] = None,
+    record: Annotated[
+        typer.FileText | None,
+        typer.Option(
+            "--record",
+            help=(
+                "Write a surface document (from --emit, run inside the latest "
+                "published release's distribution) as the committed snapshot."
+            ),
+        ),
+    ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
-    """Record the published command and MCP tool surface.
+    """Record or report the published command and MCP tool surface.
 
     The snapshot at ``src/vaultspec_core/builtins/reference/published-surface.json``
     is what the generated references attribute against: the difference between
     it and the live surface is what they render as unreleased, in place of
     hand-written per-command caveats.
 
-    Default (write) mode refreshes the snapshot from the live surface, but only
-    when the tree declares a different version from the one recorded. That
-    restriction is the contract: the recorded surface belongs to a release, so
-    the release candidate branch - where the version is already the candidate's
-    and the tree is the one about to be tagged - is the only place it may be
-    rewritten. On main between releases the versions match and this is a no-op,
-    because rewriting there would restamp unreleased commands as published.
+    The snapshot is the surface of the latest published release, and it is
+    never captured from a source tree. After publication, that release's own
+    distribution is installed in isolation and read back with ``--emit``;
+    ``--record`` writes the emitted document as the snapshot. ``--verify``
+    compares such a document against the committed snapshot, which is how the
+    snapshot is proven to be what the published distribution exposes.
 
-    ``--check`` reports that state without writing, for CI. ``--emit`` prints
-    this build's own surface, which is how a published distribution is read
-    back inside an isolated install. ``--verify`` compares such a document
-    against the committed snapshot, which is how the publish lane proves a
-    released artifact matches the reference shipped for it.
+    Without a mode flag the verb only reports what the committed snapshot
+    records. ``--emit``, ``--verify``, and ``--record`` are mutually exclusive.
     """
     from vaultspec_core.cli.reference_surface import (
         SurfaceSnapshotError,
@@ -195,82 +191,87 @@ def cmd_reference_snapshot(
         deserialize_surface,
         load_published_surface,
         published_surface_path,
-        refresh_reason,
         serialize_surface,
         write_published_surface,
     )
+
+    modes = [
+        name
+        for name, chosen in (
+            ("--emit", emit),
+            ("--verify", verify is not None),
+            ("--record", record is not None),
+        )
+        if chosen
+    ]
+    if len(modes) > 1:
+        raise typer.BadParameter(
+            f"{' and '.join(modes)} are mutually exclusive",
+            param_hint="'--emit' / '--verify' / '--record'",
+        )
 
     if emit:
         typer.echo(serialize_surface(capture_surface()), nl=False)
         raise typer.Exit(0)
 
-    try:
-        published = load_published_surface()
-    except SurfaceSnapshotError as exc:
+    def _fail(exc: SurfaceSnapshotError) -> typer.Exit:
         if json_output:
             emit_json("spec.reference.snapshot", "failed", {"message": str(exc)})
         else:
             typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        return typer.Exit(code=1)
+
+    path = published_surface_path()
+
+    if record is not None:
+        try:
+            recorded = deserialize_surface(record.read())
+        except SurfaceSnapshotError as exc:
+            raise _fail(exc) from exc
+        changed = write_published_surface(recorded)
+        payload = {"path": str(path), "version": recorded.version, "changed": changed}
+        if json_output:
+            emit_json(
+                "spec.reference.snapshot",
+                "updated" if changed else "unchanged",
+                payload,
+            )
+        elif changed:
+            typer.echo(
+                f"Published-surface snapshot recorded as {recorded.version} "
+                f"({len(recorded.commands)} commands, "
+                f"{len(recorded.mcp_tools)} MCP tools)."
+            )
+        else:
+            typer.echo(
+                f"Published-surface snapshot already records {recorded.version}."
+            )
+        raise typer.Exit(0)
+
+    try:
+        published = load_published_surface()
+    except SurfaceSnapshotError as exc:
+        raise _fail(exc) from exc
 
     if verify is not None:
         try:
             candidate = deserialize_surface(verify.read())
         except SurfaceSnapshotError as exc:
-            if json_output:
-                emit_json("spec.reference.snapshot", "failed", {"message": str(exc)})
-            else:
-                typer.echo(f"Error: {exc}", err=True)
-            raise typer.Exit(code=1) from exc
+            raise _fail(exc) from exc
         _report_verification(candidate, published, json_output=json_output)
         return
 
-    live = capture_surface()
-    reason = refresh_reason(live, published)
-    path = published_surface_path()
-
-    if reason is None:
-        payload = {
-            "path": str(path),
-            "version": published.version,
-            "refreshed": False,
-        }
-        if json_output:
-            emit_json("spec.reference.snapshot", "unchanged", payload)
-        else:
-            typer.echo(
-                f"Published-surface snapshot holds {published.version}; "
-                "the tree declares the same version, so it is not refreshed."
-            )
-        raise typer.Exit(0)
-
-    if check:
-        payload = {"path": str(path), "reason": reason, "refreshed": False}
-        if json_output:
-            emit_json("spec.reference.snapshot", "failed", payload)
-        else:
-            typer.echo(f"Published-surface snapshot is stale: {reason}.", err=True)
-            typer.echo(
-                "  Run 'vaultspec-core spec reference snapshot' to refresh it.",
-                err=True,
-            )
-        raise typer.Exit(code=1)
-
-    changed = write_published_surface(live)
-    payload = {
-        "path": str(path),
-        "version": live.version,
-        "refreshed": changed,
-        "reason": reason,
-    }
     if json_output:
         emit_json(
-            "spec.reference.snapshot", "updated" if changed else "unchanged", payload
+            "spec.reference.snapshot",
+            "unchanged",
+            {"path": str(path), "version": published.version},
         )
     else:
         typer.echo(
-            f"Published-surface snapshot refreshed to {live.version} "
-            f"({len(live.commands)} commands, {len(live.mcp_tools)} MCP tools)."
+            f"Published-surface snapshot records {published.version} "
+            f"({len(published.commands)} commands, "
+            f"{len(published.mcp_tools)} MCP tools)."
         )
     raise typer.Exit(0)
 
@@ -317,30 +318,15 @@ def _report_verification(
         if not version_matches:
             typer.echo(
                 f"Distribution declares {candidate.version}; the snapshot "
-                f"records {published.version}.",
+                f"records {published.version}, so it was not recorded from "
+                "that distribution.",
                 err=True,
             )
         else:
-            # The likeliest reading of this failure is a defect, and for a
-            # tagged build it is one. For a build from a branch that is ahead
-            # of its release it is the ordinary state - the version is the
-            # released one because release-please has not bumped it yet, while
-            # the surface has moved on - which is the very confusion this
-            # contract exists to remove, so it is spelled out rather than left
-            # to be rediscovered.
             typer.echo(
                 f"Distribution and snapshot both declare {candidate.version}, "
-                "but their surfaces differ.",
-                err=True,
-            )
-            typer.echo(
-                "  For a release tag this is a defect: the reference shipped "
-                "for that version describes a different program.",
-                err=True,
-            )
-            typer.echo(
-                "  For a build from a branch ahead of its release this is "
-                "expected, and the check is only meaningful on a tag.",
+                "but their surfaces differ: the snapshot was not recorded from "
+                "that distribution.",
                 err=True,
             )
         for label, diff in (

@@ -31,7 +31,7 @@ jobs:
 
       - name: Check out the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the lockfile and surface commits to the release branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the lockfile commit to the release branch
         with:
           ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
 
@@ -41,19 +41,6 @@ jobs:
         with:
           # A release lane must not restore a cache any branch could have written.
           enable-cache: false
-
-      # `just`, and `just init` below, because the snapshot refresh runs the
-      # project's own verbs rather than uv alone: `spec reference generate`
-      # shells out to the same `mdformat` the pre-commit hooks run, so that the
-      # committed artifact and fresh output can never disagree on whitespace.
-      # `just init` is this repository's one provisioning entry point, and a
-      # second guess at what a job needs is the drift `merge-gate.yml` is guarded
-      # against.
-      - name: Set up just for the release branch
-        if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
-        with:
-          tool: just@1.38.0
 
       - name: Regenerate and push uv.lock onto the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
@@ -66,37 +53,6 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add uv.lock
             git commit -m "chore: update uv.lock for release"
-            git push
-          fi
-
-      # THE ONLY PLACE THE SURFACE SNAPSHOT MAY MOVE, and the reason is the
-      # same one that puts the lockfile refresh above here: on this branch the
-      # version is already the candidate's and the tree is already the one
-      # about to be tagged, so what is captured is exactly what will publish.
-      #
-      # On main the two versions are equal - release-please holds the bump
-      # until this pull request merges - so `spec reference snapshot` refuses
-      # to write there, and the generated references keep attributing against
-      # the release that actually shipped. Running it anywhere else would
-      # restamp unreleased commands as published.
-      #
-      # `generate` follows because the unreleased-surface regions are rendered
-      # against the snapshot: moving one without the other leaves documents
-      # quoting the release they no longer describe. Both are idempotent and
-      # the whole step is a no-op when nothing changed, which matters on a
-      # branch release-please regenerates and force-pushes.
-      - name: Refresh the surface snapshot and generated references
-        if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        run: |
-          just init
-          just framework-surface
-          if git diff --quiet; then
-            echo "the published surface and its references are already current"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "chore: record the published surface for release"
             git push
           fi
 
@@ -147,7 +103,7 @@ jobs:
       # so the release pull request would never report the required merge
       # gate. A dispatch is exempt from that rule, and its check run lands on
       # the branch head the pull request is waiting on. Last, so it validates
-      # the lockfile and surface commits pushed above.
+      # the lockfile commit pushed above.
       - name: Dispatch the merge gate for the release pull request
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         env:

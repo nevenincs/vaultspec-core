@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#hooks-maturity'
 date: '2026-02-23'
-modified: '2026-09-19'
-body_hash: 'sha256:0140876d81ff41ecdce65646a4da3f1329f087b016ae7dd6f88ed9b0fe34fcf8'
+modified: '2026-09-27'
+body_hash: 'sha256:82fcdb33da9c83114769001779b913edfb3de1886a39e78e7b68ee47e4247cb9'
 related:
   - '[[2026-02-23-hooks-maturity-research]]'
 ---

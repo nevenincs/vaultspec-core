@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#pip-install-deployment'
 date: '2026-02-23'
-modified: '2026-06-13'
-body_hash: 'sha256:82b216aedc798f413a0feb2a214e3413e0055df3cd098c7e9691cfeb38db29b3'
+modified: '2026-09-27'
+body_hash: 'sha256:893986b2940f100aa5def5894343d246ab221429a147991a6f9c1fb93a235064'
 related:
   - '[[2026-02-21-packaging-restructure-research]]'
   - '[[2026-02-19-workspace-path-decoupling-research]]'

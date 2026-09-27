@@ -25,6 +25,7 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 from ..core.exceptions import VaultSpecError
+from ..core.helpers import require_executable
 from ..vaultcore.exclusions import EXCLUDED_VAULT_DIR_NAMES
 
 if TYPE_CHECKING:
@@ -61,7 +62,7 @@ def _run_git(root_dir: Path, args: list[str]) -> bytes:
     """
     try:
         result = subprocess.run(
-            ["git", "-C", str(root_dir), *args],
+            [require_executable("git"), "-C", str(root_dir), *args],
             capture_output=True,
             check=True,
         )

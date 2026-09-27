@@ -116,7 +116,13 @@ def run_all_checks(
         raw_texts = graph.raw_texts
         return [
             check_structure(root_dir, snapshot=snapshot, fix=False),
-            check_frontmatter(root_dir, snapshot=snapshot, feature=feature, fix=False),
+            check_frontmatter(
+                root_dir,
+                snapshot=snapshot,
+                feature=feature,
+                fix=False,
+                raw_texts=raw_texts,
+            ),
             check_annotations(
                 root_dir, feature=feature, fix=False, raw_texts=raw_texts
             ),

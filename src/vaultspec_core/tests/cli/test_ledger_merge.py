@@ -211,6 +211,23 @@ def test_two_worktrees_merge_into_one_clean_ledger(repo: Path, tmp_path: Path) -
     assert "- [x] `P01.S01`" in plan_text and "- [x] `P02.S03`" in plan_text
     assert "- [ ] `P01.S02`" in plan_text
 
+    # The union merge keeps both branches' attestation lines. The frontmatter
+    # fix collapses them so the stamp fix can re-attest the merged body.
+    assert text.count("\nbody_hash: ") == 2
+    reset_config()
+    fixed = _cli(worker_a, "vault", "check", "frontmatter", "--fix")
+    assert fixed.exit_code == 0, fixed.output
+    reset_config()
+    fixed = _cli(worker_a, "vault", "check", "modified-stamp", "--fix")
+    assert fixed.exit_code == 0, fixed.output
+    text = (worker_a / _LEDGER).read_text(encoding="utf-8")
+    assert text.count("\nbody_hash: ") == 1
+    reset_config()
+    for check_name in ("frontmatter", "modified-stamp"):
+        rechecked = _cli(worker_a, "vault", "check", check_name, "--json")
+        assert rechecked.exit_code == 0, rechecked.output
+        assert "ledger.md" not in rechecked.output, rechecked.output
+
     reset_config()
     check = _cli(worker_a, "vault", "check", "exec-mapping", "--feature", _FEATURE)
     assert check.exit_code == 0, check.output

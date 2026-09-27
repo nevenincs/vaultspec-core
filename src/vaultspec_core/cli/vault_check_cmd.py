@@ -42,8 +42,6 @@ from vaultspec_core.core.windowing import windowed_section
 from vaultspec_core.vaultcore.checks._base import DIAGNOSTIC_RENDER_CAP
 
 if TYPE_CHECKING:
-    from _typeshed import DataclassInstance
-
     from vaultspec_core.vaultcore.checks._base import CheckResult
 
 __all__ = [
@@ -117,7 +115,7 @@ OffsetOption = Annotated[
 
 
 def _bounded_check_payload(
-    result: object, *, limit: int | None = None, offset: int = 0
+    result: CheckResult, *, limit: int | None = None, offset: int = 0
 ) -> dict[str, Any]:
     """Render one check result with its diagnostics bounded.
 
@@ -138,7 +136,7 @@ def _bounded_check_payload(
     """
     import dataclasses
 
-    payload: dict[str, Any] = dataclasses.asdict(cast("DataclassInstance", result))
+    payload: dict[str, Any] = dataclasses.asdict(result)
     diagnostics = payload.get("diagnostics")
     if isinstance(diagnostics, list):
         # `asdict` erases element types, so narrowing to `list` leaves the

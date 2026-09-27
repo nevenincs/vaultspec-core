@@ -25,6 +25,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from ...core.helpers import require_executable
 from ._base import CheckDiagnostic, CheckResult, Severity
 
 if TYPE_CHECKING:
@@ -144,7 +145,7 @@ def _read_committed(
     request = "".join(f"{ref}:{name}\n" for name in names).encode()
     try:
         completed = subprocess.run(
-            ["git", "-C", str(root_dir), "cat-file", "--batch"],
+            [require_executable("git"), "-C", str(root_dir), "cat-file", "--batch"],
             input=request,
             capture_output=True,
             check=True,
@@ -303,7 +304,7 @@ def _run_checks(
 
     results = [
         check_structure(root_dir, snapshot=snapshot),
-        check_frontmatter(root_dir, snapshot=snapshot),
+        check_frontmatter(root_dir, snapshot=snapshot, raw_texts=raw_texts),
         check_annotations(root_dir, raw_texts=raw_texts),
         check_markdown(root_dir, raw_texts=raw_texts),
         check_links(root_dir, snapshot=snapshot),

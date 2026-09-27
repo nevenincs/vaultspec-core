@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Literal
 
 from .gitattributes import has_valid_block as _ga_has_valid_block
 from .gitignore import get_recommended_entries, managed_lock_candidates
+from .helpers import require_executable
 from .prek_boundary import PRECOMMIT_CONFIG_NAMES
 
 if TYPE_CHECKING:
@@ -238,7 +239,14 @@ def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
     # of root-level lock sentinels).  It is safe to splat onto the argv.
     try:
         ls_result = subprocess.run(
-            ["git", "-C", str(target), "ls-files", "--", *candidates],
+            [
+                require_executable("git"),
+                "-C",
+                str(target),
+                "ls-files",
+                "--",
+                *candidates,
+            ],
             capture_output=True,
             text=True,
             check=True,
@@ -271,7 +279,7 @@ def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
         try:
             subprocess.run(
                 [
-                    "git",
+                    require_executable("git"),
                     "-C",
                     str(target),
                     "rm",
@@ -339,7 +347,7 @@ def staged_paths(root: Path) -> list[str]:
     try:
         result = subprocess.run(
             [
-                "git",
+                require_executable("git"),
                 "-C",
                 str(root),
                 "diff",

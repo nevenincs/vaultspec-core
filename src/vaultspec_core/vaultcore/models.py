@@ -256,7 +256,7 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
     - When the frontmatter already carries a ``modified:`` field, its
       value is rewritten to ``'<today>'`` (canonical quoted
       ``yyyy-mm-dd``), keeping the field's original indentation and the
-      surrounding line ending.
+      surrounding line ending; any repeat of the field is removed.
     - When the field is absent (a pre-backfill document) it is inserted
       directly after the ``date:`` line, matching that line's
       indentation and line ending, so the stamp lands in its canonical
@@ -287,7 +287,7 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
         the scaffold-time half of decision D3.
     """
     from .body_hash import document_body_digest, set_body_hash
-    from .parser import split_frontmatter
+    from .parser import rewrite_key_line, split_frontmatter
     from .rename_ops import split_keepends
 
     # Only frontmatter on the document's first line is stamped, the position
@@ -309,13 +309,10 @@ def refresh_modified_stamp(text: str, today: _dt.date) -> str:
     digest = document_body_digest(text)
 
     # Rewrite an existing ``modified:`` line in place, preserving its ending.
-    for pair in pairs:
-        m = re.match(r"^(?P<indent>[ \t]*)modified:.*$", pair[0])
-        if m is not None:
-            pair[0] = f"{m.group('indent')}modified: {canonical}"
-            new_block = "".join(content + ending for content, ending in pairs)
-            stamped = text[:block_start] + new_block + text[block_end:]
-            return set_body_hash(stamped, digest)
+    if rewrite_key_line(pairs, "modified", canonical):
+        new_block = "".join(content + ending for content, ending in pairs)
+        stamped = text[:block_start] + new_block + text[block_end:]
+        return set_body_hash(stamped, digest)
 
     # Otherwise insert the stamp directly after the ``date:`` anchor line,
     # matching that line's indentation and line ending.

@@ -18,6 +18,7 @@ patches, no skips.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -193,11 +194,44 @@ class TestRefusesRatherThanDegrades:
 
         assert outsider.exists()
 
+    def test_vault_outside_the_workspace_records_its_absolute_origin(
+        self, tmp_path: Path
+    ) -> None:
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        vault = tmp_path / "external-vault"
+        doc = vault / "exec" / "rec-a.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_bytes(b"a\n")
+        previous = os.environ.get("VAULTSPEC_DOCS_DIR")
+        os.environ["VAULTSPEC_DOCS_DIR"] = str(vault)
+        reset_config()
+        try:
+            snapshot = snapshot_paths(workspace, [doc], label="probe")
+        finally:
+            if previous is None:
+                os.environ.pop("VAULTSPEC_DOCS_DIR", None)
+            else:
+                os.environ["VAULTSPEC_DOCS_DIR"] = previous
+            reset_config()
+
+        assert snapshot is not None
+        assert (snapshot.root / "exec" / "rec-a.md").read_bytes() == b"a\n"
+        index = (snapshot.root / RESTORE_FILENAME).read_text(encoding="utf-8")
+        assert str(doc) in index
+
 
 class TestReporting:
     @pytest.mark.parametrize(
         ("count", "expected"),
-        [(0, "0 B"), (512, "512 B"), (2048, "2.0 KB"), (5 * 1024 * 1024, "5.0 MB")],
+        [
+            (0, "0 B"),
+            (512, "512 B"),
+            (2048, "2.0 KB"),
+            (5 * 1024 * 1024, "5.0 MB"),
+            (3 * 1024**3, "3.0 GB"),
+            (2048 * 1024**3, "2048.0 GB"),
+        ],
     )
     def test_human_bytes(self, count: int, expected: str) -> None:
         assert human_bytes(count) == expected

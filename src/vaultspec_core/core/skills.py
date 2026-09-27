@@ -115,6 +115,18 @@ def skills_list() -> list[dict[str, str]]:
     return items
 
 
+def _default_skill_body(skill_name: str, template: str | None) -> str:
+    """Return the named template's text, or a placeholder instruction body."""
+    if template:
+        tmpl_path = _t.get_context().templates_dir / template
+        if not tmpl_path.suffix:
+            tmpl_path = tmpl_path.with_suffix(".md")
+        if tmpl_path.exists():
+            return tmpl_path.read_text(encoding="utf-8")
+        logger.warning("Warning: Template '%s' not found at %s", template, tmpl_path)
+    return f"# {skill_name}\n\nDefine your skill instructions here.\n"
+
+
 def skills_add(
     name: str,
     description: str = "",
@@ -166,17 +178,7 @@ def skills_add(
 
     if body_content is None:
         if is_interactive:
-            body_content = f"# {skill_name}\n\nDefine your skill instructions here.\n"
-            if template:
-                tmpl_path = _t.get_context().templates_dir / template
-                if not tmpl_path.suffix:
-                    tmpl_path = tmpl_path.with_suffix(".md")
-                if tmpl_path.exists():
-                    body_content = tmpl_path.read_text(encoding="utf-8")
-                else:
-                    logger.warning(
-                        "Warning: Template '%s' not found at %s", template, tmpl_path
-                    )
+            body_content = _default_skill_body(skill_name, template)
             fm = {"name": skill_name, "description": description}
             scaffold = build_file(fm, body_content)
             atomic_write(file_path, scaffold)
@@ -194,21 +196,7 @@ def skills_add(
             if not sys.stdin.isatty():
                 body_content = sys.stdin.read()
             if not body_content:
-                body_content = (
-                    f"# {skill_name}\n\nDefine your skill instructions here.\n"
-                )
-                if template:
-                    tmpl_path = _t.get_context().templates_dir / template
-                    if not tmpl_path.suffix:
-                        tmpl_path = tmpl_path.with_suffix(".md")
-                    if tmpl_path.exists():
-                        body_content = tmpl_path.read_text(encoding="utf-8")
-                    else:
-                        logger.warning(
-                            "Warning: Template '%s' not found at %s",
-                            template,
-                            tmpl_path,
-                        )
+                body_content = _default_skill_body(skill_name, template)
 
     fm = {"name": skill_name, "description": description}
     scaffold = build_file(fm, body_content)

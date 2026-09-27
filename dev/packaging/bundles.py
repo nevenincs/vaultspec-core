@@ -293,14 +293,36 @@ def verify_bundle(archive: Path, product: Product, version: str, target: str) ->
             f"expected {sorted(expected_members)}, got {sorted(contents)}"
         )
 
+    manifest = _parse_manifest(contents[MANIFEST_NAME])
+    _verify_manifest_identity(manifest, product, version, target)
+    _verify_manifest_archive(manifest, expected_archive, target)
+    _verify_manifest_runtime(manifest, target)
+    _verify_manifest_files(manifest, expected_roles, contents)
+
+
+def _parse_manifest(raw: bytes) -> dict[str, object]:
     try:
-        parsed: object = json.loads(contents[MANIFEST_NAME])
+        parsed: object = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise BundleError(f"manifest.json is not valid JSON: {exc}") from exc
     if not isinstance(parsed, dict):
         raise BundleError("manifest.json is not a JSON object")
-    manifest = cast("dict[str, object]", parsed)
+    return cast("dict[str, object]", parsed)
 
+
+def _manifest_object(
+    manifest: dict[str, object], key: str, what: str
+) -> dict[str, object]:
+    """Return the JSON object under *key*, refusing the manifest without one."""
+    value = manifest.get(key)
+    if not isinstance(value, dict):
+        raise BundleError(f"manifest.json {what} metadata is missing")
+    return cast("dict[str, object]", value)
+
+
+def _verify_manifest_identity(
+    manifest: dict[str, object], product: Product, version: str, target: str
+) -> None:
     expected_values = {
         "schema": MANIFEST_SCHEMA,
         "product": product.name,
@@ -318,46 +340,47 @@ def verify_bundle(archive: Path, product: Product, version: str, target: str) ->
                 f"manifest.json {key!r} is {manifest.get(key)!r}; expected {expected!r}"
             )
 
-    archive_metadata = manifest.get("archive")
-    if not isinstance(archive_metadata, dict):
-        raise BundleError("manifest.json archive metadata is missing")
-    archive_metadata = cast("dict[str, object]", archive_metadata)
+
+def _verify_manifest_archive(
+    manifest: dict[str, object], expected_archive: str, target: str
+) -> None:
+    archive_metadata = _manifest_object(manifest, "archive", "archive")
     expected_format = "zip" if is_windows_target(target) else "tar.gz"
     if archive_metadata.get("name") != expected_archive:
         raise BundleError("manifest.json archive name does not match the bundle")
     if archive_metadata.get("format") != expected_format:
         raise BundleError("manifest.json archive format does not match the target")
 
+
+def _verify_manifest_runtime(manifest: dict[str, object], target: str) -> None:
     revision = manifest.get("source_revision")
     if not isinstance(revision, str) or not revision:
         raise BundleError("manifest.json source revision is missing")
-    runtime = manifest.get("runtime")
-    if not isinstance(runtime, dict):
-        raise BundleError("manifest.json runtime metadata is missing")
-    runtime = cast("dict[str, object]", runtime)
     expected_runtime = {
         "python": PYTHON_VERSION,
         "cpython": CPYTHON_VERSION,
         "pyapp": PYAPP_VERSION,
     }
-    if runtime != expected_runtime:
+    if _manifest_object(manifest, "runtime", "runtime") != expected_runtime:
         raise BundleError("manifest.json runtime metadata is incorrect")
 
-    platform = manifest.get("platform")
-    if not isinstance(platform, dict):
-        raise BundleError("manifest.json platform metadata is missing")
-    platform = cast("dict[str, object]", platform)
     floor = GLIBC_FLOOR.get(target)
     expected_floor = ".".join(str(part) for part in floor) if floor else None
+    platform = _manifest_object(manifest, "platform", "platform")
     if platform != {"glibc_floor": expected_floor}:
         raise BundleError("manifest.json platform metadata is incorrect")
 
+
+def _verify_manifest_files(
+    manifest: dict[str, object],
+    expected_roles: dict[str, str],
+    contents: dict[str, bytes],
+) -> None:
     raw_files = manifest.get("files")
     if not isinstance(raw_files, list):
         raise BundleError("manifest.json files must be a list")
-    entries = cast("list[object]", raw_files)
     by_name: dict[str, dict[str, object]] = {}
-    for raw_entry in entries:
+    for raw_entry in cast("list[object]", raw_files):
         if not isinstance(raw_entry, dict):
             raise BundleError("manifest.json contains a non-object file entry")
         entry = cast("dict[str, object]", raw_entry)
@@ -373,11 +396,10 @@ def verify_bundle(archive: Path, product: Product, version: str, target: str) ->
         if entry.get("role") != role:
             raise BundleError(f"manifest.json role for {name} is incorrect")
         size = entry.get("size")
-        digest = entry.get("sha256")
         actual = contents[name]
         if not isinstance(size, int) or isinstance(size, bool) or size != len(actual):
             raise BundleError(f"manifest.json size for {name} is incorrect")
-        if digest != hashlib.sha256(actual).hexdigest():
+        if entry.get("sha256") != hashlib.sha256(actual).hexdigest():
             raise BundleError(f"manifest.json hash for {name} is incorrect")
 
 

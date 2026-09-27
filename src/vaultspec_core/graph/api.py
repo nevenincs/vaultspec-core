@@ -480,120 +480,16 @@ class VaultGraph:
             by_stem: Map of bare stem to the :class:`DocNode` instances that
                 share it, as produced by the Pass-1a collectors.
         """
-        # Pass 1b: assign unique keys  - qualify colliding stems with
-        # their doc-type prefix, build a stem-to-keys index for link
-        # resolution in pass 2.
-        self._stem_index = {}
-
-        for stem, node_list in by_stem.items():
-            if len(node_list) == 1:
-                # Unique stem  - use it directly as the key.
-                node = node_list[0]
-                self.nodes[stem] = node
-                self._digraph.add_node(stem, **node.to_nx_attrs())
-                self._stem_index[stem] = [stem]
-            else:
-                # Collision  - qualify each with its doc-type directory.
-                keys: list[str] = []
-                for node in node_list:
-                    dt = node.doc_type.value if node.doc_type else "unknown"
-                    qualified = f"{dt}/{stem}"
-                    node.name = qualified
-                    self.nodes[qualified] = node
-                    self._digraph.add_node(
-                        qualified,
-                        **node.to_nx_attrs(),
-                    )
-                    keys.append(qualified)
-                # Sort so the index is deterministic across platforms and
-                # matches the cache-rebuild path (which also sorts); raw scan
-                # order is filesystem-dependent and diverges on Linux vs
-                # Windows, breaking cached-vs-fresh parity.
-                self._stem_index[stem] = sorted(keys)
-                logger.warning(
-                    "Stem collision for '%s': qualified as %s",
-                    stem,
-                    sorted(keys),
-                )
-
-        logger.info(
-            "Graph pass 1: created %d nodes (%d stem collisions)",
-            len(self.nodes),
-            sum(1 for v in self._stem_index.values() if len(v) > 1),
-        )
+        self._assign_node_keys(by_stem)
 
         # Pass 2: extract links -> edges.  Unresolved targets become
         # phantom nodes so the graph mirrors Obsidian's "not created"
         # link model.  Iterate over a snapshot of the real-node keys
         # because the dict grows as phantoms are added.
-        real_node_keys = list(self.nodes.keys())
-        for name in real_node_keys:
+        for name in list(self.nodes.keys()):
             node = self.nodes[name]
             try:
-                # Keep the body and related extractions separate so each
-                # resolved edge can record its provenance (body wiki-link,
-                # related frontmatter, or both).  Both extractors now return
-                # a Counter, preserving per-target multiplicity.
-                body_links = extract_wiki_links(node.body)
-                related_links = extract_related_links(
-                    node.frontmatter.get("related", []),
-                )
-
-                # Resolve each raw target to one or more node keys, summing
-                # the source multiplicity onto every resolved key and unioning
-                # the provenance kinds.  Iterating a Counter yields its keys.
-                target_counts: Counter[str] = Counter()
-                target_kinds: dict[str, set[str]] = {}
-                for raw_target, count in body_links.items():
-                    for resolved_key in self._resolve_link(raw_target):
-                        target_counts[resolved_key] += count
-                        target_kinds.setdefault(resolved_key, set()).add("body")
-                for raw_target, count in related_links.items():
-                    for resolved_key in self._resolve_link(raw_target):
-                        target_counts[resolved_key] += count
-                        target_kinds.setdefault(resolved_key, set()).add("related")
-
-                node.out_links = set(target_counts)
-
-                for target_key, multiplicity in target_counts.items():
-                    kind = edge_kind(target_kinds[target_key])
-                    if target_key in self.nodes:
-                        self.nodes[target_key].in_links.add(name)
-                        self._digraph.add_edge(
-                            name,
-                            target_key,
-                            kind=kind,
-                            multiplicity=multiplicity,
-                        )
-                        if self.nodes[target_key].phantom and not self._is_archived(
-                            target_key
-                        ):
-                            self._dangling_links.append(
-                                (name, target_key),
-                            )
-                    else:
-                        # Create a phantom node (deduplicated).
-                        phantom = DocNode(
-                            path=None,
-                            name=target_key,
-                            phantom=True,
-                        )
-                        self.nodes[target_key] = phantom
-                        self._digraph.add_node(
-                            target_key,
-                            **phantom.to_nx_attrs(),
-                        )
-                        phantom.in_links.add(name)
-                        self._digraph.add_edge(
-                            name,
-                            target_key,
-                            kind=kind,
-                            multiplicity=multiplicity,
-                        )
-                        if not self._is_archived(target_key):
-                            self._dangling_links.append(
-                                (name, target_key),
-                            )
+                self._link_node(name, node)
             except (OSError, UnicodeDecodeError) as e:
                 logger.warning(
                     "Failed to extract links from %s: %s",
@@ -601,20 +497,7 @@ class VaultGraph:
                     e,
                 )
 
-        # Pass 2b: normalise edge weight against the maximum multiplicity in
-        # the graph so the strongest explicit edge has weight 1.0 and every
-        # other edge is its multiplicity as a fraction of that maximum.  The
-        # scheme is linear, deterministic, and exactly testable:
-        #   weight = multiplicity / max_multiplicity_in_graph
-        # When the graph has no edges there is nothing to normalise.
-        multiplicities = [
-            data["multiplicity"] for _, _, data in self._digraph.edges(data=True)
-        ]
-        max_multiplicity = max(multiplicities) if multiplicities else 0
-        for _src, _tgt, data in self._digraph.edges(data=True):
-            data["weight"] = (
-                data["multiplicity"] / max_multiplicity if max_multiplicity else 0.0
-            )
+        self._normalise_edge_weights()
 
         # Pass 3: sync nx node attrs with updated in_links/out_links
         for name, node in self.nodes.items():
@@ -625,12 +508,126 @@ class VaultGraph:
                 node.in_links,
             )
 
-        # Pass 4: node-size hints.  Attach pagerank and raw in-degree so a GUI
-        # consumer can size nodes without recomputing.  PageRank uses the
-        # pure-Python power iteration in pagerank with a fixed damping factor
-        # (PAGERANK_ALPHA) and a uniform initial vector, so the result is
-        # deterministic for a fixed graph and exactly testable.  An empty
-        # graph yields no scores.
+        self._attach_size_hints()
+
+        logger.info(
+            "Graph build complete: %d nodes, %d edges",
+            self._digraph.number_of_nodes(),
+            self._digraph.number_of_edges(),
+        )
+
+    def _assign_node_keys(self, by_stem: dict[str, list[DocNode]]) -> None:
+        """Pass 1b: key every node, qualifying colliding stems by doc type.
+
+        Also builds the stem-to-keys index that pass 2 resolves links with.
+        """
+        self._stem_index = {}
+
+        for stem, node_list in by_stem.items():
+            if len(node_list) == 1:
+                # Unique stem  - use it directly as the key.
+                node = node_list[0]
+                self.nodes[stem] = node
+                self._digraph.add_node(stem, **node.to_nx_attrs())
+                self._stem_index[stem] = [stem]
+                continue
+            # Collision  - qualify each with its doc-type directory.
+            keys: list[str] = []
+            for node in node_list:
+                dt = node.doc_type.value if node.doc_type else "unknown"
+                qualified = f"{dt}/{stem}"
+                node.name = qualified
+                self.nodes[qualified] = node
+                self._digraph.add_node(
+                    qualified,
+                    **node.to_nx_attrs(),
+                )
+                keys.append(qualified)
+            # Sort so the index is deterministic across platforms and
+            # matches the cache-rebuild path (which also sorts); raw scan
+            # order is filesystem-dependent and diverges on Linux vs
+            # Windows, breaking cached-vs-fresh parity.
+            self._stem_index[stem] = sorted(keys)
+            logger.warning(
+                "Stem collision for '%s': qualified as %s",
+                stem,
+                sorted(keys),
+            )
+
+        logger.info(
+            "Graph pass 1: created %d nodes (%d stem collisions)",
+            len(self.nodes),
+            sum(1 for v in self._stem_index.values() if len(v) > 1),
+        )
+
+    def _link_node(self, name: str, node: DocNode) -> None:
+        """Pass 2 for one node: resolve its links and add the outgoing edges."""
+        # Keep the body and related extractions separate so each resolved
+        # edge can record its provenance (body wiki-link, related frontmatter,
+        # or both).  Both extractors return a Counter, preserving per-target
+        # multiplicity.
+        body_links = extract_wiki_links(node.body)
+        related_links = extract_related_links(
+            node.frontmatter.get("related", []),
+        )
+
+        # Resolve each raw target to one or more node keys, summing the source
+        # multiplicity onto every resolved key and unioning the provenance
+        # kinds.  Iterating a Counter yields its keys.
+        target_counts: Counter[str] = Counter()
+        target_kinds: dict[str, set[str]] = {}
+        for provenance, links in (("body", body_links), ("related", related_links)):
+            for raw_target, count in links.items():
+                for resolved_key in self._resolve_link(raw_target):
+                    target_counts[resolved_key] += count
+                    target_kinds.setdefault(resolved_key, set()).add(provenance)
+
+        node.out_links = set(target_counts)
+
+        for target_key, multiplicity in target_counts.items():
+            target = self.nodes.get(target_key)
+            if target is None:
+                # Create a phantom node (deduplicated).
+                target = DocNode(path=None, name=target_key, phantom=True)
+                self.nodes[target_key] = target
+                self._digraph.add_node(target_key, **target.to_nx_attrs())
+            target.in_links.add(name)
+            self._digraph.add_edge(
+                name,
+                target_key,
+                kind=edge_kind(target_kinds[target_key]),
+                multiplicity=multiplicity,
+            )
+            if target.phantom and not self._is_archived(target_key):
+                self._dangling_links.append((name, target_key))
+
+    def _normalise_edge_weights(self) -> None:
+        """Pass 2b: weight each edge by its share of the strongest multiplicity.
+
+        The strongest explicit edge has weight 1.0 and every other edge is its
+        multiplicity as a fraction of that maximum.  The scheme is linear,
+        deterministic, and exactly testable:
+            weight = multiplicity / max_multiplicity_in_graph
+        When the graph has no edges there is nothing to normalise.
+        """
+        multiplicities = [
+            data["multiplicity"] for _, _, data in self._digraph.edges(data=True)
+        ]
+        max_multiplicity = max(multiplicities) if multiplicities else 0
+        for _src, _tgt, data in self._digraph.edges(data=True):
+            data["weight"] = (
+                data["multiplicity"] / max_multiplicity if max_multiplicity else 0.0
+            )
+
+    def _attach_size_hints(self) -> None:
+        """Pass 4: attach pagerank and raw in-degree to every node.
+
+        A GUI consumer can then size nodes without recomputing.  PageRank uses
+        the pure-Python power iteration in pagerank with a fixed damping
+        factor (PAGERANK_ALPHA) and a uniform initial vector, so the result is
+        deterministic for a fixed graph and exactly testable.  An empty graph
+        yields no scores.
+        """
         if self._digraph.number_of_nodes():
             pagerank_scores = pagerank(self._digraph, alpha=PAGERANK_ALPHA)
         else:
@@ -639,12 +636,6 @@ class VaultGraph:
         for name in self._digraph.nodes():
             self._digraph.nodes[name]["pagerank"] = pagerank_scores.get(name, 0.0)
             self._digraph.nodes[name]["in_degree"] = in_degree.get(name, 0)
-
-        logger.info(
-            "Graph build complete: %d nodes, %d edges",
-            self._digraph.number_of_nodes(),
-            self._digraph.number_of_edges(),
-        )
 
     def _is_archived(self, target: str) -> bool:
         """Check if target exists under .vault/_archive/."""

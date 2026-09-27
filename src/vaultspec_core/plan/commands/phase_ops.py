@@ -188,19 +188,7 @@ def move_phase(
     - Combining both re-parents AND positions; the anchor must reside
       in the destination Wave post-move.
     """
-    if before is not None and after is not None:
-        msg = "move_phase accepts at most one of --before / --after"
-        raise MovePhaseError(msg)
-    if to_wave is None and before is None and after is None:
-        msg = "move_phase requires --to-wave, --before, or --after"
-        raise MovePhaseError(msg)
-    self_anchor = before == phase_id or after == phase_id
-    if self_anchor:
-        msg = (
-            f"cannot move Phase {phase_id!r} relative to itself; "
-            "anchor must be a different Phase"
-        )
-        raise MovePhaseError(msg)
+    _check_move_arguments(phase_id, to_wave=to_wave, before=before, after=after)
 
     moving = find_phase(plan, phase_id)
     current_wave = _wave_of(plan, phase_id)
@@ -223,42 +211,14 @@ def move_phase(
     plan.phases.remove(moving)
 
     if dest_wave is None:
-        if anchor_id is None:
-            plan.phases.append(moving)
-        else:
-            anchor_index = next(
-                i
-                for i, phase in enumerate(plan.phases)
-                if phase.canonical_id == anchor_id
-            )
-            position = anchor_index if before is not None else anchor_index + 1
-            plan.phases.insert(position, moving)
+        _place_phase(plan.phases, moving, anchor_id, before=before is not None)
     else:
-        if anchor_id is None:
-            dest_wave.phases.append(moving)
-        else:
-            anchor_index = next(
-                i
-                for i, phase in enumerate(dest_wave.phases)
-                if phase.canonical_id == anchor_id
-            )
-            position = anchor_index if before is not None else anchor_index + 1
-            dest_wave.phases.insert(position, moving)
-        # Compute moving's new flat position by walking the Wave order;
-        # insert at that index rather than rebuilding plan.phases from
-        # scratch. This preserves the relative order of every other
-        # Phase that the writer or future callers might have arranged
-        # independently.
-        new_flat_index = 0
-        for wave in plan.waves:
-            for phase in wave.phases:
-                if phase is moving:
-                    break
-                new_flat_index += 1
-            else:
-                continue
-            break
-        plan.phases.insert(new_flat_index, moving)
+        _place_phase(dest_wave.phases, moving, anchor_id, before=before is not None)
+        # Insert at moving's new flat position in Wave order rather than
+        # rebuilding plan.phases from scratch. This preserves the relative
+        # order of every other Phase that the writer or future callers might
+        # have arranged independently.
+        plan.phases.insert(_flat_phase_index(plan, moving), moving)
 
     parent_wave_id = dest_wave.canonical_id if dest_wave is not None else None
     moving.display_path = phase_display_path(
@@ -273,6 +233,52 @@ def move_phase(
             wave_id=parent_wave_id,
         )
     return moving
+
+
+def _check_move_arguments(
+    phase_id: str,
+    *,
+    to_wave: str | None,
+    before: str | None,
+    after: str | None,
+) -> None:
+    """Refuse a move with no destination, two anchors, or itself as anchor."""
+    if before is not None and after is not None:
+        msg = "move_phase accepts at most one of --before / --after"
+        raise MovePhaseError(msg)
+    if to_wave is None and before is None and after is None:
+        msg = "move_phase requires --to-wave, --before, or --after"
+        raise MovePhaseError(msg)
+    if phase_id in (before, after):
+        msg = (
+            f"cannot move Phase {phase_id!r} relative to itself; "
+            "anchor must be a different Phase"
+        )
+        raise MovePhaseError(msg)
+
+
+def _place_phase(
+    phases: list[Phase], moving: Phase, anchor_id: str | None, *, before: bool
+) -> None:
+    """Append *moving*, or insert it before or after the anchor Phase."""
+    if anchor_id is None:
+        phases.append(moving)
+        return
+    anchor_index = next(
+        i for i, phase in enumerate(phases) if phase.canonical_id == anchor_id
+    )
+    phases.insert(anchor_index if before else anchor_index + 1, moving)
+
+
+def _flat_phase_index(plan: Plan, moving: Phase) -> int:
+    """Return how many Phases precede *moving* when walking the Waves in order."""
+    index = 0
+    for wave in plan.waves:
+        for phase in wave.phases:
+            if phase is moving:
+                return index
+            index += 1
+    return index
 
 
 def remove_phase(plan: Plan, phase_id: str) -> tuple[str, list[str]]:

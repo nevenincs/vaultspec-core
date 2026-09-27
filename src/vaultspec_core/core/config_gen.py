@@ -11,13 +11,16 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path, PurePosixPath
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from . import types as _t
 from .enums import Tool
 from .helpers import atomic_write, ensure_dir
 from .tags import TagError, has_block, upsert_block
 from .types import SyncResult, ToolConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +390,70 @@ def config_show() -> list[dict[str, str]]:
     return items
 
 
+def _action_result(action: str, path: Path, *, dry_run: bool) -> SyncResult:
+    """Build a single-file :class:`SyncResult` from a sync action."""
+    r = SyncResult()
+    abs_path = str(path).replace("\\", "/")
+    if action == "[ADD]":
+        r.added = 1
+        if dry_run:
+            r.items.append((abs_path, "[ADD]"))
+    elif action == "[UPDT]":
+        r.updated = 1
+        if dry_run:
+            r.items.append((abs_path, "[UPDATE]"))
+    return r
+
+
+def _group_config_files(
+    active_configs: Mapping[Tool, ToolConfig],
+) -> tuple[dict[Path, list[str]], dict[Path, bool], dict[Path, list[str]]]:
+    """Group the active providers by the root config file they share.
+
+    Returns the tool names sharing each file, whether each file must embed
+    rule content, and the rule refs aggregated across every provider that
+    shares it. Aggregating avoids last-writer-wins conflicts (e.g. gemini +
+    antigravity -> GEMINI.md).
+    """
+    to_tools: dict[Path, list[str]] = {}
+    # A config_file embeds rule content (rather than @-references) when ANY
+    # provider sharing it requires embedding (e.g. antigravity/agy, which does
+    # not expand @ includes). Embedded content is still valid for the other
+    # providers sharing the file, which simply read it inline.
+    embed: dict[Path, bool] = {}
+    refs: dict[Path, list[str]] = {}
+    for cfg in active_configs.values():
+        if not cfg.config_file:
+            continue
+        to_tools.setdefault(cfg.config_file, []).append(cfg.name)
+        embed[cfg.config_file] = embed.get(cfg.config_file, False) or cfg.embed_rules
+    for cfg in active_configs.values():
+        if cfg.config_file:
+            refs.setdefault(cfg.config_file, []).extend(_collect_rule_refs(cfg))
+    return to_tools, embed, refs
+
+
+def _dedupe_rule_refs(all_refs: list[str]) -> list[str]:
+    """Keep one ref per rule filename, preferring the shared ``.agents/`` path.
+
+    Multiple providers can contribute the same rule file under different
+    directories (e.g. ``.gemini/rules/X.md`` and ``.agents/rules/X.md``).
+    """
+    seen_refs: list[str] = []
+    seen_basenames: dict[str, int] = {}  # basename -> index in seen_refs
+    for ref in all_refs:
+        basename = PurePosixPath(ref).name
+        if basename in seen_basenames:
+            # A ref from the shared .agents/ dir replaces the earlier
+            # tool-specific ref.
+            if ".agents/" in ref:
+                seen_refs[seen_basenames[basename]] = ref
+            continue
+        seen_basenames[basename] = len(seen_refs)
+        seen_refs.append(ref)
+    return seen_refs
+
+
 def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
     """Sync tool configuration files using ``<vaultspec>`` managed blocks.
 
@@ -408,43 +475,9 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
     result = SyncResult()
     active_configs = installed_tool_configs()
 
-    def _make_action_result(action: str, path: Path) -> SyncResult:
-        """Build a single-file :class:`SyncResult` from a sync action."""
-        r = SyncResult()
-        abs_path = str(path).replace("\\", "/")
-        if action == "[ADD]":
-            r.added = 1
-            if dry_run:
-                r.items.append((abs_path, "[ADD]"))
-        elif action == "[UPDT]":
-            r.updated = 1
-            if dry_run:
-                r.items.append((abs_path, "[UPDATE]"))
-        return r
-
-    # --- Map config_file -> list of tool names sharing it ---
-    config_file_to_tools: dict[Path, list[str]] = {}
-    # A config_file embeds rule content (rather than @-references) when ANY
-    # provider sharing it requires embedding (e.g. antigravity/agy, which does
-    # not expand @ includes). Embedded content is still valid for the other
-    # providers sharing the file, which simply read it inline.
-    config_file_embed: dict[Path, bool] = {}
-    for _tool_type, cfg in active_configs.items():
-        if cfg.config_file:
-            config_file_to_tools.setdefault(cfg.config_file, []).append(cfg.name)
-            config_file_embed[cfg.config_file] = (
-                config_file_embed.get(cfg.config_file, False) or cfg.embed_rules
-            )
-
-    # --- Markdown root config files ---
-    # Aggregate rule refs from all providers sharing the same config_file
-    # to avoid last-writer-wins conflicts (e.g. gemini + antigravity -> GEMINI.md).
-    config_refs: dict[Path, list[str]] = {}
-    for _tool_type, cfg in active_configs.items():
-        if not cfg.config_file:
-            continue
-        refs = _collect_rule_refs(cfg)
-        config_refs.setdefault(cfg.config_file, []).extend(refs)
+    config_file_to_tools, config_file_embed, config_refs = _group_config_files(
+        active_configs
+    )
 
     seen_config_files: set[Path] = set()
     for _tool_type, cfg in active_configs.items():
@@ -456,23 +489,7 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
         if not all_refs:
             continue
 
-        # Deduplicate by filename - when multiple providers contribute
-        # the same rule file under different directories (e.g.
-        # .gemini/rules/X.md and .agents/rules/X.md), keep only one ref.
-        # Prefer the shared .agents/ path when it exists.
-        seen_refs: list[str] = []
-        seen_basenames: dict[str, int] = {}  # basename -> index in seen_refs
-        for ref in all_refs:
-            basename = PurePosixPath(ref).name
-            if basename in seen_basenames:
-                # If this ref is from the shared .agents/ dir, replace the
-                # earlier tool-specific ref.
-                if ".agents/" in ref:
-                    seen_refs[seen_basenames[basename]] = ref
-                continue
-            seen_basenames[basename] = len(seen_refs)
-            seen_refs.append(ref)
-
+        seen_refs = _dedupe_rule_refs(all_refs)
         body = _render_rules_body(
             cfg.config_file,
             seen_refs,
@@ -489,7 +506,7 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             force=force,
         )
         logger.info("%s %s", action, cfg.config_file)
-        action_result = _make_action_result(action, cfg.config_file)
+        action_result = _action_result(action, cfg.config_file, dry_run=dry_run)
         result.merge(action_result)
 
         # Attribute to ALL tools sharing this config_file.
@@ -510,7 +527,9 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             force=force,
         )
         logger.info("%s %s", action, cfg.rule_ref_config_file)
-        action_result = _make_action_result(action, cfg.rule_ref_config_file)
+        action_result = _action_result(
+            action, cfg.rule_ref_config_file, dry_run=dry_run
+        )
         result.merge(action_result)
         result.per_tool.setdefault(cfg.name, SyncResult()).merge(action_result)
 
@@ -528,7 +547,7 @@ def config_sync(dry_run: bool = False, force: bool = False) -> SyncResult:
             )
             if action != "[SKIP]":
                 logger.info("%s %s", action, codex_native_path)
-            action_result = _make_action_result(action, codex_native_path)
+            action_result = _action_result(action, codex_native_path, dry_run=dry_run)
             result.merge(action_result)
             result.per_tool.setdefault(codex_cfg.name, SyncResult()).merge(
                 action_result
