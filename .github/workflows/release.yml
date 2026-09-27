@@ -63,11 +63,12 @@ jobs:
   dispatch:
     name: "Build: Release publication (Linux)"
     needs: health
-    timeout-minutes: 10
+    timeout-minutes: 130
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       actions: write
     env:
+      CI_EXEC_BUDGET_MINUTES: 10
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TAG: ${{ inputs.tag }}
       ALLOW_QUEUE: ${{ inputs.allow_queue }}

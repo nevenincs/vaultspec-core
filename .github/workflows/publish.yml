@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   build:
-    timeout-minutes: 90
+    timeout-minutes: 210
     name: "Build: Distribution (Linux)"
     # On the fleet. Every job in this repository runs there except the two
     # the fleet declares as hosted cells - binaries.yml's linux-aarch64 build
@@ -38,6 +38,8 @@ jobs:
     # longer waits on a laptop being plugged in; it does now wait on that one
     # machine being up and free.
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 90
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -75,10 +77,12 @@ jobs:
           retention-days: 5
 
   smoke-test:
-    timeout-minutes: 45
+    timeout-minutes: 165
     name: "Test: Distribution smoke (Linux)"
     needs: build
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 45
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -126,10 +130,12 @@ jobs:
         run: just release-verify-surface dist
 
   publish-pypi:
-    timeout-minutes: 30
+    timeout-minutes: 150
     name: "Build: PyPI publication (Linux)"
     needs: smoke-test
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 30
     environment:
       name: pypi
     permissions:

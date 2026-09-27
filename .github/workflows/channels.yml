@@ -43,9 +43,11 @@ concurrency:
 
 jobs:
   channels:
-    timeout-minutes: 30
+    timeout-minutes: 150
     name: "Build: Release channel pointers (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 30
     permissions:
       # Read only. The push does not go through the automatic token at all -
       # it goes to another repository over SSH with the deploy key below - so

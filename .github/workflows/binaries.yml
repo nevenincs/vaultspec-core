@@ -45,9 +45,11 @@ jobs:
   # catches the common case it was built for, a fleet that is up but missing
   # the selector a build leg asks for. Set `allow_queue` to wait deliberately.
   preflight:
-    timeout-minutes: 15
+    timeout-minutes: 135
     name: "Check: Preflight runners (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 15
     steps:
       # Only this commit: the step below reads the matrix out of this file to
       # learn which selectors it must check. Deliberately NOT sparse. The
@@ -164,9 +166,11 @@ jobs:
   # GitHub-hosted jobs, so the answer to the queue is capacity or admission
   # weighting, not a job that opts out of the rule.
   wheel:
-    timeout-minutes: 60
+    timeout-minutes: 180
     name: "Build: Wheel (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 60
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -209,7 +213,7 @@ jobs:
           retention-days: 5
 
   build:
-    timeout-minutes: 90
+    timeout-minutes: 210
     needs: [preflight, wheel]
     name: "Build: Binaries (${{ matrix.os }})"
     strategy:
@@ -347,6 +351,8 @@ jobs:
     #
     # acquisition.yml's three aarch64 legs are hosted for the same reason.
     runs-on: ${{ matrix.runner }}
+    env:
+      CI_EXEC_BUDGET_MINUTES: 90
     # Empty for every leg but linux-aarch64, which GitHub reads as
     # "no container".
     container: ${{ matrix.container }}
@@ -454,7 +460,7 @@ jobs:
   # added to one and not the other goes red on the branch that adds it rather
   # than at release time.
   offline:
-    timeout-minutes: 45
+    timeout-minutes: 165
     needs: build
     name: "Test: Offline start (${{ matrix.os }})"
     # `!cancelled()` rather than the default, so one leg failing to compile
@@ -549,6 +555,8 @@ jobs:
             isolation: proxy
             image: ""
     runs-on: ${{ matrix.runner }}
+    env:
+      CI_EXEC_BUDGET_MINUTES: 45
     steps:
       # THIS JOB DOES NOT CHECK OUT, so on a self-hosted runner it inherits
       # whatever the last job left in the workspace - including the sentinel
@@ -892,7 +900,7 @@ jobs:
   # unverified. An enumerated list is assertable here, in the shell, before
   # anything is signed.
   attest:
-    timeout-minutes: 30
+    timeout-minutes: 150
     name: "Build: Release provenance (Linux)"
     # `offline`, NOT `build`, and that edge is load-bearing twice over.
     #
@@ -941,6 +949,8 @@ jobs:
     # file - so the field is wrong for now, is wrong about a value no verifier
     # reads, and is not wrong permanently.
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 30
     permissions:
       # THE ENTIRE CREDENTIAL SURFACE OF THE SIGNING JOB. `id-token` mints the
       # OIDC token Sigstore exchanges for a short-lived signing certificate;
@@ -1023,7 +1033,7 @@ jobs:
         run: rm -rf dist-bin
 
   release:
-    timeout-minutes: 30
+    timeout-minutes: 150
     name: "Build: Release assets (Linux)"
     # `offline` and `attest`, not `build`. This job attaches `binaries-*`, and
     # that name is produced by the offline gate rather than by the compile, so
@@ -1065,6 +1075,8 @@ jobs:
     # because that failure is about the run.
     if: ${{ !cancelled() && needs.attest.result == 'success' }}
     runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 30
     permissions:
       # WRITE, and only this. `id-token: write` and `attestations: write` used
       # to sit here too, which put a grant that can mint an OIDC token for any
