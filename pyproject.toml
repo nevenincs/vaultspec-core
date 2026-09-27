@@ -322,10 +322,16 @@ force-exclude = true
     # Cyclomatic census (production blocks):
     #     over 25:  10      over 15:  72      over 10: 196   <- the default
     [tool.ruff.lint.mccabe]
-    max-complexity = 27 # RATCHETED 58 -> 57 -> 35 -> 28 -> 27
+    max-complexity = 25 # RATCHETED 58 -> 57 -> 35 -> 28 -> 27 -> 25
 
     # Worst gated value per rule at the census: returns 8, branches 27,
     # args 13, statements 90.
+    #
+    # After the 2026-09 refactors the worst gated function on the
+    # complexity, branch and statement rules is no longer production code:
+    # `verify_bundle` in `dev/packaging/bundles.py` holds all three (25, 24
+    # and 72). Production's own worst is 18, 18 and 69, so the next step on
+    # each of these three is that release-tooling function, not the package.
     #
     # `max-args` has a FLOOR that the other rules do not. A Typer command's
     # parameters are the CLI's flags, so its signature length is the published
@@ -344,9 +350,9 @@ force-exclude = true
     # dimension to finish its burndown; the rest are still above default.
     [tool.ruff.lint.pylint]
     max-args = 13       # RATCHETED 20 -> 17 -> 13 (AT the Typer-command floor)
-    max-branches = 27   # RATCHETED 63 -> 62 -> 34 -> 28 -> 27
+    max-branches = 24   # RATCHETED 63 -> 62 -> 34 -> 28 -> 27 -> 24
     max-returns = 8     # RATCHETED 13 -> 10 -> 8 (at its floor)
-    max-statements = 90 # RATCHETED 214 -> 142 -> 93 -> 90
+    max-statements = 72 # RATCHETED 214 -> 142 -> 93 -> 90 -> 72
 
     [tool.ruff.lint.per-file-ignores]
     "**/test_*.py" = ["ARG"]
@@ -651,10 +657,10 @@ reportInvalidCast = "error"
 # `C90` measures. Nesting compounds the score here, so a deeply-indented
 # function ranks far worse than a flat one with the same branch count.
 #
-# BASELINE-CALIBRATED (census 2026-09-09): RATCHETED 253 -> 166 -> 154 -> 56 -> 51.
-# At its floor - the worst production function scores exactly 51, so this one
-# cannot move until that function does. Never raise. Long-term target: 15, the
-# tool's own default.
+# BASELINE-CALIBRATED (census 2026-09-09): RATCHETED 253 -> 166 -> 154 -> 56 -> 51
+# -> 42. At its floor - the worst production functions score exactly 42, so this
+# one cannot move until they do. Never raise. Long-term target: 15, the tool's
+# own default.
 #
 # The 253 -> 166 step cost no work of its own: it fell out of the PLR1702
 # nesting burndown. Cognitive complexity compounds with indentation depth, so
@@ -678,7 +684,7 @@ reportInvalidCast = "error"
 # the same question over a subset of the same tree told nobody anything new.
 [tool.complexipy]
 exclude = ["**/tests/**"]
-max-complexity-allowed = 51
+max-complexity-allowed = 42
 
 # pylint runs with every check off except the four that ruff has no rule for.
 # It is not a second general-purpose linter here - enabling more would produce
@@ -714,7 +720,9 @@ enable = ["C0302", "R0902", "R0904", "R0916"]
 #     over 1000:   1
 #     over  500:  31      <- where modules should settle
 #
-# Longest production module: graph/api.py at 1252 lines.
+# Longest production module: config/config.py at 1251 lines, with
+# graph/api.py, core/workspace_mode.py and mcp_server/tools/documents.py all
+# within 45 lines of it - splitting one alone moves the ceiling very little.
 #
 # The `cli/spec_cmd.py` split (spec_cmd_agents.py, spec_cmd_app.py,
 # spec_cmd_doctor.py, spec_cmd_hooks.py, spec_cmd_mcps.py,
@@ -727,7 +735,7 @@ enable = ["C0302", "R0902", "R0904", "R0916"]
 # short on the longest module here and will set a ceiling the tree cannot
 # meet.
 [tool.pylint.format]
-max-module-lines = 1252 # RATCHETED 1312 -> 1252
+max-module-lines = 1251 # RATCHETED 1312 -> 1252 -> 1251
 
 # BASELINE-CALIBRATED (census 2026-09-09): each sits at the current worst
 # production offender, so the gate is green today and can only be ratcheted
