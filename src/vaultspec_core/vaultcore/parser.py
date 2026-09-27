@@ -27,12 +27,15 @@ __all__ = [
     "RelatedBlock",
     "RelatedEntry",
     "SafeLoader",
+    "drop_duplicate_keys",
+    "duplicate_frontmatter_keys",
     "parse_frontmatter",
     "parse_vault_metadata",
     "related_block",
     "render_block_list",
     "render_scalar",
     "rerender_frontmatter",
+    "rewrite_key_line",
     "split_frontmatter",
 ]
 
@@ -567,6 +570,121 @@ def rerender_frontmatter(
     if split.body:
         lines.append(split.body)
     return content[: split.frontmatter_start] + "\n".join(lines)
+
+
+#: A top-level frontmatter key: a key name at column 0 followed by a colon.
+_TOP_LEVEL_KEY_RE = re.compile(r"^(?P<key>[A-Za-z_][\w-]*)[ \t]*:")
+
+
+def _key_groups(pairs: list[list[str]]) -> list[tuple[str | None, list[list[str]]]]:
+    """Group frontmatter line *pairs* under the top-level key that owns them.
+
+    A key owns its own line and every following line up to the next
+    top-level key. Lines before the first key belong to a ``None`` group.
+    """
+    groups: list[tuple[str | None, list[list[str]]]] = []
+    for pair in pairs:
+        match = _TOP_LEVEL_KEY_RE.match(pair[0])
+        if match is not None:
+            groups.append((match.group("key"), [pair]))
+        elif groups:
+            groups[-1][1].append(pair)
+        else:
+            groups.append((None, [pair]))
+    return groups
+
+
+def duplicate_frontmatter_keys(content: str) -> dict[str, int]:
+    """Return every top-level frontmatter key of *content* written more than once.
+
+    YAML loaders keep the last occurrence of a repeated key and drop the
+    rest without a word, and so does :func:`parse_vault_metadata`, while a
+    line-based rewrite edits whichever occurrence it meets first. A
+    repeated key therefore reads one way and is written another.
+
+    Args:
+        content: The full document text.
+
+    Returns:
+        Each repeated key mapped to its occurrence count, in first-seen
+        order; empty when *content* has no frontmatter or no repeated key.
+    """
+    from .rename_ops import split_keepends
+
+    split = split_frontmatter(content)
+    if not split.at_start:
+        return {}
+    counts: dict[str, int] = {}
+    for key, _lines in _key_groups(
+        split_keepends(content[split.yaml_start : split.yaml_end])
+    ):
+        if key is not None:
+            counts[key] = counts.get(key, 0) + 1
+    return {key: count for key, count in counts.items() if count > 1}
+
+
+def drop_duplicate_keys(content: str) -> str:
+    """Return *content* keeping only the last occurrence of each frontmatter key.
+
+    The last occurrence is the one every reader already sees, so dropping
+    the earlier ones changes what the document says to nobody. Every other
+    byte, line endings included, is preserved.
+
+    Args:
+        content: The full document text.
+
+    Returns:
+        The document with repeated top-level keys collapsed, or *content*
+        unchanged when it has none.
+    """
+    from .rename_ops import split_keepends
+
+    split = split_frontmatter(content)
+    if not split.at_start:
+        return content
+    groups = _key_groups(split_keepends(content[split.yaml_start : split.yaml_end]))
+    last = {key: idx for idx, (key, _lines) in enumerate(groups) if key is not None}
+    if len(last) == sum(1 for key, _lines in groups if key is not None):
+        return content
+    kept = "".join(
+        content_line + ending
+        for idx, (key, lines) in enumerate(groups)
+        if key is None or last[key] == idx
+        for content_line, ending in lines
+    )
+    return content[: split.yaml_start] + kept + content[split.yaml_end :]
+
+
+def rewrite_key_line(pairs: list[list[str]], key: str, value: str) -> bool:
+    """Rewrite *key*'s frontmatter line in *pairs* to ``key: value``, exactly once.
+
+    The first ``key:`` line is rewritten in place, keeping its indentation
+    and line ending; any later ``key:`` line is removed, so the rewrite can
+    never leave a stale repeat behind for a reader that keeps the last
+    occurrence.
+
+    Args:
+        pairs: The frontmatter's ``[content, ending]`` line pairs, edited in
+            place.
+        key: The frontmatter key to rewrite.
+        value: The rendered value to write after ``key: ``.
+
+    Returns:
+        Whether a ``key:`` line was found; *pairs* is untouched otherwise.
+    """
+    pattern = re.compile(rf"^(?P<indent>[ \t]*){re.escape(key)}:.*$")
+    found = [
+        (idx, match)
+        for idx, pair in enumerate(pairs)
+        if (match := pattern.match(pair[0])) is not None
+    ]
+    if not found:
+        return False
+    first_idx, first_match = found[0]
+    pairs[first_idx][0] = f"{first_match.group('indent')}{key}: {value}"
+    for idx, _match in reversed(found[1:]):
+        del pairs[idx]
+    return True
 
 
 #: A ``related:`` list entry: the text before its wiki-link target, the

@@ -303,7 +303,7 @@ def _run_checks(
 
     results = [
         check_structure(root_dir, snapshot=snapshot),
-        check_frontmatter(root_dir, snapshot=snapshot),
+        check_frontmatter(root_dir, snapshot=snapshot, raw_texts=raw_texts),
         check_annotations(root_dir, raw_texts=raw_texts),
         check_markdown(root_dir, raw_texts=raw_texts),
         check_links(root_dir, snapshot=snapshot),
