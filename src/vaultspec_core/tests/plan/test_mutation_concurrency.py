@@ -36,10 +36,12 @@ from __future__ import annotations
 import random
 import subprocess
 import sys
+import time
 from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.config import get_config
 from vaultspec_core.plan.parser import parse_plan
 from vaultspec_core.tests.plan._factories import make_clean_plan
 
@@ -49,6 +51,15 @@ if TYPE_CHECKING:
 
 # Eight interpreter cold starts queueing on one plan lock: alongside a full
 # xdist pool on the Linux runner, the last child missed its 30 s budget.
+#
+# A child is entitled to wait the whole lock budget for its turn, and Windows
+# waiters only re-test the lock about once a second, so the unluckiest child
+# can legitimately finish long after 30 s on a loaded runner. The deadline is
+# therefore the lock budget plus headroom for interpreter start-up: anything
+# slower than that is a hang the lock itself should already have reported.
+_CHILD_STARTUP_HEADROOM_SECONDS = 60.0
+
+
 @pytest.mark.serial
 def test_concurrent_cli_step_adds_all_survive(tmp_path: Path) -> None:
     plan_path = tmp_path / ".vault" / "plan" / "concurrent-writers-plan.md"
@@ -83,7 +94,21 @@ def test_concurrent_cli_step_adds_all_survive(tmp_path: Path) -> None:
         for index in range(8)
     ]
 
-    outcomes = [process.communicate(timeout=30) for process in processes]
+    deadline = (
+        time.monotonic()
+        + get_config().lock_timeout_seconds
+        + _CHILD_STARTUP_HEADROOM_SECONDS
+    )
+    try:
+        outcomes = [
+            process.communicate(timeout=max(deadline - time.monotonic(), 0.0))
+            for process in processes
+        ]
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+                process.communicate()
     # Report the exit status alongside the streams: a child that dies without
     # writing anything is indistinguishable from a quiet success otherwise,
     # and that ambiguity is what made issue #321 unreadable twice over.
