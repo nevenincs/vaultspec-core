@@ -7,8 +7,8 @@ related:
   - "[[2026-05-01-migration-registry-research]]"
   - "[[2026-04-30-vault-index-folder-adr]]"
 superseded_by: '2026-09-06-migration-registry-write-boundary-adr'
-modified: '2026-09-06'
-body_hash: 'sha256:0ebe68dc1c66679a07c4fcfad95b0ddb68a5ee389face6e809d29af4c49d7dbc'
+modified: '2026-09-27'
+body_hash: 'sha256:fb493dd78158ddb5f53a4d27610a73c7b76b21ba2aec0a8faa74a2fcf25f962e'
 ---
 
 # `migration-registry` adr: versioned schema migration | (**status:** `superseded`)

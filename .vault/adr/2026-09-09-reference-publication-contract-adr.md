@@ -1,17 +1,18 @@
 ---
 tags:
-  - '#adr'
-  - '#reference-publication-contract'
+  - "#adr"
+  - "#reference-publication-contract"
 date: '2026-09-09'
-modified: '2026-09-09'
-body_schema: 'body-v2'
-body_hash: 'sha256:ded5177cfe3cb08945112471d1ba863d2471fc549ae2e44ac2a417b5708bcdb7'
 related:
   - "[[2026-09-09-reference-publication-contract-reference]]"
-  - '[[2026-06-10-cli-reference-automation-adr]]'
+  - "[[2026-06-10-cli-reference-automation-adr]]"
+superseded_by: '2026-09-27-reference-publication-contract-published-release-source-adr'
+modified: '2026-09-27'
+body_schema: 'body-v2'
+body_hash: 'sha256:9d84d1155193689889ac30541ced33b72a34a8797e56948dd747e925ef06c3b2'
 ---
 
-# `reference-publication-contract` adr: `candidate-versus-published reference provenance` | (**status:** `accepted`)
+# `reference-publication-contract` adr: `candidate-versus-published reference provenance` | (**status:** `superseded`)
 
 ## Problem Statement
 

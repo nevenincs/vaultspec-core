@@ -2,14 +2,13 @@
 
 A generated reference describes whatever surface the tree it was rendered from
 happens to have. Between two releases that is not the published surface, and
-this repository's version string cannot tell them apart: ``pyproject.toml``
-carries the released version until release-please's pull request bumps it, so
-main declares the version PyPI serves while exposing commands that version does
-not have.
+this repository's version string cannot tell them apart: the declared version
+moves ahead of publication, so a tree can name a release that does not exist
+yet while exposing commands no published release has.
 
 This module supplies the missing half - a record of what the *published*
 surface was, so the difference against the live one is computable rather than
-asserted (per the ``reference-publication-contract`` ADR). Two pieces:
+asserted. Two pieces:
 
 *Capture.* :func:`capture_surface` reads the live CLI verb tree and the live
 MCP tool registry into a :class:`Surface`. The CLI walk delegates to
@@ -19,19 +18,15 @@ and the rendered command inventory can never disagree about what a command is.
 *Comparison.* :func:`unreleased_surface` returns the verbs and flags and tools
 present live and absent from a published :class:`Surface`. That difference is
 what the reference renders in place of hand-written per-command caveats: it has
-no skipped state, and it empties itself when a release ships rather than
-expiring.
+no skipped state, and it names the release it was measured against rather than
+asserting which release is current.
 
 The snapshot is JSON under ``builtins/`` so it ships in the wheel alongside the
-reference it attributes, and so the publish lane has one immutable object to
-verify a released distribution against.
-
-Refresh is deliberately narrow. :func:`refresh_reason` permits a rewrite only
-when the tree's version differs from the snapshot's - the release candidate
-branch, where the version is already the candidate's and the tree is the one
-about to be tagged. On main between releases the two versions are equal, and
-rewriting there would restamp HEAD-only commands as released, which is the
-exact falsehood this module exists to prevent.
+reference it attributes. It records the surface of the latest published
+release - not a draft, not a prerelease - and is never captured from a source
+tree: after publication, that release's own distribution is installed in
+isolation and read back with ``spec reference snapshot --emit``, and the
+emitted document is written only through ``spec reference snapshot --record``.
 """
 
 from __future__ import annotations
@@ -63,7 +58,6 @@ __all__ = [
     "load_published_surface",
     "project_version",
     "published_surface_path",
-    "refresh_reason",
     "serialize_surface",
     "unreleased_surface",
     "write_published_surface",
@@ -95,10 +89,10 @@ def project_version() -> str:
     """Return the version of the tree this process is running from.
 
     Read from ``pyproject.toml`` when it is present, and only from installed
-    package metadata otherwise. The order matters on the release candidate
-    branch: release-please bumps ``pyproject.toml`` there and nothing
-    reinstalls the package, so ``__version__`` would still report the previous
-    release and the snapshot would be stamped with the version it is replacing.
+    package metadata otherwise. The order matters because a source tree's
+    declared version can move ahead of the installed metadata - a version bump
+    reinstalls nothing - so ``__version__`` would report a version the tree has
+    already left.
     """
     import tomllib
 
@@ -368,8 +362,9 @@ def load_published_surface(path: Path | None = None) -> Surface:
     snapshot = path or published_surface_path()
     if not snapshot.is_file():
         raise SurfaceSnapshotError(
-            f"no published-surface snapshot at {snapshot}; run "
-            "'vaultspec-core spec reference snapshot' on a release branch"
+            f"no published-surface snapshot at {snapshot}; record one from the "
+            "latest published release's distribution with "
+            "'vaultspec-core spec reference snapshot --record <surface.json>'"
         )
     return deserialize_surface(snapshot.read_text(encoding="utf-8"))
 
@@ -419,27 +414,4 @@ def unreleased_surface(live: Surface, published: Surface) -> UnreleasedSurface:
         commands=new_commands,
         flags=dict(sorted(new_flags.items())),
         mcp_tools=new_tools,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Refresh policy
-# ---------------------------------------------------------------------------
-
-
-def refresh_reason(live: Surface, published: Surface) -> str | None:
-    """Return why the snapshot may be refreshed, or ``None`` when it may not.
-
-    The snapshot records the surface of a release. It may therefore be rewritten
-    only where the tree is a different release from the one recorded - the
-    candidate branch, after release-please has bumped the version. Rewriting it
-    on main between releases would stamp the version of the *previous* release
-    onto commands that release does not contain, restamping unreleased work as
-    published, which is the failure this whole contract exists to prevent.
-    """
-    if live.version == published.version:
-        return None
-    return (
-        f"tree version {live.version} differs from the recorded published "
-        f"version {published.version}"
     )

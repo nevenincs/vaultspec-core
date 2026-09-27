@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import re
 from contextlib import nullcontext
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from ..models import vault_today
@@ -58,37 +59,17 @@ def _fix_filename(
     from ..models import DocType
     from ..scanner import get_doc_type
 
-    renames: list[tuple[str, str]] = []
-
     doc_type = get_doc_type(doc_path, root_dir)
     if not doc_type:
-        return renames, doc_path
+        return [], doc_path
 
+    fix = _FilenameFix(doc_path, root_dir, result)
     filename = doc_path.name
-    rel = doc_path.relative_to(root_dir)
-    fixed_messages: list[str] = []
-
-    def _flush_fixed_messages() -> None:
-        fixed_rel = doc_path.relative_to(root_dir)
-        for message in fixed_messages:
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=fixed_rel,
-                    message=message,
-                    severity=Severity.INFO,
-                )
-            )
-        fixed_messages.clear()
-
     expected_suffix = f"-{doc_type.value}.md"
-    needs_rename = False
-
     if doc_type == DocType.EXEC:
-        if f"-{DocType.EXEC.value}" not in filename:
-            needs_rename = True
+        needs_rename = f"-{DocType.EXEC.value}" not in filename
     else:
-        if not filename.endswith(expected_suffix):
-            needs_rename = True
+        needs_rename = not filename.endswith(expected_suffix)
 
     if needs_rename:
         match = re.match(
@@ -96,88 +77,78 @@ def _fix_filename(
             r"exec|plan|reference|research).*)?\.md$",
             filename,
         )
-        if match:
-            base = match.group(1)
-            new_filename = f"{base}{expected_suffix}"
-            new_path = doc_path.parent / new_filename
+        if match and not fix.rename(
+            f"{match.group(1)}{expected_suffix}", conflict="target already exists"
+        ):
+            return fix.renames, fix.doc_path
 
-            if _rename_document_path(doc_path, new_path):
-                old_stem = doc_path.stem
-                old_filename = doc_path.name
-                result.fixed_count += 1
-                renames.append((old_stem, new_path.stem))
-                doc_path = new_path
-                rel = doc_path.relative_to(root_dir)
-                filename = new_filename
-                fixed_messages.append(f"Fixed: renamed to {new_filename}")
-                logger.info("Renamed %s -> %s", old_filename, new_filename)
-            else:
-                logger.warning("Cannot rename %s: target exists", filename)
-                _flush_fixed_messages()
-                result.diagnostics.append(
-                    CheckDiagnostic(
-                        path=rel,
-                        message=(
-                            f"Cannot rename to {new_filename}: target already exists"
-                        ),
-                        severity=Severity.ERROR,
-                    )
-                )
-                return renames, doc_path
-
-    if not re.match(r"^\d{4}-\d{2}-\d{2}-", filename):
+    if not re.match(r"^\d{4}-\d{2}-\d{2}-", fix.doc_path.name):
         # The vault's single canonical clock (UTC), so the backfilled
         # prefix agrees with every other vault document date regardless
         # of the runner's local timezone. See `vault_today` for why.
-        new_filename = f"{vault_today().isoformat()}-{filename}"
-        new_path = doc_path.parent / new_filename
+        fix.rename(
+            f"{vault_today().isoformat()}-{fix.doc_path.name}",
+            conflict="target already exists",
+        )
 
-        if _rename_document_path(doc_path, new_path):
-            old_stem = doc_path.stem
-            old_filename = doc_path.name
-            result.fixed_count += 1
-            renames.append((old_stem, new_path.stem))
-            doc_path = new_path
-            rel = doc_path.relative_to(root_dir)
-            filename = doc_path.name
-            fixed_messages.append(f"Fixed: renamed to {new_filename}")
+    lowercase_filename = fix.doc_path.name.lower()
+    if fix.doc_path.name != lowercase_filename:
+        fix.rename(lowercase_filename, conflict="target exists", warn=False)
+
+    fix.flush()
+    return fix.renames, fix.doc_path
+
+
+@dataclass
+class _FilenameFix:
+    """One document's filename repairs, applied in sequence.
+
+    Tracks the path as each rename lands, the ``(old_stem, new_stem)`` pairs
+    performed, and the INFO messages for them, which are reported against
+    the document's final path.
+    """
+
+    doc_path: Path
+    root_dir: Path
+    result: CheckResult
+    renames: list[tuple[str, str]] = field(default_factory=list)
+    fixed_messages: list[str] = field(default_factory=list)
+
+    def flush(self) -> None:
+        """Report the pending fixed messages against the current path."""
+        fixed_rel = self.doc_path.relative_to(self.root_dir)
+        for message in self.fixed_messages:
+            self.result.diagnostics.append(
+                CheckDiagnostic(
+                    path=fixed_rel,
+                    message=message,
+                    severity=Severity.INFO,
+                )
+            )
+        self.fixed_messages.clear()
+
+    def rename(self, new_filename: str, *, conflict: str, warn: bool = True) -> bool:
+        """Rename the document to *new_filename*, or report why it could not."""
+        new_path = self.doc_path.parent / new_filename
+        old_filename = self.doc_path.name
+        if _rename_document_path(self.doc_path, new_path):
+            self.result.fixed_count += 1
+            self.renames.append((self.doc_path.stem, new_path.stem))
+            self.doc_path = new_path
+            self.fixed_messages.append(f"Fixed: renamed to {new_filename}")
             logger.info("Renamed %s -> %s", old_filename, new_filename)
-        else:
-            logger.warning("Cannot rename %s: target exists", filename)
-            _flush_fixed_messages()
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=(f"Cannot rename to {new_filename}: target already exists"),
-                    severity=Severity.ERROR,
-                )
+            return True
+        if warn:
+            logger.warning("Cannot rename %s: target exists", old_filename)
+        self.flush()
+        self.result.diagnostics.append(
+            CheckDiagnostic(
+                path=self.doc_path.relative_to(self.root_dir),
+                message=f"Cannot rename to {new_filename}: {conflict}",
+                severity=Severity.ERROR,
             )
-
-    lowercase_filename = doc_path.name.lower()
-    if doc_path.name != lowercase_filename:
-        old_stem = doc_path.stem
-        new_path = doc_path.with_name(lowercase_filename)
-        if _rename_document_path(doc_path, new_path):
-            old_filename = doc_path.name
-            result.fixed_count += 1
-            renames.append((old_stem, new_path.stem))
-            doc_path = new_path
-            rel = doc_path.relative_to(root_dir)
-            filename = doc_path.name
-            fixed_messages.append(f"Fixed: renamed to {lowercase_filename}")
-            logger.info("Renamed %s -> %s", old_filename, lowercase_filename)
-        else:
-            _flush_fixed_messages()
-            result.diagnostics.append(
-                CheckDiagnostic(
-                    path=rel,
-                    message=(f"Cannot rename to {lowercase_filename}: target exists"),
-                    severity=Severity.ERROR,
-                )
-            )
-
-    _flush_fixed_messages()
-    return renames, doc_path
+        )
+        return False
 
 
 _INDEX_TAG = "#index"

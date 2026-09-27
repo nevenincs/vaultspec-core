@@ -3,8 +3,8 @@ tags:
   - '#exec'
   - '#test-project-removal'
 date: 2026-04-12
-modified: '2026-06-13'
-body_hash: 'sha256:8af369a8544ac54aaaf5283ca8cb98818e110fb0f2e110e4a0a08f332afc4e75'
+modified: '2026-09-27'
+body_hash: 'sha256:ca56a18e1d372c5a9bf3b107ac8f8a2207237b37e5871237f12142d92e016217'
 related:
   - '[[2026-04-12-test-project-removal-plan]]'
 ---

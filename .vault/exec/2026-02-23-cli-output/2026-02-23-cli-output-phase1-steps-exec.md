@@ -3,8 +3,8 @@ tags:
   - '#exec'
   - '#cli-output'
 date: '2026-02-23'
-modified: '2026-09-19'
-body_hash: 'sha256:5a495a6df3972e04319e965b78181d1b62b8aa313ffed57851175ba61b1d6aa5'
+modified: '2026-09-27'
+body_hash: 'sha256:4f0ea0816400011ece154c9d403086d2c88f56412d0da6a902d44d96483d19df'
 related:
   - '[[2026-09-19-cli-output-plan]]'
 ---

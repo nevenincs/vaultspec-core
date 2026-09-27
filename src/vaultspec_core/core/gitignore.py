@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from pathlib import Path
 
@@ -217,7 +218,9 @@ def get_recommended_entries(target: Path) -> list[str]:
 
     entries: set[str] = set(ENV_IGNORE_ENTRIES)
 
-    try:
+    # An unreadable workspace or a malformed hook declaration still yields the
+    # credential entries: the block must never be dropped because policy failed.
+    with contextlib.suppress(OSError, VaultSpecError):
         # Internal state that must ALWAYS be ignored if the framework
         # exists. The snapshot directory, advisory-lock sentinels, the
         # install manifest (providers.json), and the MCP ownership ledger
@@ -289,10 +292,6 @@ def get_recommended_entries(target: Path) -> list[str]:
         # covered because prek reads either.
         if framework_installed and not read_hooks_declaration(target).pre_commit:
             entries.update(f"/{name}" for name in PRECOMMIT_CONFIG_NAMES)
-
-    except Exception:
-        # Fallback for very early bootstrap or corruption
-        pass
 
     return sorted(entries)
 

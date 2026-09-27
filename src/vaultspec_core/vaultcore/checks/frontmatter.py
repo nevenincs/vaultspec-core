@@ -4,6 +4,7 @@ Validates every document against DocumentMetadata.validate() rules:
 - At least 2 tags (one directory tag, one feature tag; extra tags allowed)
 - Valid date format (YYYY-MM-DD)
 - Valid related link format ([[wiki-link]])
+- No top-level key written more than once
 """
 
 from __future__ import annotations
@@ -13,7 +14,13 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from ...core.helpers import atomic_write
-from ..parser import parse_vault_metadata, rerender_frontmatter, split_frontmatter
+from ..parser import (
+    drop_duplicate_keys,
+    duplicate_frontmatter_keys,
+    parse_vault_metadata,
+    rerender_frontmatter,
+    split_frontmatter,
+)
 from ._base import (
     CheckDiagnostic,
     CheckResult,
@@ -23,6 +30,7 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from ..models import DocType, DocumentMetadata
@@ -101,9 +109,11 @@ def _repair_frontmatter(
 ) -> tuple[str, list[str]] | None:
     """Return *content* with its frontmatter repaired, and the fixes applied.
 
-    Normalizes tag ``#`` prefixes (or builds tags from a bare ``feature:``)
-    and trims the date to ``YYYY-MM-DD``, then re-renders the frontmatter in
-    canonical field order.
+    Collapses repeated top-level keys onto their last occurrence, normalizes
+    tag ``#`` prefixes (or builds tags from a bare ``feature:``) and trims
+    the date to ``YYYY-MM-DD``, then re-renders the frontmatter in canonical
+    field order. A document whose only defect is a repeated key keeps every
+    other byte as it was.
 
     Args:
         content: The ``\\n``-normalised document text.
@@ -113,11 +123,15 @@ def _repair_frontmatter(
         ``(repaired_content, fixes)``, or ``None`` when the document has no
         frontmatter or needs no fix.
     """
+    fixes: list[str] = []
+    repeated = duplicate_frontmatter_keys(content)
+    if repeated:
+        content = drop_duplicate_keys(content)
+        fixes.append(f"removed repeated keys: {', '.join(repeated)}")
     split = split_frontmatter(content)
     if split.yaml_block is None:
         return None
     metadata, _ = parse_vault_metadata(content)
-    fixes: list[str] = []
 
     # Fix 1 and 2: normalize tag prefixes, or construct tags from feature:
     new_tags, tags_changed, tag_fix = _normalized_tags(
@@ -131,8 +145,8 @@ def _repair_frontmatter(
     if date_fixed:
         fixes.append("normalized date format")
 
-    if not fixes:
-        return None
+    if not tag_fix and not date_fixed:
+        return (content, fixes) if fixes else None
 
     # With no tags to write and none constructed, the tags lines already in
     # the frontmatter are kept as they are.
@@ -201,6 +215,28 @@ def _fix_frontmatter_locked(doc_path: Path, root_dir: Path) -> str | None:
     return "; ".join(fixes_applied)
 
 
+def _repeated_key_errors(text: str | None) -> list[str]:
+    """Return one violation message per top-level key *text* repeats."""
+    if text is None:
+        return []
+    return [
+        f"Vault violation: frontmatter key '{key}' is written {count} times; "
+        "readers keep only the last."
+        for key, count in duplicate_frontmatter_keys(text).items()
+    ]
+
+
+def _document_text(
+    doc_path: Path, raw_texts: Mapping[Path, tuple[str, bool]] | None
+) -> str | None:
+    """Return *doc_path*'s text from *raw_texts*, else from disk, else None."""
+    if raw_texts is not None:
+        entry = raw_texts.get(doc_path)
+        return entry[0] if entry is not None else None
+    source = _read_source_text(doc_path)
+    return source[0] if source is not None else None
+
+
 def check_frontmatter(
     root_dir: Path,
     *,
@@ -208,12 +244,15 @@ def check_frontmatter(
     feature: str | None = None,
     doc_type_filter: str | None = None,
     fix: bool = False,
+    raw_texts: Mapping[Path, tuple[str, bool]] | None = None,
 ) -> CheckResult:
     """Validate frontmatter of all vault documents.
 
     Enforces :meth:`~vaultspec_core.vaultcore.models.DocumentMetadata.validate`
     rules: at least two tags (one directory, one feature; extras allowed),
     valid ISO 8601 date, and ``[[wiki-link]]`` format for ``related`` entries.
+    It also flags a top-level key written more than once, which the parsed
+    snapshot cannot show because every reader keeps only the last one.
 
     Args:
         root_dir: Project root directory.
@@ -223,8 +262,12 @@ def check_frontmatter(
         doc_type_filter: Restrict checks to documents of this type
             (e.g. ``"adr"``).
         fix: When ``True``, attempt to auto-correct tag prefixes,
-            reconstruct tags from a bare ``feature:`` field, and
-            normalize date formats.
+            reconstruct tags from a bare ``feature:`` field, normalize date
+            formats, and collapse repeated keys onto their last occurrence.
+        raw_texts: The ingress read's per-document ``(text, crlf)`` map (see
+            :attr:`~vaultspec_core.graph.api.VaultGraph.raw_texts`), read
+            for repeated keys in place of the files on disk. A document the
+            map does not carry is not checked for them.
 
     Returns:
         :class:`~vaultspec_core.vaultcore.checks._base.CheckResult` with
@@ -250,7 +293,9 @@ def check_frontmatter(
             if feat not in extract_feature_tags(metadata.tags):
                 continue
 
-        errors = metadata.validate()
+        errors = metadata.validate() + _repeated_key_errors(
+            _document_text(doc_path, raw_texts)
+        )
         if not errors:
             continue
 
@@ -269,7 +314,9 @@ def check_frontmatter(
                 )
                 new_content = doc_path.read_text(encoding="utf-8")
                 new_metadata, _ = parse_vault_metadata(new_content)
-                remaining_errors = new_metadata.validate()
+                remaining_errors = new_metadata.validate() + _repeated_key_errors(
+                    new_content
+                )
                 for msg in remaining_errors:
                     severity = (
                         Severity.ERROR

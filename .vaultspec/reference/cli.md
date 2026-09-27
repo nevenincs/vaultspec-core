@@ -43,17 +43,18 @@ repository root, and the working directory itself only when none of those is fou
 
 ## Surface provenance
 
-Which of the commands below you can install, as against which exist on the branch this
-was generated from. This block is generator-owned: run
-`vaultspec-core spec reference generate` to refresh it, and
-`vaultspec-core spec reference snapshot` to move the release it is measured against. Do
-not hand-edit between the markers.
+Which of the commands below are absent from the latest published release at the time
+this reference was generated. The block is computed from the surface recorded from that
+release's published distribution, which is written after publication through
+`vaultspec-core spec reference snapshot --record` and never by hand. The block is
+generator-owned: run `vaultspec-core spec reference generate` to refresh it. Do not
+hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.3.0`. What follows is on this branch and not in that
-release, so it cannot be installed yet. This list is generated from the recorded surface
-of that release; it is never hand-maintained.
+Measured against `0.2.6`, the latest published release when this reference was
+generated. What follows is not in that release. The list is computed from the surface
+recorded from that release's published distribution; it is never hand-maintained.
 
 Commands:
 
@@ -63,6 +64,7 @@ Commands:
 Flags on commands the release already has:
 
 - `vaultspec-core install` - `--env`, `--env-file`
+- `vaultspec-core spec reference snapshot` - `--record`
 - `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
@@ -375,8 +377,8 @@ hand-edit between the markers.
 
 - `vaultspec-core spec reference generate` - Regenerate the generator-owned regions of
   the bundled CLI reference.
-- `vaultspec-core spec reference snapshot` - Record the published command and MCP tool
-  surface.
+- `vaultspec-core spec reference snapshot` - Record or report the published command and
+  MCP tool surface.
 
 ### Migrations
 
@@ -1053,15 +1055,15 @@ to render in memory and diff against the committed files, exiting non-zero on mi
 without writing, plus `--json`.
 
 `vaultspec-core spec reference snapshot` maintains `reference/published-surface.json`,
-the record of the command and MCP tool surface of the latest published release. The
-generated unreleased-surface regions are the difference between that record and the live
-surface, which is why no version caveat in these documents is hand-written. Without a
-flag it refreshes the record from the live surface, and only when the tree declares a
-different version from the one recorded: the record belongs to a release, so the release
-candidate branch is the only place it may move. `--check` reports that state without
-writing. `--emit` prints this build's own surface, which is how a published distribution
-is read back inside an isolated install; `--verify FILE` compares such a document
-against the committed record and exits non-zero when they differ. `--json` applies
+the record of the command and MCP tool surface of the latest published release, not a
+draft or a prerelease. The generated unreleased-surface regions are the difference
+between that record and the live surface, which is why no version caveat in these
+documents is hand-written. The record is never captured from a source tree. `--emit`
+prints this build's own surface, which is how the published distribution is read back
+inside an isolated install after publication; `--record FILE` writes such a document as
+the record, refusing a malformed one; `--verify FILE` compares such a document against
+the committed record and exits non-zero when they differ. Without a flag the verb only
+reports the recorded version. The three modes are mutually exclusive. `--json` applies
 throughout.
 
 ### vaultspec-core spec mcps

@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#framework'
 date: '2026-02-16'
-modified: '2026-06-25'
-body_hash: 'sha256:7eb166041ca2bb4aae9624667becbb2cfbc1074fcb7cf3279965a49c2c17eeab'
+modified: '2026-09-27'
+body_hash: 'sha256:0a33ee0a93d6267d13188cef56aea1c2f7ffc0a521d9ffb00e2e32204731c9d9'
 ---
 
 # Environment Variable Patterns Analysis — vaultspec

@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#packaging-restructure'
 date: '2026-02-21'
-modified: '2026-06-13'
-body_hash: 'sha256:3a2bf17e3021be6660596488ced534763901f474487f2649448b04e533f59bc3'
+modified: '2026-09-27'
+body_hash: 'sha256:ba7fbaba5eddac84755c419e63586d466b7bbc08f2746dd7794ec9f78999480f'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
 ---

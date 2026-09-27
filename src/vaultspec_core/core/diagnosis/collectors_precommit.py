@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..helpers import require_executable
 from .signals import PrecommitSignal
 
 if TYPE_CHECKING:
@@ -192,7 +193,14 @@ def _hooks_directory(target: Path) -> Path | None:
 
     try:
         result = subprocess.run(
-            ["git", "-C", str(target), "rev-parse", "--git-path", "hooks"],
+            [
+                require_executable("git"),
+                "-C",
+                str(target),
+                "rev-parse",
+                "--git-path",
+                "hooks",
+            ],
             capture_output=True,
             text=True,
             check=True,

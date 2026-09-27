@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#cli-logging'
 date: '2026-02-22'
-modified: '2026-06-13'
-body_hash: 'sha256:d94397a4b75325a96fed8a82f3649be910f684183214c91e86359bd86d6be5c9'
+modified: '2026-09-27'
+body_hash: 'sha256:fb6c3a0aca497dc821f309b88723a5557bc59e7468fc3c3d29c4c9b1203692a4'
 ---
 
 # `cli-logging` research: standardize CLI logging with Rich
