@@ -787,6 +787,35 @@ def collect_md_resources(
     return sources
 
 
+def require_executable(name: str, *, windows_system: bool = False) -> str:
+    """Return the absolute path of executable *name*.
+
+    Launching by absolute path pins the binary that was checked instead of
+    whatever the OS search order picks at spawn time; on Windows
+    :func:`shutil.which` also applies ``PATHEXT`` so ``git`` finds ``git.exe``.
+
+    Args:
+        name: Program name, e.g. ``"git"``.
+        windows_system: On Windows, search only the system directory. Set it for
+            OS tools such as ``icacls``: Git for Windows puts same-named POSIX
+            ports (``whoami``, ``kill``) ahead of them on ``PATH``.
+
+    Raises:
+        FileNotFoundError: When *name* cannot be found, matching what
+            :func:`subprocess.run` raises for a missing program.
+    """
+    search: str | None = None
+    if windows_system and sys.platform == "win32":
+        system_root = os.environ.get("SYSTEMROOT", r"C:\Windows")
+        search = os.path.join(system_root, "System32")
+    path = shutil.which(name, path=search)
+    if path is None:
+        raise FileNotFoundError(
+            errno.ENOENT, f"{name} executable not found on PATH", name
+        )
+    return path
+
+
 def kill_process_tree(pid: int) -> None:
     """Forcefully terminate a process and all its children.
 
@@ -797,11 +826,24 @@ def kill_process_tree(pid: int) -> None:
         pid: Root process ID to kill.
     """
     if sys.platform == "win32":
-        subprocess.run(["taskkill", "/f", "/t", "/pid", str(pid)], capture_output=True)
+        subprocess.run(
+            [
+                require_executable("taskkill", windows_system=True),
+                "/f",
+                "/t",
+                "/pid",
+                str(pid),
+            ],
+            capture_output=True,
+        )
     else:
         # Simple fallback for Unix; in production use psutil if available
-        subprocess.run(["pkill", "-9", "-P", str(pid)], capture_output=True)
-        subprocess.run(["kill", "-9", str(pid)], capture_output=True)
+        subprocess.run(
+            [require_executable("pkill"), "-9", "-P", str(pid)], capture_output=True
+        )
+        subprocess.run(
+            [require_executable("kill"), "-9", str(pid)], capture_output=True
+        )
 
 
 def package_version() -> str:

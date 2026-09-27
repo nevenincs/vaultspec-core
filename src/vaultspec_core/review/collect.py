@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from vaultspec_core.config import child_environment
+from vaultspec_core.core.helpers import require_executable
 
 MAX_CANDIDATES = 12
 MAX_LINES = 120
@@ -64,7 +65,7 @@ class Git:
         try:
             with tempfile.TemporaryFile() as output:
                 result = subprocess.run(
-                    ["git", "-C", str(self.root), *args],
+                    [require_executable("git"), "-C", str(self.root), *args],
                     stdin=subprocess.DEVNULL,
                     stdout=output,
                     stderr=subprocess.DEVNULL,
