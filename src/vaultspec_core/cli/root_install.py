@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path  # noqa: TC003 - Typer evaluates the --target annotation.
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import typer
 
@@ -18,6 +18,9 @@ from vaultspec_core.cli._target import TargetOption, apply_target_install
 from vaultspec_core.cli.root_preflight import run_preflight
 from vaultspec_core.core.enums import CliAction, InstallMode
 from vaultspec_core.core.git_artifacts import is_git_repo
+
+if TYPE_CHECKING:
+    from rich.console import Console
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,16 @@ def install_post_errors(result: dict[str, Any]) -> list[str]:
         return []
     entries = cast("list[object]", raw)
     return [str(error) for error in entries]
+
+
+def _print_environment_outcomes(
+    console: Console, result: dict[str, Any], *, dry_run: bool
+) -> None:
+    """Print each provisioned setting's outcome by name; values never appear."""
+    verb = "would be " if dry_run else ""
+    outcomes = cast("dict[str, str]", result.get("environment", {}))
+    for name, outcome in outcomes.items():
+        console.print(f"  {name}: {verb}{outcome} (value hidden)")
 
 
 def cmd_install(
@@ -86,6 +99,22 @@ def cmd_install(
             ),
         ),
     ] = None,
+    env: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--env",
+            help=(
+                "Import a supported NAME from the environment, or NAME=VALUE "
+                "for non-secrets. Repeatable."
+            ),
+        ),
+    ] = None,
+    env_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--env-file", help="Import supported settings from a UTF-8 dotenv file."
+        ),
+    ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
     no_hints: Annotated[
         bool,
@@ -107,6 +136,13 @@ def cmd_install(
 
     skip = list(skip or [])
     path: Path = apply_target_install(target)
+    from vaultspec_core.config.provisioning import prepare_environment
+
+    try:
+        environment = prepare_environment(path, env or [], env_file)
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(exc, json_output=json_output)
+        return
 
     # Guard: refuse to create deeply nested paths  - only allow creating the
     # final directory component.  This prevents accidental scaffolding of
@@ -178,6 +214,7 @@ def cmd_install(
             skip=set(skip),
             mode=mode,
             adopt=adopting,
+            environment=environment,
         )
     except (VaultSpecError, OSError) as exc:
         _handle_error(exc, json_output=json_output)
@@ -193,6 +230,7 @@ def cmd_install(
         _console = get_console()
         for warning in result.get("warnings", []):
             _console.print(f"  [yellow]![/yellow] {warning}")
+        _print_environment_outcomes(_console, result, dry_run=dry_run)
 
     # The upgrade path re-seeds bundled builtins. Per the
     # cli-sync-vocabulary ADR it reports per-builtin canonical outcomes
@@ -236,7 +274,11 @@ def cmd_install(
             command="install",
             title=title,
             json_output=json_output,
-            extra_json={"version": version, "warnings": result.get("warnings", [])},
+            extra_json={
+                "version": version,
+                "warnings": result.get("warnings", []),
+                "environment": result.get("environment", {}),
+            },
             hints=hint_dict,
         )
         # Surface the new sharing policy when this upgrade carried the

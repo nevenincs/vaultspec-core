@@ -6,10 +6,15 @@ example, is not enrolled by the generic ``TYPESAFE_API_KEY`` or by
 vaultspec-rag's own variable, so a key provisioned for another tool never
 sends vault content anywhere by accident.
 
-Precedence is the process environment first, then the workspace-root ``.env``
-for an entry marked ``workspace_dotenv``. The ``.env`` is repository content,
-so it is consulted only when the package that owns the credential is running
-from the workspace's own environment: the running interpreter lives inside
+Precedence is the process environment first; then, for a ``persistable``
+entry, the protected project store ``install --env`` provisions
+(:mod:`vaultspec_core.config.local_env`), in every install mode, because only
+an explicit operator import writes it; then the workspace-root ``.env`` for
+an entry marked ``workspace_dotenv``. A blank value counts as unset at every
+source and falls through to the next, and no file is ever loaded into the
+process environment. The ``.env`` is repository content, so it is consulted
+only when the package that owns the credential is running from the
+workspace's own environment: the running interpreter lives inside
 the workspace (its project virtual environment) and the workspace runs that
 package as a project dependency (``dependency`` or ``dev`` install mode).
 Each package's mode is resolved separately, so a workspace that takes one
@@ -32,6 +37,7 @@ credential's non-secret view: whether a key is configured, and from where.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -41,8 +47,10 @@ from typing import TYPE_CHECKING, Final
 from ..core.enums import InstallMode
 from ..core.exceptions import VaultSpecError
 from ..core.workspace_mode import resolve_install_mode
+from ..env_values import is_blank
 from .config import env_value
 from .dotenv import read_dotenv_value
+from .local_env import read_local_environment
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -72,6 +80,7 @@ class CredentialSource(StrEnum):
 
     ENVIRONMENT = "environment"
     DOTENV = "dotenv"
+    LOCAL_ENV = "local_env"
 
 
 @dataclass(frozen=True)
@@ -150,9 +159,10 @@ def resolve_credential(
 
     Args:
         var: A secret registered entry, of any package's registry.
-        root: The workspace root, whose ``.env`` may be read only when *var*
-            is marked ``workspace_dotenv`` and the package that declared it
-            runs from the workspace's own environment.
+        root: The workspace root. Its project store is read for a
+            ``persistable`` *var*; its ``.env`` only when *var* is marked
+            ``workspace_dotenv`` and the package that declared it runs from
+            the workspace's own environment.
         environ: The process environment to read; ``None`` reads the
             process's own.
         interpreter_prefix: The running interpreter's prefix; ``None`` reads
@@ -167,9 +177,16 @@ def resolve_credential(
     """
     if not var.secret:
         raise ValueError(f"{var.env_name} is not a credential")
-    key = env_value(var, environ)
+    # An explicit mapping keeps env_value to the session environment, so the
+    # store below is reported as its own source rather than as the process's.
+    key = env_value(var, os.environ if environ is None else environ)
     if key:
         return Credential(key=key, source=CredentialSource.ENVIRONMENT)
+    if var.persistable:
+        stored = read_local_environment(root).get(var.env_name)
+        if not is_blank(stored):
+            key = str(stored).strip()
+            return Credential(key=key, source=CredentialSource.LOCAL_ENV)
     if not var.workspace_dotenv:
         return None
     # env_value has already refused an entry no registry declares, so the

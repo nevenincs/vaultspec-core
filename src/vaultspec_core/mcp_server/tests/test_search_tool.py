@@ -31,7 +31,7 @@ from vaultspec_core.core.diagnosis.collectors_companion import (
     CompanionSignal,
 )
 from vaultspec_core.core.discovery_guidance import LIST_VAULT, RAG_VAULT_SEARCH
-from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.enums import InstallMode, TypeSafeModel
 from vaultspec_core.core.mcps_mode import render_launch_for_mode
 from vaultspec_core.core.windowing import apply_window
 from vaultspec_core.mcp_server.app import create_server
@@ -139,7 +139,7 @@ def _ranked(
         hits=tuple(page),
         window=window,
         usage=SearchUsage(
-            model="jev-1.13.0",
+            model=TypeSafeModel.JEV,
             requests=6,
             input_tokens=41_250,
             elapsed_ms=1_235,
@@ -278,7 +278,7 @@ async def test_an_unanswered_whole_page_says_so() -> None:
             status=SearchStatus.UNAVAILABLE,
             query="q",
             reason=UnavailableReason.DEADLINE,
-            usage=SearchUsage("jev-1.13.0", 3, 900, 25_000, 0),
+            usage=SearchUsage(TypeSafeModel.JEV, 3, 900, 25_000, 0),
             next_step=_LISTING,
         ),
     ],
@@ -598,6 +598,45 @@ async def _drive_with_a_key(project: Path) -> None:
             "source": CredentialSource.ENVIRONMENT.value,
         }
         assert _SENTINEL_KEY not in result.model_dump_json()
+
+
+async def _drive_with_local_settings(project: Path) -> None:
+    from vaultspec_core.config.provisioning import (
+        apply_environment,
+        prepare_environment,
+    )
+
+    name = VAULTSPEC_CORE_TYPESAFE_API_KEY.env_name
+    request = prepare_environment(project, [name], environ={name: _SENTINEL_KEY})
+    apply_environment(project, request)
+    environment = {key: value for key, value in os.environ.items() if key != name}
+    async with stdio_session(project, environ=environment) as session:
+        await session.initialize()
+        result = await session.call_tool("status", {})
+        assert data_of(result)["hosted_search"] == {
+            "configured": True,
+            "source": CredentialSource.LOCAL_ENV.value,
+        }
+        assert _SENTINEL_KEY not in result.model_dump_json()
+        cli = CliRunner(env={name: None}).invoke(
+            app, ["-t", str(project), "status", "--json"]
+        )
+        assert cli.exit_code == 0, cli.output
+        assert (
+            json.loads(cli.stdout)["data"]["hosted_search"]
+            == data_of(result)["hosted_search"]
+        )
+        assert _SENTINEL_KEY not in cli.output
+        apply_environment(
+            project, prepare_environment(project, [name], environ={name: ""})
+        )
+        refreshed = data_of(await session.call_tool("status", {}))
+        assert refreshed["hosted_search"] == {"configured": False, "source": None}
+
+
+@pytest.mark.integration
+def test_cli_and_running_mcp_share_local_settings_without_exposing_values() -> None:
+    run_in_fresh_workspace(_drive_with_local_settings, prefix="vsc-local-settings-")
 
 
 @pytest.mark.integration

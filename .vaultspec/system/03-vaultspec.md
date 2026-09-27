@@ -51,6 +51,12 @@ Assess decision coverage separately from planning need:
 - Routine execution needs no new ADR. A question stays in the conversation unless its
   answer establishes a costly decision that implementation will build on.
 
+The ADR author owns placement and reconciliation of affected existing wording. Propose
+the new ruling and any necessary older-ADR edits together; links do not resolve a
+contradiction. The ADR skill owns the conditional Jev check, using the configured
+TypeSafe key as opt-in. Without it, use local discovery. Semantic results guide reading
+and reconciliation; they grant no authority and add no approval gate.
+
 Work directly when this session can finish it without needing durable sequencing or
 handoff. State briefly that no plan is needed. An ADR may still be required by the
 decision test; its Implementation section then bounds the direct work. Review unplanned
@@ -108,6 +114,11 @@ otherwise present the concrete record and ask. Draft plans may link proposed dec
 but no Step executes on unaccepted authority. Completed plans retain historical links;
 reopening work requires reassessing the decisions for the affected Step.
 
+Acceptance establishes decision authority, not rollout completion. Distinguish binding
+commitments from implementation hypotheses: adapt details within the commitments, and
+revise an invalidated commitment or rationale with evidence and authorization. Expected
+rollout gaps do not by themselves contradict or retire the decision.
+
 The approved plan authorizes its Steps and in-scope corrections. Use the plan verbs to
 record routine path corrections or clarifications and continue. A material scope change,
 new costly decision, or action requiring new external authority needs user input. Record
@@ -116,8 +127,12 @@ uncovered choices to the orchestrator, who checks existing authority before aski
 
 ## Execute and recover
 
-On first entry read the plan whole. On resume, read `status`, the next open Step, and
-the decision sections it depends on. Ground the affected code, implement, verify, log,
+On first entry read the plan whole. On resume, read `status`, the next open Step, its
+governing decision sections, relevant plan-wide verification, and unresolved state.
+Reassess decision coverage when reopening historical work. Reconcile the last checkpoint
+with the ledger and Git: logging, closing, and committing are separate operations. If
+interrupted, complete the unfinished checkpoint before advancing; a checked Step alone
+does not prove its commit exists. Ground the affected code, implement, verify, log,
 close the Step through the owning verb, and commit. A run may close many Steps.
 Execution spans sessions; preserve the plan stem, feature tag, Step id, and unresolved
 state at handoff. Other skills finish a bounded artifact or report the missing input.
@@ -133,6 +148,12 @@ before handoff for merge or reporting completion. L1 has no Phase-close gate. On
 covers coincident gates on the same changes. A Step closes on its own verification;
 review does not gate each Step or each document.
 
+Verification belongs to the change, not to each agent. Reuse applicable results across
+execution and review; assign one owner to shared or expensive checks. Reviewers assess
+the evidence independently and run additional checks for concrete gaps or changed
+inputs. Report pending verification separately from code defects; do not claim
+completion without the required evidence. The review skill owns evidence handling.
+
 Review the integrated behavior against the plan and governing decisions, tracing
 affected workflows across their interfaces. For framework work this includes rules,
 skills, personas, templates, and executable checks together. Review files as evidence of
@@ -146,9 +167,12 @@ the final review passing.
 ## Supporting skills and agents
 
 Use `vaultspec-curate` for semantic reconciliation, `vaultspec-documentation` for
-user-facing documents, `vaultspec-team` to supervise approved parallel assignments, and
-`vaultspec-projectmanager` for user-requested external project coordination. Supporting
-skills do not add decision or approval gates to already authorized work.
+user-facing documents, and `vaultspec-team` to supervise approved parallel assignments.
+Use `vaultspec-projectmanager` for explicitly requested coordination across active
+workstreams: epics and trackers, roadmaps, cross-worktree triage, or a multi-feature
+developer workday. It can coordinate local or remote state. Routine repository, branch,
+worktree, and single-PR tasks do not trigger it. Supporting skills do not add decision
+or approval gates to already authorized work.
 
 Personas live in `.vaultspec/agents/`. Their `tier:` (`LOW`, `STANDARD`, `HIGH`) selects
 difficulty, not plan hierarchy. Their `mode:` is discipline, not a sandbox: read-only

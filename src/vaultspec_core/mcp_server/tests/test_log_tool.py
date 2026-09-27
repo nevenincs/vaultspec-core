@@ -15,6 +15,7 @@ from mcp import Client
 from mcp.types import TextContent
 
 from vaultspec_core.mcp_server.app import create_server
+from vaultspec_core.vaultcore.exec_ledger import ledger_step_evidence
 
 from .conftest import data_of
 
@@ -93,6 +94,24 @@ async def test_relog_is_idempotent(vault_root: Path) -> None:
 
     assert again["changed"] is False
     assert _ledger(vault_root).read_text(encoding="utf-8") == before
+
+
+@pytest.mark.parametrize(
+    "results", [("pass", "fail", "pass"), ("fail", "pass", "fail")]
+)
+async def test_relogging_preserves_latest_verification(
+    vault_root: Path, results: tuple[str, ...]
+) -> None:
+    _plan(vault_root)
+    async with Client(create_server()) as client:
+        for result in results:
+            logged = await _log(client, step="S01", verify=[f"pytest={result}"])
+            assert logged["changed"] is True
+            body = _ledger(vault_root).read_text(encoding="utf-8")
+            assert ledger_step_evidence(body)["S01"].verify == result
+
+        retry = await _log(client, step="S01", verify=[f"pytest={results[-1]}"])
+        assert retry["changed"] is False
 
 
 @pytest.mark.parametrize(

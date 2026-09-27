@@ -13,14 +13,14 @@ pytestmark = [pytest.mark.unit]
 
 class TestTokenize:
     def test_identifiers_split_into_lowercased_words(self) -> None:
-        assert tokenize("Config-merge fsync_setting `Jev-1.13`") == [
+        assert tokenize("Config-merge fsync_setting `Widget-2.14`") == [
             "config",
             "merge",
             "fsync",
             "setting",
-            "jev",
-            "1",
-            "13",
+            "widget",
+            "2",
+            "14",
         ]
 
     def test_stopwords_are_kept_by_the_tokenizer(self) -> None:

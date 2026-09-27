@@ -11,7 +11,7 @@ related:
   - '[[2026-07-14-install-parity-adr]]'
 modified: '2026-09-26'
 body_schema: body-v2
-body_hash: 'sha256:2542b148c8a7e8f0bb4c77ed048b03e66eb3b3acba9cb15e19931dc1d61dd15e'
+body_hash: 'sha256:c7306141a6c1a5b7e73099d595e32cc75a0a6fdb2a5832ab4d5f45400af67396'
 ---
 
 # `env-parity` plan
@@ -97,31 +97,31 @@ Block the wave on a released vaultspec-core that carries W01, raise rag's floor 
 Remove the package-relative dotenv load and its dependency, declare rag's variables as a core package registry with credentials and framework fallbacks, resolve credentials through core's gate and pass them to the daemon, and interpret every value with core's vocabulary.
 
 - [x] `W02.P05.S19` - Remove the import-time load_dotenv call and drop python-dotenv from the runtime dependencies; `src/vaultspec_rag/cli/_core.py`.
-- [ ] `W02.P05.S20` - Declare rag's variables as a core package registry: the classifier key and HF_TOKEN as workspace-.env-eligible credentials, and ROOT, LOG_LEVEL and STDIO_WATCHDOG chained to the framework names; `src/vaultspec_rag/config/_types.py`.
-- [ ] `W02.P05.S21` - Resolve rag's credentials in the CLI through core's gate with package vaultspec-rag and hand them to the daemon it spawns through the child environment; `src/vaultspec_rag/cli/_process.py`.
-- [ ] `W02.P05.S22` - Read the classifier key through the registry accessor rather than a bare environment lookup; `src/vaultspec_rag/search/_typesafe_transport.py`.
-- [ ] `W02.P05.S23` - Replace the mirrored boolean table with core's vocabulary, treat a blank boolean as unset, and make the preprocess kill switch a boolean; `src/vaultspec_rag/_env_values.py`.
+- [x] `W02.P05.S20` - Declare rag's variables as a core package registry: the classifier key and HF_TOKEN as workspace-.env-eligible credentials, and ROOT, LOG_LEVEL and STDIO_WATCHDOG chained to the framework names; `src/vaultspec_rag/config/_types.py`.
+- [x] `W02.P05.S21` - Resolve rag's credentials in the CLI through core's gate with package vaultspec-rag and hand them to the daemon it spawns through the child environment; `src/vaultspec_rag/cli/_process.py`.
+- [x] `W02.P05.S22` - Read the classifier key through the registry accessor rather than a bare environment lookup; `src/vaultspec_rag/search/_typesafe_transport.py`.
+- [x] `W02.P05.S23` - Replace the mirrored boolean table with core's vocabulary, treat a blank boolean as unset, and make the preprocess kill switch a boolean; `src/vaultspec_rag/_env_values.py`.
 - [x] `W02.P05.S24` - Drop the base-config rung that never matches a rag key from the settings chain; `src/vaultspec_rag/config/_settings.py`.
-- [ ] `W02.P05.S25` - Declare the stray production reads (uv cache and tool dirs, the MPS fallback, the junction and preprocess markers, the memory probe literal) as registry members; `src/vaultspec_rag/config/_types.py`.
+- [x] `W02.P05.S25` - Declare the stray production reads (uv cache and tool dirs, the MPS fallback, the junction and preprocess markers, the memory probe literal) as registry members; `src/vaultspec_rag/config/_types.py`.
 
 ### Phase `W02.P06` - root, log level, watchdog and unattended detection
 
 Resolve the workspace root, log level and stdio watchdog through the framework chain in the CLI, the stdio MCP server and the daemon, and decide unattended runs with core's detector.
 
-- [ ] `W02.P06.S26` - Resolve the root as invocation, then VAULTSPEC_RAG_ROOT, then VAULTSPEC_TARGET_DIR, then discovery, through core's resolver in the CLI and the MCP roots; `src/vaultspec_rag/cli/_app.py`.
-- [ ] `W02.P06.S27` - Apply the log-level chain in the CLI, the stdio MCP server and the daemon, keeping INFO as the daemon's declared default; `src/vaultspec_rag/logging_config.py`.
-- [ ] `W02.P06.S28` - Chain the stdio watchdog switch to VAULTSPEC_STDIO_WATCHDOG, keeping its fail-safe reading; `src/vaultspec_rag/server/_stdio_lifetime.py`.
-- [ ] `W02.P06.S29` - Decide unattended installs with core's detector, so CI, VAULTSPEC_NON_INTERACTIVE, non-TTY output and --json never prompt; `src/vaultspec_rag/cli/_install.py`.
+- [x] `W02.P06.S26` - Resolve the root as invocation, then VAULTSPEC_RAG_ROOT, then VAULTSPEC_TARGET_DIR, then discovery, through core's resolver in the CLI and the MCP roots; `src/vaultspec_rag/cli/_app.py`.
+- [x] `W02.P06.S27` - Apply the log-level chain in the CLI, the stdio MCP server and the daemon, keeping INFO as the daemon's declared default; `src/vaultspec_rag/logging_config.py`.
+- [x] `W02.P06.S28` - Chain the stdio watchdog switch to VAULTSPEC_STDIO_WATCHDOG, keeping its fail-safe reading; `src/vaultspec_rag/server/_stdio_lifetime.py`.
+- [x] `W02.P06.S29` - Decide unattended installs with core's detector, so CI, VAULTSPEC_NON_INTERACTIVE, non-TTY output and --json never prompt; `src/vaultspec_rag/cli/_install.py`.
 
 ### Phase `W02.P07` - shared install and uninstall surface
 
 Make every flag rag shares with core carry the same name, short form, default and meaning, emit core's envelope and exit codes, and infer the legacy upgrade mode through core.
 
-- [ ] `W02.P07.S30` - Add --no-hints and VAULTSPEC_NO_HINTS, and emit core's envelope for install and uninstall under --json, errors included; `src/vaultspec_rag/cli/_install.py`.
+- [x] `W02.P07.S30` - Add --no-hints and VAULTSPEC_NO_HINTS, and emit core's envelope for install and uninstall under --json, errors included; `src/vaultspec_rag/cli/_install.py`.
 - [x] `W02.P07.S31` - Validate --skip against rag's component set and fail on an unknown value with the valid list; `src/vaultspec_rag/commands/_install.py`.
 - [x] `W02.P07.S32` - Stop --force from implying consent to the torch configuration prompt; consent comes only from --yes; `src/vaultspec_rag/commands/_torch_flow.py`.
 - [x] `W02.P07.S33` - Make uninstall without --force an error pointing at --dry-run, and retire the no-op uninstall --yes behind a deprecation warning; `src/vaultspec_rag/commands/_uninstall.py`.
-- [ ] `W02.P07.S34` - Infer the legacy upgrade mode through core's public function with package vaultspec-rag and delete rag's variant; `src/vaultspec_rag/commands/_mode.py`.
+- [x] `W02.P07.S34` - Infer the legacy upgrade mode through core's public function with package vaultspec-rag and delete rag's variant; `src/vaultspec_rag/commands/_mode.py`.
 - [x] `W02.P07.S35` - Make server doctor honour --target and the root chain instead of the working directory; `src/vaultspec_rag/cli/_service_doctor.py`.
 
 ### Phase `W02.P08` - rag records, documentation and parity tests
@@ -129,8 +129,8 @@ Make every flag rag shares with core carry the same name, short form, default an
 Record the reconciliation of rag's records, correct the example file and guides, prove parity against the released core, and run the full gate.
 
 - [x] `W02.P08.S36` - Amend the rag records that contradict the code: typesafe-classifier, test-and-paths, vaultspec-rag-install, mcp-service-client and index-drift-hardening; `.vault/adr/2026-09-21-typesafe-classifier-adr.md`.
-- [ ] `W02.P08.S37` - Correct the example file header and the configuration, installation and CLI guides to the contract, including the resolution order and the .env credential rule; `docs/configuration.md`.
-- [ ] `W02.P08.S38` - Add parity tests: rag resolves the framework variables and chain as core does, reads no .env outside the gate, and its shared install flags match core's help surface; `src/vaultspec_rag/tests/test_env_parity.py`.
+- [x] `W02.P08.S37` - Correct the example file header and the configuration, installation and CLI guides to the contract, including the resolution order and the .env credential rule; `docs/configuration.md`.
+- [x] `W02.P08.S38` - Add parity tests: rag resolves the framework variables and chain as core does, reads no .env outside the gate, and its shared install flags match core's help surface; `src/vaultspec_rag/tests/test_env_parity.py`.
 - [ ] `W02.P08.S39` - Run rag's full gate and cut the release; `src/vaultspec_rag/tests`.
 
 ## Wave `W03` - vaultspec-a2a and vaultspec-dashboard conformance

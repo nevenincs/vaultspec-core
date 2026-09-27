@@ -130,13 +130,33 @@ vaultspec-core vault list adr --feature search-api
 
 Omit `--feature` to inspect decisions recorded elsewhere in the project.
 
-For prose edits, follow [editing safely](syntax.md#editing-safely). Amend an existing
-ADR for refinements, narrower scope, or parameter changes. Keep the accepted content
-intact while presenting a proposed amendment separately; apply it after approval.
+Reuse an accepted ADR when it already covers the decision. Extend a section or amend
+that record for refinements, narrower scope, or parameter changes; create a separate ADR
+for a distinct costly decision. For prose edits, follow
+[editing safely](syntax.md#editing-safely). Keep the accepted content intact while
+presenting a proposed amendment separately; apply it after approval.
 
 If the direction reverses or the rationale no longer applies, create a replacement ADR.
 The replacement must be accepted before
 [superseding the old ADR](CLI.md#vaultspec-core-vault-adr-supersede).
+
+The ADR author proposes any necessary edits to conflicting older wording alongside the
+decision. Links alone do not reconcile contradictory rulings. Keep enough context to
+explain the decision and cite detailed evidence in its source record. Research gathers
+evidence; the ADR records the resulting commitment.
+
+With `VAULTSPEC_CORE_TYPESAFE_API_KEY` configured, the author uses
+[`crossref`](CLI.md#vaultspec-core-vault-adr-crossref) on the populated draft and reads
+the relevant full records before presenting it. Proposed amendments use `--body-file`
+(MCP: `body`) without replacing accepted text. Reuse judgments while the draft and
+relevant corpus remain unchanged. Results are advisory and report bounded coverage; they
+do not certify the absence of conflict. Without a key, use local discovery; a service
+failure names a fallback and does not block authoring.
+
+Acceptance establishes the decision's authority, not implementation completion.
+Implementation hypotheses can adapt within its binding commitments. If evidence
+invalidates a commitment or its rationale, propose an authorized revision; code
+divergence alone does not rewrite the ruling.
 
 Superseding doesn't revise plans or retarget their authorizing links. Review affected
 active plans and links, revise them where necessary, and establish decision coverage
@@ -180,6 +200,17 @@ After approving the plan, ask your agent to use `vaultspec-execute`. It starts f
 next open Step. For each Step, it implements, runs relevant tests and checks, logs the
 changed files and verification results, marks the Step complete, and commits.
 
+Before adding code, the agent checks for an existing implementation it can reuse and
+follows the project's typing, lint, formatting, and style conventions. Verification
+covers the changed behavior and affected interfaces. Successful checks are repeated when
+changes, failures, or unresolved concerns justify another run; Step completion does not
+require a separate formal review. Workers verify their assigned scope, while the
+orchestrator coordinates shared checks and integrated review.
+
+Give shared or expensive checks one owner and pass their status and results to
+reviewers. The [review guide](correctness.md#share-verification-evidence) explains
+evidence reuse and incomplete verification.
+
 To resume interrupted work, ask the agent to continue or specify a Step. Use
 [status](CLI.md#vaultspec-core-status) to check progress and the next open Step.
 
@@ -210,6 +241,76 @@ vaultspec-core vault graph --feature search-api
 
 See the [graph reference](CLI.md#vaultspec-core-vault-graph) for filtering and output
 options.
+
+## Curate an existing vault
+
+Ask for `vaultspec-curate` to review an existing feature, decision cluster, or corpus.
+This is user-started maintenance, independent of the implementation pipeline. Specify
+review-only work when you want findings without repairs to the reviewed records.
+
+The curator compares decisions, relevant code, and supporting evidence. It applies
+authorized, content-preserving repairs and records unresolved choices in a
+reconciliation audit. Historical recommendations remain evidence even when a later
+decision chose another option. Implementation gaps do not automatically change accepted
+authority.
+
+With TypeSafe configured, a bounded cross-reference batch helps select relevant pairs.
+The audit distinguishes records inventoried, model-scored, and actually reviewed, and
+records incomplete coverage and continuation. Verification follows the affected scope;
+unrelated vault warnings do not require an open-ended cleanup before the audit finishes.
+
+## Coordinate several active workstreams
+
+Ask for `vaultspec-projectmanager` when you need a roadmap, cross-worktree triage,
+coordination of an epic and its project board, or a developer workday across several
+in-flight features. Routine branch comparisons, worktree operations, and single-PR tasks
+use the ordinary tools directly.
+
+The coordinator gathers relevant local and remote state, connects dependencies and
+ownership, and recommends an actionable sequence. Each assignment identifies its
+outcome, owner, target, prerequisites, and completion evidence. It updates the context
+affected by completed actions and preserves a compact handoff. GitHub access is needed
+only for the remote facts and actions that depend on it.
+
+Implementation plans remain the source of execution order and progress. At L4, the
+coordinator tracks the external association named in Epic intent alongside that plan.
+Priorities do not confer implementation or remote-action authority. Hosted vault search
+and ADR cross-referencing can supply governing context when configured; project
+coordination does not depend on them.
+
+For a bounded starting snapshot, run:
+
+```bash
+vaultspec-core project context "Prepare the release across active features" --json
+vaultspec-core project context "Prepare the release" --repo OWNER/REPO --json
+```
+
+The command reads local branches and worktrees, tracked-change status and latest commit
+subjects. `--repo` explicitly adds open GitHub issues and PRs, including assignees,
+labels, review and CI signals, through an authenticated `gh` installation. Collection
+has a shared ten-second budget and reports source failures and truncated windows.
+Boards, milestones, dependency edges, vault plans and untracked files are not collected.
+Local branches are not joined to PRs by name, since forks can reuse branch names.
+
+The default reply contains five attention items (`--limit` accepts 1–10). Observed
+blocker and shared-branch signals come first, then tracked changes, with objective fit
+and recent activity breaking ties. This order guides investigation; it does not
+establish execution dependencies, merge readiness, ownership availability or permission
+to act.
+
+With `VAULTSPEC_CORE_TYPESAFE_API_KEY` configured, the backend sends at most twelve
+shortlisted summaries in one TypeSafe request with a five-second budget. It sends no
+file contents or issue bodies. Without a key, or on service failure, ordering uses local
+signals and lexical objective overlap. `--no-hosted` disables hosted ranking. The normal
+credential precedence applies, including a workspace `.env` only when core runs from
+that workspace's own declared development or dependency environment.
+
+Save `--json` output when continuity is useful and supply it as
+`--previous result.json`. The backend refreshes observations and reuses matching
+judgments for up to one hour; it never restores old facts as current state. Replies
+report source coverage, command counts, hosted usage, reuse and timings. The command
+writes no repository or tracker state and is discoverable through the existing MCP
+gateway as `vaultspec-core project context`.
 
 ## Customize the policy
 

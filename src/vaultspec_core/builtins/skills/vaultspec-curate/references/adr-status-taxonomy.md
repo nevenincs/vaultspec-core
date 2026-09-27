@@ -1,71 +1,49 @@
-# ADR status taxonomy and supersession convention
+# ADR status and supersession
 
-This reference explains the canonical status vocabulary encoded by the core library's
-`AdrStatus` type. Approval and transition policy belongs to the vaultspec system
-section. The curator checks that records, templates, and tools agree with both
-contracts.
+The core library's `AdrStatus` enum defines the vocabulary. The vaultspec system section
+owns approval and transitions; this reference explains how curation applies them.
 
-## The canonical status set
+| Status       | Meaning                                              |
+| ------------ | ---------------------------------------------------- |
+| `proposed`   | Drafted decision awaiting authorization.             |
+| `accepted`   | Authorized commitment; rollout need not be complete. |
+| `rejected`   | Declined proposal retained as history.               |
+| `superseded` | Replaced by a named successor ADR.                   |
+| `deprecated` | Retired without a direct successor.                  |
 
-An ADR carries exactly one status. The canonical values:
+## Encoding and evidence
 
-- **proposed** - the decision is drafted but not yet ratified. The default at scaffold.
-- **accepted** - the decision is ratified and governs the codebase. It is expected to be
-  reflected in the code.
-- **rejected** - the decision was considered and declined. It does not govern anything;
-  it is retained so a future reader can see the path was evaluated.
-- **superseded** - the decision was replaced by a specific newer ADR. It records history
-  and points forward to its successor. Set mechanically by
-  `vaultspec-core vault adr supersede`.
-- **deprecated** - the decision is retired and no longer applies, but no single
-  successor ADR replaces it. Distinct from `superseded`, which always names a
-  replacement.
+The canonical declaration is the body H1:
 
-The line between `superseded` and `deprecated` is whether a successor ADR exists. A
-decision replaced by a named newer ADR is `superseded` and carries `superseded_by`. A
-decision retired without a direct replacement is `deprecated`.
-
-## Canonical encoding
-
-Status lives in the document body H1, in the canonical form:
-
-```
+```markdown
 # `feature` adr: `Title` | (**status:** `accepted`)
 ```
 
-The status token is backtick-quoted. The supersession relationship is recorded in
-frontmatter, not the body: the superseded ADR carries `superseded_by: '<new-stem>'` and
-the superseding ADR carries the old stem in its `supersedes:` list. These frontmatter
-edges are what `vaultspec-core vault graph` reads to build the decision topology.
+The predecessor's frontmatter carries `superseded_by: '<successor-stem>'`; the
+successor's `supersedes:` list names the predecessor. These fields describe the
+transition. An ordinary `related:` link or a newer date does not. Read the records to
+resolve authority; graph node frontmatter exposes the same fields.
 
-## Divergences the curator must detect
+`vaultspec-core vault check adr-status` warns about missing or unknown H1 status,
+unquoted tokens, legacy `## Status` declarations (including alongside a canonical H1),
+and disagreement between `superseded` status and `superseded_by`. It does not prove that
+acceptance was authorized or that a successor relationship is substantively correct.
 
-Divergences to detect:
+`--fix` only quotes an otherwise known token and preserves a status changed after its
+snapshot. Legacy sections or tables, conflicting declarations, and supersession repairs
+need inspection. A historical successor can itself be retired; do not reactivate it to
+repair an older record's heading.
 
-- **Legacy status section.** Older ADRs declare status in a `## Status` section with a
-  bare value (for example `Accepted`) instead of the H1 token, and a few encode it in a
-  table. These read as the same decision but evade any H1-based tooling.
-- **Quoting drift.** Some H1 tokens are bare (`status:** accepted`) rather than
-  backtick-quoted. Normalize to the quoted canonical form.
-- **Frontmatter-versus-body divergence.** Historical records may have `superseded_by` in
-  frontmatter while their visible body status stays stale (often `Accepted`). Flag this
-  mismatch. New supersession requires canonical accepted records; it is not a legacy
-  status-repair command.
-- **Off-taxonomy values.** Any status token outside the canonical set (or a typo of one)
-  is a violation to surface and normalize.
-- **Missing status.** An ADR with no parseable status at all.
+## Repair boundary
 
-## Mechanical complement
+Normalize only an unambiguous existing state. For a legacy declaration, confirm the
+recorded authority before moving it to the H1 and removing redundant status prose.
+Missing status, an unfamiliar value, contradictory declarations, or incomplete edges are
+findings until evidence establishes the state. Do not choose the nearest status to make
+the checker pass. Neither implemented code nor an accepted-looking label supplies
+approval.
 
-The `vaultspec-core vault check adr-status` check is the mechanical backstop for these
-divergences. It parses each ADR's H1, detects the legacy `## Status` section, validates
-the token against the canonical `AdrStatus` set, and flags off-taxonomy or missing
-values, bare (unquoted) tokens, and frontmatter-versus-body supersession drift. All
-findings are warnings, so the check never hard-fails an existing corpus; `--fix` applies
-backtick quoting to otherwise canonical H1 tokens. Legacy status conversion and
-already-recorded supersession drift require an owning body edit after inspecting the
-records, as the reconciliation playbook describes. The check does not authorize a new
-decision or supersession. Run it (directly, or via `vaultspec-core vault check all`) as
-part of the structural precondition, then reason over what it surfaces. The check
-derives its vocabulary from the same `AdrStatus` enum named above, so the two never
-drift.
+Use owning body verbs for confirmed encoding repairs. New supersession uses
+`vaultspec-core vault adr supersede OLD --by NEW` only when the successor is accepted
+and the transition is authorized. The reconciliation playbook covers proposed semantic
+changes and historical metadata repairs.

@@ -51,8 +51,19 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.3.0`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.3.0`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core project context`
+- `vaultspec-core review context`
+
+Flags on commands the release already has:
+
+- `vaultspec-core install` - `--env`, `--env-file`
+- `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -382,6 +393,16 @@ hand-edit between the markers.
 - `vaultspec-core config list` - Enumerate all known configuration entries and current
   values.
 
+### Project
+
+- `vaultspec-core project context` - Read local work and optional GitHub state; propose
+  a bounded attention order.
+
+### Review
+
+- `vaultspec-core review context` - Read a diff and explicit source locators; optionally
+  rank supporting passages.
+
 <!-- vaultspec:generated:end command-inventory -->
 
 ## Workspace commands
@@ -401,6 +422,19 @@ Deploy the framework into the target directory.
 | `--skip`    | `[]`    | Skip a component (repeatable).                                                                                                                                                                                |
 | `--mode`    | auto    | Provisioning mode: `tool` (uvx), `dependency` (project venv, ships in built distributions), or `dev` (default dev group, renders like dependency but does not ship); auto-detected from pyproject.toml.       |
 | `--json`    | off     | Emit machine-readable output.                                                                                                                                                                                 |
+
+`--env NAME` imports a supported process variable; `--env NAME=VALUE` supplies a
+non-secret setting. `--env-file PATH` imports supported names from a bounded dotenv
+file. Explicit entries win over imported entries. Only named keys replace values in the
+ignored, owner-restricted `.vaultspec/.env`. Upgrade, force and sync preserve other
+keys; dry runs write nothing. Tracked or redirected stores are refused. Outputs carry
+names and outcomes only. Full framework uninstall removes the store.
+
+Runtime order: explicit command flags, process environment, provisioned local settings,
+trusted root `.env` credentials, defaults. Blank is unset in every source and falls
+through. CLI and MCP share workspace-scoped resolution. Importable names: the TypeSafe
+key, `VAULTSPEC_IO_BUFFER_SIZE`, `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`,
+`VAULTSPEC_LOCK_TIMEOUT_SECONDS`, `VAULTSPEC_JSON_PRETTY`, `VAULTSPEC_NO_HINTS`.
 
 ### vaultspec-core uninstall
 
@@ -445,6 +479,63 @@ vocabulary: `created`, `updated`, `unchanged`, `removed`, `restored`, `skipped`,
 reason worth reading; only `failed` stops the pipeline. With `--json`, the payload
 declares schema `vaultspec.sync.v1` and the top-level `status` is the run's aggregate
 outcome (`mixed` when items disagree).
+
+## Project context
+
+`vaultspec-core project context OBJECTIVE [--repo OWNER/REPO] [--previous FILE]`
+`[--limit 1..10] [--no-hosted] [--target DIR] [--json]`
+
+Read-only context for coordination across active workstreams. Works in a Git repository
+without a vaultspec installation. Reads at most 30 recent local branches and inspects 8
+worktrees, with a shared 10-second collection budget. `--repo` explicitly reads up to 20
+open issues and 20 open PRs on github.com through `gh`. Every source reports its window
+or failure. Boards, milestones, dependency edges, vault plans and untracked files remain
+uncollected. No repository or tracker state is changed.
+
+Returns five attention items by default: blocker and shared-branch signals, then tracked
+changes, then other work; objective fit and latest activity break ties. This is not an
+execution schedule. A configured core TypeSafe key opts into one objective-fit request
+over at most 12 summaries with a 5-second budget. `--no-hosted`, no key, or service
+failure uses deterministic ordering. Model selection and credential precedence are
+shared with vault search. `--previous` accepts a JSON result up to 64,000 bytes and
+reuses unchanged judgments for one hour after fresh collection; it supplies no current
+observations.
+
+JSON schema `vaultspec.project.context.v1` carries observations, source coverage,
+unknowns, ranking provenance, reusable judgments, command and token usage, and timing.
+Source and hosted failures are reported in the result with exit 0; invalid input exits
+2\. The existing MCP `discover`/`invoke` gateway exposes this verb without adding a hot
+tool.
+
+## Review context
+
+`vaultspec-core review context OBJECTIVE --base REF --candidate path[:start-end]`
+`[--candidate ...] [--head REF] [--limit 1..6] [--previous FILE] [--no-hosted]`
+`[--target DIR] [--json]`
+
+Read-only selection of supporting review passages, available through the MCP gateway.
+The target must be a Git repository root. `--head` reads committed diff and candidate
+content; otherwise reads tracked working-tree state, including staged changes. Reads are
+not atomic; untracked files are excluded. Provide 1..12 tracked, repository-relative
+file locators in discovery order. Each passage is at most 120 lines and 4,000 UTF-8
+bytes from a file up to 1 MB. Larger passages require a narrower line range. Defaults to
+three selected passages. Unselected locators and exclusions remain visible.
+
+A configured core TypeSafe key opts into sending the objective, diff and passages for
+one Score batch, with a 15-second budget after at most 10 seconds of collection. Uses
+the shared credential resolver and canonical model selector. Missing or rejected keys,
+service failures and `--no-hosted` preserve discovery order. A diff exceeding 24,000
+bytes or involving environment/private-key paths disables hosted selection. Candidate
+environment stores, conventional key files, symlinks and paths outside the repository
+are excluded. This is not general secret scanning.
+
+`--previous` accepts a JSON result up to 128,000 bytes. Exact inputs and questions reuse
+judgments for up to one hour while a key remains enrolled. Hosted status `reused` does
+not claim present connectivity. JSON schema `vaultspec.review.context.v1` reports scope
+hashes, verbatim selected content, coverage, hosted status and token usage. Hosted
+failure and candidate exclusions exit 0; invalid scope or input exits 2. Selection is
+advisory: read the full diff and governing decisions and expand context as needed. It
+never establishes a review verdict or verification result.
 
 ## Vault commands
 
@@ -566,9 +657,9 @@ operation). The `data` payload carries `plans_in_flight`, `recent_documents`,
 version integer convention.
 
 The rollup's Discovery section and `data.hosted_search` (`configured`, `source`:
-`environment` or `dotenv`) report whether hosted vault search is configured;
-`data.companion` reports the semantic-search companion. Both are configuration, not
-liveness.
+`environment`, `local_env`, or `dotenv`) report whether hosted vault search is
+configured; `data.companion` reports the semantic-search companion. Both are
+configuration, not liveness.
 
 ### vaultspec-core vault search
 
@@ -762,27 +853,37 @@ newer one. Options: `--by STEM` (the superseding ADR), `--dry-run`, `--json`.
 `vaultspec-core vault adr crossref [OPTIONS] [REFS]...` - judge which ADRs each source
 ADR should cross-reference, with hosted search, within fixed ceilings: a code-only rank
 of every ADR, Choice questions over the best 192, and pair judgments of the best 32 plus
-up to 8 declared links. At most 46 requests and 60 seconds per source; a sweep takes at
-most 50 sources, or 52 when it must settle a refusal, and 300 seconds; a vault may hold
-at most 5,000 ADRs. Lists `link` verdicts (should be linked) and `weak` ones (declared,
-judged below the threshold, never removed), each with an advisory relation. One `REFS`
-entry is judged alone; several, `--feature TAG` (`-f`), `--isolated` (ADRs linking no
-other ADR) or `--all` (every ADR that still governs) sweep in stem order, resumable with
-`--after STEM` from the reply's `next_after` and the same selector; `--feature` and
-`--isolated` narrow together, while named ADRs and `--all` each stand alone. An ADR the
-provider refuses to read is held open while the sweep judges on, past its source limit
-by up to two more ADRs if it must: a later ADR the provider reads shows the refusal was
-that ADR's own, and the sweep moves past both. A refusal no read settles, three refusals
-in a row, or any other failure stops the sweep with `stopped` set and the cursor before
-the first refusal still open, so resuming retries from there. A link `--apply` could not
-write exits 1. `--max-sources N` (default `10`, `1`..`50`) caps a sweep. `--apply`
-writes new `link` verdicts, unread, into each source's `related:` as it finishes.
-`--json` emits `vaultspec.vault.adr.crossref.v1`: `data.sources` (each with `status`,
-`verdicts`, `links`, `written`, `verdicts_total`, `truncated`, and when they apply
+up to 8 declared links. At most 46 requests under a 15-second deadline per source; a
+sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300 seconds; a
+vault may hold at most 5,000 ADRs. Lists `link` verdicts (should be linked) and `weak`
+ones (declared, judged below the threshold, never removed), each with an advisory
+relation. One `REFS` entry is judged alone; several, `--feature TAG` (`-f`),
+`--isolated` (ADRs linking no other ADR) or `--all` (non-retired ADRs, including
+proposals) sweep in stem order, resumable with `--after STEM` from the reply's
+`next_after` and the same selector; `--feature` and `--isolated` narrow together, while
+named ADRs and `--all` each stand alone. An ADR the provider refuses to read is held
+open while the sweep judges on, past its source limit by up to two more ADRs if it must:
+a later ADR the provider reads shows the refusal was that ADR's own, and the sweep moves
+past both. A refusal no read settles, three refusals in a row, or any other failure
+stops the sweep with `stopped` set and the cursor before the first refusal still open,
+so resuming retries from there. A link `--apply` could not write exits 1.
+`--max-sources N` (default `10`, `1`..`50`) caps a sweep. `--apply` writes new `link`
+verdicts, unread, into each source's `related:` as it finishes. `--json` emits
+`vaultspec.vault.adr.crossref.v1`: `data.sources` (each with `status`, `verdicts`,
+`links`, `written`, `verdicts_total`, `truncated`, and when they apply
 `unjudged_declared`, `write_failed`, `reason`, `next_step`, `remediation`), the totals,
 `remaining`, `next_after`, `stopped` and `usage`; at most 80 verdict rows per reply.
 Requires `VAULTSPEC_CORE_TYPESAFE_API_KEY`; without it nothing is sent and the reply is
 `not_configured` with the search to run instead. MCP: `crossref`.
+
+Automatic sweeps skip superseded, rejected, and deprecated sources; name one explicitly
+to judge it as a source.
+
+For a proposed amendment, `--body-file PATH` judges body prose under one ADR's identity
+without replacing it. No frontmatter, sweep options, or `--apply`; the result marks
+`draft`. Judged sources report `coverage` (corpus, pool, judged counts,
+source_truncated, candidates_truncated). Candidate rows mark `input_truncated` when
+clipped. Read relevant full records; an `ok` result is not proof of no conflicts.
 
 ### vaultspec-core vault rule promote
 
@@ -902,9 +1003,9 @@ Body-content flags on `add` vary by resource: `vaultspec-core spec rules add` ta
 `--body TEXT`; `vaultspec-core spec skills add` takes `--description TEXT` and
 `--template TEXT`; `vaultspec-core spec agents add` takes `--description TEXT`. All
 three also accept `--from-file PATH`. `edit` accepts `--editor CMD` to override the
-editor binary for one invocation; resolution order is `--editor`, project config,
-`$VISUAL`, `$EDITOR` / `VAULTSPEC_EDITOR`, `vi`. `status` accepts `--json` and reports
-the missing, drifted, and stale rows of a prune-enabled dry-run sync.
+editor binary for one invocation; resolution order is `--editor`, `VAULTSPEC_EDITOR`,
+`VISUAL`, `EDITOR`, project config, `vi`. `status` accepts `--json` and reports the
+missing, drifted, and stale rows of a prune-enabled dry-run sync.
 
 ### vaultspec-core spec system
 
@@ -1020,6 +1121,8 @@ package). Earlier rungs win:
    `VAULTSPEC_<PKG>_STDIO_WATCHDOG`) is read first and falls back to the framework name
    behind it (`VAULTSPEC_TARGET_DIR`, `VAULTSPEC_LOG_LEVEL`, `VAULTSPEC_STDIO_WATCHDOG`
    respectively); a credential never chains.
+1. **Project store** - `.vaultspec/.env`, persistable settings only, written only by an
+   explicit `vaultspec-core install --env` or `--env-file` import.
 1. **Workspace `.env`** - credentials only, under the gate below.
 1. **Persisted configuration** - `.vaultspec/config.toml` or
    `.vaultspec/workspace.json`.
@@ -1046,26 +1149,26 @@ protective switch that instead warns and stays armed.
 All prefixed `VAULTSPEC_`, except the honoured external conventions listed after them.
 Env vars override defaults but are overridden by an explicit flag.
 
-| Variable                           | Type   | Default       | Description                                                                                                                                                                                    |
-| ---------------------------------- | ------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VAULTSPEC_TARGET_DIR`             | path   | discovered    | Root workspace directory, for every process kind.                                                                                                                                              |
-| `VAULTSPEC_DOCS_DIR`               | str    | `.vault`      | Vault directory name.                                                                                                                                                                          |
-| `VAULTSPEC_INDEX_DIR`              | str    | `index`       | Subdirectory of the vault holding the auto-generated feature indexes (`<feature>.index.md`).                                                                                                   |
-| `VAULTSPEC_FRAMEWORK_DIR`          | str    | `.vaultspec`  | Framework directory name.                                                                                                                                                                      |
-| `VAULTSPEC_CLAUDE_DIR`             | str    | `.claude`     | Claude tool directory name.                                                                                                                                                                    |
-| `VAULTSPEC_GEMINI_DIR`             | str    | `.gemini`     | Gemini tool directory name.                                                                                                                                                                    |
-| `VAULTSPEC_ANTIGRAVITY_DIR`        | str    | `.agents`     | Antigravity directory name.                                                                                                                                                                    |
-| `VAULTSPEC_IO_BUFFER_SIZE`         | int    | `8192`        | I/O read buffer size in bytes.                                                                                                                                                                 |
-| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`  | int    | `1000000`     | Subprocess stdout capture limit.                                                                                                                                                               |
-| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`   | float  | `120.0`       | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                             |
-| `VAULTSPEC_EDITOR`                 | str    | unset         | Editor command every surface that opens an editor consults. Read after `--editor` and before the project config key, `VISUAL` and `EDITOR`; `vi` is the last rung.                             |
-| `VAULTSPEC_CORE_TYPESAFE_API_KEY`  | secret | unset         | Enables hosted vault search; read from the environment, else the workspace `.env` under the gate above. Never printed.                                                                         |
-| `VAULTSPEC_LOG_LEVEL`              | str    | see below     | Root log level when neither `--debug` nor `--verbose` is given. `WARNING` for the CLI, `INFO` for the MCP server. An unknown name is refused.                                                  |
-| `VAULTSPEC_JSON_PRETTY`            | bool   | unset (off)   | Indents `--json` output.                                                                                                                                                                       |
-| `VAULTSPEC_NO_HINTS`               | bool   | unset (off)   | Drops the `Next actions` block; equivalent to `--no-hints`.                                                                                                                                    |
-| `VAULTSPEC_NON_INTERACTIVE`        | bool   | unset         | Declares that no operator is watching; repository triggers awaiting approval are skipped instead of prompted for. Outranks `CI` in both directions.                                            |
-| `VAULTSPEC_STDIO_WATCHDOG`         | bool   | unset (armed) | MCP server lifetime watchdog; a false word disables it (EOF-only exit); an unrecognised word warns and stays armed.                                                                            |
-| `VAULTSPEC_MCP_GATEWAY_INVOCATION` | str    | unset         | Internal: set by the MCP invoke gateway on every CLI process it spawns. Any non-empty value marks the process as having no terminal, so it refuses to open an editor. Not an operator setting. |
+| Variable                           | Type   | Default       | Description                                                                                                                                                                                                    |
+| ---------------------------------- | ------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VAULTSPEC_TARGET_DIR`             | path   | discovered    | Root workspace directory, for every process kind.                                                                                                                                                              |
+| `VAULTSPEC_DOCS_DIR`               | str    | `.vault`      | Vault directory name.                                                                                                                                                                                          |
+| `VAULTSPEC_INDEX_DIR`              | str    | `index`       | Subdirectory of the vault holding the auto-generated feature indexes (`<feature>.index.md`).                                                                                                                   |
+| `VAULTSPEC_FRAMEWORK_DIR`          | str    | `.vaultspec`  | Framework directory name.                                                                                                                                                                                      |
+| `VAULTSPEC_CLAUDE_DIR`             | str    | `.claude`     | Claude tool directory name.                                                                                                                                                                                    |
+| `VAULTSPEC_GEMINI_DIR`             | str    | `.gemini`     | Gemini tool directory name.                                                                                                                                                                                    |
+| `VAULTSPEC_ANTIGRAVITY_DIR`        | str    | `.agents`     | Antigravity directory name.                                                                                                                                                                                    |
+| `VAULTSPEC_IO_BUFFER_SIZE`         | int    | `8192`        | I/O read buffer size in bytes.                                                                                                                                                                                 |
+| `VAULTSPEC_TERMINAL_OUTPUT_LIMIT`  | int    | `1000000`     | Subprocess stdout capture limit.                                                                                                                                                                               |
+| `VAULTSPEC_LOCK_TIMEOUT_SECONDS`   | float  | `120.0`       | Advisory-lock acquisition budget in seconds, both layers combined.                                                                                                                                             |
+| `VAULTSPEC_EDITOR`                 | str    | unset         | Editor command every surface that opens an editor consults. Read after `--editor` and before the project config key, `VISUAL` and `EDITOR`; `vi` is the last rung.                                             |
+| `VAULTSPEC_CORE_TYPESAFE_API_KEY`  | secret | unset         | Enables hosted search, ADR checks and context ranking; read from the environment, then the provisioned `.vaultspec/.env` store, else the workspace `.env` under the gate above. Blank is unset. Never printed. |
+| `VAULTSPEC_LOG_LEVEL`              | str    | see below     | Root log level when neither `--debug` nor `--verbose` is given. `WARNING` for the CLI, `INFO` for the MCP server. An unknown name is refused.                                                                  |
+| `VAULTSPEC_JSON_PRETTY`            | bool   | unset (off)   | Indents `--json` output.                                                                                                                                                                                       |
+| `VAULTSPEC_NO_HINTS`               | bool   | unset (off)   | Drops the `Next actions` block; equivalent to `--no-hints`.                                                                                                                                                    |
+| `VAULTSPEC_NON_INTERACTIVE`        | bool   | unset         | Declares that no operator is watching; repository triggers awaiting approval are skipped instead of prompted for. Outranks `CI` in both directions.                                                            |
+| `VAULTSPEC_STDIO_WATCHDOG`         | bool   | unset (armed) | MCP server lifetime watchdog; a false word disables it (EOF-only exit); an unrecognised word warns and stays armed.                                                                                            |
+| `VAULTSPEC_MCP_GATEWAY_INVOCATION` | str    | unset         | Internal: set by the MCP invoke gateway on every CLI process it spawns. Any non-empty value marks the process as having no terminal, so it refuses to open an editor. Not an operator setting.                 |
 
 vaultspec-core also honours these external conventions; it does not own them.
 
