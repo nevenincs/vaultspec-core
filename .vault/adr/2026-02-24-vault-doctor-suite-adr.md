@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#vault-doctor-suite'
 date: '2026-02-24'
-modified: '2026-09-19'
-body_hash: 'sha256:3a7bab3f8dfd8d5767ee65d6b739527b35d1123c015d412ddc1923ad629bf7f4'
+modified: '2026-09-27'
+body_hash: 'sha256:fada419d75b6d0fc72b7839dbccf7174d3e30bd532cb04983cf9f13acd5a54e0'
 related:
   - '[[2026-02-24-vault-doctor-suite-research]]'
   - '[[2026-02-24-vault-doctor-suite-p1-plan]]'
