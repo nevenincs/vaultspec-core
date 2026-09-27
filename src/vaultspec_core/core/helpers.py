@@ -806,8 +806,11 @@ def require_executable(name: str, *, windows_system: bool = False) -> str:
     """
     search: str | None = None
     if windows_system and sys.platform == "win32":
-        system_root = os.environ.get("SYSTEMROOT", r"C:\Windows")
-        search = os.path.join(system_root, "System32")
+        import ctypes
+
+        buffer = ctypes.create_unicode_buffer(260)
+        if ctypes.windll.kernel32.GetSystemDirectoryW(buffer, len(buffer)):
+            search = buffer.value
     path = shutil.which(name, path=search)
     if path is None:
         raise FileNotFoundError(
