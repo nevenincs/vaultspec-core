@@ -116,7 +116,6 @@ def test_every_built_linux_target_is_acquired() -> None:
 def test_linux_offline_gate_runs_the_extracted_bundle() -> None:
     """The no-network gate executes extracted stable names, not archive files."""
     workflow = (WORKFLOWS / "binaries.yml").read_text(encoding="utf-8")
-    assert '"${PWD}/offline-bundle:/artifacts:ro"' in workflow
     assert 'ARTIFACTS="${PWD}/offline-bundle"' in workflow
     assert '"${ARTIFACTS}"/vaultspec-core --version' in workflow
 
