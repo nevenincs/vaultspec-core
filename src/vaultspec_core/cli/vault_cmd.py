@@ -24,7 +24,7 @@ in the generated command reference.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -178,10 +178,10 @@ __all__ = [
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from _typeshed import DataclassInstance
     from rich.console import Console
 
     from vaultspec_core.graph.api import VaultGraph
+    from vaultspec_core.vaultcore.query_listing import VaultDocument
 
 
 # The apps themselves live in `vault_cmd_app` so the per-verb command modules
@@ -462,7 +462,7 @@ def cmd_stats(
 # ---- vault list --------------------------------------------------------------
 
 
-def _list_row(doc: object) -> dict[str, object]:
+def _list_row(doc: VaultDocument) -> dict[str, object]:
     """Project one document into the listing row.
 
     Drops what the caller can derive. Measured over 1,222 documents, 41% of the
@@ -481,7 +481,7 @@ def _list_row(doc: object) -> dict[str, object]:
 
     from vaultspec_core.core.types import get_context as _get_ctx
 
-    row: dict[str, object] = dataclasses.asdict(cast("DataclassInstance", doc))
+    row: dict[str, object] = dataclasses.asdict(doc)
     row.pop("name", None)
     row.pop("tags", None)
     # `asdict` leaves a Path as a Path, so guarding on `str` alone silently
