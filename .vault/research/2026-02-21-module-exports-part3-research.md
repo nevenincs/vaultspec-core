@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#module-exports'
 date: '2026-02-21'
-modified: '2026-06-13'
-body_hash: 'sha256:eff0eace70dc51ebc7dfbf280f68e95cc74919e3c6166345f771eb5fec38c927'
+modified: '2026-09-27'
+body_hash: 'sha256:8cfe9690f9e804f1ce52e133d35a7d941abd1692c7ef5480eeaafadb59ff1e12'
 related:
   - '[[2026-02-21-packaging-restructure-adr]]'
 ---

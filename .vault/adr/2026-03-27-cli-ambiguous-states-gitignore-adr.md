@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-ambiguous-states'
 date: '2026-03-27'
-modified: '2026-09-05'
-body_hash: 'sha256:151d4e103800d9b63dadc8722c634475edc36f1b686f7489d4c68f62b5a48cf3'
+modified: '2026-09-27'
+body_hash: 'sha256:4c6211265984736ef6c2b21d203bb0458b07a98fa6ac4ee5a6663391f883ef87'
 related:
   - '[[2026-03-27-cli-ambiguous-states-research]]'
   - '[[2026-03-27-cli-ambiguous-states-prior-art-research]]'

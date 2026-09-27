@@ -18,13 +18,18 @@ Exit codes:
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.json_output import json_format_kwargs
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from vaultspec_core.graph import VaultGraph
 
 __all__ = ["link_app"]
 
@@ -97,73 +102,37 @@ def cmd_link_list(
             console.print(f"[red]Error reading vault: {exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    # Resolve src argument to a stem
     src_stem: str | None = None
     if src is not None:
-        from vaultspec_core.vaultcore.resolve import (
-            RelatedResolutionError,
-            resolve_related_inputs,
-        )
-
-        try:
-            resolved = resolve_related_inputs([src], root_dir)
-        except RelatedResolutionError:
-            resolved = []
-
-        if resolved:
-            # resolved is like ["[[stem]]"]
-            inner = resolved[0]
-            src_stem = inner[2:-2] if inner.startswith("[[") else inner
-        else:
-            if json_output:
-                typer.echo(
-                    json.dumps(
-                        json_envelope(
-                            "vault.link.list",
-                            "failed",
-                            {"message": f"Cannot resolve source document: '{src}'"},
-                        ),
-                        **json_format_kwargs(),
-                    )
-                )
-            else:
-                console.print(f"[red]Cannot resolve source document: '{src}'[/red]")
+        src_stem = _resolve_src_stem(src, root_dir)
+        if src_stem is None:
+            _emit_fail(
+                json_output,
+                console,
+                "vault.link.list",
+                f"Cannot resolve source document: '{src}'",
+            )
             raise typer.Exit(code=1)
 
-    feat = feature.lstrip("#") if feature else None
-
-    # Build the edge list
-    edges: list[dict[str, str]] = []
-
-    if src_stem is not None:
+    if src_stem is None:
+        edges = _all_edges(graph, feature.lstrip("#") if feature else None)
+    else:
         node = graph.nodes.get(src_stem)
         if node is None:
-            if json_output:
-                typer.echo(
-                    json.dumps(
-                        json_envelope(
-                            "vault.link.list",
-                            "failed",
-                            {"message": f"Node not found: {src_stem}"},
-                        ),
-                        **json_format_kwargs(),
-                    )
-                )
-            else:
-                console.print(f"[red]Node not found: {src_stem}[/red]")
+            _emit_fail(
+                json_output, console, "vault.link.list", f"Node not found: {src_stem}"
+            )
             raise typer.Exit(code=1)
-        for tgt in sorted(node.out_links):
-            edges.append({"src": src_stem, "dst": tgt, "direction": "out"})
-        for lnk in sorted(node.in_links):
-            edges.append({"src": lnk, "dst": src_stem, "direction": "in"})
-    else:
-        for name, node in sorted(graph.nodes.items()):
-            if node.phantom:
-                continue
-            if feat and node.feature != feat:
-                continue
-            for tgt in sorted(node.out_links):
-                edges.append({"src": name, "dst": tgt, "direction": "out"})
+        edges = [
+            *(
+                {"src": src_stem, "dst": t, "direction": "out"}
+                for t in sorted(node.out_links)
+            ),
+            *(
+                {"src": lnk, "dst": src_stem, "direction": "in"}
+                for lnk in sorted(node.in_links)
+            ),
+        ]
 
     if json_output:
         typer.echo(
@@ -185,6 +154,35 @@ def cmd_link_list(
     for e in edges:
         direction_glyph = "->" if e["direction"] == "out" else "<-"
         console.print(f"  {e['src']}  {direction_glyph}  {e['dst']}")
+
+
+def _resolve_src_stem(src: str, root_dir: Path) -> str | None:
+    """Resolve a user-supplied document reference to its stem, if it resolves."""
+    from vaultspec_core.vaultcore.resolve import (
+        RelatedResolutionError,
+        resolve_related_inputs,
+    )
+
+    try:
+        resolved = resolve_related_inputs([src], root_dir)
+    except RelatedResolutionError:
+        return None
+    if not resolved:
+        return None
+    # resolved is like ["[[stem]]"]
+    inner = resolved[0]
+    return inner[2:-2] if inner.startswith("[[") else inner
+
+
+def _all_edges(graph: VaultGraph, feature: str | None) -> list[dict[str, str]]:
+    """Return every real node's out-edges, optionally for one feature only."""
+    edges: list[dict[str, str]] = []
+    for name, node in sorted(graph.nodes.items()):
+        if node.phantom or (feature and node.feature != feature):
+            continue
+        for tgt in sorted(node.out_links):
+            edges.append({"src": name, "dst": tgt, "direction": "out"})
+    return edges
 
 
 # ---------------------------------------------------------------------------

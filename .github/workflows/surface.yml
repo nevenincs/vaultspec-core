@@ -1,0 +1,105 @@
+name: Core Published Surface
+
+# The record the generated references are measured against, taken from the
+# release a user can install and from nothing else.
+#
+# `published-surface.json` names a release and holds its command, flag and MCP
+# tool surface. It used to be stamped on the release-please branch from the
+# candidate's own version, which named that version as published the moment the
+# release pull request merged - and a release that then stopped before
+# publication left main's references naming a version nobody could install.
+#
+# So the record moves only here, only after publication, and only from the
+# published artifact: `just release-record-surface` asks GitHub which release
+# is latest (never a draft, never a prerelease), installs that release's own
+# wheel in isolation, and records the surface it reports. main is
+# ruleset-protected, so the result lands by pull request, the way the lockfile
+# reconciliation in release-please.yml does.
+#
+# publish.yml dispatches this after it publishes. Dispatching it by hand is the
+# repair when that dispatch failed, and it is a no-op when main already records
+# the latest release. It takes no tag: the latest release is the only one it may
+# record, so there is no input to get wrong.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One recording at a time. Two publications in quick succession must not have
+# their pushes to the recording branch race; both read the same latest release
+# by the time either runs, so the second is a no-op.
+concurrency:
+  group: published-surface
+  cancel-in-progress: false
+
+jobs:
+  record:
+    timeout-minutes: 150
+    name: "Build: Published surface record (Linux)"
+    runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 30
+    permissions:
+      # Push the recording branch and open its pull request.
+      contents: write
+      pull-requests: write
+      # Dispatch the merge gate for that pull request, which the default
+      # token's own pull request cannot trigger.
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the recording branch
+        with:
+          ref: main
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          # A lane that writes to main must not restore a cache any branch
+          # could have written.
+          enable-cache: false
+
+      - name: Set up just
+        uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
+        with:
+          tool: just@1.38.0
+
+      - name: Initialize the worktree
+        run: just init
+
+      - name: Record the latest published release's surface
+        run: just release-record-surface
+
+      # The default token's pull request starts no workflow run, so the merge
+      # gate is dispatched onto the branch head, as release-please.yml does for
+      # the release pull request. Force-pushed: the branch is this workflow's
+      # alone, and an older recording on it is superseded, not merged.
+      - name: Open a pull request recording the published surface
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "main already records the latest published release's surface"
+            exit 0
+          fi
+          snapshot="src/vaultspec_core/builtins/reference/published-surface.json"
+          version="$(uv run --no-sync python -c "import json, sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['version'])" "${snapshot}")"
+          branch="chore/record-published-surface"
+          title="chore: record the published surface of ${version}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${branch}"
+          git add -A
+          git commit -m "${title}"
+          git push --force origin "${branch}"
+          body="GitHub now reports \`${version}\` as the latest published release. This records the surface its published wheel reports and re-renders the references measured against it. Until this merges, main's references are measured against an earlier release, and the repository guard comparing the two is red."
+          if [ -z "$(gh pr list --head "${branch}" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --base main --head "${branch}" --title "${title}" --body "${body}"
+          else
+            gh pr edit "${branch}" --title "${title}" --body "${body}"
+          fi
+          gh workflow run merge-gate.yml --repo "${GITHUB_REPOSITORY}" --ref "${branch}" -f "ref=${branch}"
+          echo "Recorded the published surface of ${version} on ${branch}" >> "$GITHUB_STEP_SUMMARY"

@@ -15,7 +15,7 @@ the generated references - that they make no such claim by hand at all, because
 the claim is rendered from the recorded surface of the release and recomputed on
 every generate.
 
-Three properties are held.
+Four properties are held.
 
 *The attribution exists and is generator-owned.* Both CLI surfaces carry the
 ``unreleased-*`` markers - one per file, MCP-scoped in the MCP handbook - so
@@ -29,12 +29,19 @@ noticed by a reader who cannot install what they are reading.
 *The empty state is written out.* When a release ships, the difference is empty,
 and the region must still say so. A blank region is indistinguishable from an
 unfilled one, and the whole point is that a reader can tell.
+
+*The record is the release a user can install.* The committed snapshot must be
+the surface the latest published GitHub release's own wheel reports - never a
+draft's, never a prerelease's, never a source tree's. It was once stamped on
+the release-please branch from the candidate's version, and main's references
+named a draft as the latest published release for as long as that draft sat
+unpublished.
 """
 
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -47,6 +54,7 @@ from vaultspec_core.cli.reference_gen import (
 )
 from vaultspec_core.cli.reference_surface import (
     Surface,
+    deserialize_surface,
     load_published_surface,
     published_surface_path,
 )
@@ -152,6 +160,12 @@ def _region_ids() -> list[str]:
     )
 
 
+def _region_body(text: str, region_id: str) -> str:
+    return text.partition(begin_marker(region_id))[2].partition(end_marker(region_id))[
+        0
+    ]
+
+
 def test_every_managed_reference_carries_the_attribution_region() -> None:
     """The region cannot be dropped, leaving a document that attributes nothing."""
     for path, region_id in _attribution_regions():
@@ -196,13 +210,27 @@ def test_the_committed_snapshot_backs_the_committed_region() -> None:
     """
     published = load_published_surface()
     for path, region_id in _attribution_regions():
-        text = path.read_text(encoding="utf-8")
-        _, _, rest = text.partition(begin_marker(region_id))
-        body, _, _ = rest.partition(end_marker(region_id))
+        body = _region_body(path.read_text(encoding="utf-8"), region_id)
         assert f"`{published.version}`" in body, (
             f"{path.name}'s {region_id} region does not name "
             f"{published.version}, the release {published_surface_path().name} "
             "records. Run `vaultspec-core spec reference generate`."
+        )
+
+
+def test_no_attribution_asserts_which_release_is_latest() -> None:
+    """A frozen copy cannot keep a present-tense claim true.
+
+    The rendered region ships inside the wheel and is deployed into consuming
+    projects, where no generator reruns. "The latest published release is X"
+    turned false in every such copy the day a later release published; the
+    region names the release it was measured against instead.
+    """
+    for path, region_id in _attribution_regions():
+        body = _region_body(path.read_text(encoding="utf-8"), region_id)
+        assert "latest published release is" not in " ".join(body.split()), (
+            f"{path.name}'s {region_id} region states which release is latest "
+            "in the present tense, which every frozen copy of it will outlive"
         )
 
 
@@ -250,30 +278,80 @@ def test_a_difference_names_every_kind_of_addition() -> None:
     assert "log" in rendered
 
 
+def test_the_committed_snapshot_is_the_latest_published_release(
+    tmp_path: Path,
+) -> None:
+    """The record the references cite is the surface of the release users install.
+
+    Asked the way the recording lane asks it: which release GitHub reports as
+    latest, and what that release's own wheel reports when installed in
+    isolation. Red from a publication until its recording pull request merges -
+    the window in which main's references are measured against an earlier
+    release, which is what this exists to make visible. An unreachable GitHub
+    raises rather than failing, so an outage never reads as a stale record.
+    """
+    from dev.packaging.products import VAULTSPEC_CORE
+    from dev.packaging.published_surface import read_published_surface
+
+    release, document = read_published_surface(VAULTSPEC_CORE, tmp_path)
+    committed = load_published_surface()
+
+    assert committed.version == release.version, (
+        f"{published_surface_path().name} records {committed.version}, but the "
+        f"latest published release is {release.tag}. Merge the open "
+        "'chore: record the published surface' pull request, or run "
+        "`just release-record-surface`."
+    )
+    assert committed == deserialize_surface(document), (
+        f"{published_surface_path().name} names {release.tag} but does not hold "
+        "the surface that release's wheel reports, so it was not recorded from "
+        "it. Run `just release-record-surface`."
+    )
+
+
 # ---------------------------------------------------------------------------
 # The release lane
 #
-# The contract has two halves in two workflows, and each is one step that
+# The contract has halves in three workflows, and each is one step that
 # nothing else depends on - a shape that can be deleted without anything
 # turning red until the release it was supposed to guard. So the steps
 # themselves are the assertion here.
 # ---------------------------------------------------------------------------
 
 
-def _workflow_runs(path: str) -> list[str]:
-    """Every ``run:`` script in a workflow, flattened to one string each."""
+def _workflow(path: str) -> dict[object, object]:
+    """A workflow document. Keyed by ``object``: PyYAML reads ``on:`` as True."""
     import yaml
 
-    document = yaml.safe_load(
-        (_repo_root() / ".github" / "workflows" / path).read_text(encoding="utf-8")
+    return cast(
+        "dict[object, object]",
+        yaml.safe_load(
+            (_repo_root() / ".github" / "workflows" / path).read_text(encoding="utf-8")
+        ),
     )
-    scripts: list[str] = []
-    for job in document["jobs"].values():
-        for step in job.get("steps", []):
-            script = step.get("run")
-            if script:
-                scripts.append(" ".join(str(script).split()))
-    return scripts
+
+
+def _jobs(path: str) -> dict[str, dict[str, object]]:
+    return cast("dict[str, dict[str, object]]", _workflow(path)["jobs"])
+
+
+def _steps(path: str, job_id: str) -> list[dict[str, object]]:
+    return cast("list[dict[str, object]]", _jobs(path)[job_id].get("steps", []))
+
+
+def _workflow_runs(path: str) -> list[str]:
+    """Every ``run:`` script in a workflow, flattened to one string each."""
+    return [
+        " ".join(str(step["run"]).split())
+        for job_id in _jobs(path)
+        for step in _steps(path, job_id)
+        if step.get("run")
+    ]
+
+
+def _job_runs(path: str, job_id: str) -> list[str]:
+    """One job's ``run:`` scripts in step order, flattened; empty for ``uses:``."""
+    return [" ".join(str(step.get("run", "")).split()) for step in _steps(path, job_id)]
 
 
 def _repo_root() -> Path:
@@ -282,33 +360,82 @@ def _repo_root() -> Path:
     return _Path(__file__).resolve().parents[2]
 
 
-def test_the_candidate_branch_refreshes_the_surface_snapshot() -> None:
-    """The one place the snapshot may move is the one place that moves it.
+def _workflow_names() -> list[str]:
+    """Every workflow file, asserted present so a moved directory fails loudly."""
+    names = sorted(
+        path.name for path in (_repo_root() / ".github" / "workflows").glob("*.yml")
+    )
+    assert "publish.yml" in names, "the workflow corpus resolved to nothing"
+    return names
 
-    On main the versions match and the refresh verb refuses to write, so if
-    this step is not on the candidate branch the snapshot never advances - and
-    the references keep attributing every later release against the surface of
-    whichever release last had this step.
+
+def test_only_the_recording_lane_records_the_surface() -> None:
+    """Nothing before publication, and nothing but the published wheel, writes it.
+
+    The release-please branch is where the candidate's version was stamped as
+    published. Any workflow other than the recording lane that writes the
+    snapshot is that shape returning.
     """
-    scripts = _workflow_runs("release-please.yml")
-
-    assert any("just framework-surface" in script for script in scripts), (
-        "release-please.yml no longer refreshes the published surface on the "
-        "candidate branch, which is the only branch where it may be refreshed."
+    writers = ("release-record-surface", "snapshot --record", "framework-surface")
+    offenders = [
+        f"{name}: {writer}"
+        for name in _workflow_names()
+        if name != "surface.yml"
+        for script in _workflow_runs(name)
+        for writer in writers
+        if writer in script
+    ]
+    assert not offenders, (
+        "a workflow other than surface.yml writes the published-surface "
+        "record:\n  " + "\n  ".join(offenders)
     )
 
 
-def test_the_refresh_commits_what_it_regenerates() -> None:
-    """A refresh that is not pushed is a refresh the tag will not carry."""
-    refresh = next(
-        script
-        for script in _workflow_runs("release-please.yml")
-        if "just framework-surface" in script
+def test_the_recording_lane_reads_the_latest_release_and_lands_by_pull_request() -> (
+    None
+):
+    """It takes no tag, so the only release it can record is the latest one.
+
+    main is ruleset-protected; a recording that is not proposed as a pull
+    request is a recording main never receives.
+    """
+    triggers = cast(
+        "dict[str, dict[str, object] | None]", _workflow("surface.yml")[True]
+    )
+    dispatch = triggers["workflow_dispatch"] or {}
+    assert not dispatch.get("inputs"), (
+        "surface.yml takes an input; a tag chosen by the caller can name a "
+        "release other than the latest one"
     )
 
-    assert "git commit" in refresh and "git push" in refresh, (
-        "the surface refresh runs but is never pushed, so the tag would be cut "
-        "from a tree that still carries the previous release's snapshot"
+    runs = _job_runs("surface.yml", "record")
+    recording = next(
+        (i for i, run in enumerate(runs) if run == "just release-record-surface"),
+        None,
+    )
+    assert recording is not None, "surface.yml no longer records the surface"
+    proposing = next((i for i, run in enumerate(runs) if "gh pr create" in run), None)
+    assert proposing is not None and proposing > recording, (
+        "surface.yml records the surface but never proposes it to main"
+    )
+
+
+def test_the_surface_is_recorded_only_after_publication() -> None:
+    """Before the flip, the latest release is still the previous one."""
+    runs = _job_runs("publish.yml", "publish-pypi")
+
+    published = next(i for i, run in enumerate(runs) if "--draft=false" in run)
+    recording = next(
+        (i for i, run in enumerate(runs) if "gh workflow run surface.yml" in run),
+        None,
+    )
+    assert recording is not None, (
+        "publish.yml no longer asks for the published surface to be recorded, "
+        "so main's references stay measured against the release before it"
+    )
+    assert recording > published, (
+        "the recording is dispatched before the release is published, when "
+        "the latest release is still the previous one"
     )
 
 
@@ -318,38 +445,40 @@ def test_the_publish_lane_verifies_the_surface_before_it_publishes() -> None:
     `publish-pypi` is the one step in this repository that cannot be undone.
     A surface check after it can only report; this one refuses.
     """
-    import yaml
-
-    document = yaml.safe_load(
-        (_repo_root() / ".github" / "workflows" / "publish.yml").read_text(
-            encoding="utf-8"
-        )
+    assert any(
+        "just release-verify-surface" in run
+        for run in _job_runs("publish.yml", "smoke-test")
+    ), (
+        "the smoke-test job no longer compares the built distribution's "
+        "surface with its tree's, so a build that dropped a command would "
+        "reach PyPI"
     )
-    smoke_steps = [
-        " ".join(str(step.get("run", "")).split())
-        for step in document["jobs"]["smoke-test"]["steps"]
-    ]
-
-    assert any("just release-verify-surface" in step for step in smoke_steps), (
-        "the smoke-test job no longer verifies the built distribution against "
-        "the reference it ships, so a mismatch would reach PyPI"
-    )
-    assert "smoke-test" in document["jobs"]["publish-pypi"]["needs"], (
+    needs = cast("list[str]", _jobs("publish.yml")["publish-pypi"]["needs"])
+    assert "smoke-test" in needs, (
         "publish-pypi no longer depends on smoke-test, so the surface gate "
         "cannot stop the upload it exists to stop"
     )
 
 
-def test_the_publish_lane_verifies_what_it_actually_published() -> None:
-    """The attached artifact is read back, not assumed to be what was built."""
-    scripts = _workflow_runs("publish.yml")
-    published_check = [
-        script
-        for script in scripts
-        if "gh release download" in script and "just release-verify-surface" in script
-    ]
+def test_the_publish_lane_reads_back_what_it_attached_without_project_code() -> None:
+    """The attached wheel is compared with the built one, byte for byte.
 
-    assert published_check, (
-        "publish.yml no longer downloads the attached wheel and verifies its "
-        "surface, so nothing checks what a user actually installs"
+    The job holds `id-token: write` and checks nothing out, so a recipe there
+    runs whatever project code the runner's workspace happens to hold.
+    """
+    runs = _job_runs("publish.yml", "publish-pypi")
+
+    assert any("gh release download" in run and "cmp " in run for run in runs), (
+        "publish.yml no longer compares the attached wheel with the one it "
+        "built, so nothing checks what a user actually downloads"
+    )
+    recipes = [
+        line.strip()
+        for step in _steps("publish.yml", "publish-pypi")
+        for line in str(step.get("run", "")).splitlines()
+        if line.strip().startswith("just ")
+    ]
+    assert not recipes, (
+        "the publishing job runs a recipe, which is project code in a job "
+        f"that can mint an OIDC token: {recipes}"
     )

@@ -13,6 +13,7 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .signals import (
     BuiltinVersionSignal,
@@ -20,6 +21,9 @@ from .signals import (
     ManifestEntrySignal,
     ProviderDirSignal,
 )
+
+if TYPE_CHECKING:
+    from ..types import ToolConfig
 
 logger = logging.getLogger(__name__)
 
@@ -256,82 +260,67 @@ def collect_provider_dir_state(target: Path, tool_value: str) -> ProviderDirSign
 
     # Content directories require markdown files; structural directories
     # (like workflows) only need to exist.
-    content_dirs: list[Path] = []
-    for d in (cfg.rules_dir, cfg.skills_dir, cfg.agents_dir):
-        if d is not None:
-            content_dirs.append(d)
+    content_dirs = [
+        d for d in (cfg.rules_dir, cfg.skills_dir, cfg.agents_dir) if d is not None
+    ]
+    structural_dirs = [d for d in (cfg.workflows_dir,) if d is not None]
 
-    structural_dirs: list[Path] = []
-    if cfg.workflows_dir is not None:
-        structural_dirs.append(cfg.workflows_dir)
-
-    expected_dirs = content_dirs + structural_dirs
-
-    # Build a set of known paths to detect foreign content
-    known_paths: set[Path] = set()
-    for d in expected_dirs:
-        known_paths.add(d)
-
-    # Config files are also known content
-    if cfg.config_file is not None:
-        known_paths.add(cfg.config_file)
-    if cfg.native_config_file is not None:
-        known_paths.add(cfg.native_config_file)
-    if cfg.system_file is not None:
-        known_paths.add(cfg.system_file)
-    # The provider-native MCP config (e.g. Antigravity's .agents/mcp_config.json)
-    # is written by mcp_sync. Read the same ToolConfig field the writer uses so
-    # the doctor and the writer share one notion of what legitimately lives in a
-    # provider directory, rather than maintaining a divergent hardcoded list.
-    if cfg.mcp_config_file is not None:
-        known_paths.add(cfg.mcp_config_file)
-
-    all_present = True
-    for d in content_dirs:
-        if not d.is_dir():
-            all_present = False
-            continue
-        # Rules/agents dirs contain flat .md files; skills dirs contain
-        # subdirectories each holding a SKILL.md.  Accept either layout.
-        md_files = list(d.glob("*.md"))
-        skill_files = list(d.glob("*/SKILL.md")) if not md_files else []
-        if not md_files and not skill_files:
-            all_present = False
-    for d in structural_dirs:
-        if not d.is_dir():
-            all_present = False
-
-    # Check for files in the provider directory that don't match known patterns
-    has_foreign = False
-    for child in children:
-        child_resolved = child.resolve()
-        # Known subdirectory
-        if any(child_resolved == kp.resolve() for kp in known_paths):
-            continue
-        # Known config file at provider level
-        if child.is_file() and any(
-            child_resolved == kp.resolve() for kp in known_paths
-        ):
-            continue
-        # Subdirectories of expected dirs are fine
-        if child.is_dir() and any(child_resolved == d.resolve() for d in expected_dirs):
-            continue
-        # Host-tool-native files (e.g. Claude Code's settings.local.json) are
-        # benign and must not classify the directory as MIXED (issue #122).
-        if child.is_file() and _is_host_native(tool_value, child.name):
-            continue
-        # Advisory-lock byproducts (e.g. mcp_config.json.lock) are local runtime
-        # artefacts the framework itself writes; they are not foreign content.
-        if child.is_file() and child.name.endswith(".lock"):
-            continue
-        # If we reach here, the child is not a known resource
-        has_foreign = True
-        break
-
-    if has_foreign:
+    known = {path.resolve() for path in _known_provider_paths(cfg)}
+    if any(_is_foreign_child(child, known, tool_value) for child in children):
         return ProviderDirSignal.MIXED
 
+    all_present = all(_has_markdown_content(d) for d in content_dirs) and all(
+        d.is_dir() for d in structural_dirs
+    )
     return ProviderDirSignal.COMPLETE if all_present else ProviderDirSignal.PARTIAL
+
+
+def _known_provider_paths(cfg: ToolConfig) -> list[Path]:
+    """Return every path a provider's configuration legitimately places.
+
+    The expected resource directories plus the config files. The
+    provider-native MCP config (e.g. Antigravity's .agents/mcp_config.json)
+    is written by mcp_sync; reading the same ToolConfig field the writer uses
+    gives the doctor and the writer one notion of what legitimately lives in
+    a provider directory, rather than a divergent hardcoded list.
+    """
+    candidates = (
+        cfg.rules_dir,
+        cfg.skills_dir,
+        cfg.agents_dir,
+        cfg.workflows_dir,
+        cfg.config_file,
+        cfg.native_config_file,
+        cfg.system_file,
+        cfg.mcp_config_file,
+    )
+    return [path for path in candidates if path is not None]
+
+
+def _has_markdown_content(content_dir: Path) -> bool:
+    """Whether a content directory exists and holds markdown resources.
+
+    Rules/agents dirs contain flat .md files; skills dirs contain
+    subdirectories each holding a SKILL.md.  Either layout is accepted.
+    """
+    if not content_dir.is_dir():
+        return False
+    return any(content_dir.glob("*.md")) or any(content_dir.glob("*/SKILL.md"))
+
+
+def _is_foreign_child(child: Path, known: set[Path], tool_value: str) -> bool:
+    """Whether a provider-directory entry is content vaultspec does not own."""
+    if child.resolve() in known:
+        return False
+    if child.is_file():
+        # Host-tool-native files (e.g. Claude Code's settings.local.json) are
+        # benign and must not classify the directory as MIXED (issue #122).
+        # Advisory-lock byproducts (e.g. mcp_config.json.lock) are local
+        # runtime artefacts the framework itself writes.
+        return not (
+            _is_host_native(tool_value, child.name) or child.name.endswith(".lock")
+        )
+    return True
 
 
 def collect_builtin_version_state(target: Path) -> BuiltinVersionSignal:

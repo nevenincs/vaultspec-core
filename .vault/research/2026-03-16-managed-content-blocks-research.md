@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#install-cmds'
 date: '2026-03-16'
-modified: '2026-06-13'
-body_hash: 'sha256:07d957db1e364112f84cbbb11100ba1aac582f7b1147fa8f8da0f08b78bfe5dc'
+modified: '2026-09-27'
+body_hash: 'sha256:794247c2682788c04fa299d303628b2445bfaebd40a2f3e8006391a70e535611'
 related:
   - '[[2026-03-15-install-cmds-capability-audit]]'
 ---

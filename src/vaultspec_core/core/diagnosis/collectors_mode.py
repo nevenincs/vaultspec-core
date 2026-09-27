@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from ..mcps_mode import MODE_COMMAND_TOKEN
 from .collectors_config import read_mcp_servers
 from .collectors_precommit import observed_precommit_mode
 from .signals import ModeMismatchSignal, VersionFloorSignal
@@ -22,8 +23,6 @@ if TYPE_CHECKING:
     from ..enums import InstallMode
 
 logger = logging.getLogger(__name__)
-
-_MODE_NEUTRAL_COMMAND_TOKEN = "@@VAULTSPEC_INSTALL_MODE_COMMAND@@"
 
 
 def _builtin_server_name(filename: str) -> str:
@@ -292,8 +291,7 @@ def collect_stale_seed_definitions(target: Path) -> list[str]:
             continue
         if (
             isinstance(raw, dict)
-            and cast("dict[str, object]", raw).get("command")
-            != _MODE_NEUTRAL_COMMAND_TOKEN
+            and cast("dict[str, object]", raw).get("command") != MODE_COMMAND_TOKEN
         ):
             stale.append(_builtin_server_name(path.name))
     return sorted(stale)

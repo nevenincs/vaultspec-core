@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#framework'
 date: '2026-02-16'
-modified: '2026-06-13'
-body_hash: 'sha256:92e2dd1b6b78f125ca4acd9dd2f831cc35b052bfe549df728bcb69ca16f2fd88'
+modified: '2026-09-27'
+body_hash: 'sha256:8ace12748afc431c9f160d5f2a5380799884c25d162c31c5e7eb432a3c009edb'
 related:
   - '[[2026-02-16-environment-variable-research]]'
   - '[[2026-02-16-environment-variable-adr]]'

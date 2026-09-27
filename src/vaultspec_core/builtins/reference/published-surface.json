@@ -26,8 +26,6 @@
     ],
     "install": [
       "--dry-run",
-      "--env",
-      "--env-file",
       "--force",
       "--json",
       "--mode",
@@ -44,24 +42,6 @@
     ],
     "migrations status": [
       "--json",
-      "--target"
-    ],
-    "project context": [
-      "--json",
-      "--limit",
-      "--no-hosted",
-      "--previous",
-      "--repo",
-      "--target"
-    ],
-    "review context": [
-      "--base",
-      "--candidate",
-      "--head",
-      "--json",
-      "--limit",
-      "--no-hosted",
-      "--previous",
       "--target"
     ],
     "spec agents add": [
@@ -411,7 +391,6 @@
       "--after",
       "--all",
       "--apply",
-      "--body-file",
       "--feature",
       "--isolated",
       "--json",
@@ -1011,5 +990,5 @@
     "status"
   ],
   "schema": 1,
-  "version": "0.3.1"
+  "version": "0.2.6"
 }

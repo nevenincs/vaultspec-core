@@ -14,8 +14,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-import networkx as nx
-
 from ..vaultcore import DocType
 from .models import DocNode
 
@@ -72,13 +70,11 @@ def top_n(
 
 
 def betweenness_centrality(g: NetworkXGraph) -> dict[str, float]:
-    """Compute betweenness centrality via the C-backed engine when available.
+    """Compute betweenness centrality via the C-backed ``rustworkx`` engine.
 
     Betweenness is the one O(V*E) algorithm on the opt-in analysis surface;
     ``rustworkx`` runs the same Brandes algorithm with the same
     normalisation orders of magnitude faster than pure-Python networkx.
-    The networkx implementation remains the automatic fallback when the
-    binary wheel is unavailable, so no platform loses the surface.
 
     Args:
         g: The (sub)graph to analyse.
@@ -87,10 +83,8 @@ def betweenness_centrality(g: NetworkXGraph) -> dict[str, float]:
         Mapping of node name to normalised betweenness score, matching
         ``nx.betweenness_centrality``'s semantics.
     """
-    try:
-        import rustworkx as rx
-    except ImportError:  # pragma: no cover - wheel unavailable on platform
-        return nx.betweenness_centrality(g)
+    import rustworkx as rx
+
     rgraph = rx.networkx_converter(g)
     scores = rx.betweenness_centrality(rgraph, normalized=True, endpoints=False)
     return {rgraph[index]: score for index, score in scores.items()}

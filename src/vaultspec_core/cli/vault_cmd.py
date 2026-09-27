@@ -24,7 +24,7 @@ in the generated command reference.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -178,30 +178,24 @@ __all__ = [
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from _typeshed import DataclassInstance
     from rich.console import Console
 
     from vaultspec_core.graph.api import VaultGraph
+    from vaultspec_core.vaultcore.query_listing import VaultDocument
 
 
 # The apps themselves live in `vault_cmd_app` so the per-verb command modules
 # can mount onto them without importing back through this module. They are
 # re-exported here because this module is the family's public surface.
 
+from vaultspec_core.cli.archive_cmd import archive_app
+from vaultspec_core.cli.exec_cmd import exec_app
+from vaultspec_core.cli.link_cmd import link_app
 from vaultspec_core.cli.plan_cmd import plan_app
 
 vault_app.add_typer(plan_app, name="plan")
-
-from vaultspec_core.cli.link_cmd import link_app  # noqa: E402
-
 vault_app.add_typer(link_app, name="link")
-
-from vaultspec_core.cli.exec_cmd import exec_app  # noqa: E402
-
 vault_app.add_typer(exec_app, name="exec")
-
-from vaultspec_core.cli.archive_cmd import archive_app  # noqa: E402
-
 vault_app.add_typer(archive_app, name="archive")
 
 
@@ -468,7 +462,7 @@ def cmd_stats(
 # ---- vault list --------------------------------------------------------------
 
 
-def _list_row(doc: object) -> dict[str, object]:
+def _list_row(doc: VaultDocument) -> dict[str, object]:
     """Project one document into the listing row.
 
     Drops what the caller can derive. Measured over 1,222 documents, 41% of the
@@ -487,7 +481,7 @@ def _list_row(doc: object) -> dict[str, object]:
 
     from vaultspec_core.core.types import get_context as _get_ctx
 
-    row: dict[str, object] = dataclasses.asdict(cast("DataclassInstance", doc))
+    row: dict[str, object] = dataclasses.asdict(doc)
     row.pop("name", None)
     row.pop("tags", None)
     # `asdict` leaves a Path as a Path, so guarding on `str` alone silently
