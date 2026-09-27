@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.vaultcore.exec_ledger import ledger_step_evidence
 
 from .test_step_aware_exec import setup_test_plan
 
@@ -129,6 +130,22 @@ def test_rename_and_delete_rows(runner: CliRunner, synthetic_project: Path) -> N
     text = _ledger_text(synthetic_project)
     assert "- `S01` `R` `src/old.py` -> `src/new.py`" in text
     assert "- `S01` `D` `src/gone.py`" in text
+
+
+@pytest.mark.parametrize(
+    "results", [("pass", "fail", "pass"), ("fail", "pass", "fail")]
+)
+def test_relogging_preserves_latest_verification(
+    runner: CliRunner, synthetic_project: Path, results: tuple[str, ...]
+) -> None:
+    setup_test_plan(synthetic_project)
+    for result in results:
+        logged = _log(runner, synthetic_project, "P01.S01", verify=f"pytest={result}")
+        assert logged.exit_code == 0, logged.output
+        assert (
+            ledger_step_evidence(_ledger_text(synthetic_project))["S01"].verify
+            == result
+        )
 
 
 def test_verify_and_by_become_rows(runner: CliRunner, synthetic_project: Path) -> None:

@@ -8,9 +8,9 @@ record-kind weight and the excerpt floor held on a held-out query set, and the
 alternatives that did not (a per-record directness Score, a finalist Choice over
 the leading records) are deliberately absent.
 
-The model is pinned by version. An alias such as ``jev-latest`` moves when a new
-release ships, and every threshold below was tuned against the pinned version;
-moving to a new model is a deliberate re-evaluation, not a silent change.
+Model selection belongs to the core enum. The API resolves the stable alias;
+usage records the model that actually answered. Thresholds remain explicit
+application policy and can be evaluated against observed results.
 
 Question texts refer to state fields by backticked path. Those backticks are
 part of the question, not of the vault text, and are never sanitised; only the
@@ -32,7 +32,6 @@ __all__ = [
     "KIND_CRITERIA",
     "KIND_TO_TYPE",
     "KIND_WEIGHT",
-    "MODEL",
     "NONE_KEY",
     "NO_BLOCK",
     "NO_RECORD",
@@ -47,9 +46,6 @@ __all__ = [
     "WHERE",
     "WIDE",
 ]
-
-#: The Jev version every threshold in this module was measured against.
-MODEL: Final = "jev-1.13.0"
 
 # ---------------------------------------------------------------- stage 1
 

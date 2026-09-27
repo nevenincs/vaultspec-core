@@ -373,18 +373,23 @@ reaches the model. An empty or blank query, a query over 2,000 characters, a `li
 outside 1 to 11, an unknown type, or `index` fails the whole call with a protocol error.
 
 **Enabling hosted search.** Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` in the server's
-environment. If the variable is absent there, the server reads that one variable from
-the workspace-root `.env` instead, but only when both hold: the server runs from the
-workspace's own environment (its Python interpreter lives inside the workspace, as a
-project virtual environment does), and the workspace declares the `dependency` or `dev`
-install mode. A globally installed vaultspec-core, such as a uv tool, a pipx install, or
-a release binary, never reads the workspace `.env`, so a cloned repository cannot supply
-the key. No other variable enables search: `TYPESAFE_API_KEY` and vaultspec-rag's own
-variables do not. With a key set, every search sends the question and vault text to the
-TypeSafe API at `api.typesafe.ai`. Setting the key is the consent to that data flow, and
-it applies in read-only mode too. Without a key, nothing leaves the machine. The key
-never appears in a response, a log, or an error. `status` reports only whether a key is
-configured and where it was found.
+environment, or provision it with
+`vaultspec-core install --env VAULTSPEC_CORE_TYPESAFE_API_KEY` (add `--upgrade` for an
+existing installation). Process values override the protected `.vaultspec/.env` store,
+which works in all install modes; a blank value is unset in either and falls through.
+The resolver refreshes local file changes without changing the server's inherited
+environment. If neither source supplies the variable, the server reads that one variable
+from the workspace-root `.env` instead, but only when both hold: the server runs from
+the workspace's own environment (its Python interpreter lives inside the workspace, as a
+project virtual environment does), and vaultspec-core's resolved install mode for the
+workspace is `dependency` or `dev`. A globally installed vaultspec-core, such as a uv
+tool, a pipx install, or a release binary, never reads the workspace `.env`, so a cloned
+repository cannot supply the key. No other variable enables search: `TYPESAFE_API_KEY`
+and vaultspec-rag's own variables do not. With a key set, every search sends the
+question and vault text to the TypeSafe API at `api.typesafe.ai`. Setting the key is the
+consent to that data flow, and it applies in read-only mode too. Without a key, nothing
+leaves the machine. The key never appears in a response, a log, or an error. `status`
+reports only whether a key is configured and where it was found.
 
 **Outcomes.** The `status` field is one of three values:
 
@@ -477,7 +482,7 @@ Example response:
   "total": 6,
   "truncated": true,
   "usage": {
-    "model": "jev-1.13.0",
+    "model": "<API-reported model>",
     "requests": 6,
     "input_tokens": 41250,
     "elapsed_ms": 1234,
@@ -511,36 +516,38 @@ Find the ADRs a decision should cross-reference, within fixed bounds. Not read-o
 can write links), non-destructive, idempotent, open-world. On a read-only server it is
 read-only and judges one ADR.
 
-`crossref` judges a source ADR against every other ADR in the vault and returns the ones
-it should link, plus the links it already declares that were judged weak. It is the same
-backend as `vaultspec-core vault adr crossref`, and it uses the hosted-search key and
-data flow described under [`search`](#search).
+`crossref` ranks every other ADR locally, judges a bounded shortlist, and returns
+suggested links and declared links judged weak. It is the same backend as
+`vaultspec-core vault adr crossref`, and it uses the hosted-search key and data flow
+described under [`search`](#search).
 
-| Parameter     | Type                   | Default | Description                                                                                  |
-| ------------- | ---------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`, at most 50. One ref is judged alone. |
-| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                   |
-| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                      |
-| `all_adrs`    | boolean                | `false` | Sweep every ADR that still governs; superseded and rejected ones are skipped unless named.   |
-| `after`       | string or null         | `null`  | Resume a sweep after this ADR, the `next_after` of the previous reply.                       |
-| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                  |
-| `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                         |
+| Parameter     | Type                   | Default | Description                                                                                               |
+| ------------- | ---------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| `refs`        | list of ADR references | `[]`    | ADRs to judge: stem, filename, path or `[[wiki-link]]`, at most 50. One ref is judged alone.              |
+| `feature`     | string or null         | `null`  | Sweep this feature's ADRs.                                                                                |
+| `isolated`    | boolean                | `false` | Sweep only ADRs that link no other ADR.                                                                   |
+| `all_adrs`    | boolean                | `false` | Sweep non-retired ADRs, including proposals; superseded, rejected, and deprecated sources require naming. |
+| `after`       | string or null         | `null`  | Resume a sweep after this ADR, the `next_after` of the previous reply.                                    |
+| `max_sources` | integer, 1 to 50       | `10`    | Most ADRs one sweep judges.                                                                               |
+| `apply`       | boolean                | `false` | Write each new `link` verdict, unread, into the source's `related:`.                                      |
+| `body`        | string or null         | `null`  | Proposed body prose for one ADR, judged without changing it; no sweep or apply.                           |
 
 A call needs `refs`, `feature`, `isolated`, or `all_adrs`. `feature` and `isolated`
 narrow together; `refs` and `all_adrs` each stand alone, and combining either with
-another selector is refused. The read-only server takes one parameter, `ref`, the ADR to
-judge.
+another selector is refused. The read-only server takes `ref`, the ADR to judge, and
+optional `body` prose. Body prose omits frontmatter and allows amendments to be checked
+before changing accepted text; the source result is marked `draft`.
 
 **Bounds.** Every other ADR is ranked by code alone, the best 192 are put to the model
 as Choice questions of at most 32 options, and the best 32, plus up to 8 declared links
-outside them, are judged in pairs. A source costs at most 46 requests and 60 seconds, a
-sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300 seconds,
-and a vault may hold at most 5,000 ADRs. Sweeps run in stem order and store no state. An
-ADR the provider refuses to read is held open while the sweep judges on, past its source
-limit by up to two more ADRs if it must: a later ADR the provider reads shows the
-refusal was that ADR's own, and the sweep moves past both. A refusal no read settles,
-three refusals in a row, or any other failure stops the sweep with `stopped` set and the
-cursor before the first refusal still open, so resuming retries from there.
+outside them, are judged in pairs. A source has at most 46 requests and a 15-second
+deadline, a sweep takes at most 50 sources, or 52 when it must settle a refusal, and 300
+seconds, and a vault may hold at most 5,000 ADRs. Sweeps run in stem order and store no
+state. An ADR the provider refuses to read is held open while the sweep judges on, past
+its source limit by up to two more ADRs if it must: a later ADR the provider reads shows
+the refusal was that ADR's own, and the sweep moves past both. A refusal no read
+settles, three refusals in a row, or any other failure stops the sweep with `stopped`
+set and the cursor before the first refusal still open, so resuming retries from there.
 
 **Verdicts.** Each row has `stem`, `kind`, `score`, `relation`, `status`, `declared`,
 and `applied` when this call wrote it. `link` means the source should link the ADR;
@@ -562,6 +569,12 @@ processed (without it, a resume starts from the beginning), `stopped` when a swe
 early, and `usage` (requests, input tokens, and `unscored`, the requests the provider
 refused to read) when anything was sent. A source whose every pair was refused is
 `unavailable` with `content_rejected`, never a source with no links.
+
+Judged sources include `coverage`: `corpus`, `pool`, `judged`, `source_truncated`, and
+`candidates_truncated`. Returned candidates with clipped decision text carry
+`input_truncated`. This is distinct from reply-row `truncated`. The 6,000-character
+input budget is shared across sections, with decisions and constraints first. Read
+relevant full records when coverage is incomplete; `ok` does not prove no conflicts.
 
 ______________________________________________________________________
 
@@ -751,13 +764,13 @@ document count, latest activity, whether a plan exists, lifecycle status, plan t
 plan completion percent), the plans currently in flight (stem, feature, tier, open and
 closed step counts, completion percent, and the next open step), vault-wide totals, and
 `hosted_search`. That field reports whether [`search`](#search) has a key (`configured`)
-and, when it does, where the key was found (`source`: `environment` or `dotenv`). It
-describes configuration, not whether the key works. Next to it, `companion` reports
-whether the `vaultspec-rag` companion is provisioned, which decides the next step a
-declined `search` names (`package`, `signal`, `mode`, `version`, `floor`,
-`health_authority`; the key is absent when the probe failed). It reports configuration,
-not liveness: a provisioned companion can still be down. Both fields come from the same
-backend call as `vaultspec-core status --json`. Every response carries a
+and, when it does, where the key was found (`source`: `environment`, `local_env`, or
+`dotenv`). It describes configuration, not whether the key works. Next to it,
+`companion` reports whether the `vaultspec-rag` companion is provisioned, which decides
+the next step a declined `search` names (`package`, `signal`, `mode`, `version`,
+`floor`, `health_authority`; the key is absent when the probe failed). It reports
+configuration, not liveness: a provisioned companion can still be down. Both fields come
+from the same backend call as `vaultspec-core status --json`. Every response carries a
 `tool_schema_version` field so a client can detect a server upgrade.
 
 Pass a target to trace one plan or feature instead. The response then reports each

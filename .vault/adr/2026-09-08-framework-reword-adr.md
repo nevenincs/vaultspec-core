@@ -3,11 +3,13 @@ tags:
   - '#adr'
   - '#framework-reword'
 date: '2026-09-08'
-modified: '2026-09-08'
+modified: '2026-09-25'
 body_schema: 'body-v2'
-body_hash: 'sha256:70e2e1021daeb62b171227a43f0a08814bb63d374bd914b7598552b9d741ce86'
+body_hash: 'sha256:a2d557931a90273c1a4abf27cd743d0a5663939b1758c0c45ea8eb2857660299'
 related:
   - "[[2026-09-08-framework-reword-research]]"
+  - '[[2026-09-25-skill-audit-adr-authoring-audit]]'
+  - '[[2026-09-25-skill-audit-projectmanager-audit]]'
 ---
 
 # `framework-reword` adr: `proportional pipeline routing and decision coverage` | (**status:** `accepted`)
@@ -37,6 +39,22 @@ An approved plan may have no governing ADR when discovery finds no costly decisi
 
 Approval is scoped user authorization, including explicit advance authorization. Persist its basis; never infer it from elapsed time or record status alone. Routine corrections within approved intent do not need renewed permission; changed scope, costly commitments, or external authority do. Preserve accepted ADR content while an amendment is pending, presenting a proposed revision separately for approval before replacing it. A successor must be accepted before supersession retires the old decision. Historical plan links retain their historical meaning; active execution must have accepted decision coverage.
 
+The ADR author owns placement and proposed reconciliation of affected current wording:
+reuse, a subsection or amendment to the same decision, a distinct decision, or
+supersession. Present necessary older-ADR edits with the new ruling and apply existing
+authority coherently. Detailed evidence remains in its evidence home; retain the context
+needed to understand scope and rationale. Acceptance establishes authority, not rollout
+completion. Implementation hypotheses can change within binding commitments; invalidated
+commitments require an evidenced, authorized revision. Research-only delegation uses the
+general researcher; the ADR persona drafts from supplied evidence.
+
+The opt-in authoring check follows `2026-09-23-adr-crossref-adr`. It guides reconciliation
+without adding an approval gate, credential prerequisite, or repeated unchanged review.
+
+**Amendment, 2026-09-25:** Authorized by the user's request to apply the ADR authoring
+audit findings to skills, personas, wording rules and backend. Evidence:
+`2026-09-25-skill-audit-adr-authoring-audit`. Existing approval and routing boundaries hold.
+
 ## Implementation
 
 The always-on system owns routing, coverage, approval, and review policy. Record rules own artifact boundaries; templates own syntax and tier structure; skills and personas implement those contracts without independent policy variants. Relevant creation, validation, repair, and ADR transition code must agree. Checks verify explicit links and status, not infer semantic approval or invent authority by selecting a same-feature record.
@@ -44,6 +62,19 @@ The always-on system owns routing, coverage, approval, and review policy. Record
 Use a plan when scope or progress must survive sessions or handoff, or coordination needs durable sequencing. File counts and parallel workers alone do not force a tier. L1 is a flat sequence of cohesive, verifiable revisions; add containers only when they clarify coordination and dependencies. Expected file creation and routine path corrections are not blockers. Parallel assignments may be Steps at L1 or containers at higher tiers, with isolated writes and coordinated shared metadata and commits.
 
 Formal review is for planned work: review the integrated changed behavior against the plan and its governing decisions at Phase close where Phases exist, plan close, and handoff. Coincident gates share a review. A Step closes on its verification. L1 requires no invented Phase. Review the complete affected workflow across rules, skills, personas, templates, and executable contracts, not each document as a separate approval gate. Planless review stays in the reply. In-scope corrective findings are covered by the approved work; findings requiring new scope or decisions are separately authorized.
+
+Project coordination is an explicitly requested aggregation of context across active
+workstreams: epics and trackers, roadmaps, cross-worktree triage, or a multi-feature
+workday. Local-only coordination is valid. Routine repository, branch, worktree and
+single-PR operations do not require the project-manager role. The coordinator owns
+priorities, assignments, tracker context and handoffs; implementation plans retain
+execution sequencing and authority. An L4 association supplies tracker context without
+making every Epic-intent operation a coordination task.
+
+**Amendment, 2026-09-25, project coordination:** Authorized by the user's specification
+of the project-manager skill's intended scope during the ongoing skill audit. Evidence:
+`2026-09-25-skill-audit-projectmanager-audit`. This refines role routing and ownership;
+it introduces no mandatory hosted service or project-triage backend.
 
 ## Rationale
 

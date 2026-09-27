@@ -1,50 +1,56 @@
 ---
 name: vaultspec-adr
-description: Record a new or changed costly decision after checking accepted decision coverage and sufficient Research, Reference, or Audit evidence.
+description: Record a costly decision, place it within accepted decision coverage, and reconcile affected ADR wording.
 ---
 
 # ADR (vaultspec-adr)
 
-Records one costly decision. Apply the coverage and approval contract in the vaultspec
-system section before creating a record. Reuse an accepted ADR unchanged when it covers
-the work, including across features; return its stem without drafting a duplicate.
+Records one decision. Apply the system's coverage and approval contract. Reuse accepted
+coverage across features; a new task does not require a new ADR.
 
-## Steps
+## Author
 
-- Check coverage per the `vaultspec-discovery` rule: search for the decision, then list
-  the ADRs across features. No covering record in the listing, together with a "nothing
-  in the vault answers this" (`nothing_answers`) verdict, shows the decision is new.
-  When search gives no such verdict (it declined or failed, or replied "no record that
-  was read answers this", `none_read_answers`), the ADR listing plus a targeted grep of
-  `.vault/adr/` decide coverage. That is the rule's `.vault/` grep, narrowed to
-  decisions. Read covering decisions whole, then their evidence. Classify the need as
-  unchanged reuse, amendment, supersession, or a distinct decision.
-- Confirm sufficient Research, Reference, or Audit evidence. Gather missing evidence
-  through `vaultspec-research` for option research or `vaultspec-code-research` for code
-  patterns. Do not copy an adequate Audit into a new Research merely for its type.
-- For a new decision, scaffold:
-  `vaultspec-core vault add adr --feature {feature} --related <evidence-stem>` (or
-  `create`). Read `.vaultspec/templates/adr.md`.
-- Draft the decision, or dispatch `vaultspec-adr-researcher` with the existing evidence
-  and requested decision scope; it returns content for persistence.
-- Once the decision sections are persisted, cross-reference the ADR with `crossref`
-  (CLI: `vaultspec-core vault adr crossref <adr-stem>`). This step is optional and
-  recommended. Read each `link` verdict's ADR and add the ones you confirm to `related:`
-  with `vaultspec-core vault link add`. Read in full every pair labelled `supersedes`,
-  `refines`, or `conflicts` before you settle amendment, supersession, or a distinct
-  decision. The label marks a pair to read; it never decides. When the reply is
-  `not_configured` or `unavailable`, run the next step it names instead.
-- For an amendment, preserve accepted content while proposing the revision separately.
-  Follow the system's pending-proposal procedure if it must survive handoff.
-- For a reversal, draft the successor first. After its content is authorized, set it
-  `accepted`, then run `vaultspec-core vault adr supersede OLD --by NEW`.
-- Verify with `vaultspec-core vault check all`. Present the record and authorization
-  basis. If authorization is missing, ask and stop. Otherwise persist acceptance and
-  continue with the authorized work. Rejected proposals remain as evidence; rejection
-  never changes the accepted predecessor.
+- Follow the discovery rule to find governing decisions and their implementation. Read
+  the relevant ADRs whole. Choose unchanged reuse, a subsection or amendment to the same
+  decision, supersession of a reversal, or a separate distinct decision.
+- Reuse sufficient Research, Reference, or Audit evidence. Gather only missing evidence
+  through `vaultspec-research` or `vaultspec-code-research`.
+- For a new decision, scaffold with `create` (CLI:
+  `vaultspec-core vault add adr --feature {feature} --related <evidence-stem>`). Read
+  `.vaultspec/templates/adr.md`. Draft directly or delegate to
+  `vaultspec-adr-researcher` with the evidence, scope, and affected ADRs.
+- State the chosen commitment, scope, binding constraints, rationale, and consequences.
+  Distinguish implementation hypotheses from obligations; name reconsideration
+  conditions when useful. Keep enough context to understand the ruling and cite detailed
+  evidence. An inconclusive spike remains evidence, not an accepted decision.
+- Own the affected decision set: return concrete proposed wording for older ADRs whose
+  commitments would otherwise conflict, including scoped exceptions or supersession. A
+  relation label or a new link alone does not reconcile contradictory text. Follow the
+  system's approval contract for applying those changes.
 
-## Document boundary
+## Jev-assisted placement
 
-Evidence stays in Research, Reference, or Audit. Cite it by stem; add missing facts to
-their evidence home before using them. The ADR owns the decision, rationale, and
-consequences. Decision language found in evidence moves here only when authorized.
+Use the existing hosted-search configuration signal from `status`. TypeSafe is opt-in
+through `VAULTSPEC_CORE_TYPESAFE_API_KEY`; configured use sends decision text to
+TypeSafe. Do not seek credentials or require setup to finish authoring.
+
+- When configured, run one `crossref` pass on the populated draft before offering it
+  (CLI: `vaultspec-core vault adr crossref <adr-stem> --json`). For an amendment, pass
+  proposed body prose through the tool's `body` argument or CLI `--body-file <path>`;
+  this judges it without changing the accepted record. Do not use `apply` for drafts.
+- Reuse results supplied for the same draft and relevant corpus state. Recheck only
+  materially changed commitments or evidence; do not repeat unchanged reviews.
+- Read relevant returned ADRs, especially `supersedes`, `refines`, and `conflicts`
+  pairs. Interpret status, scope, exceptions, and ruling history. Confirm useful links
+  before adding them through `vaultspec-core vault link add`.
+- Missing configuration uses local discovery. On `unavailable`, use the named fallback
+  once. Clipped input, unjudged candidates, and a bounded shortlist mean incomplete
+  coverage; inspect relevant omitted text. An `ok` result is not approval or proof of no
+  conflicts. Do not turn service failures into an authoring gate.
+
+## Offer
+
+Present placement, the decision, affected prior wording, and unresolved conflicts
+together. Verify the changed records once through the owning tools. Record existing
+authorization and proceed; ask only for authority not supplied. Accept a reversal's
+successor before `vaultspec-core vault adr supersede OLD --by NEW`.

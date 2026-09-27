@@ -213,7 +213,9 @@ def get_recommended_entries(target: Path) -> list[str]:
     Args:
         target: Workspace root directory.
     """
-    entries: set[str] = set()
+    from ..config.local_env import ENV_IGNORE_ENTRIES
+
+    entries: set[str] = set(ENV_IGNORE_ENTRIES)
 
     try:
         # Internal state that must ALWAYS be ignored if the framework

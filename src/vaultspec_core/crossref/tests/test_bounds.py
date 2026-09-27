@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 
 from vaultspec_core.config import reset_config
+from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.crossref import (
     CrossrefStatus,
     InvalidSourceError,
@@ -35,7 +36,6 @@ from vaultspec_core.crossref._questions import (
     POOL,
 )
 from vaultspec_core.search._models import UnavailableReason
-from vaultspec_core.search._questions import MODEL
 from vaultspec_core.search._transport import DeadlineExceededError, JevClient
 from vaultspec_core.search.tests.scripted_provider import Reply, ScriptedProvider
 
@@ -118,7 +118,9 @@ def test_the_worst_case_source_sends_exactly_its_ceiling(
 
 def test_a_slow_provider_is_cut_off_at_the_deadline(tmp_path: Path) -> None:
     _small_vault(tmp_path)
-    slow = Reply.json({"model": MODEL, "answers": {}, "usage": {}}, delay=2.0)
+    slow = Reply.json(
+        {"model": TypeSafeModel.JEV, "answers": {}, "usage": {}}, delay=2.0
+    )
     index = Index(load_adrs(tmp_path))
 
     with ScriptedProvider(slow) as provider:

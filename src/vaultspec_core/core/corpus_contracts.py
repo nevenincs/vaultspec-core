@@ -43,6 +43,7 @@ RUNTIME_VAULTSPEC_PATHS = frozenset(
     {
         "workspace.json",  # written by install; per-project state
         "config.toml",  # written by config set / interactive setup; per-project state
+        ".env",  # the project store; written only by install --env / --env-file
         # Created by scaffold rather than copied from builtins: neither hooks
         # nor triggers ship a bundled example, because both hold shell commands
         # that would then land in every install, and a directory cannot be
@@ -55,9 +56,11 @@ RUNTIME_VAULTSPEC_PATHS = frozenset(
 #: Always-on word budget. Sum of the shared system parts (the synthesized
 #: ``vaultspec-system`` rule) plus every ``rules/*.builtin.md``. The harness
 #: audit measured 4,650 words before the long-horizon rewrite and 2,937
-#: after; 3,200 leaves room for a paragraph, not a section. Raise it in a
-#: commit that says why.
-ALWAYS_ON_WORD_BUDGET = 3200
+#: after. The 2026-09-25 skill audit's system and rule rewrites (review
+#: context, ADR reconciliation, bounded checks) brought it to 3,436, kept as
+#: written; 3,500 again leaves room for a paragraph, not a section. Raise it
+#: in a commit that says why.
+ALWAYS_ON_WORD_BUDGET = 3500
 
 #: Forbidden vocabulary, each entry with the reason it is forbidden. The
 #: reason is the test's failure message.

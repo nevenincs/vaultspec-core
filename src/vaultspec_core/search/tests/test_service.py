@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from vaultspec_core.config import VAULTSPEC_CORE_TYPESAFE_API_KEY
+from vaultspec_core.core.enums import TypeSafeModel
 from vaultspec_core.search import (
     DEFAULT_RESULTS,
     MAX_QUERY_CHARS,
@@ -30,7 +31,6 @@ from vaultspec_core.search._engine import KIND_QID
 from vaultspec_core.search._questions import (
     ANSWERED_THRESHOLD,
     KIND_WEIGHT,
-    MODEL,
     NONE_KEY,
 )
 from vaultspec_core.search._service import search_vault
@@ -145,7 +145,9 @@ class Judge:
             for qid, question in questions.items()
         }
         usage = {"input_tokens": len(received.body) // 4, "output_tokens": 0}
-        return Reply.json({"model": MODEL, "answers": answers, "usage": usage})
+        return Reply.json(
+            {"model": TypeSafeModel.JEV, "answers": answers, "usage": usage}
+        )
 
     def _answer(
         self, qid: str, question: dict[str, Any], state: dict[str, Any]
@@ -317,7 +319,7 @@ class TestRanking:
 
         usage = outcome.usage
         assert usage is not None
-        assert usage.model == MODEL
+        assert usage.model == TypeSafeModel.JEV
         assert usage.requests == len(provider.received)
         assert usage.input_tokens == sum(len(r.body) // 4 for r in provider.received)
         assert usage.unscored == 0

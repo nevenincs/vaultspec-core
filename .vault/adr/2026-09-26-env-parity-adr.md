@@ -5,7 +5,7 @@ tags:
 date: '2026-09-26'
 modified: '2026-09-26'
 body_schema: 'body-v2'
-body_hash: 'sha256:034f920c34d9c0bf448696b9bdc2bd2479f2bec1d0541ecc66df65dd1121e406'
+body_hash: 'sha256:7bb0100a4d02f2ba46d6bee244dfd7da33a04f56d5cc0b2bdce05c0b6fc3c703'
 related:
   - "[[2026-09-26-env-parity-research]]"
   - "[[2026-02-16-environment-variable-adr]]"
@@ -181,6 +181,8 @@ Rag deletes its mirrors of each and imports them. a2a promotes core from its too
 - **Package extensions stay:** core's `PROVIDER` argument and `--remove-vault`; rag's provisioning flags, `--remove-data` and data-path options.
 
 **Record reconciliation.** Each record the research lists as contradicting the code is amended in its own vault with a dated note. The amendment points at this record, or corrects the claim to what the code does.
+
+**Amendment note, 2026-09-26, project store**: `2026-09-25-environment-provisioning-adr`, accepted on a parallel branch and merged with this one, adds `.vaultspec/.env`: a gitignored, owner-restricted store that only an explicit `install --env` or `--env-file` import writes, for vaultspec-core registry entries marked `persistable`. It is operator-owned, not repository content, and ranks directly after the session environment and before the workspace `.env`, so an explicit import outranks the implicit credential fallback. Unlike an operator settings file it is found at a fixed workspace path rather than named, because only the installer writes it and every read re-checks that it is ignored, untracked and owner-restricted. A resolver passed an explicit environment mapping never reads it, blank values in it are unset, and no package-scoped name is persistable, so the public API other packages import is unchanged.
 
 ## Rationale
 

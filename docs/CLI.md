@@ -123,8 +123,19 @@ not hand-edit between the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-The latest published release is `0.3.0`, and every command, flag, and tool documented
-here is in it.
+The latest published release is `0.3.0`. What follows is on this branch and not in that
+release, so it cannot be installed yet. This list is generated from the recorded surface
+of that release; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core project context`
+- `vaultspec-core review context`
+
+Flags on commands the release already has:
+
+- `vaultspec-core install` - `--env`, `--env-file`
+- `vaultspec-core vault adr crossref` - `--body-file`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -453,6 +464,16 @@ full options.
 - `vaultspec-core config list` - Enumerate all known configuration entries and current
   values.
 
+### Project
+
+- `vaultspec-core project context` - Read local work and optional GitHub state; propose
+  a bounded attention order.
+
+### Review
+
+- `vaultspec-core review context` - Read a diff and explicit source locators; optionally
+  rank supporting passages.
+
 <!-- vaultspec:generated:end command-inventory -->
 
 ## Workspace commands
@@ -483,6 +504,11 @@ Deploy the vaultspec framework into the target directory.
   `dependency` and `dev` use `uv run --no-sync`. Selection order: explicit `--mode`,
   saved mode in `.vaultspec/workspace.json`, dependency detection in `pyproject.toml`,
   then `tool`. This option doesn't change package dependency declarations.
+- `--env NAME` - Import a supported variable from the process environment. Repeatable.
+  `--env NAME=VALUE` supplies a non-secret setting directly. Secret values on the
+  command line are refused; import them by name or file.
+- `--env-file PATH` - Import supported names from a UTF-8 dotenv file (maximum 64 KiB).
+  Explicit `--env` entries override file entries; the last repeated entry wins.
 - `--no-hints` (default off) - Suppress next-step advisory hints.
 - `--json` (default off) - Emit machine-readable output.
 
@@ -491,6 +517,44 @@ Deploy the vaultspec framework into the target directory.
 Exit codes: `0` success, `1` failure, `2` completed with a required step skipped. The
 three are shared by every vaultspec package's install surface; core has no step that
 reports `2` today.
+
+#### Local environment provisioning
+
+```bash
+vaultspec-core install --env VAULTSPEC_CORE_TYPESAFE_API_KEY
+vaultspec-core install --upgrade --env-file /private/vaultspec.env --env VAULTSPEC_NO_HINTS=1
+```
+
+The first command imports an already exported key without putting its value in shell
+history. Only supplied keys replace existing values. Installation, adoption, upgrade,
+`--force`, and sync preserve unmentioned settings; a failed install does not replace
+them. Existing installations still require `--upgrade` or `--force`. Dry runs report
+names and planned outcomes without writing. Outputs never show imported values.
+
+Values are stored in `.vaultspec/.env`, outside the vault. The installer establishes
+mandatory ignore rules, refuses tracked or redirected storage paths, and writes
+atomically with owner-only permissions (a restricted DACL on Windows). Ignore protection
+remains required when managed-block maintenance is disabled. The commit gate rejects
+force-added local environment files. Full framework uninstall removes this local store.
+Protect the original import file separately; installation never rewrites it.
+
+Supported imports are `VAULTSPEC_CORE_TYPESAFE_API_KEY`, `VAULTSPEC_IO_BUFFER_SIZE`,
+`VAULTSPEC_TERMINAL_OUTPUT_LIMIT`, `VAULTSPEC_LOCK_TIMEOUT_SECONDS`,
+`VAULTSPEC_JSON_PRETTY`, and `VAULTSPEC_NO_HINTS`. Other names are refused. Dotenv
+imports support comments, `export`, and single-line quoted or unquoted values, with no
+variable interpolation or shell evaluation. Double-quoted backslashes and quotes may be
+escaped.
+
+The store is the third rung of the [settings resolution](#settings-resolution) order:
+after explicit command options and the process environment, before the trusted root
+`.env` credential fallback and the defaults. A blank value is unset in the store as
+everywhere else, and falls through. Both CLI and MCP use this resolver, scoped to the
+selected workspace; file and environment changes refresh its cache. Local settings work
+in all install modes, while the root `.env` fallback keeps the trust restrictions
+described under settings resolution. Provisioning does not copy secrets into generated
+MCP configuration or change the parent shell's environment. A running MCP server keeps
+its inherited process environment until restarted, and that environment continues to
+override local file edits.
 
 #### Examples
 
@@ -912,13 +976,13 @@ framework health.
 
 The rollup's Discovery section says which vault search to reach for. First it says
 whether hosted vault search (`vaultspec-core vault search`) is configured and whether
-the key came from the `environment` or the workspace `dotenv`. It then shows whether the
-`vaultspec-rag` companion is provisioned, which decides the next step a declined vault
-search names. Both lines report configuration, not liveness: a configured key can still
-be rejected when a search runs, and a provisioned companion can still be down. Under
-`--json` they are `data.hosted_search` (`configured`, `source`) and `data.companion`
-(`package`, `signal`, `mode`, `version`, `floor`, `health_authority`; the key is absent
-when the probe failed).
+the key came from the `environment`, provisioned `local_env`, or workspace `dotenv`. It
+then shows whether the `vaultspec-rag` companion is provisioned, which decides the next
+step a declined vault search names. Both lines report configuration, not liveness: a
+configured key can still be rejected when a search runs, and a provisioned companion can
+still be down. Under `--json` they are `data.hosted_search` (`configured`, `source`) and
+`data.companion` (`package`, `signal`, `mode`, `version`, `floor`, `health_authority`;
+the key is absent when the probe failed).
 
 **Targeted mode** (`TARGET` is a plan stem, plan path, or feature handle): renders the
 grounding trace - a plan-line header, then each step (display path, checkbox state, a
@@ -1628,10 +1692,10 @@ ______________________________________________________________________
 vaultspec-core vault adr crossref [OPTIONS] [REFS]...
 ```
 
-Find the ADRs a decision should cross-reference. Each source ADR is judged against every
-other ADR in the vault, and the reply lists the ones it should link and the links it
-already declares that were judged weak. With `--apply`, the new links are written into
-the source's `related:` field. The same backend serves the MCP `crossref` tool.
+Find the ADRs a decision should cross-reference. Every other ADR is ranked locally;
+hosted judgments evaluate a bounded shortlist. The reply lists suggested links and
+declared links judged weak. With `--apply`, the new links are written into the source's
+`related:` field. The same backend serves the MCP `crossref` tool.
 
 The judgment runs in three stages, each with a fixed ceiling, so a run's cost does not
 grow with the size of the vault:
@@ -1645,9 +1709,9 @@ grow with the size of the vault:
 - The best 32 of the combined ranking, plus up to 8 declared links outside them, are
   judged in pairs.
 
-A source costs at most 46 requests and 60 seconds. A sweep takes at most 50 sources, or
-52 when it must settle a refusal, and 300 seconds, and the vault may hold at most 5,000
-ADRs.
+A source costs at most 46 requests under a 15-second deadline. A sweep takes at most 50
+sources, or 52 when it must settle a refusal, and 300 seconds, and the vault may hold at
+most 5,000 ADRs.
 
 Cross-referencing uses the hosted-search key in `VAULTSPEC_CORE_TYPESAFE_API_KEY` (see
 [environment variables](#environment-variables)) and sends ADR text to the TypeSafe API.
@@ -1671,8 +1735,8 @@ anything.
 #### Options
 
 - `--feature TAG` (`-f`) - Sweep this feature's ADRs.
-- `--all` (default off) - Sweep every ADR that still governs. Superseded and rejected
-  ADRs are skipped unless named.
+- `--all` (default off) - Sweep non-retired ADRs, including proposals. Superseded,
+  rejected, and deprecated ADRs are skipped unless named.
 - `--isolated` (default off) - Sweep only ADRs that link no other ADR. Combines with
   `--feature` to narrow further; `--all` stands alone.
 - `--after STEM` - Resume a sweep after this ADR: the `next_after` a previous sweep
@@ -1683,6 +1747,9 @@ anything.
   three refusals in a row, or any other failure stops the sweep with `stopped` set and
   the cursor before the first refusal still open, so resuming retries from there.
 - `--max-sources N` (default `10`) - Most ADRs one sweep judges, from `1` to `50`.
+- `--body-file PATH` - Judge proposed body prose for one existing ADR without changing
+  it. Use this for an amendment before replacing accepted text. Omit frontmatter; no
+  sweep options or `--apply` may accompany it. The result marks the source as `draft`.
 - `--apply` (default off) - Write each new `link` verdict into the source's `related:`,
   as each source finishes, without reading them first. Nothing is removed, and no
   candidate is written to. To add only the links you have read and confirmed, run
@@ -1702,6 +1769,13 @@ not write, and, when it was not judged, its `reason`, `next_step`, and `remediat
 `remaining`, `next_after` when sources remain and one was processed (without it, a
 resume starts from the beginning), `stopped` when a sweep ended early, and `usage` when
 anything was sent.
+
+Each judged source includes `coverage`: corpus, pool, and judged candidate counts,
+`source_truncated`, and `candidates_truncated`. Each returned candidate whose input was
+clipped has `input_truncated`. Decision and constraint sections receive space before
+context can consume the 6,000-character budget; other sections are retained within that
+bound. Read relevant full records when input was clipped. An `ok` response means the
+bounded judgment completed, not that every conflict was excluded.
 
 Exit codes:
 
@@ -1826,7 +1900,9 @@ the frontmatter name. Pick the one whose side you trust.
   Research, Reference, or Audit evidence and the status of decisions linked by active
   approved plans. Decision-free plans may have no ADR links.
 - `adr-status` (`--fix`: yes, `--feature`: yes) - Validate ADR status against the
-  canonical taxonomy.
+  canonical taxonomy. Warn about legacy declarations even alongside a canonical H1, and
+  mismatches between superseded status and successor metadata. Repairs only quote a
+  known token; missing or conflicting authority requires inspection.
 - `rename-integrity` (`--fix`: yes, `--feature`: no) - Check name/filename integrity for
   rules, skills, and agents.
 - `encoding` (`--fix`: no, `--feature`: yes) - Surface `.vault/` documents that are not
@@ -3416,6 +3492,89 @@ Enumerate all known configuration entries and current values.
 
 ______________________________________________________________________
 
+## Project coordination
+
+### vaultspec-core project context
+
+```bash
+vaultspec-core project context [OPTIONS] OBJECTIVE
+```
+
+Collect recent Git activity, branches, worktrees, and optional GitHub issues and PRs to
+propose a bounded attention order for the developer's objective. The command reads
+project state without changing repositories or trackers. Missing sources are reported as
+incomplete coverage. A configured TypeSafe key enables optional ranking; without a key,
+with `--no-hosted`, or after a service failure, deterministic ordering is used.
+
+#### Arguments
+
+- `OBJECTIVE` - The developer outcome to prioritize.
+
+#### Options
+
+- `--repo OWNER/REPO` - Read issues and PRs from this GitHub repository using `gh`.
+- `--previous FILE` - Reuse unchanged judgments from a previous JSON result for up to
+  one hour. Input is limited to 64,000 bytes.
+- `--limit INTEGER` (default `5`, range `1..10`) - Maximum attention items returned.
+- `--no-hosted` - Disable hosted ranking even when a key is configured.
+- `--target DIR` (`-t`, default cwd) - Project directory to inspect.
+- `--json` - Emit structured observations, coverage, ordering, and available usage.
+
+#### Examples
+
+```bash
+vaultspec-core project context "Finish the release and unblock active PRs" --no-hosted
+vaultspec-core project context "Prioritize today's work" --repo owner/project --json
+```
+
+## Review context
+
+### vaultspec-core review context
+
+```bash
+vaultspec-core review context "Preserve caller contracts" --base main --candidate src/caller.py:20-70 --candidate tests/test_service.py:1-80 --json
+```
+
+Select supporting passages from an explicit Git review scope. This command reads
+repository state without running checks or producing a review verdict. A configured
+`VAULTSPEC_CORE_TYPESAFE_API_KEY` opts into sending the objective, bounded diff and
+candidate passages to TypeSafe. Missing credentials, rejected keys, timeouts and service
+failures preserve the supplied discovery order.
+
+#### Arguments and options
+
+- `OBJECTIVE` - Review behavior or constraint, 1..1,000 UTF-8 bytes.
+- `--base REF` - Required base commit reference.
+- `--candidate PATH[:START-END]` - Required tracked, repository-relative locator; repeat
+  for 1..12 passages. A single line can use `PATH:LINE`.
+- `--head REF` - Read the target commit and its candidate content. Without this flag,
+  read tracked working-tree changes, including staged changes. Untracked files are
+  excluded and working-tree reads are not atomic.
+- `--limit INTEGER` - Return up to this many passages; default 3, range 1..6.
+- `--previous FILE` - Reuse identical-input judgments from a JSON result up to 128,000
+  bytes for at most one hour. A key must remain enrolled. Status `reused` does not claim
+  current service connectivity.
+- `--no-hosted` - Disable hosted selection even with a configured key.
+- `--target DIR` (`-t`, default cwd) - Git repository root.
+- `--json` - Return the `vaultspec.review.context.v1` envelope.
+
+Each candidate is at most 120 lines and 4,000 UTF-8 bytes from a file up to 1 MB. Larger
+passages need narrower locators. Collection has a shared 10-second budget; hosted
+selection makes one batch with a 15-second budget. A diff exceeding 24,000 bytes or
+involving environment/private-key paths disables hosted selection. Candidate environment
+stores, conventional key files, symlinks and paths outside the repository are excluded.
+These path protections are not general secret scanning.
+
+The result carries verbatim selected passages and hashes, unselected locators,
+exclusions, diff scope, hosted status, usage and a reusable judgment. Source text is not
+rewritten by the model. Candidate exclusions and hosted failure exit 0 with reasons;
+invalid input or an unavailable Git scope exits 2. The existing MCP `discover`/`invoke`
+gateway exposes the same command; repeatable candidate flags accept a JSON array.
+
+Keep the full diff and governing decisions in the review. Expand omitted context when
+needed, share selections across reviewers, and reuse applicable verification results.
+Ranking is optional supporting evidence, not proof of correctness or complete coverage.
+
 ## Settings resolution
 
 One order holds for every setting, in every process kind (CLI, MCP server, and any
@@ -3428,6 +3587,9 @@ package that imports vaultspec-core's public resolvers). Earlier rungs win:
    - and falls back to the framework name behind it - `VAULTSPEC_TARGET_DIR`,
      `VAULTSPEC_LOG_LEVEL`, `VAULTSPEC_STDIO_WATCHDOG` - when it supplies nothing. A
      credential never chains.
+1. **Project store** - `.vaultspec/.env`, for the persistable settings only, written
+   only by an explicit import; see
+   [local environment provisioning](#local-environment-provisioning).
 1. **Workspace `.env`** - credentials only, under the gate below.
 1. **Persisted configuration** - the single store that owns the key:
    `.vaultspec/config.toml` or `.vaultspec/workspace.json`.
@@ -3484,12 +3646,15 @@ overridden by the invocation.
   last rung when none of them answers. Unlike the flag and the config key, an editor
   named in the environment is not restricted to the recognised set; see
   [which editors are accepted](#which-editors-are-accepted).
-- `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key that
-  enables hosted vault search (`vaultspec-core vault search` and the MCP `search` tool).
-  Read from the process environment first. A workspace-root `.env` supplies it only
-  under the credential gate above. Only this one variable is read from that file. The
-  generic `TYPESAFE_API_KEY` does not enable it. The key never appears in output;
-  `vaultspec-core status` reports only whether one is configured and from which source.
+- `VAULTSPEC_CORE_TYPESAFE_API_KEY` (secret, unset by default) - TypeSafe API key for
+  hosted vault search (`vaultspec-core vault search` and the MCP `search` tool), ADR
+  wording checks, and optional project and review context ranking. Read from the process
+  environment, then the provisioned `.vaultspec/.env` project store. A workspace-root
+  `.env` supplies it only when both omit it, and then only under the credential gate
+  above. Only this one variable is read from that file. Blank counts as unset at every
+  source. The generic `TYPESAFE_API_KEY` does not enable it. The key never appears in
+  output; `vaultspec-core status` reports only whether one is configured and from which
+  source.
 - `VAULTSPEC_LOG_LEVEL` (str, default `WARNING` for the CLI, `INFO` for the MCP server)
   - Root log level when neither `--debug` nor `--verbose` is given, for example `DEBUG`,
     `INFO`, or `WARNING`. An unknown name is refused.

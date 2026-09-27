@@ -38,7 +38,7 @@ from ..core.exceptions import AdvisoryLockTimeoutError
 from ..search._models import UnavailableReason
 from ..vaultcore.models import DocType
 from ..vaultcore.related_links import link_document
-from ._corpus import AdrRecord, load_adrs, wiki_stem
+from ._corpus import AdrRecord, load_adrs, wiki_stem, with_body
 from ._engine import Meter, judge
 from ._models import (
     CrossrefOutcome,
@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 
 #: Statuses a sweep skips unless the source is named: a decision that no
 #: longer governs gains nothing from new links.
-_RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED})
+_RETIRED = frozenset({AdrStatus.SUPERSEDED, AdrStatus.REJECTED, AdrStatus.DEPRECATED})
 
 #: Failures that can belong to one ADR's text rather than to the provider or
 #: the key. A sweep holds such a refusal open and judges on: a later source the
@@ -202,6 +202,7 @@ def crossref_adr(
     ref: str,
     *,
     apply: bool = False,
+    body: str | None = None,
     environ: Mapping[str, str] | None = None,
     client: JevClient | None = None,
 ) -> CrossrefOutcome:
@@ -211,6 +212,8 @@ def crossref_adr(
         root: The workspace root.
         ref: The source ADR: a stem, filename, path or ``[[wiki-link]]``.
         apply: Write the ``link`` verdicts the source does not declare yet.
+        body: Proposed body prose replacing the source in memory only. Cannot
+            be combined with applying links.
         environ: The environment the credential is read from; ``None`` reads
             :data:`os.environ`.
         client: A client to use instead of building one; not closed here.
@@ -222,8 +225,14 @@ def crossref_adr(
         InvalidSourceError: If *ref* names no ADR of this vault.
         CorpusTooLargeError: If the vault holds more ADRs than one run reads.
     """
+    deadline = time.monotonic() + SOURCE_DEADLINE
+    if body is not None and apply:
+        raise InvalidSourceError("a draft body cannot be combined with apply")
     records = {record.stem: record for record in load_adrs(root)}
     source = _resolve(ref, records)
+    if body is not None:
+        source = with_body(source, body)
+        records[source.stem] = source
     credential = _credential(root, environ)
     if credential is None:
         return _declined(root, source.stem)
@@ -232,14 +241,15 @@ def crossref_adr(
     if active is None:
         return _declined(root, source.stem, UnavailableReason.CREDENTIAL_REJECTED)
     try:
-        return _judge_one(
+        outcome = _judge_one(
             root,
             active,
             source,
             Index(list(records.values())),
-            deadline=time.monotonic() + SOURCE_DEADLINE,
+            deadline=deadline,
             apply=apply,
         )
+        return replace(outcome, draft=body is not None)
     finally:
         if owned:
             active.close()
@@ -297,7 +307,7 @@ def crossref_sweep(
     """Cross-reference several ADRs in one bounded, resumable run.
 
     With *refs* the sweep takes exactly those ADRs; otherwise every ADR that
-    still governs (not superseded or rejected), narrowed to *feature* and, with
+    is not superseded, rejected, or deprecated, narrowed to *feature* and, with
     *isolated*, to ADRs that declare no ADR link; the two narrow together.
     *all_adrs* takes every such ADR unnarrowed. Named ADRs and *all_adrs* each
     stand alone, and one selector is required.
@@ -316,7 +326,7 @@ def crossref_sweep(
             :func:`crossref_adr` resolves its source.
         feature: Take only this feature's ADRs.
         isolated: Take only ADRs that declare no ADR link.
-        all_adrs: Take every ADR that still governs.
+        all_adrs: Take every non-retired ADR, including proposals.
         after: Take only sources whose stem sorts after this ADR: the
             ``next_after`` of the previous run.
         max_sources: Sources to judge; clamped to ``1..MAX_SOURCES``.
