@@ -18,20 +18,32 @@ several hundred snippets, so the grammar is owned here instead of inherited.
 :class:`CanonicalTyperArgument` applies it to the live ``--help`` surface, and
 :mod:`vaultspec_core.cli.reference_gen` renders generated signatures through the
 same function, so the live CLI and every generated document cannot diverge.
+
+The grammar is scoped to this CLI's own command tree. :class:`CanonicalTyper`
+builds its commands and groups from classes that adopt their positional
+arguments into :class:`CanonicalTyperArgument`, so another Typer application
+in the same process keeps Typer's own rendering regardless of import order.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, override
 
-from typer.core import TyperArgument
+import typer
+from typer.core import TyperArgument, TyperCommand, TyperGroup
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from typer._click.core import Context as ClickContext
+    from typer._click.core import Parameter as ClickParameter
+    from typer.models import CommandFunctionType
 
 __all__ = [
+    "CanonicalTyper",
     "CanonicalTyperArgument",
-    "install_canonical_argument_metavars",
+    "CanonicalTyperCommand",
+    "CanonicalTyperGroup",
     "render_argument_metavar",
 ]
 
@@ -97,20 +109,65 @@ class CanonicalTyperArgument(TyperArgument):
         return render_argument_metavar(self, ctx)
 
 
-def install_canonical_argument_metavars() -> None:
-    """Route Typer's argument construction through :class:`CanonicalTyperArgument`.
+def _adopt_canonical_arguments(params: list[ClickParameter]) -> None:
+    """Re-class each plain Typer positional argument as canonical, in place.
 
-    Typer builds every positional argument in ``typer.main.get_click_param``,
-    which names its argument class through a module global and offers no
-    per-application hook. Rebinding that global is therefore the only seam;
-    it is idempotent and safe to call from every app construction.
+    Typer constructs every argument in ``typer.main.get_click_param`` from a
+    module global and offers no per-application hook, so the argument is adopted
+    after construction instead. The subclass adds behaviour only, never state,
+    which makes the class swap exact; doing it in place keeps the identity the
+    command's callback closure already holds. Any other ``TyperArgument``
+    subclass is a deliberate choice and is left alone.
     """
-    import typer.main
+    for param in params:
+        if type(param) is TyperArgument:
+            param.__class__ = CanonicalTyperArgument
 
-    # The rebinding is deliberately routed through an untyped module alias:
-    # the attribute's declared type is the concrete upstream class, so a
-    # subclass is not assignable to it under strict checking even though it is
-    # exactly what the construction site needs.
-    typer_main: Any = typer.main
-    if typer_main.TyperArgument is not CanonicalTyperArgument:
-        typer_main.TyperArgument = CanonicalTyperArgument
+
+class CanonicalTyperCommand(TyperCommand):
+    """A Typer command whose positional arguments render the canonical grammar."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        _adopt_canonical_arguments(self.params)
+
+
+class CanonicalTyperGroup(TyperGroup):
+    """A Typer group whose positional arguments render the canonical grammar."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        _adopt_canonical_arguments(self.params)
+
+
+class CanonicalTyper(typer.Typer):
+    """A Typer application whose own commands and groups render canonical metavars.
+
+    Groups default to :class:`CanonicalTyperGroup` and commands to
+    :class:`CanonicalTyperCommand`; an explicit ``cls`` still wins. The grammar
+    reaches exactly the command tree built from this application.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        kwargs.setdefault("cls", CanonicalTyperGroup)
+        super().__init__(**kwargs)
+
+    @override
+    def command(
+        self,
+        name: str | None = None,
+        *,
+        cls: type[TyperCommand] | None = None,
+        **kwargs: Any,
+    ) -> Callable[[CommandFunctionType], CommandFunctionType]:
+        """Register a command built as :class:`CanonicalTyperCommand` by default.
+
+        Args:
+            name: The command name, derived from the function when omitted.
+            cls: An explicit command class, which overrides the default.
+            **kwargs: Every other :meth:`typer.Typer.command` keyword, verbatim.
+
+        Returns:
+            The registering decorator :meth:`typer.Typer.command` returns.
+        """
+        return super().command(name, cls=cls or CanonicalTyperCommand, **kwargs)
