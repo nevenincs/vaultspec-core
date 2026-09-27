@@ -338,12 +338,30 @@ def _emit_status_rollup(
         typer.echo(json.dumps(envelope, **json_format_kwargs(), default=str))
         return
 
-    from vaultspec_core.cli.rendering import (
-        active_feature_tail,
-        align_plan_rows,
-    )
-
     console.print("[bold]Vault Status[/bold]")
+    _print_rollup_plans(console, rollup)
+    _print_rollup_recent_changes(console, rollup)
+    _print_rollup_exec_activity(console, rollup)
+    _print_rollup_active_features(console, rollup)
+
+    console.print()
+    console.print("[bold]Discovery[/bold]")
+    console.print(_hosted_search_line(discovery.hosted_search))
+    if discovery.companion is not None:
+        console.print(_companion_line(discovery.companion))
+
+    totals = rollup.totals
+    console.print()
+    console.print("[bold]Totals[/bold]")
+    console.print(f"  Total documents: {totals.get('total_docs', 0)}")
+    console.print(f"  Total features:  {totals.get('total_features', 0)}")
+
+    _emit_status_hints(_STATUS_ROLLUP_HINTS, json_output=False, no_hints=no_hints)
+
+
+def _print_rollup_plans(console: Console, rollup: Rollup) -> None:
+    """Print the in-flight and recently completed plan sections."""
+    from vaultspec_core.cli.rendering import align_plan_rows
 
     console.print()
     console.print("[bold]Plans in flight[/bold]  [dim](at least one open step)[/dim]")
@@ -361,72 +379,68 @@ def _emit_status_rollup(
         ):
             console.print(f"  {line}")
 
+
+def _print_rollup_recent_changes(console: Console, rollup: Rollup) -> None:
+    """Print the recently modified documents, grouped by document type."""
     console.print()
     console.print("[bold]Recent changes[/bold]")
-    if rollup.recent_documents:
-        for doc_type in sorted(rollup.recent_documents):
-            console.print(f"  [bold dim]{doc_type}[/bold dim]")
-            for doc in rollup.recent_documents[doc_type]:
-                modified = f"  [dim]{doc.modified}[/dim]" if doc.modified else ""
-                console.print(f"    {doc.stem}{modified}")
-    else:
+    if not rollup.recent_documents:
         console.print("  [dim]none[/dim]")
+        return
+    for doc_type in sorted(rollup.recent_documents):
+        console.print(f"  [bold dim]{doc_type}[/bold dim]")
+        for doc in rollup.recent_documents[doc_type]:
+            modified = f"  [dim]{doc.modified}[/dim]" if doc.modified else ""
+            console.print(f"    {doc.stem}{modified}")
 
-    if rollup.exec_activity:
-        console.print()
-        console.print("[bold]Execution activity[/bold]  [dim](per feature)[/dim]")
-        for activity in rollup.exec_activity:
-            feature = activity.feature or "(no feature)"
-            latest = f"  [dim]{activity.latest}[/dim]" if activity.latest else ""
-            records = "record" if activity.count == 1 else "records"
-            console.print(
-                f"  {feature}  [cyan]{activity.count} {records}[/cyan]{latest}"
-            )
+
+def _print_rollup_exec_activity(console: Console, rollup: Rollup) -> None:
+    """Print per-feature execution activity, when there is any."""
+    if not rollup.exec_activity:
+        return
+    console.print()
+    console.print("[bold]Execution activity[/bold]  [dim](per feature)[/dim]")
+    for activity in rollup.exec_activity:
+        feature = activity.feature or "(no feature)"
+        latest = f"  [dim]{activity.latest}[/dim]" if activity.latest else ""
+        records = "record" if activity.count == 1 else "records"
+        console.print(f"  {feature}  [cyan]{activity.count} {records}[/cyan]{latest}")
+
+
+def _print_rollup_active_features(console: Console, rollup: Rollup) -> None:
+    """Print the capped active-feature list and how many were left out."""
+    from vaultspec_core.cli.rendering import active_feature_tail
 
     console.print()
     console.print("[bold]Active features[/bold]")
-    if rollup.active_features:
-        shown = rollup.active_features[:_ACTIVE_FEATURES_DISPLAY_CAP]
-        for feat in shown:
-            plan_marker = " [green]plan[/green]" if feat.has_plan else ""
-            tail = active_feature_tail(
-                tier=feat.plan_tier,
-                steps_completed=feat.plan_steps_completed,
-                step_count=feat.plan_step_count,
-                completion_percent=feat.plan_completion_percent,
-                plan_count=feat.plan_count,
-                plans_unreadable=feat.plans_unreadable,
-            )
-            tail_str = f"  [cyan]{tail}[/cyan]" if tail else ""
-            activity = (
-                f"  [dim]{feat.latest_activity}[/dim]" if feat.latest_activity else ""
-            )
-            console.print(
-                f"  [bold]{feat.name}[/bold]  {feat.doc_count} docs"
-                f"{plan_marker}{tail_str}{activity}"
-            )
-        remainder = rollup.active_features_total - len(shown)
-        if remainder > 0:
-            console.print(
-                f"  [dim]... and {remainder} more  "
-                f"> vaultspec-core vault feature list[/dim]"
-            )
-    else:
+    if not rollup.active_features:
         console.print("  [dim]none[/dim]")
-
-    console.print()
-    console.print("[bold]Discovery[/bold]")
-    console.print(_hosted_search_line(discovery.hosted_search))
-    if discovery.companion is not None:
-        console.print(_companion_line(discovery.companion))
-
-    totals = rollup.totals
-    console.print()
-    console.print("[bold]Totals[/bold]")
-    console.print(f"  Total documents: {totals.get('total_docs', 0)}")
-    console.print(f"  Total features:  {totals.get('total_features', 0)}")
-
-    _emit_status_hints(_STATUS_ROLLUP_HINTS, json_output=False, no_hints=no_hints)
+        return
+    shown = rollup.active_features[:_ACTIVE_FEATURES_DISPLAY_CAP]
+    for feat in shown:
+        plan_marker = " [green]plan[/green]" if feat.has_plan else ""
+        tail = active_feature_tail(
+            tier=feat.plan_tier,
+            steps_completed=feat.plan_steps_completed,
+            step_count=feat.plan_step_count,
+            completion_percent=feat.plan_completion_percent,
+            plan_count=feat.plan_count,
+            plans_unreadable=feat.plans_unreadable,
+        )
+        tail_str = f"  [cyan]{tail}[/cyan]" if tail else ""
+        activity = (
+            f"  [dim]{feat.latest_activity}[/dim]" if feat.latest_activity else ""
+        )
+        console.print(
+            f"  [bold]{feat.name}[/bold]  {feat.doc_count} docs"
+            f"{plan_marker}{tail_str}{activity}"
+        )
+    remainder = rollup.active_features_total - len(shown)
+    if remainder > 0:
+        console.print(
+            f"  [dim]... and {remainder} more  "
+            f"> vaultspec-core vault feature list[/dim]"
+        )
 
 
 def _plan_trace_payload(plan: PlanTrace) -> dict[str, Any]:
