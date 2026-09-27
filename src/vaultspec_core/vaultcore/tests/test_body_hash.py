@@ -164,6 +164,21 @@ class TestSetBodyHash:
         assert out.count("body_hash:") == 1
         assert _sha256("Body.") in out
 
+    def test_collapses_a_repeated_field_onto_one_fresh_line(self):
+        # A union merge keeps both branches' attestation lines. Readers take
+        # the last one, so rewriting only the first never converges.
+        text = (
+            "---\ndate: '2026-02-08'\nmodified: '2026-02-08'\n"
+            f"body_hash: '{_sha256('left')}'\n"
+            f"body_hash: '{_sha256('right')}'\n"
+            "related: []\n---\n\nBody.\n"
+        )
+        assert set_body_hash(text) == (
+            "---\ndate: '2026-02-08'\nmodified: '2026-02-08'\n"
+            f"body_hash: '{_sha256('Body.')}'\n"
+            "related: []\n---\n\nBody.\n"
+        )
+
     def test_preserves_indentation_of_an_existing_field(self):
         text = "---\ndate: '2026-02-08'\n  body_hash: 'sha256:0'\n---\n\nBody.\n"
         assert "\n  body_hash: '" in set_body_hash(text)

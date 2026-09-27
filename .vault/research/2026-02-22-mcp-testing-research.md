@@ -3,8 +3,8 @@ tags:
   - '#research'
   - '#mcp-testing'
 date: '2026-02-22'
-modified: '2026-06-13'
-body_hash: 'sha256:e873a5883ec508cc0de665ef9c1c5b2a4e1ac12b817e8b19045049490188c25e'
+modified: '2026-09-27'
+body_hash: 'sha256:5befc8689b5df9d8e2a22003c589228eeb5506d34d220471f3c5e87860010ca1'
 related:
   - '[[2026-02-22-mcp-consolidation-research]]'
   - '[[2026-02-22-mcp-consolidation-adr]]'

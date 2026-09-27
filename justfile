@@ -471,15 +471,6 @@ framework-reference:
 framework-reference-check:
     {{dev}} framework reference-check
 
-# A no-op unless this tree declares a version other than the one recorded,
-# which is true only on a release candidate branch. Recording the surface
-# anywhere else would restamp unreleased work as published.
-
-# Record the published surface and re-render the references that cite it.
-[group('dev')]
-framework-surface:
-    {{dev}} framework surface
-
 # Report the installed framework providers.
 [group('dev')]
 framework-providers:
@@ -563,16 +554,15 @@ release-bundle tag rust_target raw_dir='dist-bin' outdir='dist-bundles':
     uv run --no-project --python 3.13 -- python -m dev.packaging.bundles --tag {{tag}} --target {{rust_target}} --raw-dir {{raw_dir}} --outdir {{outdir}}
 
 # Asked of the artifact rather than the source, because only the artifact can
-# answer. The generated references are rendered against a snapshot refreshed on
-# the release branch, so between that refresh and the tag the documents could
-# describe a program the wheel does not carry, and no source-tree check would
-# see it. Both commands run inside one isolated install of that wheel: the
-# first reads the surface it exposes, the second compares it against the
-# snapshot it ships. Takes a DIRECTORY, like `release-binaries` and for the
-# same reason - a recipe cannot glob, and the wheel's filename carries a
-# version the caller does not know.
+# answer whether the build dropped or grew a command. The wheel is installed in
+# isolation and reports its own surface; the tree it was built from reports its
+# own; the two documents must be identical. Both are written to a scratch
+# directory, never beside the wheel: a file left in `dist/` is attested and
+# attached to the release by the job that publishes it. Takes a DIRECTORY, like
+# `release-binaries` and for the same reason - a recipe cannot glob, and the
+# wheel's filename carries a version the caller does not know.
 
-# Prove a built distribution's surface matches the reference it ships.
+# Prove a built distribution exposes the surface of the tree it was built from.
 [group('release')]
 release-verify-surface wheel_dir='dist':
     #!/usr/bin/env bash
@@ -584,9 +574,26 @@ release-verify-surface wheel_dir='dist':
       exit 1
     fi
     wheel="${wheels[0]}"
-    uv run --isolated --no-project --with "${wheel}"       vaultspec-core spec reference snapshot --emit > "${wheel}.surface.json"
-    uv run --isolated --no-project --with "${wheel}"       vaultspec-core spec reference snapshot --verify "${wheel}.surface.json"
-    echo "${wheel} matches the reference it ships"
+    scratch="$(mktemp -d)"
+    trap 'rm -rf "${scratch}"' EXIT
+    uv run --isolated --no-project --with "${wheel}" vaultspec-core spec reference snapshot --emit > "${scratch}/distribution.json"
+    uv run --no-sync vaultspec-core spec reference snapshot --emit > "${scratch}/source.json"
+    if ! diff -u "${scratch}/source.json" "${scratch}/distribution.json"; then
+      echo "${wheel} does not expose the surface of the tree it was built from" >&2
+      exit 1
+    fi
+    echo "${wheel} exposes the surface of the tree it was built from"
+
+# The only writer of the published-surface record the references are measured
+# against. It asks GitHub which release is latest - never a draft, never a
+# prerelease - downloads that release's own wheel, installs it in isolation,
+# records the surface it reports, and re-renders the references. It needs the
+# network and no credential: the question is one any user can ask.
+
+# Record the latest published release's surface and re-render what cites it.
+[group('release')]
+release-record-surface:
+    uv run --no-sync python -m dev.packaging.published_surface record
 
 # `root` is REQUIRED and is a checkout of nevenincs/homebrew-tap - the account
 # channel root, which is where these pointers live. It used to default to this

@@ -250,17 +250,10 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
     from vaultspec_core.core.diagnosis import (
         BuiltinVersionSignal,
         ConfigSignal,
-        ContentSignal,
         FrameworkSignal,
         GitattributesSignal,
         GitignoreSignal,
-        ManifestEntrySignal,
-        ModeMismatchSignal,
-        PrecommitSignal,
-        ProcessRegistrySignal,
         RenameIntegritySignal,
-        VaultContentSignal,
-        VersionFloorSignal,
     )
 
     rows: list[dict[str, object]] = []
@@ -291,56 +284,9 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         }
     )
 
-    process_status, process_style = _signal_status(
-        diag.process_registry.signal,
-        {
-            ProcessRegistrySignal.ABSENT: ("info", "dim"),
-            ProcessRegistrySignal.HEALTHY: ("ok", "green"),
-            ProcessRegistrySignal.STALE: ("warn", "yellow"),
-        },
-    )
-    process_detail = {
-        ProcessRegistrySignal.ABSENT: "~/.vaultspec/procs/ not present",
-        ProcessRegistrySignal.HEALTHY: (
-            f"{diag.process_registry.record_count} process record(s); "
-            "all recorded PIDs alive"
-        ),
-        ProcessRegistrySignal.STALE: (
-            f"{len(diag.process_registry.stale_records)} stale of "
-            f"{diag.process_registry.record_count} process record(s): "
-            + ", ".join(diag.process_registry.stale_records)
-        ),
-    }.get(diag.process_registry.signal, str(diag.process_registry.signal))
-    rows.append(
-        {
-            "component": "process registry",
-            "status": Cell(process_status, style=process_style),
-            "detail": process_detail,
-        }
-    )
+    _append_process_registry_row(rows, diag)
 
-    # Provider rows
-    for tool, prov in diag.providers.items():
-        prov_status, prov_style = _provider_status(prov)
-        details: list[str] = []
-        details.append(f"dir: {prov.dir_state.value}")
-        if prov.manifest_entry not in (
-            ManifestEntrySignal.COHERENT,
-            ManifestEntrySignal.NOT_INSTALLED,
-        ):
-            details.append(f"manifest: {prov.manifest_entry.value}")
-        if prov.config not in (ConfigSignal.OK,):
-            details.append(f"config: {prov.config.value}")
-        stale = sum(1 for s in prov.content.values() if s != ContentSignal.CLEAN)
-        if stale:
-            details.append(f"{stale} file(s) need attention")
-        rows.append(
-            {
-                "component": tool.value,
-                "status": Cell(prov_status, style=prov_style),
-                "detail": ", ".join(details),
-            }
-        )
+    _append_provider_rows(rows, diag)
 
     # Builtins row
     bv_status, bv_style = _signal_status(
@@ -466,6 +412,145 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         }
     )
 
+    _append_vault_content_row(rows, diag)
+
+    _append_precommit_row(rows, diag)
+
+    _append_provider_hook_rows(rows, diag)
+
+    # Stale package-bundled MCP seed advisory (warn-only): core cannot refresh
+    # these; only the owning package's installer can.
+    if diag.stale_mcp_seeds:
+        names = ", ".join(diag.stale_mcp_seeds)
+        rows.append(
+            {
+                "component": "mcp seeds",
+                "status": Cell("warn", style="yellow"),
+                "detail": (
+                    f"stale package seed definition(s): {names} - re-run that "
+                    "package's installer with --upgrade to refresh the seed"
+                ),
+            }
+        )
+
+    # Rename integrity row
+    ri_status, ri_style = _signal_status(
+        diag.rename_integrity,
+        {
+            RenameIntegritySignal.CLEAN: ("ok", "green"),
+            RenameIntegritySignal.MISMATCH: ("warn", "yellow"),
+            RenameIntegritySignal.ERROR: ("error", "red"),
+        },
+    )
+    ri_details = {
+        RenameIntegritySignal.CLEAN: (
+            "all rules, skills, and agents names are consistent"
+        ),
+        RenameIntegritySignal.MISMATCH: (
+            f"{diag.rename_mismatch_count} name/filename mismatch(es) found; "
+            "run vaultspec-core vault check rename-integrity"
+        ),
+        RenameIntegritySignal.ERROR: "failed to evaluate name/filename integrity",
+    }
+    ri_detail = ri_details.get(diag.rename_integrity, str(diag.rename_integrity))
+    rows.append(
+        {
+            "component": "rename integrity",
+            "status": Cell(ri_status, style=ri_style),
+            "detail": ri_detail,
+        }
+    )
+
+    _append_install_mode_rows(rows, diag)
+
+    _append_companion_row(rows, diag)
+
+    render_listing(
+        rows,
+        [Column("component"), Column("status"), Column("detail")],
+        title="workspace diagnosis",
+        empty="no components",
+    )
+
+
+def _append_process_registry_row(
+    rows: list[dict[str, object]], diag: "WorkspaceDiagnosis"
+) -> None:
+    """Append the process-registry row."""
+    from vaultspec_core.cli.rendering import Cell
+    from vaultspec_core.core.diagnosis import ProcessRegistrySignal
+
+    process_status, process_style = _signal_status(
+        diag.process_registry.signal,
+        {
+            ProcessRegistrySignal.ABSENT: ("info", "dim"),
+            ProcessRegistrySignal.HEALTHY: ("ok", "green"),
+            ProcessRegistrySignal.STALE: ("warn", "yellow"),
+        },
+    )
+    process_detail = {
+        ProcessRegistrySignal.ABSENT: "~/.vaultspec/procs/ not present",
+        ProcessRegistrySignal.HEALTHY: (
+            f"{diag.process_registry.record_count} process record(s); "
+            "all recorded PIDs alive"
+        ),
+        ProcessRegistrySignal.STALE: (
+            f"{len(diag.process_registry.stale_records)} stale of "
+            f"{diag.process_registry.record_count} process record(s): "
+            + ", ".join(diag.process_registry.stale_records)
+        ),
+    }.get(diag.process_registry.signal, str(diag.process_registry.signal))
+    rows.append(
+        {
+            "component": "process registry",
+            "status": Cell(process_status, style=process_style),
+            "detail": process_detail,
+        }
+    )
+
+
+def _append_provider_rows(
+    rows: list[dict[str, object]], diag: "WorkspaceDiagnosis"
+) -> None:
+    """Append one row per provider with its directory, manifest and config state."""
+    from vaultspec_core.cli.rendering import Cell
+    from vaultspec_core.core.diagnosis import (
+        ConfigSignal,
+        ContentSignal,
+        ManifestEntrySignal,
+    )
+
+    # Provider rows
+    for tool, prov in diag.providers.items():
+        prov_status, prov_style = _provider_status(prov)
+        details: list[str] = []
+        details.append(f"dir: {prov.dir_state.value}")
+        if prov.manifest_entry not in (
+            ManifestEntrySignal.COHERENT,
+            ManifestEntrySignal.NOT_INSTALLED,
+        ):
+            details.append(f"manifest: {prov.manifest_entry.value}")
+        if prov.config not in (ConfigSignal.OK,):
+            details.append(f"config: {prov.config.value}")
+        stale = sum(1 for s in prov.content.values() if s != ContentSignal.CLEAN)
+        if stale:
+            details.append(f"{stale} file(s) need attention")
+        rows.append(
+            {
+                "component": tool.value,
+                "status": Cell(prov_status, style=prov_style),
+                "detail": ", ".join(details),
+            }
+        )
+
+
+def _append_vault_content_row(
+    rows: list[dict[str, object]], diag: "WorkspaceDiagnosis"
+) -> None:
+    """Append the read-only vault-content annotation row."""
+    from vaultspec_core.cli.rendering import Cell
+    from vaultspec_core.core.diagnosis import VaultContentSignal
+
     # Vault content row - read-only annotation signal.
     vc_status, vc_style = _signal_status(
         diag.vault_content,
@@ -500,6 +585,14 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "detail": vc_detail,
         }
     )
+
+
+def _append_precommit_row(
+    rows: list[dict[str, object]], diag: "WorkspaceDiagnosis"
+) -> None:
+    """Append the pre-commit row, naming the remedy for each degraded reading."""
+    from vaultspec_core.cli.rendering import Cell
+    from vaultspec_core.core.diagnosis import PrecommitSignal
 
     # Pre-commit row
     pc_status, pc_style = _signal_status(
@@ -581,49 +674,15 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         }
     )
 
-    _append_provider_hook_rows(rows, diag)
 
-    # Stale package-bundled MCP seed advisory (warn-only): core cannot refresh
-    # these; only the owning package's installer can.
-    if diag.stale_mcp_seeds:
-        names = ", ".join(diag.stale_mcp_seeds)
-        rows.append(
-            {
-                "component": "mcp seeds",
-                "status": Cell("warn", style="yellow"),
-                "detail": (
-                    f"stale package seed definition(s): {names} - re-run that "
-                    "package's installer with --upgrade to refresh the seed"
-                ),
-            }
-        )
-
-    # Rename integrity row
-    ri_status, ri_style = _signal_status(
-        diag.rename_integrity,
-        {
-            RenameIntegritySignal.CLEAN: ("ok", "green"),
-            RenameIntegritySignal.MISMATCH: ("warn", "yellow"),
-            RenameIntegritySignal.ERROR: ("error", "red"),
-        },
-    )
-    ri_details = {
-        RenameIntegritySignal.CLEAN: (
-            "all rules, skills, and agents names are consistent"
-        ),
-        RenameIntegritySignal.MISMATCH: (
-            f"{diag.rename_mismatch_count} name/filename mismatch(es) found; "
-            "run vaultspec-core vault check rename-integrity"
-        ),
-        RenameIntegritySignal.ERROR: "failed to evaluate name/filename integrity",
-    }
-    ri_detail = ri_details.get(diag.rename_integrity, str(diag.rename_integrity))
-    rows.append(
-        {
-            "component": "rename integrity",
-            "status": Cell(ri_status, style=ri_style),
-            "detail": ri_detail,
-        }
+def _append_install_mode_rows(
+    rows: list[dict[str, object]], diag: "WorkspaceDiagnosis"
+) -> None:
+    """Append the install-mode coherence and version-floor rows."""
+    from vaultspec_core.cli.rendering import Cell
+    from vaultspec_core.core.diagnosis import (
+        ModeMismatchSignal,
+        VersionFloorSignal,
     )
 
     # Install-mode coherence rows: the persisted declaration versus the shape of
@@ -699,15 +758,6 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
                     ),
                 }
             )
-
-    _append_companion_row(rows, diag)
-
-    render_listing(
-        rows,
-        [Column("component"), Column("status"), Column("detail")],
-        title="workspace diagnosis",
-        empty="no components",
-    )
 
 
 def _provider_hook_detail(
@@ -899,125 +949,112 @@ def doctor_exit_code(
     Returns:
         ``0`` if all ok/info, ``1`` if any warnings, ``2`` if any errors.
     """
-    from vaultspec_core.core.diagnosis import (
-        BuiltinVersionSignal,
-        ConfigSignal,
-        ContentSignal,
-        FrameworkSignal,
-        ManifestEntrySignal,
-        ModeMismatchSignal,
-        ProviderDirSignal,
-        RenameIntegritySignal,
-        VaultContentSignal,
-        VersionFloorSignal,
-    )
-
-    has_error = False
-    has_warn = False
-
-    if diag.framework in (
-        FrameworkSignal.MISSING,
-        FrameworkSignal.CORRUPTED,
-    ):
-        has_error = True
-    # Adoptable is a coherent workspace awaiting its per-machine manifest, not a
-    # broken one: actionable, so a warning, but never an error.
-    if diag.framework == FrameworkSignal.ADOPTABLE:
-        has_warn = True
-    gitignore_error, gitignore_warn = _gitignore_weight(diag.gitignore)
-    has_error = has_error or gitignore_error
-    has_warn = has_warn or gitignore_warn
-    gitattributes_error, gitattributes_warn = _gitattributes_weight(diag.gitattributes)
-    has_error = has_error or gitattributes_error
-    has_warn = has_warn or gitattributes_warn
-    precommit_error, precommit_warn = _precommit_weight(diag.precommit)
-    has_error = has_error or precommit_error
-    has_warn = has_warn or precommit_warn
-    has_warn = has_warn or _provider_hooks_weigh_warn(diag.provider_hooks)
-    if diag.builtin_version == BuiltinVersionSignal.DELETED:
-        has_error = True
-    elif diag.builtin_version == BuiltinVersionSignal.MODIFIED:
-        has_warn = True
-
-    if diag.migration_status == "pending":
-        has_warn = True
-    if diag.vault_content in (
-        VaultContentSignal.ANNOTATIONS,
-        VaultContentSignal.UNREADABLE,
-    ):
-        has_warn = True
-
-    # The `mcp` row was rendered and never weighed, so a `.mcp.json` this
-    # command could not read still exited 0 while `sync` refused the same
-    # workspace (issue #407). Only the could-not-run reading is weighed here:
-    # whether the pre-existing MISSING and REGISTRY_DRIFT readings should also
-    # gate is a policy question this change deliberately leaves alone.
-    if diag.mcp == ConfigSignal.UNREADABLE:
-        has_warn = True
-
-    if diag.rename_integrity == RenameIntegritySignal.ERROR:
-        has_error = True
-    elif diag.rename_integrity == RenameIntegritySignal.MISMATCH:
-        has_warn = True
-
-    # A declared-vs-observed install-mode mismatch is a warning; a running
-    # version below the committed floor is a hard error on doctor, mirroring the
-    # refuse-and-tell that install and sync raise. Weighed per declared package
-    # when a packages map exists so a companion package's mismatch or floor
-    # violation counts; UNKNOWN and CLEAN are neither. A legacy workspace with no
-    # packages map falls back to core's own top-level view.
-    if diag.packages:
-        for pkg_diag in diag.packages.values():
-            if pkg_diag.mode_mismatch == ModeMismatchSignal.MISMATCH:
-                has_warn = True
-            if pkg_diag.version_floor == VersionFloorSignal.BELOW:
-                has_error = True
-    else:
-        if diag.mode_mismatch == ModeMismatchSignal.MISMATCH:
-            has_warn = True
-        if diag.version_floor == VersionFloorSignal.BELOW:
-            has_error = True
-
-    for prov in diag.providers.values():
-        if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:
-            continue
-        if prov.manifest_entry == ManifestEntrySignal.ORPHANED:
-            has_error = True
-        elif prov.manifest_entry == ManifestEntrySignal.UNTRACKED:
-            has_warn = True
-        if prov.dir_state == ProviderDirSignal.MISSING:
-            has_error = True
-        elif prov.dir_state in (
-            ProviderDirSignal.EMPTY,
-            ProviderDirSignal.PARTIAL,
-        ):
-            has_warn = True
-        # ProviderDirSignal.MIXED is a soft, informational signal: it means the
-        # provider directory carries extra files vaultspec does not own. That is
-        # benign (genuine managed-content drift surfaces via ContentSignal), so
-        # it must not fail the doctor exit code (issue #122).
-        if prov.config in (
-            ConfigSignal.MISSING,
-            ConfigSignal.FOREIGN,
-            ConfigSignal.REGISTRY_DRIFT,
-        ):
-            has_warn = True
-        if any(
-            s
-            in (
-                ContentSignal.STALE,
-                ContentSignal.DIVERGED,
-                ContentSignal.MISSING,
-            )
-            for s in prov.content.values()
-        ):
-            has_warn = True
-
-    if has_error:
+    weights = [
+        _framework_weight(diag),
+        _gitignore_weight(diag.gitignore),
+        _gitattributes_weight(diag.gitattributes),
+        _precommit_weight(diag.precommit),
+        (False, _provider_hooks_weigh_warn(diag.provider_hooks)),
+        _workspace_state_weight(diag),
+        _install_mode_weight(diag),
+        *(_provider_weight(prov) for prov in diag.providers.values()),
+    ]
+    if any(error for error, _warn in weights):
         return 2
-    if has_warn:
+    if any(warn for _error, warn in weights):
         return 1
     return 0
+
+
+def _framework_weight(diag: "WorkspaceDiagnosis") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for the framework and builtin-version rows."""
+    from vaultspec_core.core.diagnosis import BuiltinVersionSignal, FrameworkSignal
+
+    return (
+        diag.framework in (FrameworkSignal.MISSING, FrameworkSignal.CORRUPTED)
+        or diag.builtin_version == BuiltinVersionSignal.DELETED,
+        # Adoptable is a coherent workspace awaiting its per-machine manifest,
+        # not a broken one: actionable, so a warning, but never an error.
+        diag.framework == FrameworkSignal.ADOPTABLE
+        or diag.builtin_version == BuiltinVersionSignal.MODIFIED,
+    )
+
+
+def _workspace_state_weight(diag: "WorkspaceDiagnosis") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for migration, vault, mcp and rename rows."""
+    from vaultspec_core.core.diagnosis import (
+        ConfigSignal,
+        RenameIntegritySignal,
+        VaultContentSignal,
+    )
+
+    return (
+        diag.rename_integrity == RenameIntegritySignal.ERROR,
+        diag.migration_status == "pending"
+        or diag.vault_content
+        in (VaultContentSignal.ANNOTATIONS, VaultContentSignal.UNREADABLE)
+        # The `mcp` row was rendered and never weighed, so a `.mcp.json` this
+        # command could not read still exited 0 while `sync` refused the same
+        # workspace (issue #407). Only the could-not-run reading is weighed
+        # here: whether the pre-existing MISSING and REGISTRY_DRIFT readings
+        # should also gate is a policy question left alone.
+        or diag.mcp == ConfigSignal.UNREADABLE
+        or diag.rename_integrity == RenameIntegritySignal.MISMATCH,
+    )
+
+
+def _install_mode_weight(diag: "WorkspaceDiagnosis") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for the install-mode and version-floor rows.
+
+    A declared-vs-observed install-mode mismatch is a warning; a running
+    version below the committed floor is a hard error on doctor, mirroring the
+    refuse-and-tell that install and sync raise. Weighed per declared package
+    when a packages map exists so a companion package's mismatch or floor
+    violation counts; UNKNOWN and CLEAN are neither. A legacy workspace with
+    no packages map falls back to core's own top-level view.
+    """
+    from vaultspec_core.core.diagnosis import ModeMismatchSignal, VersionFloorSignal
+
+    views = (
+        [(pkg.mode_mismatch, pkg.version_floor) for pkg in diag.packages.values()]
+        if diag.packages
+        else [(diag.mode_mismatch, diag.version_floor)]
+    )
+    return (
+        any(floor == VersionFloorSignal.BELOW for _mode, floor in views),
+        any(mode == ModeMismatchSignal.MISMATCH for mode, _floor in views),
+    )
+
+
+def _provider_weight(prov: "ProviderDiagnosis") -> tuple[bool, bool]:
+    """Return ``(error, warn)`` for one installed provider's rows."""
+    from vaultspec_core.core.diagnosis import (
+        ConfigSignal,
+        ContentSignal,
+        ManifestEntrySignal,
+        ProviderDirSignal,
+    )
+
+    if prov.manifest_entry == ManifestEntrySignal.NOT_INSTALLED:
+        return False, False
+    stale_content = (
+        ContentSignal.STALE,
+        ContentSignal.DIVERGED,
+        ContentSignal.MISSING,
+    )
+    return (
+        prov.manifest_entry == ManifestEntrySignal.ORPHANED
+        or prov.dir_state == ProviderDirSignal.MISSING,
+        prov.manifest_entry == ManifestEntrySignal.UNTRACKED
+        # ProviderDirSignal.MIXED is a soft, informational signal: it means
+        # the provider directory carries extra files vaultspec does not own.
+        # That is benign (genuine managed-content drift surfaces via
+        # ContentSignal), so it must not fail the doctor exit code (#122).
+        or prov.dir_state in (ProviderDirSignal.EMPTY, ProviderDirSignal.PARTIAL)
+        or prov.config
+        in (ConfigSignal.MISSING, ConfigSignal.FOREIGN, ConfigSignal.REGISTRY_DRIFT)
+        or any(s in stale_content for s in prov.content.values()),
+    )
 
 
 def _gate(exit_code: int, *, gate_errors: bool) -> int:

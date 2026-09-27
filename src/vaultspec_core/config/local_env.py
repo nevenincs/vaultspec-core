@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Final
 
 from ..core.exceptions import VaultSpecError
+from ..core.helpers import require_executable
 from .dotenv import format_dotenv, parse_dotenv
 
 if TYPE_CHECKING:
@@ -55,7 +56,7 @@ def validate_store_path(root: Path) -> Path:
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
-            ["git", "-C", str(root), *args],
+            [require_executable("git"), "-C", str(root), *args],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -251,7 +252,13 @@ def _read_cached(
 @lru_cache(maxsize=1)
 def _windows_sid() -> str:
     result = subprocess.run(
-        ["whoami", "/user", "/fo", "csv", "/nh"],
+        [
+            require_executable("whoami", windows_system=True),
+            "/user",
+            "/fo",
+            "csv",
+            "/nh",
+        ],
         capture_output=True,
         text=True,
         timeout=5,
@@ -267,7 +274,7 @@ def _restrict_temp(descriptor: int, temporary: Path) -> None:
     if os.name == "nt":
         subprocess.run(
             [
-                "icacls",
+                require_executable("icacls", windows_system=True),
                 str(temporary),
                 "/inheritance:r",
                 "/grant:r",

@@ -118,6 +118,82 @@ def apply_file_sync(
     return action
 
 
+def _is_stale_item(item: Path, source_names: set[str], *, is_skill: bool) -> bool:
+    """Whether destination *item* is a synced resource with no source left."""
+    from .system import SYSTEM_BUILTIN_RULE
+
+    if is_skill:
+        return (
+            item.is_dir()
+            and (item / "SKILL.md").exists()
+            and item.name not in source_names
+        )
+    return (
+        item.is_file()
+        and item.suffix == ".md"
+        and item.name not in source_names
+        and item.name != SYSTEM_BUILTIN_RULE
+    )
+
+
+def _is_managed_item(item: Path, *, is_skill: bool) -> bool:
+    """Whether a stale *item* carries vaultspec's managed-content markers.
+
+    Content-ownership guard: vaultspec only ever prunes .md files it created
+    (a matching source or a managed-content marker). User-authored files are
+    never pruned, so the ownership probe runs in both modes to keep the
+    warning honest: an unmanaged file must not be advertised as removable via
+    --force.
+    """
+    if is_skill or not item.is_file() or item.suffix != ".md":
+        return True
+    try:
+        head = item.read_text(encoding="utf-8")[:512]
+    except OSError:
+        head = ""
+    return CONFIG_HEADER in head or "<vaultspec " in head or "trigger:" in head
+
+
+def _reconcile_stale_item(
+    result: SyncResult,
+    item: Path,
+    *,
+    label: str,
+    prune: bool,
+    dry_run: bool,
+    is_skill: bool,
+) -> None:
+    """Prune a stale destination *item* or record why it was left in place."""
+    abs_path = str(item).replace("\\", "/")
+
+    if not _is_managed_item(item, is_skill=is_skill):
+        if prune:
+            result.warnings.append(
+                f"Skipped pruning user file: {abs_path} (not managed by vaultspec)"
+            )
+        else:
+            result.warnings.append(
+                f"Stale {label} file: {abs_path} "
+                f"(not managed by vaultspec; remove manually if unwanted)"
+            )
+        return
+
+    if not prune:
+        result.warnings.append(
+            f"Stale {label} file: {abs_path} "
+            f"(not in .vaultspec source, use --force to remove)"
+        )
+        return
+
+    result.items.append((abs_path, "[DELETE]"))
+    if not dry_run:
+        if is_skill:
+            rmtree_robust(item)
+        else:
+            item.unlink()
+    result.pruned += 1
+
+
 def sync_files(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
     dest_dir: Path,
@@ -181,74 +257,17 @@ def sync_files(
             result.errors.append(f"{name}: {e}")
             logger.error("    [ERROR] %s: %s", name, e, exc_info=True)
 
-    # Detect stale destination items and either prune or warn.
-    from .system import SYSTEM_BUILTIN_RULE
-
-    source_names = set(sources.keys())
     if dest_dir.exists():
-        items = list(dest_dir.iterdir())
-        for item in items:
-            is_stale = False
-            if is_skill:
-                is_stale = (
-                    item.is_dir()
-                    and (item / "SKILL.md").exists()
-                    and item.name not in source_names
-                )
-            else:
-                is_stale = (
-                    item.is_file()
-                    and item.suffix == ".md"
-                    and item.name not in source_names
-                    and item.name != SYSTEM_BUILTIN_RULE
-                )
-
-            if not is_stale:
-                continue
-
-            abs_path = str(item).replace("\\", "/")
-
-            # Content-ownership guard: vaultspec only ever prunes .md files
-            # it created (a matching source or a managed-content marker).
-            # User-authored files are never pruned, so the ownership probe
-            # runs in both modes to keep the warning honest: an unmanaged
-            # file must not be advertised as removable via --force.
-            is_managed = True
-            if not is_skill and item.is_file() and item.suffix == ".md":
-                try:
-                    head = item.read_text(encoding="utf-8")[:512]
-                except OSError:
-                    head = ""
-                is_managed = (
-                    CONFIG_HEADER in head or "<vaultspec " in head or "trigger:" in head
-                )
-
-            if not is_managed:
-                if prune:
-                    result.warnings.append(
-                        f"Skipped pruning user file: {abs_path} "
-                        f"(not managed by vaultspec)"
-                    )
-                else:
-                    result.warnings.append(
-                        f"Stale {label} file: {abs_path} "
-                        f"(not managed by vaultspec; remove manually if unwanted)"
-                    )
-                continue
-
-            if prune:
-                result.items.append((abs_path, "[DELETE]"))
-                if not dry_run:
-                    if is_skill:
-                        rmtree_robust(item)
-                    else:
-                        item.unlink()
-                result.pruned += 1
-            else:
-                # Not pruning  - emit a warning so the user knows.
-                result.warnings.append(
-                    f"Stale {label} file: {abs_path} "
-                    f"(not in .vaultspec source, use --force to remove)"
+        source_names = set(sources.keys())
+        for item in list(dest_dir.iterdir()):
+            if _is_stale_item(item, source_names, is_skill=is_skill):
+                _reconcile_stale_item(
+                    result,
+                    item,
+                    label=label,
+                    prune=prune,
+                    dry_run=dry_run,
+                    is_skill=is_skill,
                 )
 
     return result

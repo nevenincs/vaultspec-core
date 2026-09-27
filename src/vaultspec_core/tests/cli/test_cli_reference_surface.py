@@ -1,4 +1,4 @@
-"""Cover the published-surface snapshot: capture, comparison, and refresh policy.
+"""Cover the published-surface snapshot: capture, comparison, and recording.
 
 The snapshot (:mod:`vaultspec_core.cli.reference_surface`) is what the generated
 references attribute against. These tests exercise the real capture against the
@@ -6,16 +6,17 @@ live Typer tree and the live MCP registry, the real serialization round-trip,
 and the real ``vaultspec-core spec reference snapshot`` verb - no mocks, no
 skips.
 
-The refresh policy carries most of the weight here. The snapshot records the
-surface of a *release*, so it may be rewritten only where the tree is a
-different release from the one recorded. Rewriting it on main between releases
-would stamp the previous release's version onto commands that release does not
-contain, which is the exact falsehood the contract removes; the tests below
-pin that asymmetry in both directions.
+The snapshot records the surface of the latest published release, read back
+from that release's own distribution and written only through ``--record``.
+The verb tests below pin that the bare invocation is read-only, that recording
+refuses a malformed document without touching the committed file, and that the
+modes cannot be combined. No test writes a different surface to the committed
+snapshot.
 """
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -40,7 +41,6 @@ from vaultspec_core.cli.reference_surface import (
     deserialize_surface,
     load_published_surface,
     published_surface_path,
-    refresh_reason,
     serialize_surface,
     unreleased_surface,
     write_published_surface,
@@ -240,49 +240,78 @@ def test_the_difference_carries_the_version_it_was_taken_against() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Refresh policy
-# ---------------------------------------------------------------------------
-
-
-def test_a_matching_version_forbids_refresh() -> None:
-    """On main between releases the snapshot is frozen, whatever the surface."""
-    published = _surface(version="0.1.73", commands={"vault add": ()})
-    live = _surface(version="0.1.73", commands={"vault add": (), "new verb": ()})
-
-    assert refresh_reason(live, published) is None
-
-
-def test_a_bumped_version_permits_refresh() -> None:
-    """On the candidate branch the version differs and the snapshot may move."""
-    published = _surface(version="0.1.73")
-    live = _surface(version="0.2.0")
-
-    reason = refresh_reason(live, published)
-
-    assert reason is not None
-    assert "0.2.0" in reason
-    assert "0.1.73" in reason
-
-
-# ---------------------------------------------------------------------------
 # The verb
 # ---------------------------------------------------------------------------
 
 
-def test_snapshot_check_passes_on_a_tree_whose_version_matches() -> None:
-    """`--check` is green while the recorded release is the declared one."""
-    result = _RUNNER.invoke(app, ["spec", "reference", "snapshot", "--check"])
-
-    assert result.exit_code == 0, result.output
-
-
-def test_snapshot_write_is_a_no_op_when_the_version_matches() -> None:
-    """The default mode leaves the committed snapshot untouched on main."""
+def test_snapshot_without_a_mode_reports_the_committed_release_read_only() -> None:
+    """The bare verb names the recorded release and writes nothing."""
     before = published_surface_path().read_bytes()
+    published = load_published_surface()
 
     result = _RUNNER.invoke(app, ["spec", "reference", "snapshot"])
 
     assert result.exit_code == 0, result.output
+    assert published.version in result.output
+    assert published_surface_path().read_bytes() == before
+
+
+def test_snapshot_record_of_the_committed_bytes_reports_unchanged(
+    tmp_path: Path,
+) -> None:
+    """Recording what is already committed is a no-op, reported as such."""
+    before = published_surface_path().read_bytes()
+    document = tmp_path / "surface.json"
+    document.write_bytes(before)
+
+    result = _RUNNER.invoke(
+        app,
+        ["spec", "reference", "snapshot", "--record", str(document), "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    envelope = json.loads(result.output)
+    assert envelope["status"] == "unchanged"
+    assert envelope["data"]["changed"] is False
+    assert published_surface_path().read_bytes() == before
+
+
+def test_snapshot_record_refuses_a_malformed_document(tmp_path: Path) -> None:
+    """A malformed surface is refused by name and the snapshot is untouched."""
+    before = published_surface_path().read_bytes()
+    document = tmp_path / "surface.json"
+    document.write_text(f'{{"schema": {SNAPSHOT_SCHEMA}}}', encoding="utf-8")
+
+    result = _RUNNER.invoke(
+        app, ["spec", "reference", "snapshot", "--record", str(document)]
+    )
+
+    assert result.exit_code == 1
+    assert "no version" in result.output
+    assert published_surface_path().read_bytes() == before
+
+
+def test_snapshot_refuses_two_modes_at_once(tmp_path: Path) -> None:
+    """The modes are exclusive: combining them is a usage error, not a guess."""
+    before = published_surface_path().read_bytes()
+    document = tmp_path / "surface.json"
+    document.write_bytes(before)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "spec",
+            "reference",
+            "snapshot",
+            "--verify",
+            str(document),
+            "--record",
+            str(document),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "mutually exclusive" in result.output
     assert published_surface_path().read_bytes() == before
 
 

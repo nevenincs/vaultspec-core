@@ -489,38 +489,133 @@ def _build_phase(match: re.Match[str], index: int) -> Phase:
     )
 
 
+@dataclass
+class _BodyWalker:
+    """Line-by-line state for :func:`_walk_body`.
+
+    Each :meth:`feed` call classifies one body line against the containers
+    open so far: it either consumes the line as structure, appends it to the
+    open intent paragraph, or buffers it as an unknown block anchored at the
+    next structural token.
+    """
+
+    waves: list[Wave] = field(default_factory=list)
+    phases: list[Phase] = field(default_factory=list)
+    steps: list[Step] = field(default_factory=list)
+    unknown_blocks: list[UnknownBlock] = field(default_factory=list)
+    current_wave: Wave | None = None
+    current_phase: Phase | None = None
+    intent_target: Wave | Phase | None = None
+    intent_buffer: list[str] = field(default_factory=list)
+    buffered_unknown: list[str] = field(default_factory=list)
+    in_epic_intent: bool = False
+    in_link_rules_comment: bool = False
+    has_link_rules: bool = False
+
+    def flush_intent(self) -> None:
+        """Assign the buffered intent prose to the open Wave or Phase."""
+        if self.intent_target is not None and self.intent_buffer:
+            self.intent_target.intent = "\n".join(self.intent_buffer).strip()
+        self.intent_buffer.clear()
+
+    def _close_intent(self) -> None:
+        self.flush_intent()
+        self.intent_target = None
+
+    def flush_unknown(self, anchor: str) -> None:
+        """Emit the buffered unrecognised lines as a block before *anchor*."""
+        if self.buffered_unknown:
+            content = "\n".join(self.buffered_unknown).strip()
+            if content.strip():
+                self.unknown_blocks.append(UnknownBlock(anchor=anchor, content=content))
+            self.buffered_unknown.clear()
+
+    def feed(self, index: int, line: str, tokens: _LineTokens) -> None:
+        """Classify one body line; the order of the checks is the grammar."""
+        if tokens.title:
+            self.flush_unknown("before_title")
+            return
+        if self._consume_link_rules(line) or _RE_RETIRED_LEDGER.search(line):
+            return
+
+        if tokens.epic_intent:
+            self._close_intent()
+            self.flush_unknown("before_epic_intent")
+            self.in_epic_intent = True
+            return
+        if self.in_epic_intent:
+            if not tokens.opens_a_structural_block():
+                return
+            self.in_epic_intent = False
+
+        if self._consume_structure(index, line, tokens):
+            return
+
+        if self.intent_target is not None:
+            if not tokens.is_section_heading():
+                self.intent_buffer.append(line)
+                return
+            self._close_intent()
+
+        self.buffered_unknown.append(line)
+
+    def _consume_link_rules(self, line: str) -> bool:
+        """Swallow the link-rules comment block, noting that it was present."""
+        if LINK_RULES_OPEN in line:
+            self.has_link_rules = True
+            self.in_link_rules_comment = True
+        if not self.in_link_rules_comment:
+            return False
+        if HTML_COMMENT_CLOSE in line:
+            self.in_link_rules_comment = False
+        return True
+
+    def _consume_structure(self, index: int, line: str, tokens: _LineTokens) -> bool:
+        """Open the Steps section, a Wave, a Phase, or a Step row."""
+        if tokens.steps_heading:
+            # Consumed, never buffered: the serialiser owns this heading and
+            # re-emits it, so letting it fall through to the unknown buffer
+            # would duplicate it on every round trip. Dropping it here is safe
+            # precisely because the emission is unconditional.
+            self._close_intent()
+            self.flush_unknown("before_steps")
+            return True
+        if tokens.wave:
+            self.flush_intent()
+            wave = _build_wave(tokens.wave, index)
+            self.flush_unknown(f"before_wave_{wave.canonical_id}")
+            self.waves.append(wave)
+            self.current_wave = wave
+            self.current_phase = None
+            self.intent_target = wave
+            return True
+        if tokens.phase:
+            self.flush_intent()
+            phase = _build_phase(tokens.phase, index)
+            self.flush_unknown(f"before_phase_{phase.canonical_id}")
+            self.phases.append(phase)
+            if self.current_wave is not None:
+                self.current_wave.phases.append(phase)
+            self.current_phase = phase
+            self.intent_target = phase
+            return True
+        if tokens.step:
+            self._close_intent()
+            step = _build_step(tokens.step, index, line)
+            self.flush_unknown(f"before_step_{step.canonical_id}")
+            self.steps.append(step)
+            if self.current_phase is not None:
+                self.current_phase.steps.append(step)
+            return True
+        return False
+
+
 def _walk_body(
     body: str,
 ) -> tuple[list[Wave], list[Phase], list[Step], list[UnknownBlock], bool]:
     """Walk the body and assemble container chains and unknown blocks."""
-    waves: list[Wave] = []
-    phases: list[Phase] = []
-    steps: list[Step] = []
-    unknown_blocks: list[UnknownBlock] = []
-
-    current_wave: Wave | None = None
-    current_phase: Phase | None = None
-    intent_target: Wave | Phase | None = None
-    intent_buffer: list[str] = []
-
-    buffered_unknown: list[str] = []
-    in_epic_intent: bool = False
-    in_link_rules_comment: bool = False
-    has_link_rules = False
-
-    def _flush_intent() -> None:
-        if intent_target is not None and intent_buffer:
-            intent_target.intent = "\n".join(intent_buffer).strip()
-        intent_buffer.clear()
-
-    def _flush_unknown(anchor: str) -> None:
-        if buffered_unknown:
-            content = "\n".join(buffered_unknown).strip()
-            if content.strip():
-                unknown_blocks.append(UnknownBlock(anchor=anchor, content=content))
-            buffered_unknown.clear()
-
-    # Every structural decision below reads the tokens of the *masked* line, in
+    walker = _BodyWalker()
+    # Every structural decision reads the tokens of the *masked* line, in
     # which HTML comment spans have been blanked out, while every
     # text-preserving branch (intent prose, unknown blocks, a Step's
     # ``raw_line``) reads the original. A plan's shipped scaffold quotes the
@@ -531,98 +626,18 @@ def _walk_body(
     for index, (line, tokens) in enumerate(
         zip(source_lines, _line_tokens(source_lines), strict=True), start=1
     ):
-        # 1. H1 Title line
-        if tokens.title:
-            _flush_unknown("before_title")
-            continue
+        walker.feed(index, line, tokens)
 
-        # 2. Link rules comment block
-        if LINK_RULES_OPEN in line:
-            has_link_rules = True
-            in_link_rules_comment = True
-        if in_link_rules_comment:
-            if HTML_COMMENT_CLOSE in line:
-                in_link_rules_comment = False
-            continue
+    walker.flush_intent()
+    walker.flush_unknown("after_all")
 
-        # 3. Retired comment ledger
-        if _RE_RETIRED_LEDGER.search(line):
-            continue
-
-        # 4. Epic intent heading
-        if tokens.epic_intent:
-            _flush_intent()
-            intent_target = None
-            _flush_unknown("before_epic_intent")
-            in_epic_intent = True
-            continue
-
-        if in_epic_intent:
-            if tokens.opens_a_structural_block():
-                in_epic_intent = False
-            else:
-                continue
-
-        # 5. Steps section heading
-        #
-        # Consumed, never buffered: the serialiser owns this heading and
-        # re-emits it, so letting it fall through to ``buffered_unknown``
-        # would duplicate it on every round trip. Dropping it here is safe
-        # precisely because the emission is unconditional.
-        if tokens.steps_heading:
-            _flush_intent()
-            intent_target = None
-            _flush_unknown("before_steps")
-            continue
-
-        # 6. Wave heading
-        if tokens.wave:
-            _flush_intent()
-            current_wave = _build_wave(tokens.wave, index)
-            _flush_unknown(f"before_wave_{current_wave.canonical_id}")
-            waves.append(current_wave)
-            current_phase = None
-            intent_target = current_wave
-            continue
-
-        # 7. Phase heading
-        if tokens.phase:
-            _flush_intent()
-            current_phase = _build_phase(tokens.phase, index)
-            _flush_unknown(f"before_phase_{current_phase.canonical_id}")
-            phases.append(current_phase)
-            if current_wave is not None:
-                current_wave.phases.append(current_phase)
-            intent_target = current_phase
-            continue
-
-        # 8. Step row
-        if tokens.step:
-            _flush_intent()
-            intent_target = None
-            step = _build_step(tokens.step, index, line)
-            _flush_unknown(f"before_step_{step.canonical_id}")
-            steps.append(step)
-            if current_phase is not None:
-                current_phase.steps.append(step)
-            continue
-
-        # 9. Intent paragraph checking
-        if intent_target is not None:
-            if tokens.is_section_heading():
-                _flush_intent()
-                intent_target = None
-            else:
-                intent_buffer.append(line)
-                continue
-
-        # 10. Fallthrough to unknown buffered lines
-        buffered_unknown.append(line)
-
-    _flush_intent()
-    _flush_unknown("after_all")
-
-    return waves, phases, steps, unknown_blocks, has_link_rules
+    return (
+        walker.waves,
+        walker.phases,
+        walker.steps,
+        walker.unknown_blocks,
+        walker.has_link_rules,
+    )
 
 
 def _build_step(match: re.Match[str], index: int, raw_line: str) -> Step:

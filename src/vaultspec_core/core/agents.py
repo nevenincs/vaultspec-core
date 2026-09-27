@@ -636,12 +636,61 @@ def sanitize_legacy_codex_agents(content: str, names: set[str]) -> str:
     return sanitized
 
 
+def _prune_codex_agents_dir(
+    result: SyncResult, agents_dir: Path, *, dry_run: bool
+) -> None:
+    """Delete the obsolete per-file Codex ``agents/`` directory."""
+    if not agents_dir.is_dir():
+        return
+    for child in sorted(agents_dir.iterdir()):
+        if child.is_file():
+            child_abs = str(child).replace("\\", "/")
+            result.items.append((child_abs, "[DELETE]"))
+            if not dry_run:
+                child.unlink()
+            result.pruned += 1
+    if not dry_run:
+        import contextlib
+
+        with contextlib.suppress(OSError):
+            agents_dir.rmdir()
+
+
+def _prune_codex_agents_block(
+    result: SyncResult,
+    path: Path,
+    existing: str,
+    raw_existing: str,
+    *,
+    dry_run: bool,
+) -> None:
+    """Strip the managed ``agents`` block from a Codex config with no sources."""
+    from .tags import TagError, has_block, strip_block
+
+    new_content = existing
+    if has_block(existing, "agents"):
+        try:
+            new_content = strip_block(existing, "agents")
+        except TagError as e:
+            logger.warning("Cannot prune agents from %s: %s", path, e)
+            result.errors.append(str(e))
+            return
+    if new_content == raw_existing:
+        result.skipped = 1
+        return
+    if dry_run:
+        result.items.append((str(path).replace("\\", "/"), "[DELETE]"))
+    else:
+        atomic_write(path, new_content)
+    result.pruned = 1
+
+
 def _sync_codex_agents(
     sources: dict[str, tuple[Path, dict[str, Any], str]],
     prune: bool = False,
     dry_run: bool = False,
 ) -> SyncResult:
-    from .tags import TagError, has_block, strip_block, upsert_block
+    from .tags import TagError, upsert_block
 
     result = SyncResult()
     codex_cfg = _t.get_context().tool_configs.get(Tool.CODEX)
@@ -659,39 +708,13 @@ def _sync_codex_agents(
 
     # Issue 149: Prune obsolete agents directory if prune is True
     if prune:
-        agents_dir = path.parent / "agents"
-        if agents_dir.is_dir():
-            for child in sorted(agents_dir.iterdir()):
-                if child.is_file():
-                    child_abs = str(child).replace("\\", "/")
-                    result.items.append((child_abs, "[DELETE]"))
-                    if not dry_run:
-                        child.unlink()
-                    result.pruned += 1
-            if not dry_run:
-                import contextlib
-
-                with contextlib.suppress(OSError):
-                    agents_dir.rmdir()
+        _prune_codex_agents_dir(result, path.parent / "agents", dry_run=dry_run)
 
     if not body:
         if prune and existed:
-            new_content = existing
-            if has_block(existing, "agents"):
-                try:
-                    new_content = strip_block(existing, "agents")
-                except TagError as e:
-                    logger.warning("Cannot prune agents from %s: %s", path, e)
-                    result.errors.append(str(e))
-                    return result
-            if new_content == raw_existing:
-                result.skipped = 1
-                return result
-            if dry_run:
-                result.items.append((abs_path, "[DELETE]"))
-            else:
-                atomic_write(path, new_content)
-            result.pruned = 1
+            _prune_codex_agents_block(
+                result, path, existing, raw_existing, dry_run=dry_run
+            )
         else:
             result.skipped = 1
         return result

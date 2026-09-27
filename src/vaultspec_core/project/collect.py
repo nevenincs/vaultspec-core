@@ -238,6 +238,49 @@ class _Remote(BaseModel):
     checks: list[_Check] | None = Field(default=None, alias="statusCheckRollup")
 
 
+_CI_FAILED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED"}
+_CI_FAILED_STATES = {"FAILURE", "ERROR"}
+_CI_PENDING_STATUSES = {"QUEUED", "IN_PROGRESS", "WAITING", "PENDING", "REQUESTED"}
+_CI_PENDING_STATES = {"PENDING", "EXPECTED"}
+
+
+def _ci_state(checks: list[_Check] | None) -> str:
+    """Summarize a PR's status-check rollup as one CI state."""
+    rollup = checks or []
+    if any(
+        check.conclusion in _CI_FAILED_CONCLUSIONS or check.state in _CI_FAILED_STATES
+        for check in rollup
+    ):
+        return "failed"
+    if any(
+        check.status in _CI_PENDING_STATUSES or check.state in _CI_PENDING_STATES
+        for check in rollup
+    ):
+        return "pending"
+    return "reported" if checks else "unknown"
+
+
+def _add_pr_state(row: _Remote, facts: dict[str, object], signals: list[str]) -> None:
+    """Add the pull-request-only facts and signals for *row*."""
+    ci = _ci_state(row.checks)
+    facts.update(
+        head=row.head,
+        branch=compact(row.branch),
+        draft=row.draft,
+        review=row.review,
+        mergeable=row.merge,
+        ci=ci,
+    )
+    if row.draft:
+        signals.append("draft")
+    if row.merge == "CONFLICTING":
+        signals.append("merge_conflict")
+    if row.review == "CHANGES_REQUESTED":
+        signals.append("changes_requested")
+    if ci == "failed":
+        signals.append("ci_failed")
+
+
 def remote_items(text: str, repo: str, kind: str) -> list[Item]:
     """Normalize a bounded GitHub response; never infer local/fork branch identity."""
     parsed = json.loads(text)
@@ -260,42 +303,7 @@ def remote_items(text: str, repo: str, kind: str) -> list[Item]:
         if any(label.name.casefold() == "blocked" for label in row.labels):
             signals.append("labelled_blocked")
         if kind == "pr":
-            facts.update(
-                head=row.head,
-                branch=compact(row.branch),
-                draft=row.draft,
-                review=row.review,
-                mergeable=row.merge,
-            )
-            if row.draft:
-                signals.append("draft")
-            if row.merge == "CONFLICTING":
-                signals.append("merge_conflict")
-            if row.review == "CHANGES_REQUESTED":
-                signals.append("changes_requested")
-            failed = any(
-                check.conclusion
-                in {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED"}
-                or check.state in {"FAILURE", "ERROR"}
-                for check in row.checks or []
-            )
-            pending = any(
-                check.status
-                in {"QUEUED", "IN_PROGRESS", "WAITING", "PENDING", "REQUESTED"}
-                or check.state in {"PENDING", "EXPECTED"}
-                for check in row.checks or []
-            )
-            facts["ci"] = (
-                "failed"
-                if failed
-                else "pending"
-                if pending
-                else "reported"
-                if row.checks
-                else "unknown"
-            )
-            if failed:
-                signals.append("ci_failed")
+            _add_pr_state(row, facts, signals)
         identity = f"github:{repo}:{kind}:{row.number}"
         items[identity] = Item(
             identity, kind, compact(row.title), row.updated, facts, tuple(signals)

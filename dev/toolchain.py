@@ -148,8 +148,14 @@ UTF8 = {environment.PYTHONIOENCODING.name: "utf-8"}
 #: steps are defined once here so the two entry points cannot drift.
 VAULT_FIX_STEPS = (
     uv_run("vaultspec-core", "vault", "check", "all", "--fix"),
-    uv_run("vaultspec-core", "vault", "sanitize", "annotations"),
+    uv_run("vaultspec-core", "vault", "check", "annotations", "--fix"),
 )
+
+#: A formatter that rewrites a vault record's body leaves its attested
+#: fingerprint stale, and the vault gate only warns about that. The record's
+#: owning verb re-attests whatever the formatting pass changed, so formatting
+#: never leaves the corpus reading as hand-edited.
+VAULT_REATTEST = uv_run("vaultspec-core", "vault", "check", "modified-stamp", "--fix")
 
 
 @dataclass(frozen=True)
@@ -516,6 +522,7 @@ FIX = Verb(
                     "-r",
                     *MARKDOWN_PATHS,
                 ),
+                VAULT_REATTEST,
             ),
         ),
         Target(
@@ -885,14 +892,6 @@ FRAMEWORK = Verb(
             "reference-check",
             "Verify the bundled CLI reference is current.",
             (uv_run("vaultspec-core", "spec", "reference", "generate", "--check"),),
-        ),
-        Target(
-            "surface",
-            "Record the published surface and re-render what cites it.",
-            (
-                uv_run("vaultspec-core", "spec", "reference", "snapshot"),
-                uv_run("vaultspec-core", "spec", "reference", "generate"),
-            ),
         ),
         Target(
             "providers",

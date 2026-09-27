@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#cli-ecosystem-factoring'
 date: '2026-02-22'
-modified: '2026-09-19'
-body_hash: 'sha256:e3cae69cfdba752f31ed0df3db23be06d71a329e94439ddcc1c1dd0603181675'
+modified: '2026-09-27'
+body_hash: 'sha256:b592bf4ea53b1151fb7c1a0d81dc407605c1d9e679b5682e832be3248b46ec4d'
 related:
   - '[[2026-02-22-cli-ecosystem-factoring-research]]'
   - '[[2026-02-23-cli-test-coverage-plan]]'

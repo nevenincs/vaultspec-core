@@ -63,7 +63,7 @@ from __future__ import annotations
 import hashlib
 import re
 
-from .parser import split_frontmatter
+from .parser import rewrite_key_line, split_frontmatter
 
 __all__ = [
     "BODY_HASH_FIELD",
@@ -87,10 +87,6 @@ BODY_HASH_PREFIX = "sha256:"
 #: Canonical serialized form: the prefix followed by 64 lowercase hex
 #: characters. Anything else is not a fingerprint this module wrote.
 _CANONICAL_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
-
-#: Frontmatter ``body_hash:`` line, capturing indentation so an indented
-#: key is rewritten in place rather than duplicated.
-_BODY_HASH_LINE_RE = re.compile(r"^(?P<indent>[ \t]*)body_hash:.*$")
 
 #: Insertion anchors, in canonical field order: the fingerprint lands
 #: directly after ``body_schema:`` when present, else after ``modified:``,
@@ -206,13 +202,13 @@ def set_body_hash(text: str, digest: str | None = None) -> str:
 
     Preserves every other byte, including the source LF/CRLF/CR convention
     and a leading BOM. An existing ``body_hash:`` line is rewritten in
-    place, keeping its indentation; otherwise the field is inserted
-    directly after the first of ``body_schema:``, ``modified:``, or
-    ``date:`` that the frontmatter carries, which is its canonical schema
-    position. Text with no frontmatter fence, or frontmatter carrying none
-    of the three anchors, is returned unchanged: there is nowhere
-    canonical to put the field, and the document simply keeps making no
-    claim about its body.
+    place, keeping its indentation, and any repeat of it is removed;
+    otherwise the field is inserted directly after the first of
+    ``body_schema:``, ``modified:``, or ``date:`` that the frontmatter
+    carries, which is its canonical schema position. Text with no
+    frontmatter fence, or frontmatter carrying none of the three anchors,
+    is returned unchanged: there is nowhere canonical to put the field,
+    and the document simply keeps making no claim about its body.
 
     Args:
         text: Full document text, including any YAML frontmatter.
@@ -237,11 +233,8 @@ def set_body_hash(text: str, digest: str | None = None) -> str:
     pairs = split_keepends(text[block_start:block_end])
     canonical = f"'{value}'"
 
-    for pair in pairs:
-        existing = _BODY_HASH_LINE_RE.match(pair[0])
-        if existing is not None:
-            pair[0] = f"{existing.group('indent')}{BODY_HASH_FIELD}: {canonical}"
-            return _rejoin(text, pairs, block_start, block_end)
+    if rewrite_key_line(pairs, BODY_HASH_FIELD, canonical):
+        return _rejoin(text, pairs, block_start, block_end)
 
     for anchor in _ANCHOR_PATTERNS:
         for idx, pair in enumerate(pairs):

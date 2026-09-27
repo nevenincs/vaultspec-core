@@ -137,11 +137,13 @@ def trash_root(workspace: Path) -> Path:
 def human_bytes(count: int) -> str:
     """Render *count* bytes in the largest unit that keeps it readable."""
     size = float(count)
-    for unit in ("B", "KB", "MB", "GB"):
-        if size < 1024 or unit == "GB":
-            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+    if size < 1024:
+        return f"{size:.0f} B"
+    for unit in ("KB", "MB"):
         size /= 1024
-    return f"{size:.1f} GB"  # pragma: no cover - unreachable, loop returns at GB
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+    return f"{size / 1024:.1f} GB"
 
 
 class TrashWriter:
@@ -222,7 +224,7 @@ class TrashWriter:
         fresh: list[Path] = []
         try:
             self._copy_batch(root, pending, fresh)
-            self._write_index()
+            self._write_index(root)
         except SnapshotError:
             self._rollback(fresh, committed)
             raise
@@ -335,14 +337,11 @@ class TrashWriter:
         """Return *source* as a workspace-relative path for ``RESTORE.txt``."""
         try:
             return str(source.relative_to(self._workspace)).replace(os.sep, "/")
-        except ValueError:  # pragma: no cover - _relative_of rejects these first
+        except ValueError:
             return str(source)
 
-    def _write_index(self) -> None:
+    def _write_index(self, root: Path) -> None:
         """Write (or rewrite) ``RESTORE.txt`` describing every copy so far."""
-        root = self._root
-        if root is None:  # pragma: no cover - only reached after _ensure_root
-            return
         width = max((len(entry.copy) for entry in self._entries), default=0)
         lines = [
             "vaultspec-core snapshot",

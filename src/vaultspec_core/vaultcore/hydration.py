@@ -526,6 +526,94 @@ def _admit_date(raw: str | None, *, label: str) -> str:
     return result.value
 
 
+def _admit_extra_tags(
+    fields: TemplateFields, doc_type: DocType, feature: str
+) -> TemplateFields:
+    """Refuse extra tags other than the required pair, then drop them.
+
+    Raises:
+        VaultSpecError: If an extra tag is not the directory or feature tag.
+    """
+    if not fields.extra_tags:
+        return fields
+    required_tags = {doc_type.tag, f"#{feature}"}
+    unsupported = [
+        tag
+        for tag in fields.extra_tags
+        if (tag if tag.startswith("#") else f"#{tag}") not in required_tags
+    ]
+    if unsupported:
+        raise VaultSpecError(
+            f"Unsupported tags: {', '.join(unsupported)}. "
+            f"Only {doc_type.tag} and #{feature} are allowed."
+        )
+    return replace(fields, extra_tags=None)
+
+
+def _scaffold_location(
+    docs_root: pathlib.Path,
+    identity: DocumentIdentity,
+    *,
+    date_str: str,
+    plan_date: str | None,
+    ledger: bool,
+) -> tuple[pathlib.Path, str]:
+    """Return the ``(directory, filename)`` a new document is written to."""
+    doc_type = identity.doc_type
+    feature = identity.feature
+    if doc_type is DocType.EXEC and ledger:
+        # One ledger per plan, so the filename carries no Step or Phase
+        # segment - the Step identity lives in the rows, not the path.
+        stamp = plan_date or date_str
+        return (
+            docs_root / doc_type.value / f"{stamp}-{feature}",
+            f"{stamp}-{feature}-ledger.md",
+        )
+    if identity.topic is not None:
+        filename = f"{date_str}-{feature}-{identity.topic}-{doc_type.value}.md"
+    else:
+        filename = f"{date_str}-{feature}-{doc_type.value}.md"
+    return docs_root / doc_type.value, filename
+
+
+def _refuse_existing_target(root_dir: pathlib.Path, target_path: pathlib.Path) -> None:
+    """Refuse a target that exists, or whose stem another document holds.
+
+    Raises:
+        ResourceExistsError: If the file exists, or a live document elsewhere
+            in the vault shares its stem.
+    """
+    from ..config import get_config
+
+    if target_path.exists():
+        raise ResourceExistsError(
+            f"File already exists at {target_path}",
+            hint="Use --force to overwrite",
+        )
+
+    # Guard against stem collisions  - a file with the same stem in a
+    # different type directory would cause silent overwrites in the
+    # graph (nodes are keyed by stem).
+    stem = target_path.stem
+    docs_dir = root_dir / get_config().docs_dir
+    if not docs_dir.exists():
+        return
+    for existing in docs_dir.rglob("*.md"):
+        # A pre-deletion snapshot under `.trash/` keeps the stem of the
+        # document it backs up, and an archived document keeps its
+        # own. Neither is a live graph key, so neither may block a
+        # legitimate creation.
+        if is_excluded_vault_path(existing.relative_to(docs_dir)):
+            continue
+        if existing.stem == stem and existing != target_path:
+            raise ResourceExistsError(
+                f"A file with stem '{stem}' already exists at "
+                f"{existing.relative_to(root_dir)}. "
+                f"Choose a different name to avoid graph key collisions.",
+                hint="Use --force to overwrite",
+            )
+
+
 def create_vault_doc(
     root_dir: pathlib.Path,
     identity: DocumentIdentity,
@@ -593,19 +681,7 @@ def create_vault_doc(
         else None
     )
 
-    if fields.extra_tags:
-        required_tags = {doc_type.tag, f"#{feature}"}
-        unsupported = [
-            tag
-            for tag in fields.extra_tags
-            if (tag if tag.startswith("#") else f"#{tag}") not in required_tags
-        ]
-        if unsupported:
-            raise VaultSpecError(
-                f"Unsupported tags: {', '.join(unsupported)}. "
-                f"Only {doc_type.tag} and #{feature} are allowed."
-            )
-        fields = replace(fields, extra_tags=None)
+    fields = _admit_extra_tags(fields, doc_type, feature)
 
     if topic is not None and doc_type not in _TOPIC_INFIX_TYPES:
         raise ValueError(
@@ -654,23 +730,14 @@ def create_vault_doc(
         exec_binding,
     )
 
-    if doc_type is DocType.EXEC and exec_binding.ledger:
-        # One ledger per plan, so the filename carries no Step or Phase
-        # segment - the Step identity lives in the rows, not the path.
-        filename = f"{plan_date or date_str}-{feature}-ledger.md"
-        target_dir = (
-            root_dir
-            / get_config().docs_dir
-            / doc_type.value
-            / f"{plan_date or date_str}-{feature}"
-        )
-    elif topic is not None:
-        filename = f"{date_str}-{feature}-{topic}-{doc_type.value}.md"
-        target_dir = root_dir / get_config().docs_dir / doc_type.value
-    else:
-        filename = f"{date_str}-{feature}-{doc_type.value}.md"
-        target_dir = root_dir / get_config().docs_dir / doc_type.value
-
+    docs_root = root_dir / get_config().docs_dir
+    target_dir, filename = _scaffold_location(
+        docs_root,
+        identity,
+        date_str=date_str,
+        plan_date=plan_date,
+        ledger=exec_binding.ledger,
+    )
     target_path = target_dir / filename
 
     # Containment backstop. The date admission above closes the field this
@@ -679,37 +746,11 @@ def create_vault_doc(
     # path segment inherits it without a second audit. Both sides resolve
     # before comparison, so a `..` segment, an absolute value, and a
     # symlinked type directory are all refused alike.
-    docs_root = root_dir / get_config().docs_dir
     assert_within_docs(docs_root, target_dir)
     assert_within_docs(docs_root, target_path)
 
     if not write.force:
-        if target_path.exists():
-            raise ResourceExistsError(
-                f"File already exists at {target_path}",
-                hint="Use --force to overwrite",
-            )
-
-        # Guard against stem collisions  - a file with the same stem in a
-        # different type directory would cause silent overwrites in the
-        # graph (nodes are keyed by stem).
-        stem = target_path.stem
-        docs_dir = root_dir / get_config().docs_dir
-        if docs_dir.exists():
-            for existing in docs_dir.rglob("*.md"):
-                # A pre-deletion snapshot under `.trash/` keeps the stem of the
-                # document it backs up, and an archived document keeps its
-                # own. Neither is a live graph key, so neither may block a
-                # legitimate creation.
-                if is_excluded_vault_path(existing.relative_to(docs_dir)):
-                    continue
-                if existing.stem == stem and existing != target_path:
-                    raise ResourceExistsError(
-                        f"A file with stem '{stem}' already exists at "
-                        f"{existing.relative_to(root_dir)}. "
-                        f"Choose a different name to avoid graph key collisions.",
-                        hint="Use --force to overwrite",
-                    )
+        _refuse_existing_target(root_dir, target_path)
 
     # Emit-time validator: refuse to write content the framework's own
     # validators would reject on the next read. Closes the

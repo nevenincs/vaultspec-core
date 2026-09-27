@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path  # noqa: TC003 - Typer evaluates the --target annotation.
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, NoReturn, cast
 
 import typer
 
@@ -144,28 +144,7 @@ def cmd_install(
         _handle_error(exc, json_output=json_output)
         return
 
-    # Guard: refuse to create deeply nested paths  - only allow creating the
-    # final directory component.  This prevents accidental scaffolding of
-    # arbitrary directory trees from typos or path traversal.
-    if not path.exists():
-        if not path.parent.exists():
-            typer.echo(
-                f"Error: Parent directory does not exist: {path.parent}\n"
-                f"Create intermediate directories manually or use an existing path.",
-                err=True,
-            )
-            raise typer.Exit(code=1)
-        if not dry_run:
-            path.mkdir(parents=False, exist_ok=True)
-
-    fw_path = path / ".vaultspec"
-    if fw_path.exists() and not fw_path.is_dir():
-        typer.echo(
-            f"Error: {fw_path} exists but is a file, not a directory.\n"
-            "  Remove the file and re-run install.",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    _ensure_install_target(path, dry_run=dry_run)
 
     # Preflight rewrites a stale managed gitignore block, so capture
     # whether this workspace is still on the pre-reversal policy first -
@@ -237,62 +216,119 @@ def cmd_install(
     # (created/updated/unchanged) through the shared renderer instead of
     # the old "Re-seeded N / Upgrade complete" wording.
     if result["action"] == "upgrade":
-        from vaultspec_core.cli.rendering import (
-            Outcome,
-            OutcomeItem,
-            emit_next_step_hint,
-            emit_outcomes,
-            render_sharing_policy,
-        )
-        from vaultspec_core.cli_common import get_version
-
-        action_map = {
-            "[ADD]": Outcome.CREATED,
-            "[UPDATE]": Outcome.UPDATED,
-            "[UNCHANGED]": Outcome.UNCHANGED,
-        }
-        outcomes = [
-            OutcomeItem(name=rel, outcome=action_map.get(action, Outcome.UPDATED))
-            for rel, action in result["items"]
-        ]
-        # Stamp the framework version into the heading and the JSON so an
-        # operator can see *which* version they are now on, not just that
-        # something changed.
-        version = get_version()
-        verb = "Upgrade preview" if result.get("dry_run") else "Upgrade"
-        title = f"{verb} {version} -> {path}"
-
-        hint_dict = emit_next_step_hint(
-            command="install",
-            outcome="updated",
+        _emit_upgrade_result(
+            result,
+            path,
             json_output=json_output,
             no_hints=no_hints,
+            gitignore_was_pre_reversal=gitignore_was_pre_reversal,
         )
 
-        code = emit_outcomes(
-            outcomes,
-            command="install",
-            title=title,
-            json_output=json_output,
-            extra_json={
-                "version": version,
-                "warnings": result.get("warnings", []),
-                "environment": result.get("environment", {}),
-            },
-            hints=hint_dict,
+    if json_output:
+        _emit_install_json(result, no_hints=no_hints)
+    elif result["action"] == "dry_run":
+        _render_install_preview(result, path)
+    else:
+        _render_install_text(result, path, no_hints=no_hints)
+
+
+def _ensure_install_target(path: Path, *, dry_run: bool) -> None:
+    """Create the final target directory if needed and reject a file framework."""
+    # Guard: refuse to create deeply nested paths  - only allow creating the
+    # final directory component.  This prevents accidental scaffolding of
+    # arbitrary directory trees from typos or path traversal.
+    if not path.exists():
+        if not path.parent.exists():
+            typer.echo(
+                f"Error: Parent directory does not exist: {path.parent}\n"
+                f"Create intermediate directories manually or use an existing path.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        if not dry_run:
+            path.mkdir(parents=False, exist_ok=True)
+
+    fw_path = path / ".vaultspec"
+    if fw_path.exists() and not fw_path.is_dir():
+        typer.echo(
+            f"Error: {fw_path} exists but is a file, not a directory.\n"
+            "  Remove the file and re-run install.",
+            err=True,
         )
-        # Surface the new sharing policy when this upgrade carried the
-        # workspace off the pre-reversal team-hidden gitignore policy.  The
-        # statement describes what git does with these files, so it is
-        # withheld where there is no repository to do it.
-        if not json_output and gitignore_was_pre_reversal and is_git_repo(path):
-            render_sharing_policy()
-        raise typer.Exit(code)
+        raise typer.Exit(code=1)
+
+
+def _emit_upgrade_result(
+    result: dict[str, Any],
+    path: Path,
+    *,
+    json_output: bool,
+    no_hints: bool,
+    gitignore_was_pre_reversal: bool,
+) -> NoReturn:
+    """Report an upgrade's per-builtin outcomes and exit with their code."""
+    from vaultspec_core.cli.rendering import (
+        Outcome,
+        OutcomeItem,
+        emit_next_step_hint,
+        emit_outcomes,
+        render_sharing_policy,
+    )
+    from vaultspec_core.cli_common import get_version
+
+    action_map = {
+        "[ADD]": Outcome.CREATED,
+        "[UPDATE]": Outcome.UPDATED,
+        "[UNCHANGED]": Outcome.UNCHANGED,
+    }
+    outcomes = [
+        OutcomeItem(name=rel, outcome=action_map.get(action, Outcome.UPDATED))
+        for rel, action in result["items"]
+    ]
+    # Stamp the framework version into the heading and the JSON so an
+    # operator can see *which* version they are now on, not just that
+    # something changed.
+    version = get_version()
+    verb = "Upgrade preview" if result.get("dry_run") else "Upgrade"
+    title = f"{verb} {version} -> {path}"
+
+    hint_dict = emit_next_step_hint(
+        command="install",
+        outcome="updated",
+        json_output=json_output,
+        no_hints=no_hints,
+    )
+
+    code = emit_outcomes(
+        outcomes,
+        command="install",
+        title=title,
+        json_output=json_output,
+        extra_json={
+            "version": version,
+            "warnings": result.get("warnings", []),
+            "environment": result.get("environment", {}),
+        },
+        hints=hint_dict,
+    )
+    # Surface the new sharing policy when this upgrade carried the
+    # workspace off the pre-reversal team-hidden gitignore policy.  The
+    # statement describes what git does with these files, so it is
+    # withheld where there is no repository to do it.
+    if not json_output and gitignore_was_pre_reversal and is_git_repo(path):
+        render_sharing_policy()
+    raise typer.Exit(code)
+
+
+def _emit_install_json(result: dict[str, Any], *, no_hints: bool) -> NoReturn:
+    """Echo the install envelope and exit non-zero on a recorded sync error."""
+    from vaultspec_core.cli.rendering import (
+        emit_next_step_hint,
+        render_install_envelope,
+    )
 
     hint_dict = None
-    if json_output and result["action"] != "dry_run":
-        from vaultspec_core.cli.rendering import emit_next_step_hint
-
+    if result["action"] != "dry_run":
         hint_dict = emit_next_step_hint(
             command="install",
             outcome="created",
@@ -300,70 +336,70 @@ def cmd_install(
             no_hints=no_hints,
         )
 
-    if json_output:
-        from vaultspec_core.cli.rendering import render_install_envelope
-
-        result["path"] = str(result["path"])
-        post_errors = install_post_errors(result)
-        if post_errors:
-            status = "failed"
-        else:
-            status = "unchanged" if result["action"] == "dry_run" else "created"
-        typer.echo(render_install_envelope("install", status, result, hints=hint_dict))
-        raise typer.Exit(1 if post_errors else 0)
-
-    if result["action"] == "dry_run":
-        from vaultspec_core.cli.rendering import render_dry_run_tree
-        from vaultspec_core.core.dry_run import (
-            DryRunItem,
-            DryRunStatus,
-        )
-
-        items = result["items"]
-        dry_items = [
-            DryRunItem(
-                path=str(path / rel).replace("\\", "/"),
-                status=(
-                    DryRunStatus.EXISTS if (path / rel).exists() else DryRunStatus.NEW
-                ),
-                label=label,
-            )
-            for rel, label in items
-        ]
-        render_dry_run_tree(dry_items, title=f"Install preview -> {path}")
+    result["path"] = str(result["path"])
+    post_errors = install_post_errors(result)
+    if post_errors:
+        status = "failed"
     else:
-        from vaultspec_core.cli.rendering import (
-            emit_next_step_hint,
-            render_install_summary,
-            render_sharing_policy,
-        )
+        status = "unchanged" if result["action"] == "dry_run" else "created"
+    typer.echo(render_install_envelope("install", status, result, hints=hint_dict))
+    raise typer.Exit(1 if post_errors else 0)
 
-        render_install_summary(
-            result.get("source_counts", {}),
-            path=str(path),
-            providers=result.get("providers", []),
-            has_mcp=result.get("has_mcp", False),
-        )
-        # Withheld outside a repository: the statement claims these files
-        # "are committed to git so teammates inherit your project policy",
-        # which cannot happen in a directory git does not track.
-        if is_git_repo(path):
-            render_sharing_policy()
-        emit_next_step_hint(
-            command="install",
-            outcome="created",
-            json_output=False,
-            no_hints=no_hints,
-        )
-        post_errors = install_post_errors(result)
-        if post_errors:
-            from vaultspec_core.console import get_console
 
-            console = get_console()
-            console.print()
-            for error in post_errors:
-                console.print(f"[red]x[/red] {error}")
-            raise typer.Exit(1)
+def _render_install_preview(result: dict[str, Any], path: Path) -> None:
+    """Render a dry-run install as a tree of new and existing paths."""
+    from vaultspec_core.cli.rendering import render_dry_run_tree
+    from vaultspec_core.core.dry_run import (
+        DryRunItem,
+        DryRunStatus,
+    )
+
+    items = result["items"]
+    dry_items = [
+        DryRunItem(
+            path=str(path / rel).replace("\\", "/"),
+            status=(DryRunStatus.EXISTS if (path / rel).exists() else DryRunStatus.NEW),
+            label=label,
+        )
+        for rel, label in items
+    ]
+    render_dry_run_tree(dry_items, title=f"Install preview -> {path}")
+
+
+def _render_install_text(result: dict[str, Any], path: Path, *, no_hints: bool) -> None:
+    """Render a completed install and exit non-zero on a recorded sync error."""
+    from vaultspec_core.cli.rendering import (
+        emit_next_step_hint,
+        render_install_summary,
+        render_sharing_policy,
+    )
+
+    render_install_summary(
+        result.get("source_counts", {}),
+        path=str(path),
+        providers=result.get("providers", []),
+        has_mcp=result.get("has_mcp", False),
+    )
+    # Withheld outside a repository: the statement claims these files
+    # "are committed to git so teammates inherit your project policy",
+    # which cannot happen in a directory git does not track.
+    if is_git_repo(path):
+        render_sharing_policy()
+    emit_next_step_hint(
+        command="install",
+        outcome="created",
+        json_output=False,
+        no_hints=no_hints,
+    )
+    post_errors = install_post_errors(result)
+    if post_errors:
+        from vaultspec_core.console import get_console
+
+        console = get_console()
+        console.print()
+        for error in post_errors:
+            console.print(f"[red]x[/red] {error}")
+        raise typer.Exit(1)
 
 
 def cmd_uninstall(

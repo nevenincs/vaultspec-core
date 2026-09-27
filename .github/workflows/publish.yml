@@ -111,20 +111,21 @@ jobs:
       - name: Smoke test (sdist)
         run: uv run --isolated --no-project --with dist/*.tar.gz dev/smoke/smoke_check.py
 
-      # ASKED OF THE DISTRIBUTION, NOT OF THE SOURCE. The generated references
-      # are rendered against a snapshot of the published surface, and the
-      # snapshot is refreshed on the release-please branch - so between the
-      # refresh and the tag there is a window in which the documents could
-      # describe a program the wheel does not contain, and nothing in the
-      # source tree can tell. Only the built artifact can answer.
+      # The tree the wheel was built from, provisioned so it can report its own
+      # surface for the comparison below. After the two smoke tests, which ask
+      # the distribution alone and must not see a project environment.
+      - name: Initialize the worktree
+        run: just init
+
+      # ASKED OF THE DISTRIBUTION, NOT OF THE SOURCE. The wheel is installed in
+      # isolation and reports the commands, flags and MCP tools it actually
+      # exposes; the tagged tree reports its own; they must be identical. A
+      # build that dropped or grew a command would otherwise ship a reference
+      # describing a different program.
       #
-      # Both commands run inside the same isolated install of the wheel: the
-      # first reads the surface that install actually exposes, the second
-      # compares it against the snapshot that install ships. A mismatch is a
-      # release whose own reference describes a different program, and it fails
-      # HERE - before `publish-pypi`, which is the one step that cannot be
-      # undone.
-      - name: Verify the distribution matches the reference it ships
+      # It fails HERE - before `publish-pypi`, which is the one step that
+      # cannot be undone.
+      - name: Verify the distribution exposes the surface of its tree
         run: just release-verify-surface dist
 
   publish-pypi:
@@ -315,22 +316,34 @@ jobs:
           fi
           echo "all ${checked} distribution file(s) verify against ${GITHUB_REPOSITORY}"
 
-      # The same question as the smoke-test gate, asked of the artifact a user
-      # downloads rather than the one this run built. They are meant to be the
-      # same bytes; this is what says so about the surface, in the same place
-      # and for the same reason the provenance gate above re-reads what was
-      # attached rather than trusting that the upload delivered it.
+      # The artifact a user downloads, read back rather than assumed to be the
+      # one the smoke-test job proved. Byte-identical is the whole question, and
+      # a byte comparison answers it without running project code: this job
+      # holds `id-token: write`, and it has no checkout of its own to run
+      # project code from anyway.
       #
       # After the upload by necessity - there is nothing attached to check
-      # before it - so this cannot stop a bad release, only report one. The
-      # smoke-test gate is the one that stops it.
-      - name: Verify the published distribution matches the reference it ships
+      # before it - but before the publication, so a mismatch leaves an
+      # unpublished draft rather than an advertised release.
+      - name: Verify the attached wheel is the one this run built
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release download "${TAG}" --repo "$GITHUB_REPOSITORY" --pattern '*.whl' --dir published --clobber
-          just release-verify-surface published
+          set -euo pipefail
+          published="${RUNNER_TEMP}/published"
+          rm -rf "${published}"
+          gh release download "${TAG}" --repo "$GITHUB_REPOSITORY" --pattern '*.whl' --dir "${published}"
+          checked=0
+          for built in dist/*.whl; do
+            cmp "${built}" "${published}/$(basename "${built}")"
+            checked=$((checked + 1))
+          done
+          if [ "${checked}" -ne 1 ]; then
+            echo "::error::compared ${checked} wheel(s); exactly one is built and attached"
+            exit 1
+          fi
+          echo "the attached wheel is byte-identical to the one this run built"
 
       # THE PUBLICATION. Everything above this line ran against a draft: the
       # binaries lane attached and proved every declared target, this job
@@ -371,6 +384,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
+
+      # The record the generated references are measured against, taken from
+      # this release now that it is the one GitHub reports as latest. It lands
+      # on main by pull request, so it cannot run before the flip above: before
+      # it, the latest release is still the previous one.
+      #
+      # A failure to dispatch leaves main's references measured against the
+      # previous release, and the repository guard that compares the record
+      # with the latest release turns red until surface.yml is run for it.
+      - name: Record the published surface on main
+        run: gh workflow run surface.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # The acquisition check acquires the way a user does - unauthenticated
       # `curl` against the releases API - so it cannot see a draft and has to
