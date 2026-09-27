@@ -377,61 +377,48 @@ def parse_vault_metadata(content: str) -> tuple[DocumentMetadata, str]:
 
         if ":" in line and not line.startswith("-"):
             key, val = line.split(":", 1)
-            key = key.strip()
-            val = val.strip()
-            current_key = key
-
-            if key == "date":
-                # Retained as authored: `vault check all --fix` normalizes
-                # non-canonical stamps and can only do so while it can still
-                # see what was written. The typed reading lives on
-                # `DocumentMetadata.parsed_date`, and every consumer that
-                # would let this value decide a path reads it there - the
-                # raw string is text for reporting and repair, never a path
-                # segment.
-                metadata.date = val.strip("\"'")
-            elif key == "modified":
-                metadata.modified = val.strip("\"'") or None
-            elif key == "superseded_by":
-                metadata.superseded_by = val.strip("\"'") or None
-            elif key == "archived":
-                metadata.archived = val.strip("\"'") or None
-            elif key == "step_id":
-                metadata.step_id = val.strip("\"'") or None
-            elif key == "body_schema":
-                metadata.body_schema = val.strip("\"'") or None
-            elif key == "body_hash":
-                metadata.body_hash = val.strip("\"'") or None
-            elif val.startswith("[") and val.endswith("]"):
-                # Simple inline list parsing: ["#a", "#b"]
-                items = [
-                    i.strip().strip("\"'") for i in val[1:-1].split(",") if i.strip()
-                ]
-                if key == "tags":
-                    metadata.tags = items
-                elif key == "related":
-                    metadata.related = items
-                elif key == "supersedes":
-                    metadata.supersedes = items
-                elif key == "derived_from":
-                    metadata.derived_from = items
-                elif key == "promoted_to":
-                    metadata.promoted_to = items
-        elif line.startswith("-") and current_key:
+            current_key = key.strip()
+            _apply_metadata_value(metadata, current_key, val.strip())
+        elif line.startswith("-") and current_key in _METADATA_LIST_KEYS:
             # Bulleted list item
-            val = line[1:].strip().strip("\"'")
-            if current_key == "tags":
-                metadata.tags.append(val)
-            elif current_key == "related":
-                metadata.related.append(val)
-            elif current_key == "supersedes":
-                metadata.supersedes.append(val)
-            elif current_key == "derived_from":
-                metadata.derived_from.append(val)
-            elif current_key == "promoted_to":
-                metadata.promoted_to.append(val)
+            _metadata_list(metadata, current_key).append(line[1:].strip().strip("\"'"))
 
     return metadata, body
+
+
+#: Optional scalar fields: an empty value reads as ``None``.
+_METADATA_SCALAR_KEYS = frozenset(
+    {"modified", "superseded_by", "archived", "step_id", "body_schema", "body_hash"}
+)
+
+#: List fields, written as an inline ``[...]`` or as bulleted items.
+_METADATA_LIST_KEYS = frozenset(
+    {"tags", "related", "supersedes", "derived_from", "promoted_to"}
+)
+
+
+def _metadata_list(metadata: DocumentMetadata, key: str) -> list[str]:
+    """Return the list field *key* of *metadata*, one of the list keys."""
+    return cast("list[str]", getattr(metadata, key))
+
+
+def _apply_metadata_value(metadata: DocumentMetadata, key: str, val: str) -> None:
+    """Store one ``key: value`` line's value on the matching metadata field."""
+    if key == "date":
+        # Retained as authored: `vault check all --fix` normalizes
+        # non-canonical stamps and can only do so while it can still
+        # see what was written. The typed reading lives on
+        # `DocumentMetadata.parsed_date`, and every consumer that
+        # would let this value decide a path reads it there - the
+        # raw string is text for reporting and repair, never a path
+        # segment.
+        metadata.date = val.strip("\"'")
+    elif key in _METADATA_SCALAR_KEYS:
+        setattr(metadata, key, val.strip("\"'") or None)
+    elif val.startswith("[") and val.endswith("]") and key in _METADATA_LIST_KEYS:
+        # Simple inline list parsing: ["#a", "#b"]
+        items = [i.strip().strip("\"'") for i in val[1:-1].split(",") if i.strip()]
+        setattr(metadata, key, items)
 
 
 #: Keys :func:`rerender_frontmatter` writes from the metadata model. ``feature``
