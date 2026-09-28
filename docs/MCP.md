@@ -251,7 +251,7 @@ distribution, which is written after publication through
 
 <!-- vaultspec:generated:begin unreleased-mcp-surface -->
 
-Measured against `0.2.6`, the latest published release when this reference was
+Measured against `0.3.2`, the latest published release when this reference was
 generated: every tool above is in it.
 
 <!-- vaultspec:generated:end unreleased-mcp-surface -->
