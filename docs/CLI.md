@@ -123,20 +123,8 @@ the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-Measured against `0.2.6`, the latest published release when this reference was
-generated. What follows is not in that release. The list is computed from the surface
-recorded from that release's published distribution; it is never hand-maintained.
-
-Commands:
-
-- `vaultspec-core project context`
-- `vaultspec-core review context`
-
-Flags on commands the release already has:
-
-- `vaultspec-core install` - `--env`, `--env-file`
-- `vaultspec-core spec reference snapshot` - `--record`
-- `vaultspec-core vault adr crossref` - `--body-file`
+Measured against `0.3.2`, the latest published release when this reference was
+generated: every command, flag, and tool documented here is in it.
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
