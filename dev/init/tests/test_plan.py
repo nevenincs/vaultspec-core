@@ -9,7 +9,6 @@ be swept into somebody's next commit.
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -17,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from dev import environment
 from dev.init import plan
 
 pytestmark = [pytest.mark.repo]
@@ -64,16 +64,11 @@ def test_the_framework_step_leaves_tracked_files_untouched(tmp_path: Path) -> No
     )
     (step,) = [step for step in plan.TOOLS.steps if step.name == "framework-install"]
     arguments = step.argv[step.argv.index("vaultspec-core") + 1 :]
-    environment = {
-        name: value
-        for name, value in os.environ.items()
-        if name != "VAULTSPEC_TARGET_DIR"
-    }
 
     completed = subprocess.run(
         [sys.executable, "-m", "vaultspec_core", *arguments],
         cwd=tmp_path,
-        env=environment,
+        env=environment.child_environment(without=("VAULTSPEC_TARGET_DIR",)),
         capture_output=True,
         text=True,
         encoding="utf-8",

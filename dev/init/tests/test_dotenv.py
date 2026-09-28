@@ -9,12 +9,12 @@ overwritten loses the operator's credentials with no way back.
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from dev import environment
 from dev.init import plan
 from dev.init.dotenv import main
 
@@ -211,7 +211,7 @@ def test_the_init_preflight_carries_into_a_linked_worktree(tmp_path: Path) -> No
     completed = subprocess.run(
         step.argv,
         cwd=linked,
-        env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
+        env=environment.child_environment({"PYTHONPATH": str(REPO_ROOT)}),
         capture_output=True,
         text=True,
         encoding="utf-8",
