@@ -75,7 +75,7 @@ jobs:
   # skipped for them, and the gate then refuses the commit as unproven.
   lint:
     name: "Check: Lint (Linux)"
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' || github.event.label.name == 'ci:full'))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' || github.event.label.name == 'ci:full')) }}
     timeout-minutes: 150
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -145,7 +145,7 @@ jobs:
 
   test-linux:
     name: "Test: Full suite (Linux)"
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false)))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
     timeout-minutes: 240
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -236,7 +236,7 @@ jobs:
   # Independent of the Linux suite: it must start even when that one fails.
   test-windows:
     name: "Test: Library suite (Windows)"
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false)))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
     timeout-minutes: 90
     runs-on: [self-hosted, Windows, X64]
     env:
@@ -278,7 +278,7 @@ jobs:
   gate:
     name: "Check: Merge gate (Linux)"
     needs: [lint, test-linux, test-windows]
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (!cancelled()) }}
+    if: ${{ !cancelled() }}
     timeout-minutes: 10
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
