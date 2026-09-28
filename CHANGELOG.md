@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.2](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.1...vaultspec-core-v0.3.2) (2026-09-28)
+
+
+### Features
+
+* **init:** carry .env into linked worktrees; stop rewriting tracked framework files ([#576](https://github.com/nevenincs/vaultspec-core/issues/576)) ([b60bb8a](https://github.com/nevenincs/vaultspec-core/commit/b60bb8a3c1afd6c171d94035732552ded449de3d))
+
+
+### Bug Fixes
+
+* **ci:** drop the remaining hosted-runner references from the workflows ([3dfc6e2](https://github.com/nevenincs/vaultspec-core/commit/3dfc6e2c8af43c80a994fbff48a65e2dd871040d))
+* **ci:** re-deploy the fleet's canonical dev/actionlint.py ([#573](https://github.com/nevenincs/vaultspec-core/issues/573)) ([7891e16](https://github.com/nevenincs/vaultspec-core/commit/7891e162969a1afba377157c41b8aec05e42b45e))
+* **ci:** re-deploy the fleet's canonical dev/ci_contract.py ([#575](https://github.com/nevenincs/vaultspec-core/issues/575)) ([ce59734](https://github.com/nevenincs/vaultspec-core/commit/ce59734b9effc7b43672665fdd169b00a2f72a5b))
+* **ci:** run every job on the self-hosted fleet again ([7c91c3e](https://github.com/nevenincs/vaultspec-core/commit/7c91c3e4d5b7344c0382ba99c8dae81e1539ea2b))
+* **ci:** run the Linux release legs natively on the fleet ([#574](https://github.com/nevenincs/vaultspec-core/issues/574)) ([9b4b4f7](https://github.com/nevenincs/vaultspec-core/commit/9b4b4f78c513c77981101974f84c9874dbb97627))
+* **release:** derive the references' published release from GitHub ([#570](https://github.com/nevenincs/vaultspec-core/issues/570)) ([2487f50](https://github.com/nevenincs/vaultspec-core/commit/2487f50e00ae930ad1fe53ab65b3686c4fea67ba))
+
 ## [0.3.1](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.0...vaultspec-core-v0.3.1) (2026-09-27)
 
 
