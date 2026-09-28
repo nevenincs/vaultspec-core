@@ -77,7 +77,8 @@ class Phase:
         steps: The commands, in order. An empty tuple means this repository has
             nothing to do in this phase, which is reported as ``skipped``.
         inputs: Repository-relative paths whose content decides whether the
-            phase is current. A change to any of them makes the phase stale.
+            phase is current. A change to any of them makes the phase stale. A
+            directory counts every file beneath it.
         artifacts: Repository-relative paths that must exist for the phase to
             count as done. This is what stops a stamp from vouching for an
             environment somebody has since deleted.

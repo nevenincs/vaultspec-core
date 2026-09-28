@@ -56,6 +56,13 @@ the repository.
 command. There are no `[windows]`/`[unix]` recipe pairs and no shell logic,
 which is what lets one implementation serve `cmd.exe`, `pwsh` and `sh` alike.
 
+**`.env` is created, never replaced.** Before any phase, a missing `.env` is
+created from `.env.example`, byte for byte; an existing one is never touched.
+When `plan.py` passes `--from-main-worktree`, a linked worktree's new `.env`
+also takes the values set in the main worktree's `.env`, each written over the
+line of `.env.example` that declares it. Variables the example does not declare
+are left behind, and the step names what it carried without printing a value.
+
 **It provisions the worktree, not the workstation.** `uv`, `just`, `node`,
 `rustup` and `mise` are the operator's responsibility; `init` probes for them,
 reports the complete list of what is missing with installation URLs, and exits
@@ -90,5 +97,6 @@ from the rest of the harness.
 Edit `plan.py` and nothing else. Add a `Step` to the right phase, and — this is
 the part that is easy to forget — add whatever file decides that step's outcome
 to that phase's `inputs`, and whatever the step produces to its `artifacts`.
+An input may be a directory, which counts every file beneath it.
 A step whose input is not declared will be skipped after that input changes; a
 step whose artifact is not declared will be skipped after somebody deletes it.

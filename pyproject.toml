@@ -645,6 +645,11 @@ reportInvalidCast = "error"
   [[tool.basedpyright.executionEnvironments]]
   extraPaths = ["."]
   reportPrivateUsage = false
+  root = "dev/init/tests"
+
+  [[tool.basedpyright.executionEnvironments]]
+  extraPaths = ["."]
+  reportPrivateUsage = false
   root = "dev/statistics/tests"
 
   [[tool.basedpyright.executionEnvironments]]

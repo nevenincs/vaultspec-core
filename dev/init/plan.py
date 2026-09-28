@@ -9,9 +9,12 @@ change makes a phase stale and the artifacts whose absence does the same.
 locked `uv` sync, then the framework enrollment that a fresh worktree
 specifically needs: `.vaultspec/` is tracked but its install manifest,
 `.vaultspec/providers.json`, is not, and the diagnosis engine reads
-"config without manifest" as CORRUPTED. ``vaultspec-core install --force``
-rebuilds the manifest from the tracked config, which is what a consumer
-recovering a lost manifest does.
+"config without manifest" as CORRUPTED. ``vaultspec-core install --skip core``
+rebuilds the manifest and renders every provider's configuration from the
+tracked `.vaultspec/` without seeding it. ``--force`` would also copy the
+package's bundled builtins over the tracked ones, so a fresh worktree would
+start with modified files whenever the two differ; bringing `.vaultspec/` up
+to date is a change to commit, not a side effect of initializing.
 
 Stdlib-only, by the constraint stated in :mod:`dev.init`.
 """
@@ -44,11 +47,24 @@ REQUIREMENTS: Final[tuple[Requirement, ...]] = (
 #: belongs here rather than in `init-tools` because a worktree without one is
 #: under-configured for tools that read it, including `just` itself in the
 #: repositories that set `dotenv-load`. The rule is uniform across the fleet.
+#: A linked worktree also carries the values already set in the main
+#: worktree's `.env`, so a fresh worktree has the operator's hosted-search key
+#: instead of a blank placeholder.
 PREFLIGHT: Final[tuple[Step, ...]] = (
     Step(
         name="dotenv",
-        argv=(PY, "-m", "dev.init.dotenv", ".env.example", ".env"),
-        summary="Provision .env from .env.example when it is absent.",
+        argv=(
+            PY,
+            "-m",
+            "dev.init.dotenv",
+            ".env.example",
+            ".env",
+            "--from-main-worktree",
+        ),
+        summary=(
+            "Provision .env from .env.example when it is absent, carrying the "
+            "values set in the main worktree's .env."
+        ),
     ),
 )
 
@@ -88,9 +104,13 @@ TOOLS = Phase(
                 "--no-sync",
                 "vaultspec-core",
                 "install",
-                "--force",
+                "--skip",
+                "core",
             ),
-            summary="Rebuild .vaultspec/providers.json from the tracked config.",
+            summary=(
+                "Rebuild .vaultspec/providers.json and render the providers "
+                "from the tracked .vaultspec/."
+            ),
         ),
         Step(
             name="actionlint-install",
@@ -106,7 +126,20 @@ TOOLS = Phase(
             summary="Provision the pinned actionlint the workflow check uses.",
         ),
     ),
-    inputs=("uv.lock",),
+    # The sources the provider render reads, so pulling a changed rule or skill
+    # re-renders the providers instead of leaving them stale until `uv.lock`
+    # next moves.
+    inputs=(
+        "uv.lock",
+        ".vaultspec/agents",
+        ".vaultspec/hooks",
+        ".vaultspec/mcps",
+        ".vaultspec/rules",
+        ".vaultspec/skills",
+        ".vaultspec/system",
+        ".vaultspec/triggers",
+        ".vaultspec/workspace.json",
+    ),
     artifacts=(".vaultspec/providers.json",),
 )
 
