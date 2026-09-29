@@ -27,15 +27,58 @@ LOCAL_ENV: Final = ".vaultspec/.env"
 ENV_IGNORE_ENTRIES: Final = ("/.vaultspec/.env", "/.vaultspec/.env.*")
 MAX_ENV_BYTES: Final = 65_536
 
+#: The committable dotenv template. It documents the variables and holds no
+#: values, so it is the one dotenv name left trackable.
+DOTENV_TEMPLATE: Final = ".env.example"
+
+#: Every ``.env`` and ``.env.*`` file, at any depth: dotenv files hold secrets.
+#: Unanchored, so Git matches them in every directory. The negation must follow
+#: the glob it carves the template out of.
+DOTENV_IGNORE_ENTRIES: Final = (".env", ".env.*", f"!{DOTENV_TEMPLATE}")
+
+
+def _is_dotenv_name(name: str) -> bool:
+    return name == ".env" or name.startswith(".env.")
+
 
 def is_local_environment_path(path: str) -> bool:
-    """Identify private stores and temporaries, including nested workspaces."""
+    """Identify files that hold credentials and must never be committed.
+
+    Every ``.env`` and ``.env.*`` file at any depth, other than a
+    ``.env.example`` template; under ``.vaultspec/`` the private store's
+    template-named temporaries count too.
+    """
     parts = PurePosixPath(path.replace("\\", "/")).parts
-    return (
-        len(parts) >= 2
-        and parts[-2] == ".vaultspec"
-        and (parts[-1] == ".env" or parts[-1].startswith(".env."))
+    if not parts or not _is_dotenv_name(parts[-1]):
+        return False
+    return parts[-1] != DOTENV_TEMPLATE or (
+        len(parts) >= 2 and parts[-2] == ".vaultspec"
     )
+
+
+def tracked_dotenv_files(root: Path) -> list[str]:
+    """Return the dotenv files the Git index tracks, templates excluded.
+
+    Args:
+        root: Workspace root.
+
+    Returns:
+        The tracked root-relative paths, at any depth; empty outside a
+        repository.
+
+    Raises:
+        VaultSpecError: When Git cannot report the index.
+    """
+    if not _in_git(root):
+        return []
+    result = _git(root, "ls-files", "--", ":(glob)**/.env", ":(glob)**/.env.*")
+    if result.returncode:
+        raise VaultSpecError("Cannot verify whether a .env file is tracked.")
+    return [
+        name
+        for name in (line.strip() for line in result.stdout.splitlines())
+        if name and is_local_environment_path(name)
+    ]
 
 
 def _plain_path(path: Path) -> None:

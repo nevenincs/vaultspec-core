@@ -645,9 +645,10 @@ The read-only check the generated pre-commit hook runs. It checks each staged va
 document with the checkers that judge a document on its own, and blocks only on errors
 the commit introduces: an error the document's committed version already carries is
 printed as advisory and does not block. It also blocks staged per-machine files, such as
-the install manifest, snapshots, lock sentinels, and local vault caches. It never
-writes, and it never runs the whole-vault checks; `vaultspec-core vault check all`
-remains the corpus-wide gate for CI and explicit runs.
+the install manifest, snapshots, lock sentinels, and local vault caches, and every
+`.env` or `.env.*` file other than an `.env.example` template. It never writes, and it
+never runs the whole-vault checks; `vaultspec-core vault check all` remains the
+corpus-wide gate for CI and explicit runs.
 
 #### Arguments
 
@@ -3601,6 +3602,13 @@ running interpreter lives inside the workspace (its project virtual environment)
 the owning package's own resolved install mode for that workspace is `dependency` or
 `dev`. A globally installed tool (a uv tool, a pipx install, a release binary) pointed
 at a freshly cloned repository never reads that repository's `.env`.
+
+No `.env` file is ever committed, this one or any other: dotenv files hold secrets. The
+managed `.gitignore` block ignores every `.env` and `.env.*` file at any depth, leaving
+only `.env.example` templates committable; the commit gate refuses one that is
+force-added; and `vaultspec-core doctor` warns when the Git index already tracks one. An
+ignore rule cannot untrack a file, so a tracked `.env` needs `git rm --cached` and every
+secret it held rotated.
 
 Booleans read one vocabulary: `1`, `true`, `yes` or `on` against `0`, `false`, `no` or
 `off`, case-folded and stripped. A blank value is unset, not off, and falls through to
