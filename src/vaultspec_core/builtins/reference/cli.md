@@ -1128,6 +1128,12 @@ running interpreter lives inside the workspace, and the owning package's own res
 install mode for that workspace is `dependency` or `dev`. A globally installed tool run
 against a cloned repository never reads that repository's `.env`.
 
+No `.env` file is ever committed, this one or any other: dotenv files hold secrets. The
+managed `.gitignore` block ignores every `.env` and `.env.*` file at any depth, leaving
+only `.env.example` templates committable; the commit gate refuses one that is
+force-added; and `vaultspec-core doctor` warns when the Git index already tracks one. A
+tracked `.env` needs `git rm --cached` and every secret it held rotated.
+
 Booleans read one vocabulary: `1`, `true`, `yes` or `on` against `0`, `false`, `no` or
 `off`, case-folded and stripped. A blank value is unset, not off, and falls through to
 the next rung. An invalid value for a product-owned variable refuses the process and

@@ -199,8 +199,10 @@ trust the server. If your agent asks, approve it.
 Records live in `.vault/`, and the policy lives in `.vaultspec/`. Commit both, along
 with the agent configuration the installer writes, so teammates share the records and
 rules. Installation adds ignore rules that keep local state out of Git, such as lock
-files, snapshots, and `.vaultspec/.env`. It also writes a pre-commit configuration
-unless you pass `--skip precommit`. Activating the commit hooks is a separate step; see
+files, snapshots, and `.vaultspec/.env`. They also keep every `.env` and `.env.*` file
+out of Git, at any depth; only `.env.example` templates stay committable. It also writes
+a pre-commit configuration unless you pass `--skip precommit`. Activating the commit
+hooks is a separate step; see
 [configure project integrations](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md#configure-project-integrations).
 
 To check the result, run:
