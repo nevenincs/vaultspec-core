@@ -101,7 +101,8 @@ A feature tag groups the work's records. To see recorded progress:
 uvx vaultspec-core status search-api
 ```
 
-Without a feature tag, `status` lists every plan in flight and its next open Step:
+Without a feature tag, `vaultspec-core status` lists every plan in flight and its next
+open Step:
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-status.svg" alt="status listing two plans in flight with their progress and next open Step, one completed plan, and recent changes" width="880">
