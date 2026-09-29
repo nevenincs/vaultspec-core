@@ -317,12 +317,20 @@ def untrack_managed_paths(target: Path, entries: list[str]) -> list[str]:
 def _covered_by_entry(path: str, entry: str) -> bool:
     """Whether root-relative *path* falls under managed ignore *entry*.
 
-    Every managed entry is root-anchored: it either starts with ``/`` or has a
-    slash before its end, which is how gitignore anchors a pattern. So a
-    directory entry matches by prefix, a glob entry matches the whole path, and
-    anything else matches exactly.
+    An entry with a slash before its end is root-anchored, which is how
+    gitignore anchors a pattern: a directory entry matches by prefix, a glob
+    entry matches the whole path, and anything else matches exactly. An entry
+    without one, such as ``.env``, matches the final name at any depth.
     """
     pattern = entry.removeprefix("/")
+    if not (entry.startswith("/") or "/" in pattern.rstrip("/")):
+        parts = PurePosixPath(path).parts
+        if pattern.endswith("/"):
+            return any(
+                PurePosixPath(part).full_match(pattern.rstrip("/"))
+                for part in parts[:-1]
+            )
+        return bool(parts) and PurePosixPath(parts[-1]).full_match(pattern)
     if pattern.endswith("/"):
         return path.startswith(pattern)
     if any(char in pattern for char in "*?["):

@@ -335,7 +335,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         }
     )
 
-    # Credentials row. An ignore rule cannot untrack a file, so a tracked root
+    # Credentials row. An ignore rule cannot untrack a file, so a tracked
     # .env names the remediation rather than only the condition.
     if diag.tracked_credentials is None:
         cred_status, cred_detail = "warn", "unreadable (git index could not be read)"
@@ -347,7 +347,7 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
             "every secret it held)"
         )
     else:
-        cred_status, cred_detail = "ok", "no root .env tracked"
+        cred_status, cred_detail = "ok", "no .env file tracked"
     rows.append(
         {
             "component": "credentials",
@@ -975,7 +975,7 @@ def doctor_exit_code(
     weights = [
         _framework_weight(diag),
         _gitignore_weight(diag.gitignore),
-        # A tracked root .env, or an index that could not be read to rule one
+        # A tracked .env file, or an index that could not be read to rule one
         # out, is a warning.
         (False, diag.tracked_credentials != []),
         _gitattributes_weight(diag.gitattributes),

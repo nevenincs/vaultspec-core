@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
-from vaultspec_core.config.local_env import ENV_IGNORE_ENTRIES, ROOT_ENV_IGNORE_ENTRIES
+from vaultspec_core.config.local_env import DOTENV_IGNORE_ENTRIES, ENV_IGNORE_ENTRIES
 from vaultspec_core.core.commands import (
     canonical_hook_entries_for_mode,
     entry_prefix_for_mode,
@@ -945,7 +945,7 @@ class TestGitignoreState:
     def test_complete(self, tmp_path: Path) -> None:
         # The credential ignores are always recommended, framework or not.
         entries = "\n".join(
-            [*DEFAULT_ENTRIES, *ENV_IGNORE_ENTRIES, *ROOT_ENV_IGNORE_ENTRIES]
+            [*DEFAULT_ENTRIES, *ENV_IGNORE_ENTRIES, *DOTENV_IGNORE_ENTRIES]
         )
         content = f"node_modules/\n\n{MARKER_BEGIN}\n{entries}\n{MARKER_END}\n"
         _write_gitignore(tmp_path, content)

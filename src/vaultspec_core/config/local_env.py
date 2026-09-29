@@ -27,13 +27,14 @@ LOCAL_ENV: Final = ".vaultspec/.env"
 ENV_IGNORE_ENTRIES: Final = ("/.vaultspec/.env", "/.vaultspec/.env.*")
 MAX_ENV_BYTES: Final = 65_536
 
-#: The committable template beside the workspace-root dotenv. It documents the
-#: variables and holds no values, so it is the one root variant left trackable.
-ROOT_ENV_TEMPLATE: Final = ".env.example"
+#: The committable dotenv template. It documents the variables and holds no
+#: values, so it is the one dotenv name left trackable.
+DOTENV_TEMPLATE: Final = ".env.example"
 
-#: The workspace-root dotenv, which the credential resolver reads, and its
-#: variants. The negation must follow the glob it carves the template out of.
-ROOT_ENV_IGNORE_ENTRIES: Final = ("/.env", "/.env.*", f"!/{ROOT_ENV_TEMPLATE}")
+#: Every ``.env`` and ``.env.*`` file, at any depth: dotenv files hold secrets.
+#: Unanchored, so Git matches them in every directory. The negation must follow
+#: the glob it carves the template out of.
+DOTENV_IGNORE_ENTRIES: Final = (".env", ".env.*", f"!{DOTENV_TEMPLATE}")
 
 
 def _is_dotenv_name(name: str) -> bool:
@@ -43,33 +44,36 @@ def _is_dotenv_name(name: str) -> bool:
 def is_local_environment_path(path: str) -> bool:
     """Identify files that hold credentials and must never be committed.
 
-    These are the private stores and their temporaries, including nested
-    workspaces, and the workspace-root dotenv and its variants other than the
-    template.
+    Every ``.env`` and ``.env.*`` file at any depth, other than a
+    ``.env.example`` template; under ``.vaultspec/`` the private store's
+    template-named temporaries count too.
     """
     parts = PurePosixPath(path.replace("\\", "/")).parts
-    if len(parts) == 1:
-        return _is_dotenv_name(parts[0]) and parts[0] != ROOT_ENV_TEMPLATE
-    return len(parts) >= 2 and parts[-2] == ".vaultspec" and _is_dotenv_name(parts[-1])
+    if not parts or not _is_dotenv_name(parts[-1]):
+        return False
+    return parts[-1] != DOTENV_TEMPLATE or (
+        len(parts) >= 2 and parts[-2] == ".vaultspec"
+    )
 
 
-def tracked_root_environment_files(root: Path) -> list[str]:
-    """Return the root dotenv files the Git index tracks, the template excluded.
+def tracked_dotenv_files(root: Path) -> list[str]:
+    """Return the dotenv files the Git index tracks, templates excluded.
 
     Args:
         root: Workspace root.
 
     Returns:
-        The tracked root-relative paths; empty outside a repository.
+        The tracked root-relative paths, at any depth; empty outside a
+        repository.
 
     Raises:
         VaultSpecError: When Git cannot report the index.
     """
     if not _in_git(root):
         return []
-    result = _git(root, "ls-files", "--", ".env", ".env.*")
+    result = _git(root, "ls-files", "--", ":(glob)**/.env", ":(glob)**/.env.*")
     if result.returncode:
-        raise VaultSpecError("Cannot verify whether the root .env is tracked.")
+        raise VaultSpecError("Cannot verify whether a .env file is tracked.")
     return [
         name
         for name in (line.strip() for line in result.stdout.splitlines())

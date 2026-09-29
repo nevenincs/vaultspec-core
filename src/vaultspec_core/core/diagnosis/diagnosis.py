@@ -122,11 +122,11 @@ class HomeDiagnosis:
     #: Empty when the question could not be asked at all - no active workspace
     #: context, or no installed provider that consumes hooks.
     provider_hooks: list[ProviderHookReport] = field(default_factory=list)
-    #: Root ``.env`` files, and variants other than the ``.env.example``
-    #: template, that the Git index already tracks. An ignore rule cannot
-    #: protect a tracked file, so each needs removing from the index and its
-    #: secrets rotating. ``None`` when the index could not be read, which
-    #: vouches for nothing.
+    #: ``.env`` and ``.env.*`` files, at any depth and other than
+    #: ``.env.example`` templates, that the Git index already tracks. An
+    #: ignore rule cannot protect a tracked file, so each needs removing from
+    #: the index and its secrets rotating. ``None`` when the index could not
+    #: be read, which vouches for nothing.
     tracked_credentials: list[str] | None = field(default_factory=list)
 
 
@@ -223,7 +223,7 @@ class WorkspaceDiagnosis:
 
     @property
     def tracked_credentials(self) -> list[str] | None:
-        """Tracked root ``.env`` files, or ``None`` when unverifiable."""
+        """Tracked ``.env`` files, or ``None`` when unverifiable."""
         return self.home.tracked_credentials
 
 
@@ -258,11 +258,11 @@ def _safe_gitignore_state(target: Path) -> GitignoreSignal:
 
 
 def _safe_tracked_credentials(target: Path) -> list[str] | None:
-    """List tracked root dotenv files, or ``None`` when the index is unreadable."""
-    from ...config.local_env import tracked_root_environment_files
+    """List tracked ``.env`` files, or ``None`` when the index is unreadable."""
+    from ...config.local_env import tracked_dotenv_files
 
     try:
-        return tracked_root_environment_files(target)
+        return tracked_dotenv_files(target)
     except Exception:
         logger.warning("Tracked credential probe failed", exc_info=True)
         return None

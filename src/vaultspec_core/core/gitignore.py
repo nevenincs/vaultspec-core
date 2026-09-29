@@ -212,16 +212,16 @@ def get_recommended_entries(target: Path) -> list[str]:
     sharing rule that keeps it out of the block does not apply to it.
 
     Credential files are listed unconditionally: the private store under
-    ``.vaultspec/`` and the workspace-root ``.env`` the credential resolver
-    reads, with its variants. Negations sort last, because Git applies a
-    negation only to the patterns above it.
+    ``.vaultspec/``, and every ``.env`` and ``.env.*`` file at any depth, with
+    only the ``.env.example`` template re-included. Negations sort last,
+    because Git applies a negation only to the patterns above it.
 
     Args:
         target: Workspace root directory.
     """
-    from ..config.local_env import ENV_IGNORE_ENTRIES, ROOT_ENV_IGNORE_ENTRIES
+    from ..config.local_env import DOTENV_IGNORE_ENTRIES, ENV_IGNORE_ENTRIES
 
-    entries: set[str] = {*ENV_IGNORE_ENTRIES, *ROOT_ENV_IGNORE_ENTRIES}
+    entries: set[str] = {*ENV_IGNORE_ENTRIES, *DOTENV_IGNORE_ENTRIES}
 
     # An unreadable workspace or a malformed hook declaration still yields the
     # credential entries: the block must never be dropped because policy failed.

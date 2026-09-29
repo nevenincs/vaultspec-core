@@ -46,17 +46,17 @@ def _old_policy_vocabulary() -> frozenset[str]:
     that falls outside this set is therefore an operator addition the
     migration must not clobber.
     """
-    from ..config.local_env import ENV_IGNORE_ENTRIES, ROOT_ENV_IGNORE_ENTRIES
+    from ..config.local_env import DOTENV_IGNORE_ENTRIES, ENV_IGNORE_ENTRIES
     from ..core.enums import DirName, FileName
 
     # Runtime by-products - emitted by both the old and the reversed policy.
     # The set also covers entries later releases added to the reversed
-    # policy (mcp-ownership.json, the project store's ignores, the root
-    # dotenv's), so a re-run over an already-reversed block stays a no-op
+    # policy (mcp-ownership.json, the project store's ignores, the
+    # dotenv files'), so a re-run over an already-reversed block stays a no-op
     # instead of reading its own output as operator edits.
     vocabulary = {
         *ENV_IGNORE_ENTRIES,
-        *ROOT_ENV_IGNORE_ENTRIES,
+        *DOTENV_IGNORE_ENTRIES,
         ".vaultspec/_snapshots/",
         ".vaultspec/*.lock",
         ".vaultspec/providers.json",
