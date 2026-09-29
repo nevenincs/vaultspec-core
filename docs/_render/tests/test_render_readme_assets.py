@@ -163,20 +163,63 @@ def test_demo_corpus_names_no_feature_of_this_project(
     assert not demo_features & real_features
 
 
-def test_render_svg_writes_a_themed_terminal_window(tmp_path: Path) -> None:
-    """The export lands on disk with the brand border swapped in."""
-    from docs._render.render_readme_assets import LIGHT_STROKE, RICH_STROKE, render_svg
+#: The traffic-light fills of rich's default macOS window chrome.
+MACOS_BUTTONS = ("#ff5f57", "#febc2e", "#28c840")
+
+VIEWBOX = re.compile(r'viewBox="0 0 ([\d.]+) ([\d.]+)"')
+
+
+def test_render_svg_writes_a_brand_terminal_without_window_buttons(
+    tmp_path: Path,
+) -> None:
+    """The bar names the directory and command; no platform chrome is drawn."""
+    from docs._render.render_readme_assets import VAULTSPEC_THEME, render_svg
 
     out = tmp_path / "term.svg"
-    render_svg("first line\nsecond line\n", str(out), "vaultspec-core status", 40)
+    render_svg(
+        "first line\nsecond line\n",
+        str(out),
+        "vaultspec-core status",
+        40,
+        cwd="~/code/project",
+    )
 
     svg = svg_source(out)
     assert svg.lstrip().startswith("<svg")
-    assert "vaultspec-core status" in svg
+    assert ">~/code/project</text>" in svg
+    assert ">vaultspec-core status</text>" in svg
     assert "first line" in svg
     assert "second line" in svg
-    assert LIGHT_STROKE in svg
-    assert RICH_STROKE not in svg
+    assert f'fill="{VAULTSPEC_THEME.background_color.hex}"' in svg
+    assert "<circle" not in svg
+    assert not [fill for fill in MACOS_BUTTONS if fill in svg]
+
+
+def test_render_svg_frame_grows_by_one_line_pitch_per_row(tmp_path: Path) -> None:
+    """The frame is sized to the capture, so no row is clipped or padded out."""
+    from docs._render.render_readme_assets import LINE_HEIGHT, render_svg
+
+    def viewbox(rows: int) -> tuple[float, float]:
+        out = tmp_path / f"rows-{rows}.svg"
+        render_svg("\n".join(f"row{i}" for i in range(rows)), str(out), "t", 40)
+        match = VIEWBOX.search(out.read_text(encoding="utf-8"))
+        assert match is not None, f"{out} has no viewBox"
+        return float(match.group(1)), float(match.group(2))
+
+    two_wide, two_high = viewbox(2)
+    five_wide, five_high = viewbox(5)
+    assert five_wide == two_wide
+    assert five_high - two_high == pytest.approx(3 * LINE_HEIGHT)
+
+
+def test_render_svg_keeps_braces_in_the_title_bar(tmp_path: Path) -> None:
+    """A command naming a placeholder must not be read as a template field."""
+    from docs._render.render_readme_assets import render_svg
+
+    out = tmp_path / "braces.svg"
+    render_svg("body\n", str(out), "vaultspec-core vault add --feature {feature}", 40)
+
+    assert "--feature {feature}</text>" in svg_source(out)
 
 
 def test_render_svg_truncates_to_max_lines_and_marks_the_cut(tmp_path: Path) -> None:

@@ -2,8 +2,8 @@
 """Regenerate the README terminal renders under ``docs/assets/``.
 
 Runs real CLI commands against a neutral, synthetic demo vault and exports
-each capture as a rich terminal-window SVG themed on the vaultspec logo
-palette. The demo vault is built in a throwaway temporary directory with
+each capture as an SVG styled as the brand's documentation terminal. The
+demo vault is built in a throwaway temporary directory with
 invented feature names (``editor-demo``, ``grid-layout``,
 ``syntax-highlighting``) so the published screenshots never embed a real
 project's own development records. ``vaultspec-core`` commands run
@@ -16,7 +16,7 @@ does not populate.
 
 Output is genuine command output over the demo vault; rendering only trims
 length (a dim ellipsis marks truncation) and applies the brand terminal
-theme.
+frame and palette.
 
 Usage::
 
@@ -36,7 +36,9 @@ import subprocess
 import sys
 import tempfile
 import time
+from html import escape
 from pathlib import Path
+from string import Template
 
 from rich.console import Console
 from rich.terminal_theme import TerminalTheme
@@ -48,41 +50,106 @@ import vaultspec_core.console as vsconsole
 # recording consoles below are never a real terminal.
 os.environ.pop("NO_COLOR", None)
 
-# Palette derived from the vaultspec logo, light variant: warm charcoal
-# foreground on cream paper, with the sage / teal / sand / dusty-rose /
-# lavender accents darkened to keep contrast on the light ground.
+# The brand's documentation terminal, which is dark in both page themes so
+# one render serves both: grey-green ink on the dark mat, the brand green for
+# success, ochre for warnings, and chalk blue for commands. The remaining ANSI
+# slots are filled with cool tones at the same lightness.
 VAULTSPEC_THEME = TerminalTheme(
-    background=(250, 247, 242),
-    foreground=(30, 27, 24),
+    background=(20, 24, 22),
+    foreground=(216, 223, 218),
     normal=[
-        (30, 27, 24),
-        (166, 92, 92),
-        (106, 122, 77),
-        (163, 122, 58),
-        (86, 108, 158),
-        (124, 106, 156),
-        (74, 124, 116),
-        (94, 86, 78),
+        (15, 18, 17),
+        (229, 122, 134),
+        (111, 190, 139),
+        (220, 160, 90),
+        (132, 182, 214),
+        (180, 166, 212),
+        (114, 194, 196),
+        (216, 223, 218),
     ],
     bright=[
-        (145, 137, 129),
-        (146, 72, 72),
-        (88, 104, 60),
-        (140, 102, 42),
-        (66, 88, 140),
-        (104, 86, 138),
-        (56, 106, 98),
-        (30, 27, 24),
+        (141, 153, 145),
+        (240, 154, 163),
+        (138, 207, 162),
+        (232, 183, 117),
+        (163, 201, 227),
+        (201, 189, 227),
+        (147, 211, 211),
+        (241, 244, 241),
     ],
 )
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
-# Rich hardcodes a white window border, invisible around a light terminal
-# on a light page; render_svg swaps it for a soft warm-charcoal line. The
-# literal lives inside rich's export_svg, so a rich upgrade can change it.
-RICH_STROKE = 'stroke="rgba(255,255,255,0.35)"'
-LIGHT_STROKE = 'stroke="rgba(30,27,24,0.22)"'
+# The working directory the stills' title bar names. The demo vault lives in a
+# throwaway temp directory, so the bar shows a neutral project path instead.
+DEMO_CWD = "~/code/editor"
+
+TERM_BAR = "#1e2321"
+TERM_FAINT = "#8d9991"
+TERM_RULE = "#3c4541"
+FONT_STACK = (
+    "'IBM Plex Mono', 'Cascadia Mono', 'Cascadia Code', ui-monospace, Menlo, "
+    "Consolas, 'DejaVu Sans Mono', monospace"
+)
+
+# Frame geometry in SVG units. Rich fixes a 20-unit character height and a
+# 1.22 line pitch; the aspect ratio is passed to it so both sides share it.
+FONT_ASPECT = 0.61
+CHAR_WIDTH = 20 * FONT_ASPECT
+LINE_HEIGHT = 20 * 1.22
+PAD_X = 28
+BAR_HEIGHT = 50
+PAD_TOP = 26
+PAD_BOTTOM = 30
+RADIUS = 14
+
+# Replaces rich's default template, whose chrome draws a macOS window with
+# three traffic-light buttons. `$` fields are filled here; `{}` fields are
+# rich's own, filled by export_svg.
+SVG_FRAME = Template("""\
+<svg class="rich-terminal" viewBox="0 0 $width $height" xmlns="http://www.w3.org/2000/svg">
+    <style>
+    .{unique_id}-matrix {{
+        font-family: $font;
+        font-size: {char_height}px;
+        line-height: {line_height}px;
+        font-variant-east-asian: full-width;
+    }}
+    .{unique_id}-bar {{
+        font-family: $font;
+        font-size: 17px;
+        fill: $faint;
+    }}
+    {styles}
+    </style>
+    <defs>
+    <clipPath id="{unique_id}-clip-frame">
+      <rect x="0" y="0" width="$width" height="$height" rx="$radius"/>
+    </clipPath>
+    <clipPath id="{unique_id}-clip-terminal">
+      <rect x="0" y="0" width="{terminal_width}" height="{terminal_height}"/>
+    </clipPath>
+    {lines}
+    </defs>
+    <g clip-path="url(#{unique_id}-clip-frame)">
+    <rect width="$width" height="$height" fill="$background"/>
+    <rect width="$width" height="$bar_height" fill="$bar"/>
+    </g>
+    <rect x="0.5" y="0.5" width="$outline_width" height="$outline_height"
+        rx="$radius" fill="none" stroke="$rule"/>
+    <text class="{unique_id}-bar" x="$pad_x" y="$bar_text_y">$left</text>
+    <text class="{unique_id}-bar" x="$right_x" y="$bar_text_y"
+        text-anchor="end">$right</text>
+    <g transform="translate($pad_x, $body_y)"
+        clip-path="url(#{unique_id}-clip-terminal)">
+    {backgrounds}
+    <g class="{unique_id}-matrix">
+    {matrix}
+    </g>
+    </g>
+</svg>
+""")
 
 # ---------------------------------------------------------------------------
 # Demo vault definition
@@ -449,8 +516,13 @@ def render_svg(
     width: int,
     max_lines: int | None = None,
     start_match: str | None = None,
+    cwd: str = DEMO_CWD,
 ) -> None:
-    """Export captured ANSI text as a themed terminal-window SVG."""
+    """Export captured ANSI text as a brand-styled terminal SVG.
+
+    The title bar names *cwd* on the left and the command, *title*, on the
+    right.
+    """
     lines = ansi.splitlines()
     if start_match is not None:
         for i, line in enumerate(lines):
@@ -469,15 +541,46 @@ def render_svg(
         out.print(Text.from_ansi(line), no_wrap=True, overflow="ellipsis")
     if truncated:
         out.print(Text("  …", style="bright_black"))
-    svg = out.export_svg(title=title, theme=VAULTSPEC_THEME)
-    if RICH_STROKE not in svg:
-        raise RuntimeError(
-            "rich's window-border stroke literal changed; update RICH_STROKE"
-        )
-    svg = svg.replace(RICH_STROKE, LIGHT_STROKE)
-    with open(out_path, "w", encoding="utf-8") as fh:
+    rows = len(lines) + int(truncated)
+    svg = out.export_svg(
+        title=title,
+        theme=VAULTSPEC_THEME,
+        font_aspect_ratio=FONT_ASPECT,
+        code_format=svg_frame(rows, width, left=cwd, right=title),
+    )
+    with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(svg)
     print(f"wrote {out_path} ({len(lines)} lines)")
+
+
+def svg_frame(rows: int, columns: int, *, left: str, right: str) -> str:
+    """Return the rich ``code_format`` for a *rows* by *columns* terminal."""
+    width = PAD_X * 2 + CHAR_WIDTH * columns
+    height = BAR_HEIGHT + PAD_TOP + LINE_HEIGHT * rows + PAD_BOTTOM
+
+    def bar_text(text: str) -> str:
+        # Rich formats the result with str.format, so literal braces double.
+        return escape(text).replace("{", "{{").replace("}", "}}")
+
+    return SVG_FRAME.substitute(
+        width=f"{width:g}",
+        height=f"{height:g}",
+        outline_width=f"{width - 1:g}",
+        outline_height=f"{height - 1:g}",
+        radius=RADIUS,
+        font=FONT_STACK,
+        faint=TERM_FAINT,
+        background=VAULTSPEC_THEME.background_color.hex,
+        bar=TERM_BAR,
+        bar_height=BAR_HEIGHT,
+        rule=TERM_RULE,
+        pad_x=PAD_X,
+        right_x=f"{width - PAD_X:g}",
+        bar_text_y=BAR_HEIGHT // 2 + 6,
+        body_y=BAR_HEIGHT + PAD_TOP,
+        left=bar_text(left),
+        right=bar_text(right),
+    )
 
 
 def main() -> None:

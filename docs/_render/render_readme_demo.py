@@ -8,8 +8,8 @@ output in-process (see :mod:`docs._render.render_readme_assets` for the
 recording-console technique). The captures are stitched into a
 synthesized asciicast v2 stream - typed prompts, streamed output, a
 comment beat for the off-screen drafting and first Step - and rendered to
-GIF with `agg <https://github.com/asciinema/agg>`_ themed on the
-vaultspec logo palette.
+GIF with `agg <https://github.com/asciinema/agg>`_ in the palette of the
+brand's documentation terminal, shared with the SVG stills.
 
 The only edits to the captured output are cosmetic: the temp directory
 path is redacted to ``~/code/search-api``, Windows path separators are
@@ -102,10 +102,10 @@ def _fg(rgb: tuple[int, int, int]) -> str:
 
 # Derived from the single palette source in render_readme_assets so the
 # demo GIF and the SVG stills can never drift apart.
-TEAL = _fg(VAULTSPEC_THEME.ansi_colors[6])
+GREEN = _fg(VAULTSPEC_THEME.ansi_colors[2])
 DIM = _fg(VAULTSPEC_THEME.ansi_colors[8])
 RESET = "\x1b[0m"
-PROMPT = f"{TEAL}❯{RESET} "  # noqa: RUF001
+PROMPT = f"{GREEN}❯{RESET} "  # noqa: RUF001
 
 # agg theme string: bg, fg, then ANSI colors 0-15.
 AGG_THEME = ",".join(
