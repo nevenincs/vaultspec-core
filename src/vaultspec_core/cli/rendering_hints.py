@@ -32,19 +32,28 @@ _NEXT_STEP_HINTS: dict[tuple[str, str], tuple[str, str]] = {
         "vaultspec-core vault add plan --feature {feature} --related {adr_stem}",
         "If durable sequencing is needed, draft a plan using this decision",
     ),
+    # A new plan has no structure yet, so the next action authors its first
+    # container, which the tier decides: Steps at L1, Phases at L2, and Waves
+    # above. The add command appends the tier to the key for L2 and up.
     ("vault.add.plan", "created"): (
-        "vaultspec-core vault add exec --all-steps --feature {feature} "
-        "--related {plan_stem}",
-        "Scaffold step-aware execution records for your plan",
+        "vaultspec-core vault plan step add {plan_stem} "
+        '--action "<action>" --scope "<path>"',
+        "Author the plan's first Step",
     ),
-    # The argument is named rather than interpolated: the context this hint is
-    # rendered with carries the stem of the document just created, which for an
-    # exec record is the record and not the plan it belongs to. A placeholder a
-    # reader substitutes beats a plausible stem that resolves to the wrong
-    # document, and `vault plan status` requires the argument either way.
-    ("vault.add.exec", "created"): (
-        "vaultspec-core vault plan status <plan-or-feature>",
-        "Track the progress and verification of your plan",
+    ("vault.add.plan.L2", "created"): (
+        "vaultspec-core vault plan phase add {plan_stem} "
+        '--title "<title>" --intent "<intent>"',
+        "Author the plan's first Phase",
+    ),
+    ("vault.add.plan.L3", "created"): (
+        "vaultspec-core vault plan wave add {plan_stem} "
+        '--title "<title>" --intent "<intent>"',
+        "Author the plan's first Wave",
+    ),
+    ("vault.add.plan.L4", "created"): (
+        "vaultspec-core vault plan wave add {plan_stem} "
+        '--title "<title>" --intent "<intent>"',
+        "Author the plan's first Wave",
     ),
     ("vault.add.audit", "created"): (
         "vaultspec-core vault rule promote --from {audit_stem} --as {rule_name}",
