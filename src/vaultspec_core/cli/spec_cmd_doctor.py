@@ -335,6 +335,29 @@ def render_diagnosis_table(_console: "Console", diag: "WorkspaceDiagnosis") -> N
         }
     )
 
+    # Credentials row. An ignore rule cannot untrack a file, so a tracked root
+    # .env names the remediation rather than only the condition.
+    if diag.tracked_credentials is None:
+        cred_status, cred_detail = "warn", "unreadable (git index could not be read)"
+    elif diag.tracked_credentials:
+        files = " ".join(diag.tracked_credentials)
+        cred_status = "warn"
+        cred_detail = (
+            f"tracked: {files} (run git rm --cached {files}, then rotate "
+            "every secret it held)"
+        )
+    else:
+        cred_status, cred_detail = "ok", "no root .env tracked"
+    rows.append(
+        {
+            "component": "credentials",
+            "status": Cell(
+                cred_status, style="yellow" if cred_status == "warn" else "green"
+            ),
+            "detail": cred_detail,
+        }
+    )
+
     # Gitattributes row
     ga_status, ga_style = _signal_status(
         diag.gitattributes,
@@ -952,6 +975,9 @@ def doctor_exit_code(
     weights = [
         _framework_weight(diag),
         _gitignore_weight(diag.gitignore),
+        # A tracked root .env, or an index that could not be read to rule one
+        # out, is a warning.
+        (False, diag.tracked_credentials != []),
         _gitattributes_weight(diag.gitattributes),
         _precommit_weight(diag.precommit),
         (False, _provider_hooks_weigh_warn(diag.provider_hooks)),

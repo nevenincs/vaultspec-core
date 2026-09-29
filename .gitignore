@@ -195,11 +195,14 @@ dev/statistics/out/
 .vaultspec/providers.json
 /.agents/mcp_config.json.lock
 /.codex/config.toml.lock
+/.env
+/.env.*
 /.gitignore.lock
 /.mcp.json.lock
 /.pre-commit-config.yaml.lock
 /.vaultspec/.env
 /.vaultspec/.env.*
+!/.env.example
 # <<< vaultspec-managed <<<
 
 # Release binaries built locally by `just binaries`, and the stock

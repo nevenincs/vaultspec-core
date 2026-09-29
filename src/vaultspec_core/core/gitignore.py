@@ -211,12 +211,17 @@ def get_recommended_entries(target: Path) -> list[str]:
     the workspace declined is not policy a teammate should inherit, so the
     sharing rule that keeps it out of the block does not apply to it.
 
+    Credential files are listed unconditionally: the private store under
+    ``.vaultspec/`` and the workspace-root ``.env`` the credential resolver
+    reads, with its variants. Negations sort last, because Git applies a
+    negation only to the patterns above it.
+
     Args:
         target: Workspace root directory.
     """
-    from ..config.local_env import ENV_IGNORE_ENTRIES
+    from ..config.local_env import ENV_IGNORE_ENTRIES, ROOT_ENV_IGNORE_ENTRIES
 
-    entries: set[str] = set(ENV_IGNORE_ENTRIES)
+    entries: set[str] = {*ENV_IGNORE_ENTRIES, *ROOT_ENV_IGNORE_ENTRIES}
 
     # An unreadable workspace or a malformed hook declaration still yields the
     # credential entries: the block must never be dropped because policy failed.
@@ -293,7 +298,7 @@ def get_recommended_entries(target: Path) -> list[str]:
         if framework_installed and not read_hooks_declaration(target).pre_commit:
             entries.update(f"/{name}" for name in PRECOMMIT_CONFIG_NAMES)
 
-    return sorted(entries)
+    return sorted(entries, key=lambda entry: (entry.startswith("!"), entry))
 
 
 # Managed-block entries the cli-spec-gitignore reversal removed. Their

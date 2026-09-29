@@ -392,11 +392,20 @@ def per_machine_paths(root: Path, paths: Iterable[str]) -> list[str]:
     from ..config.local_env import is_local_environment_path
 
     entries = [e for e in get_recommended_entries(root) if e not in declined_configs]
+    ignored = [e for e in entries if not e.startswith("!")]
+    # The block lists its negations last, so a negated path is re-included no
+    # matter which pattern above it matched, exactly as Git reads the block.
+    reincluded = [e.removeprefix("!") for e in entries if e.startswith("!")]
+
+    def covered(path: str) -> bool:
+        return any(_covered_by_entry(path, e) for e in ignored) and not any(
+            _covered_by_entry(path, e) for e in reincluded
+        )
+
     return [
         path
         for path in paths
-        if is_local_environment_path(path)
-        or any(_covered_by_entry(path.replace("\\", "/"), entry) for entry in entries)
+        if is_local_environment_path(path) or covered(path.replace("\\", "/"))
     ]
 
 

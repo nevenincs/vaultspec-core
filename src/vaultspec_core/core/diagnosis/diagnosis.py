@@ -122,6 +122,12 @@ class HomeDiagnosis:
     #: Empty when the question could not be asked at all - no active workspace
     #: context, or no installed provider that consumes hooks.
     provider_hooks: list[ProviderHookReport] = field(default_factory=list)
+    #: Root ``.env`` files, and variants other than the ``.env.example``
+    #: template, that the Git index already tracks. An ignore rule cannot
+    #: protect a tracked file, so each needs removing from the index and its
+    #: secrets rotating. ``None`` when the index could not be read, which
+    #: vouches for nothing.
+    tracked_credentials: list[str] | None = field(default_factory=list)
 
 
 @dataclass
@@ -215,6 +221,11 @@ class WorkspaceDiagnosis:
         """Per-provider verdicts on hooks rendered into provider configs."""
         return self.home.provider_hooks
 
+    @property
+    def tracked_credentials(self) -> list[str] | None:
+        """Tracked root ``.env`` files, or ``None`` when unverifiable."""
+        return self.home.tracked_credentials
+
 
 def _safe_framework_presence(target: Path) -> FrameworkSignal:
     """Collect framework presence, neutral to :attr:`FrameworkSignal.MISSING`."""
@@ -244,6 +255,17 @@ def _safe_gitignore_state(target: Path) -> GitignoreSignal:
     except Exception:
         logger.warning("Gitignore state collector failed", exc_info=True)
         return GitignoreSignal.UNREADABLE
+
+
+def _safe_tracked_credentials(target: Path) -> list[str] | None:
+    """List tracked root dotenv files, or ``None`` when the index is unreadable."""
+    from ...config.local_env import tracked_root_environment_files
+
+    try:
+        return tracked_root_environment_files(target)
+    except Exception:
+        logger.warning("Tracked credential probe failed", exc_info=True)
+        return None
 
 
 def _safe_gitattributes_state(target: Path) -> GitattributesSignal:
@@ -578,6 +600,7 @@ def _collect_layer1_diagnosis(
             process_registry=process_registry,
             companion=companion,
             provider_hooks=_safe_provider_hook_reports(),
+            tracked_credentials=_safe_tracked_credentials(target),
         ),
     )
 

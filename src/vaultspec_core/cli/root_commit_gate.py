@@ -74,7 +74,8 @@ def cmd_commit_gate(
     on its own, and blocks only on errors the commit introduces: an error the
     document's committed version already carries is reported as advisory.
     Also blocks staged per-machine files (install manifest, snapshots, lock
-    sentinels, local vault caches). Never writes, and never runs the
+    sentinels, local vault caches) and credential files (the root .env and its
+    variants other than .env.example). Never writes, and never runs the
     whole-vault checks; run 'vaultspec-core vault check all' for those.
 
     Exit codes: 0 = nothing blocks, 1 = something blocks.

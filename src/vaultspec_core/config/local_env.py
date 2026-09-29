@@ -27,15 +27,54 @@ LOCAL_ENV: Final = ".vaultspec/.env"
 ENV_IGNORE_ENTRIES: Final = ("/.vaultspec/.env", "/.vaultspec/.env.*")
 MAX_ENV_BYTES: Final = 65_536
 
+#: The committable template beside the workspace-root dotenv. It documents the
+#: variables and holds no values, so it is the one root variant left trackable.
+ROOT_ENV_TEMPLATE: Final = ".env.example"
+
+#: The workspace-root dotenv, which the credential resolver reads, and its
+#: variants. The negation must follow the glob it carves the template out of.
+ROOT_ENV_IGNORE_ENTRIES: Final = ("/.env", "/.env.*", f"!/{ROOT_ENV_TEMPLATE}")
+
+
+def _is_dotenv_name(name: str) -> bool:
+    return name == ".env" or name.startswith(".env.")
+
 
 def is_local_environment_path(path: str) -> bool:
-    """Identify private stores and temporaries, including nested workspaces."""
+    """Identify files that hold credentials and must never be committed.
+
+    These are the private stores and their temporaries, including nested
+    workspaces, and the workspace-root dotenv and its variants other than the
+    template.
+    """
     parts = PurePosixPath(path.replace("\\", "/")).parts
-    return (
-        len(parts) >= 2
-        and parts[-2] == ".vaultspec"
-        and (parts[-1] == ".env" or parts[-1].startswith(".env."))
-    )
+    if len(parts) == 1:
+        return _is_dotenv_name(parts[0]) and parts[0] != ROOT_ENV_TEMPLATE
+    return len(parts) >= 2 and parts[-2] == ".vaultspec" and _is_dotenv_name(parts[-1])
+
+
+def tracked_root_environment_files(root: Path) -> list[str]:
+    """Return the root dotenv files the Git index tracks, the template excluded.
+
+    Args:
+        root: Workspace root.
+
+    Returns:
+        The tracked root-relative paths; empty outside a repository.
+
+    Raises:
+        VaultSpecError: When Git cannot report the index.
+    """
+    if not _in_git(root):
+        return []
+    result = _git(root, "ls-files", "--", ".env", ".env.*")
+    if result.returncode:
+        raise VaultSpecError("Cannot verify whether the root .env is tracked.")
+    return [
+        name
+        for name in (line.strip() for line in result.stdout.splitlines())
+        if name and is_local_environment_path(name)
+    ]
 
 
 def _plain_path(path: Path) -> None:
