@@ -3,17 +3,18 @@
 
 Builds a disposable demo project in a temp directory, runs the real
 pipeline commands against it (provision, scaffold research -> ADR ->
-plan, check, feature index, graph), and captures each command's genuine
+plan, check, graph, status), and captures each command's genuine
 output in-process (see :mod:`docs._render.render_readme_assets` for the
 recording-console technique). The captures are stitched into a
-synthesized asciicast v2 stream - typed prompts, streamed output,
-comment beats for the off-screen prose-drafting step - and rendered to
+synthesized asciicast v2 stream - typed prompts, streamed output, a
+comment beat for the off-screen drafting and first Step - and rendered to
 GIF with `agg <https://github.com/asciinema/agg>`_ themed on the
 vaultspec logo palette.
 
 The only edits to the captured output are cosmetic: the temp directory
-path is redacted to ``~/code/search-api`` and over-long lines are
-ellipsis-trimmed to the terminal width.
+path is redacted to ``~/code/search-api``, Windows path separators are
+shown as ``/``, and over-long lines are ellipsis-trimmed to the terminal
+width.
 
 Usage::
 
@@ -55,6 +56,40 @@ COLS = 112
 ROWS = 30
 FEATURE = "search-api"
 REDACTED = "~/code/search-api"
+# The prompt shows the command form the README tells readers to type; the
+# captured output is the same in-process CLI either way.
+CLI = "uvx vaultspec-core"
+
+RESEARCH_SECTIONS = {
+    "Findings": "Postgres `tsvector` columns with a GIN index rank keyword matches "
+    "inside the existing database. A dedicated engine adds a second store to "
+    "keep in sync with every write.",
+    "Sources": "https://www.postgresql.org/docs/current/textsearch.html",
+}
+ADR_SECTIONS = {
+    "Problem Statement": "Clients cannot search document text; they page "
+    "through every record.",
+    "Considerations": "Results must stay consistent with writes.",
+    "Considered options": "Postgres full-text search, or a dedicated search engine.",
+    "Constraints": "No new service to operate.",
+    "Implementation": "A generated `tsvector` column with a GIN index, queried "
+    "from `GET /search`.",
+    "Rationale": "Search stays transactional with the data it indexes.",
+    "Consequences": "Ranking is simpler than a dedicated engine's.",
+}
+PLAN_SECTIONS = {
+    "Description": "Serve ranked full-text search over documents.",
+    "Parallelization": "Sequential: `S02` queries the index `S01` creates.",
+    "Verification": "`pytest tests/test_search.py` passes on a seeded database.",
+}
+# (action, scope) per Step, authored through `vault plan step add`.
+PLAN_STEPS = [
+    (
+        "Add a generated tsvector column and GIN index to documents",
+        "migrations/0012_search_index.sql",
+    ),
+    ("Serve ranked results from GET /search", "api/search.py"),
+]
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
@@ -165,23 +200,78 @@ class Cast:
 
 
 def fill_prose(vault: pathlib.Path, date: str) -> None:
-    """Stand in for the drafting step: fill the scaffolded placeholders."""
+    """Stand in for the off-screen agent work between scaffold and review.
+
+    Fills every required body section, authors the plan's Steps and closes
+    the first through the plan verbs, and logs it to the ledger, so the
+    scenes that follow show a clean check and a plan in progress.
+    """
     research = vault / "research" / f"{date}-{FEATURE}-research.md"
-    research.write_text(
-        research.read_text(encoding="utf-8").replace(
-            "{topic}", "full-text search options"
-        ),
-        encoding="utf-8",
-    )
     adr = vault / "adr" / f"{date}-{FEATURE}-adr.md"
-    text = adr.read_text(encoding="utf-8")
-    text = text.replace("{title}", "adopt postgres full-text search")
-    text = text.replace(
-        "{proposed|accepted|rejected|superseded|deprecated}", "accepted"
+    plan_stem = f"{date}-{FEATURE}-plan"
+    plan = vault / "plan" / f"{plan_stem}.md"
+
+    run_core(["vault", "check", "annotations", "--fix"])
+    fill_sections(
+        research,
+        {"{topic}": "full-text search options"},
+        RESEARCH_SECTIONS,
     )
-    adr.write_text(text, encoding="utf-8")
-    run_core(["vault", "sanitize", "annotations"])
+    fill_sections(
+        adr,
+        {
+            "{title}": "adopt postgres full-text search",
+            "{proposed|accepted|rejected|superseded|deprecated}": "accepted",
+        },
+        ADR_SECTIONS,
+    )
+    fill_sections(plan, {}, PLAN_SECTIONS)
+    for action, scope in PLAN_STEPS:
+        run_core(
+            [
+                "vault",
+                "plan",
+                "step",
+                "add",
+                plan_stem,
+                "--action",
+                action,
+                "--scope",
+                scope,
+            ]
+        )
+    run_core(["vault", "plan", "step", "check", plan_stem, "S01"])
+    run_core(
+        [
+            "vault",
+            "exec",
+            "log",
+            "--feature",
+            FEATURE,
+            "--related",
+            plan_stem,
+            "--step",
+            "S01",
+            "--row",
+            f"A:{PLAN_STEPS[0][1]}",
+            "--verify",
+            "pytest tests/test_search.py=pass",
+        ]
+    )
+    run_core(["vault", "feature", "index", "-f", FEATURE])
     run_core(["vault", "check", "all", "--fix"])
+
+
+def fill_sections(
+    path: pathlib.Path, placeholders: dict[str, str], sections: dict[str, str]
+) -> None:
+    """Replace heading placeholders and give each empty section its prose."""
+    text = path.read_text(encoding="utf-8")
+    for placeholder, value in placeholders.items():
+        text = text.replace(placeholder, value)
+    for heading, prose in sections.items():
+        text = text.replace(f"\n## {heading}\n", f"\n## {heading}\n\n{prose}\n", 1)
+    path.write_text(text, encoding="utf-8", newline="\n")
 
 
 def main() -> None:
@@ -200,9 +290,10 @@ def main() -> None:
     def redact(ansi: str) -> str:
         for variant in (str(demo), str(demo).replace("\\", "/")):
             ansi = ansi.replace(variant, REDACTED)
-        # Normalize the backslash tail Windows leaves after the redacted root.
+        # Normalize the backslash paths Windows prints, after the redacted
+        # root or relative to it, so the demo reads the same on every platform.
         return re.sub(
-            re.escape(REDACTED) + r"(?:\\[\w.\-]+)+",
+            "(?:" + re.escape(REDACTED) + r"|\.vault)(?:\\[\w.\-]+)+",
             lambda m: m.group(0).replace("\\", "/"),
             ansi,
         )
@@ -220,10 +311,10 @@ def main() -> None:
         cast.type_line(comment, style=DIM)
         cast.emit("\r\n", 1.1)
 
-    scene(["install"], "vaultspec-core install", hold=2.2)
+    scene(["install"], f"{CLI} install", hold=2.2)
     scene(
         ["vault", "add", "research", "--feature", FEATURE],
-        f"vaultspec-core vault add research --feature {FEATURE}",
+        f"{CLI} vault add research --feature {FEATURE}",
     )
     date = next((demo / ".vault" / "research").glob("*.md")).name.split(f"-{FEATURE}")[
         0
@@ -238,8 +329,7 @@ def main() -> None:
             "--related",
             f"{date}-{FEATURE}-research",
         ],
-        f"vaultspec-core vault add adr --feature {FEATURE} "
-        f"--related {date}-{FEATURE}-research",
+        f"{CLI} vault add adr --feature {FEATURE} --related {date}-{FEATURE}-research",
     )
     scene(
         [
@@ -251,21 +341,17 @@ def main() -> None:
             "--related",
             f"{date}-{FEATURE}-adr",
         ],
-        f"vaultspec-core vault add plan --feature {FEATURE} "
-        f"--related {date}-{FEATURE}-adr",
+        f"{CLI} vault add plan --feature {FEATURE} --related {date}-{FEATURE}-adr",
     )
-    narrate("# ... the agent drafts the findings, the decision, and the plan ...")
+    narrate("# ... the agent drafts each record, then implements and logs S01 ...")
     fill_prose(demo / ".vault", date)
-    scene(["vault", "check", "all"], "vaultspec-core vault check all", hold=2.2)
-    scene(
-        ["vault", "feature", "index", "-f", FEATURE],
-        f"vaultspec-core vault feature index -f {FEATURE}",
-    )
+    scene(["vault", "check", "all"], f"{CLI} vault check all", hold=2.2)
     scene(
         ["vault", "graph", "--feature", FEATURE],
-        f"vaultspec-core vault graph --feature {FEATURE}",
-        hold=3.0,
+        f"{CLI} vault graph --feature {FEATURE}",
+        hold=2.2,
     )
+    scene(["status", FEATURE], f"{CLI} status {FEATURE}", hold=3.0)
 
     cast_path = str(demo / "demo.cast")
     cast.dump(cast_path, "vaultspec pipeline demo")

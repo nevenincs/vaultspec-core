@@ -91,18 +91,24 @@ LIGHT_STROKE = 'stroke="rgba(30,27,24,0.22)"'
 # A tiny, fully-valid vault authored entirely from invented feature names so
 # the published renders carry no real project development records. Each
 # feature contributes a research, reference, ADR, and plan document; every
-# checked Step also gets an execution record so the status view reads as a
-# tracked project rather than a wall of "record missing" flags.
+# checked Step is logged to its plan's ledger so the status view reads as a
+# tracked project rather than a wall of "record missing" flags. Each ADR
+# states a concrete decision so the semantic-search render recalls a passage
+# that answers its query.
 
 _DemoStep = tuple[str, str, str, bool]  # (step_id, action, path, checked)
 _DemoPhase = tuple[str, str, str, list[_DemoStep]]  # (phase_id, slug, intent, steps)
-_DemoFeature = tuple[str, str, str, list[_DemoPhase]]  # (feature, title, date, phases)
+# (feature, title, date, decision, phases)
+_DemoFeature = tuple[str, str, str, str, list[_DemoPhase]]
 
 _DEMO_FEATURES: list[_DemoFeature] = [
     (
         "editor-demo",
         "Editor Demo",
         "2026-02-04",
+        "Parse markdown with a hand-written tokeniser that emits a tree of block "
+        "and inline nodes, so the canvas renderer and the live preview share one "
+        "document model instead of each re-parsing the source text.",
         [
             (
                 "P01",
@@ -148,6 +154,8 @@ _DEMO_FEATURES: list[_DemoFeature] = [
         "grid-layout",
         "Grid Layout",
         "2026-02-05",
+        "Measure column tracks once per container resize and place blocks into "
+        "the resolved tracks, rather than reflowing the whole page on every edit.",
         [
             (
                 "P01",
@@ -174,6 +182,8 @@ _DEMO_FEATURES: list[_DemoFeature] = [
         "syntax-highlighting",
         "Syntax Highlighting",
         "2026-02-06",
+        "Colour fenced code by scopes from a per-language grammar table, loaded "
+        "on first use, and keep that tokeniser separate from the markdown parser.",
         [
             (
                 "P01",
@@ -230,11 +240,18 @@ def build_demo_vault(root: Path) -> None:
     The corpus is deliberately neutral: invented feature names, no real
     project records. It parses cleanly under ``vault check all`` and drives
     a representative ``status``/``graph``/``check`` render.
-    """
-    vault = root / ".vault"
-    (root / ".vaultspec").mkdir(parents=True, exist_ok=True)
 
-    for feature, title, date, phases in _DEMO_FEATURES:
+    The framework content is seeded first because the ledger is written by
+    the same verb an executor uses, and that verb scaffolds from the
+    deployed template mirror.
+    """
+    from vaultspec_core.builtins import seed_builtins
+    from vaultspec_core.vaultcore.exec_log import LogRequest, log_step, parse_row_spec
+
+    vault = root / ".vault"
+    seed_builtins(root / ".vaultspec")
+
+    for feature, title, date, decision, phases in _DEMO_FEATURES:
         research = f"{date}-{feature}-research"
         reference = f"{date}-{feature}-reference"
         adr = f"{date}-{feature}-adr"
@@ -260,7 +277,7 @@ def build_demo_vault(root: Path) -> None:
             adr,
             _frontmatter("adr", feature, date, [research, reference]),
             f"# `{feature}` adr: `{title}` | (**status:** `accepted`)\n\n"
-            "## Decision\n\nThe approach is adopted.\n",
+            f"## Decision\n\n{decision}\n",
         )
 
         # Plan body: an L2 structure with canonical Phase/Step rows.
@@ -288,25 +305,20 @@ def build_demo_vault(root: Path) -> None:
             "\n".join(lines) + "\n",
         )
 
-        # Execution record per checked Step so status reads as tracked work.
-        exec_dir = vault / "exec" / f"{date}-{feature}"
+        # Log each checked Step to the plan's ledger so status reads as
+        # tracked work.
         for phase_id, _slug, _intent, steps in phases:
-            for step_id, action, _path, checked in steps:
-                if not checked:
-                    continue
-                stem = f"{date}-{feature}-{phase_id}-{step_id}"
-                front = _frontmatter(
-                    "exec",
-                    feature,
-                    date,
-                    [plan],
-                    extra=f"step_id: {step_id}\n",
-                )
-                exec_dir.mkdir(parents=True, exist_ok=True)
-                (exec_dir / f"{stem}.md").write_text(
-                    front + f"\n# `{feature}` exec: `{action}`\n\nCompleted.\n",
-                    encoding="utf-8",
-                )
+            for step_id, _action, path, checked in steps:
+                if checked:
+                    log_step(
+                        root,
+                        LogRequest(
+                            feature=feature,
+                            plan_stem=plan,
+                            step=f"{phase_id}.{step_id}",
+                            rows=(parse_row_spec(f"A:{path}"),),
+                        ),
+                    )
 
 
 def _recording_console(width: int) -> Console:
@@ -363,8 +375,11 @@ def index_demo_vault(exe: str, demo_root: str, timeout: float = 90.0) -> bool:
     index does not populate within *timeout* seconds.
     """
     try:
+        # The demo root is always a project the service has never seen, and
+        # the service refuses an incremental index of a project with no prior
+        # generation; a rebuild is the explicit first build.
         queued = subprocess.run(
-            [exe, "--target", demo_root, "index", "--type", "vault"],
+            [exe, "--target", demo_root, "index", "--type", "vault", "--rebuild"],
             capture_output=True,
             text=True,
             timeout=timeout,

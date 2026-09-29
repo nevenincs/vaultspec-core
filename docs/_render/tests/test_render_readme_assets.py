@@ -28,8 +28,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.usefixtures("preserved_no_color")]
 DIRECTORY_TAGS = frozenset({"research", "reference", "adr", "plan", "exec"})
 
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
-TAG_LINE = re.compile(r'^\s*-\s*"#([^"]+)"\s*$', re.MULTILINE)
+TAG_LINE = re.compile(r"""^\s*-\s*["']#([^"']+)["']\s*$""", re.MULTILINE)
 STEP_ROW = re.compile(r"^- \[(x| )\] `(P\d+)\.(S\d+)`", re.MULTILINE)
+LEDGER_ROW = re.compile(r"^- `(S\d+)` `[AMDR]` ", re.MULTILINE)
 DATE_STAMP = re.compile(r"^(date|modified): '([\d-]+)'$", re.MULTILINE)
 
 
@@ -97,32 +98,50 @@ def test_demo_documents_carry_exactly_the_required_tag_pair(
 def test_demo_documents_carry_matching_date_and_modified_stamps(
     demo_vault: Path,
 ) -> None:
-    """Scaffolded documents stamp ``modified`` equal to ``date``."""
-    for document in sorted(demo_vault.rglob("*.md")):
+    """Authored documents stamp ``modified`` equal to ``date``.
+
+    The ledgers are excluded: the logging verb owns their ``modified`` stamp
+    and refreshes it to the day each row is appended.
+    """
+    documents = sorted(
+        document
+        for document in demo_vault.rglob("*.md")
+        if document.relative_to(demo_vault).parts[0] != "exec"
+    )
+    assert documents, "build_demo_vault wrote no documents"
+    for document in documents:
         stamps = DATE_STAMP.findall(frontmatter_of(document))
         assert len(stamps) == 2, f"{document} frontmatter: {stamps}"
         assert stamps[0][1] == stamps[1][1], f"{document} stamps disagree: {stamps}"
 
 
-def test_every_checked_step_gets_an_execution_record(demo_vault: Path) -> None:
-    """The status render reads as tracked work only if the records exist."""
+def test_every_checked_step_is_logged_to_its_plan_ledger(demo_vault: Path) -> None:
+    """The status render reads as tracked work only if the ledger covers it."""
     checked_total = 0
     open_total = 0
     for plan in sorted(demo_vault.glob("plan/*.md")):
         prefix = plan.stem.removesuffix("-plan")
-        exec_dir = demo_vault / "exec" / prefix
+        ledgers = list((demo_vault / "exec").rglob(f"{prefix}-ledger.md"))
+        assert len(ledgers) == 1, f"{plan.name} has ledgers {ledgers}"
+        logged = set(LEDGER_ROW.findall(ledgers[0].read_text(encoding="utf-8")))
         rows = STEP_ROW.findall(plan.read_text(encoding="utf-8"))
         assert rows, f"{plan} declares no Step rows"
-        for box, phase_id, step_id in rows:
-            record = exec_dir / f"{prefix}-{phase_id}-{step_id}.md"
+        for box, _phase_id, step_id in rows:
             if box == "x":
                 checked_total += 1
-                assert record.is_file(), f"checked Step has no record: {record}"
+                assert step_id in logged, f"checked {step_id} of {plan.name} unlogged"
             else:
                 open_total += 1
-                assert not record.exists(), f"open Step has a record: {record}"
+                assert step_id not in logged, f"open {step_id} of {plan.name} logged"
     assert checked_total, "the demo corpus checks no Steps at all"
     assert open_total, "the demo corpus has no open Steps, so status shows no work"
+
+
+def test_demo_corpus_writes_no_per_step_execution_records(demo_vault: Path) -> None:
+    """The ledger is the only execution artifact ``vault check`` accepts."""
+    records = sorted(demo_vault.glob("exec/**/*.md"))
+    assert records, "build_demo_vault wrote no ledgers"
+    assert all(record.name.endswith("-ledger.md") for record in records), records
 
 
 def test_demo_corpus_names_no_feature_of_this_project(
