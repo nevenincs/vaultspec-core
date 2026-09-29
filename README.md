@@ -19,6 +19,13 @@ The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
 [Install](#install) · [Start a feature](#start-a-feature) ·
 [Documentation](#documentation) · [Optional services](#optional-services)
 
+The agent works through a CLI you can run yourself, shown here taking one feature from
+install to a plan with its first Step logged:
+
+<p align="center">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/demo.gif" alt="Installing Vaultspec, scaffolding the search-api research, ADR, and plan, then checking the records, drawing the feature graph, and showing the plan at one of two Steps done" width="880">
+</p>
+
 ## Install
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run this
@@ -81,11 +88,24 @@ Record checks complement tests and review, but do not prove the code is correct.
 Approval covers the agreed scope, including ordinary in-scope corrections; new choices
 outside that authorization need your input.
 
+`vaultspec-core vault check all` runs those record checks and prints a fix for each
+finding:
+
+<p align="center">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-check.svg" alt="vault check all passing every validator, from structure and frontmatter to links, plan schema, and encoding" width="880">
+</p>
+
 A feature tag groups the work's records. To see recorded progress:
 
 ```bash
 uvx vaultspec-core status search-api
 ```
+
+Without a feature tag, `status` lists every plan in flight and its next open Step:
+
+<p align="center">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-status.svg" alt="status listing two plans in flight with their progress and next open Step, one completed plan, and recent changes" width="880">
+</p>
 
 For planned work, ask the agent to resume the feature from its next open Step. The
 [workflow guide](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md#choose-the-route-for-your-task)
@@ -109,9 +129,18 @@ explains how to choose a route, approve work, and continue across sessions.
 
 ## Optional services
 
-Open `.vault/` in [Obsidian](https://obsidian.md) to browse its linked documents. The
-optional [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package adds
+Open `.vault/` in [Obsidian](https://obsidian.md) to browse its linked documents.
+
+<p align="center">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/obsidian-vault.png" alt="A vault opened in Obsidian, showing the documents as a linked graph beside an accepted ADR" width="880">
+</p>
+
+The optional [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package adds
 semantic search across the vault and your code.
+
+<p align="center">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-rag.svg" alt="vaultspec-rag search answering how the parser tokenises markdown with the editor-demo ADR and its decision passage" width="880">
+</p>
 
 Hosted search and ranking are optional. Set `VAULTSPEC_CORE_TYPESAFE_API_KEY` in the
 environment, or import it by name with
