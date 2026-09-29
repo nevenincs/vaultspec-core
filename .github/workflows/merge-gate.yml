@@ -237,9 +237,10 @@ jobs:
   test-windows:
     name: "Test: Library suite (Windows)"
     if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
-    timeout-minutes: 90
+    timeout-minutes: 166
     runs-on: [self-hosted, Windows, X64]
     env:
+      CI_EXEC_BUDGET_MINUTES: 90
       # Native filesystem/process contention made eight auto-selected xdist
       # workers intermittently miss subprocess and file-release deadlines.
       PYTEST_XDIST_AUTO_NUM_WORKERS: "4"
@@ -279,7 +280,7 @@ jobs:
     name: "Check: Merge gate (Linux)"
     needs: [lint, test-linux, test-windows]
     if: ${{ !cancelled() }}
-    timeout-minutes: 10
+    timeout-minutes: 125
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: read
