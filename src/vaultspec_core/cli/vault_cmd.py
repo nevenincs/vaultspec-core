@@ -349,8 +349,12 @@ def cmd_add(
         "rule_name": f"{feat}-rule",
     }
 
+    hint_command = f"vault.add.{dt.value}"
+    if dt is DocType.PLAN and tier != "L1":
+        hint_command = f"{hint_command}.{tier}"
+
     hint_dict = emit_next_step_hint(
-        command=f"vault.add.{dt.value}",
+        command=hint_command,
         outcome="created",
         context_vars=context_vars,
         json_output=json_output,

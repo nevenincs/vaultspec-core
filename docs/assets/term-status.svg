@@ -1,47 +1,28 @@
-<svg class="rich-terminal" viewBox="0 0 1385 391.59999999999997" xmlns="http://www.w3.org/2000/svg">
-    <!-- Generated with Rich https://www.textualize.io -->
+<svg class="rich-terminal" viewBox="0 0 1422.4 447.6" xmlns="http://www.w3.org/2000/svg">
     <style>
-
-    @font-face {
-        font-family: "Fira Code";
-        src: local("FiraCode-Regular"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
-        font-style: normal;
-        font-weight: 400;
-    }
-    @font-face {
-        font-family: "Fira Code";
-        src: local("FiraCode-Bold"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
-        font-style: bold;
-        font-weight: 700;
-    }
-
     .terminal-2955500476-matrix {
-        font-family: Fira Code, monospace;
+        font-family: 'IBM Plex Mono', 'Cascadia Mono', 'Cascadia Code', ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', monospace;
         font-size: 20px;
         line-height: 24.4px;
         font-variant-east-asian: full-width;
     }
-
-    .terminal-2955500476-title {
-        font-size: 18px;
-        font-weight: bold;
-        font-family: arial;
+    .terminal-2955500476-bar {
+        font-family: 'IBM Plex Mono', 'Cascadia Mono', 'Cascadia Code', ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+        font-size: 17px;
+        fill: #8d9991;
     }
-
-    .terminal-2955500476-r1 { fill: #1e1b18;font-weight: bold }
-.terminal-2955500476-r2 { fill: #1e1b18 }
-.terminal-2955500476-r3 { fill: #76736f }
-.terminal-2955500476-r4 { fill: #76736f;font-weight: bold }
-.terminal-2955500476-r5 { fill: #918981 }
+    .terminal-2955500476-r1 { fill: #d8dfda;font-weight: bold }
+.terminal-2955500476-r2 { fill: #d8dfda }
+.terminal-2955500476-r3 { fill: #898f8b }
+.terminal-2955500476-r4 { fill: #898f8b;font-weight: bold }
+.terminal-2955500476-r5 { fill: #8d9991 }
     </style>
-
     <defs>
+    <clipPath id="terminal-2955500476-clip-frame">
+      <rect x="0" y="0" width="1422.4" height="447.6" rx="14"/>
+    </clipPath>
     <clipPath id="terminal-2955500476-clip-terminal">
-      <rect x="0" y="0" width="1365.3999999999999" height="340.59999999999997" />
+      <rect x="0" y="0" width="1365.3999999999999" height="340.59999999999997"/>
     </clipPath>
     <clipPath id="terminal-2955500476-line-0">
     <rect x="0" y="1.5" width="1366.4" height="24.65"/>
@@ -83,15 +64,17 @@
     <rect x="0" y="294.3" width="1366.4" height="24.65"/>
             </clipPath>
     </defs>
-
-    <rect fill="#faf7f2" stroke="rgba(30,27,24,0.22)" stroke-width="1" x="1" y="1" width="1383" height="389.6" rx="8"/><text class="terminal-2955500476-title" fill="#1e1b18" text-anchor="middle" x="691" y="27">vaultspec-core&#160;status</text>
-            <g transform="translate(26,22)">
-            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
-            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
-            <circle cx="44" cy="0" r="7" fill="#28c840"/>
-            </g>
-        
-    <g transform="translate(9, 41)" clip-path="url(#terminal-2955500476-clip-terminal)">
+    <g clip-path="url(#terminal-2955500476-clip-frame)">
+    <rect width="1422.4" height="447.6" fill="#141816"/>
+    <rect width="1422.4" height="50" fill="#1e2321"/>
+    </g>
+    <rect x="0.5" y="0.5" width="1421.4" height="446.6"
+        rx="14" fill="none" stroke="#3c4541"/>
+    <text class="terminal-2955500476-bar" x="28" y="31">~/code/editor</text>
+    <text class="terminal-2955500476-bar" x="1394.4" y="31"
+        text-anchor="end">vaultspec-core status</text>
+    <g transform="translate(28, 76)"
+        clip-path="url(#terminal-2955500476-clip-terminal)">
     
     <g class="terminal-2955500476-matrix">
     <text class="terminal-2955500476-r1" x="0" y="20" textLength="146.4" clip-path="url(#terminal-2955500476-line-0)">Vault&#160;Status</text><text class="terminal-2955500476-r2" x="1366.4" y="20" textLength="12.2" clip-path="url(#terminal-2955500476-line-0)">

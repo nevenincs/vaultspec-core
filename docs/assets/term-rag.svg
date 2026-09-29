@@ -1,122 +1,105 @@
-<svg class="rich-terminal" viewBox="0 0 1385 464.79999999999995" xmlns="http://www.w3.org/2000/svg">
-    <!-- Generated with Rich https://www.textualize.io -->
+<svg class="rich-terminal" viewBox="0 0 1422.4 520.8" xmlns="http://www.w3.org/2000/svg">
     <style>
-
-    @font-face {
-        font-family: "Fira Code";
-        src: local("FiraCode-Regular"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
-        font-style: normal;
-        font-weight: 400;
-    }
-    @font-face {
-        font-family: "Fira Code";
-        src: local("FiraCode-Bold"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
-                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
-        font-style: bold;
-        font-weight: 700;
-    }
-
-    .terminal-2558025488-matrix {
-        font-family: Fira Code, monospace;
+    .terminal-2984306408-matrix {
+        font-family: 'IBM Plex Mono', 'Cascadia Mono', 'Cascadia Code', ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', monospace;
         font-size: 20px;
         line-height: 24.4px;
         font-variant-east-asian: full-width;
     }
-
-    .terminal-2558025488-title {
-        font-size: 18px;
-        font-weight: bold;
-        font-family: arial;
+    .terminal-2984306408-bar {
+        font-family: 'IBM Plex Mono', 'Cascadia Mono', 'Cascadia Code', ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+        font-size: 17px;
+        fill: #8d9991;
     }
-
-    .terminal-2558025488-r1 { fill: #1e1b18 }
-.terminal-2558025488-r2 { fill: #918981 }
+    .terminal-2984306408-r1 { fill: #d8dfda }
+.terminal-2984306408-r2 { fill: #8d9991 }
     </style>
-
     <defs>
-    <clipPath id="terminal-2558025488-clip-terminal">
-      <rect x="0" y="0" width="1365.3999999999999" height="413.79999999999995" />
+    <clipPath id="terminal-2984306408-clip-frame">
+      <rect x="0" y="0" width="1422.4" height="520.8" rx="14"/>
     </clipPath>
-    <clipPath id="terminal-2558025488-line-0">
+    <clipPath id="terminal-2984306408-clip-terminal">
+      <rect x="0" y="0" width="1365.3999999999999" height="413.79999999999995"/>
+    </clipPath>
+    <clipPath id="terminal-2984306408-line-0">
     <rect x="0" y="1.5" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-1">
+<clipPath id="terminal-2984306408-line-1">
     <rect x="0" y="25.9" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-2">
+<clipPath id="terminal-2984306408-line-2">
     <rect x="0" y="50.3" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-3">
+<clipPath id="terminal-2984306408-line-3">
     <rect x="0" y="74.7" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-4">
+<clipPath id="terminal-2984306408-line-4">
     <rect x="0" y="99.1" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-5">
+<clipPath id="terminal-2984306408-line-5">
     <rect x="0" y="123.5" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-6">
+<clipPath id="terminal-2984306408-line-6">
     <rect x="0" y="147.9" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-7">
+<clipPath id="terminal-2984306408-line-7">
     <rect x="0" y="172.3" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-8">
+<clipPath id="terminal-2984306408-line-8">
     <rect x="0" y="196.7" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-9">
+<clipPath id="terminal-2984306408-line-9">
     <rect x="0" y="221.1" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-10">
+<clipPath id="terminal-2984306408-line-10">
     <rect x="0" y="245.5" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-11">
+<clipPath id="terminal-2984306408-line-11">
     <rect x="0" y="269.9" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-12">
+<clipPath id="terminal-2984306408-line-12">
     <rect x="0" y="294.3" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-13">
+<clipPath id="terminal-2984306408-line-13">
     <rect x="0" y="318.7" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-14">
+<clipPath id="terminal-2984306408-line-14">
     <rect x="0" y="343.1" width="1366.4" height="24.65"/>
             </clipPath>
-<clipPath id="terminal-2558025488-line-15">
+<clipPath id="terminal-2984306408-line-15">
     <rect x="0" y="367.5" width="1366.4" height="24.65"/>
             </clipPath>
     </defs>
-
-    <rect fill="#faf7f2" stroke="rgba(30,27,24,0.22)" stroke-width="1" x="1" y="1" width="1383" height="462.8" rx="8"/><text class="terminal-2558025488-title" fill="#1e1b18" text-anchor="middle" x="691" y="27">vaultspec-rag&#160;search&#160;&quot;how&#160;the&#160;parser&#160;tokenises&#160;markdown&#160;into&#160;blocks&quot;&#160;--type&#160;vault&#160;--doc-type&#160;adr</text>
-            <g transform="translate(26,22)">
-            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
-            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
-            <circle cx="44" cy="0" r="7" fill="#28c840"/>
-            </g>
-        
-    <g transform="translate(9, 41)" clip-path="url(#terminal-2558025488-clip-terminal)">
+    <g clip-path="url(#terminal-2984306408-clip-frame)">
+    <rect width="1422.4" height="520.8" fill="#141816"/>
+    <rect width="1422.4" height="50" fill="#1e2321"/>
+    </g>
+    <rect x="0.5" y="0.5" width="1421.4" height="519.8"
+        rx="14" fill="none" stroke="#3c4541"/>
+    <text class="terminal-2984306408-bar" x="28" y="31">~/code/editor</text>
+    <text class="terminal-2984306408-bar" x="1394.4" y="31"
+        text-anchor="end">vaultspec-rag search &quot;how the parser tokenises markdown into blocks&quot; --type vault --doc-type adr</text>
+    <g transform="translate(28, 76)"
+        clip-path="url(#terminal-2984306408-clip-terminal)">
     
-    <g class="terminal-2558025488-matrix">
-    <text class="terminal-2558025488-r1" x="0" y="20" textLength="622.2" clip-path="url(#terminal-2558025488-line-0)">1.&#160;.vault/adr/2026-02-06-syntax-highlighting-adr.md</text><text class="terminal-2558025488-r1" x="1366.4" y="20" textLength="12.2" clip-path="url(#terminal-2558025488-line-0)">
-</text><text class="terminal-2558025488-r1" x="0" y="44.4" textLength="610" clip-path="url(#terminal-2558025488-line-1)">&#160;&#160;&#160;adr&#160;|&#160;feature:&#160;syntax-highlighting&#160;|&#160;2026-02-06</text><text class="terminal-2558025488-r1" x="1366.4" y="44.4" textLength="12.2" clip-path="url(#terminal-2558025488-line-1)">
-</text><text class="terminal-2558025488-r1" x="0" y="68.8" textLength="976" clip-path="url(#terminal-2558025488-line-2)">&#160;&#160;&#160;#&#160;`syntax-highlighting`&#160;adr:&#160;`Syntax&#160;Highlighting`&#160;|&#160;(**status:**&#160;`accepted`)</text><text class="terminal-2558025488-r1" x="1366.4" y="68.8" textLength="12.2" clip-path="url(#terminal-2558025488-line-2)">
-</text><text class="terminal-2558025488-r1" x="1366.4" y="93.2" textLength="12.2" clip-path="url(#terminal-2558025488-line-3)">
-</text><text class="terminal-2558025488-r1" x="0" y="117.6" textLength="170.8" clip-path="url(#terminal-2558025488-line-4)">&#160;&#160;&#160;##&#160;Decision</text><text class="terminal-2558025488-r1" x="1366.4" y="117.6" textLength="12.2" clip-path="url(#terminal-2558025488-line-4)">
-</text><text class="terminal-2558025488-r1" x="1366.4" y="142" textLength="12.2" clip-path="url(#terminal-2558025488-line-5)">
-</text><text class="terminal-2558025488-r1" x="0" y="166.4" textLength="329.4" clip-path="url(#terminal-2558025488-line-6)">&#160;&#160;&#160;The&#160;approach&#160;is&#160;adopted.</text><text class="terminal-2558025488-r1" x="1366.4" y="166.4" textLength="12.2" clip-path="url(#terminal-2558025488-line-6)">
-</text><text class="terminal-2558025488-r1" x="0" y="190.8" textLength="524.6" clip-path="url(#terminal-2558025488-line-7)">2.&#160;.vault/adr/2026-02-04-editor-demo-adr.md</text><text class="terminal-2558025488-r1" x="1366.4" y="190.8" textLength="12.2" clip-path="url(#terminal-2558025488-line-7)">
-</text><text class="terminal-2558025488-r1" x="0" y="215.2" textLength="512.4" clip-path="url(#terminal-2558025488-line-8)">&#160;&#160;&#160;adr&#160;|&#160;feature:&#160;editor-demo&#160;|&#160;2026-02-04</text><text class="terminal-2558025488-r1" x="1366.4" y="215.2" textLength="12.2" clip-path="url(#terminal-2558025488-line-8)">
-</text><text class="terminal-2558025488-r1" x="0" y="239.6" textLength="780.8" clip-path="url(#terminal-2558025488-line-9)">&#160;&#160;&#160;#&#160;`editor-demo`&#160;adr:&#160;`Editor&#160;Demo`&#160;|&#160;(**status:**&#160;`accepted`)</text><text class="terminal-2558025488-r1" x="1366.4" y="239.6" textLength="12.2" clip-path="url(#terminal-2558025488-line-9)">
-</text><text class="terminal-2558025488-r1" x="1366.4" y="264" textLength="12.2" clip-path="url(#terminal-2558025488-line-10)">
-</text><text class="terminal-2558025488-r1" x="0" y="288.4" textLength="170.8" clip-path="url(#terminal-2558025488-line-11)">&#160;&#160;&#160;##&#160;Decision</text><text class="terminal-2558025488-r1" x="1366.4" y="288.4" textLength="12.2" clip-path="url(#terminal-2558025488-line-11)">
-</text><text class="terminal-2558025488-r1" x="1366.4" y="312.8" textLength="12.2" clip-path="url(#terminal-2558025488-line-12)">
-</text><text class="terminal-2558025488-r1" x="0" y="337.2" textLength="329.4" clip-path="url(#terminal-2558025488-line-13)">&#160;&#160;&#160;The&#160;approach&#160;is&#160;adopted.</text><text class="terminal-2558025488-r1" x="1366.4" y="337.2" textLength="12.2" clip-path="url(#terminal-2558025488-line-13)">
-</text><text class="terminal-2558025488-r1" x="0" y="361.6" textLength="524.6" clip-path="url(#terminal-2558025488-line-14)">3.&#160;.vault/adr/2026-02-05-grid-layout-adr.md</text><text class="terminal-2558025488-r1" x="1366.4" y="361.6" textLength="12.2" clip-path="url(#terminal-2558025488-line-14)">
-</text><text class="terminal-2558025488-r1" x="0" y="386" textLength="512.4" clip-path="url(#terminal-2558025488-line-15)">&#160;&#160;&#160;adr&#160;|&#160;feature:&#160;grid-layout&#160;|&#160;2026-02-05</text><text class="terminal-2558025488-r1" x="1366.4" y="386" textLength="12.2" clip-path="url(#terminal-2558025488-line-15)">
-</text><text class="terminal-2558025488-r2" x="0" y="410.4" textLength="36.6" clip-path="url(#terminal-2558025488-line-16)">&#160;&#160;…</text><text class="terminal-2558025488-r1" x="1366.4" y="410.4" textLength="12.2" clip-path="url(#terminal-2558025488-line-16)">
+    <g class="terminal-2984306408-matrix">
+    <text class="terminal-2984306408-r1" x="0" y="20" textLength="524.6" clip-path="url(#terminal-2984306408-line-0)">1.&#160;.vault/adr/2026-02-04-editor-demo-adr.md</text><text class="terminal-2984306408-r1" x="1366.4" y="20" textLength="12.2" clip-path="url(#terminal-2984306408-line-0)">
+</text><text class="terminal-2984306408-r1" x="0" y="44.4" textLength="1366.4" clip-path="url(#terminal-2984306408-line-1)">&#160;&#160;&#160;adr&#160;|&#160;feature:&#160;editor-demo&#160;|&#160;status:&#160;accepted&#160;|&#160;2026-02-04&#160;|&#160;related:&#160;[[2026-02-04-editor-demo-research]],&#160;[…</text><text class="terminal-2984306408-r1" x="1366.4" y="44.4" textLength="12.2" clip-path="url(#terminal-2984306408-line-1)">
+</text><text class="terminal-2984306408-r1" x="0" y="68.8" textLength="780.8" clip-path="url(#terminal-2984306408-line-2)">&#160;&#160;&#160;#&#160;`editor-demo`&#160;adr:&#160;`Editor&#160;Demo`&#160;|&#160;(**status:**&#160;`accepted`)</text><text class="terminal-2984306408-r1" x="1366.4" y="68.8" textLength="12.2" clip-path="url(#terminal-2984306408-line-2)">
+</text><text class="terminal-2984306408-r1" x="1366.4" y="93.2" textLength="12.2" clip-path="url(#terminal-2984306408-line-3)">
+</text><text class="terminal-2984306408-r1" x="0" y="117.6" textLength="170.8" clip-path="url(#terminal-2984306408-line-4)">&#160;&#160;&#160;##&#160;Decision</text><text class="terminal-2984306408-r1" x="1366.4" y="117.6" textLength="12.2" clip-path="url(#terminal-2984306408-line-4)">
+</text><text class="terminal-2984306408-r1" x="1366.4" y="142" textLength="12.2" clip-path="url(#terminal-2984306408-line-5)">
+</text><text class="terminal-2984306408-r1" x="0" y="166.4" textLength="1366.4" clip-path="url(#terminal-2984306408-line-6)">&#160;&#160;&#160;Parse&#160;markdown&#160;with&#160;a&#160;hand-written&#160;tokeniser&#160;that&#160;emits&#160;a&#160;tree&#160;of&#160;block&#160;and&#160;inline&#160;nodes,&#160;so&#160;the&#160;canvas&#160;rend…</text><text class="terminal-2984306408-r1" x="1366.4" y="166.4" textLength="12.2" clip-path="url(#terminal-2984306408-line-6)">
+</text><text class="terminal-2984306408-r1" x="0" y="190.8" textLength="622.2" clip-path="url(#terminal-2984306408-line-7)">2.&#160;.vault/adr/2026-02-06-syntax-highlighting-adr.md</text><text class="terminal-2984306408-r1" x="1366.4" y="190.8" textLength="12.2" clip-path="url(#terminal-2984306408-line-7)">
+</text><text class="terminal-2984306408-r1" x="0" y="215.2" textLength="1366.4" clip-path="url(#terminal-2984306408-line-8)">&#160;&#160;&#160;adr&#160;|&#160;feature:&#160;syntax-highlighting&#160;|&#160;status:&#160;accepted&#160;|&#160;2026-02-06&#160;|&#160;related:&#160;[[2026-02-06-syntax-highlighti…</text><text class="terminal-2984306408-r1" x="1366.4" y="215.2" textLength="12.2" clip-path="url(#terminal-2984306408-line-8)">
+</text><text class="terminal-2984306408-r1" x="0" y="239.6" textLength="976" clip-path="url(#terminal-2984306408-line-9)">&#160;&#160;&#160;#&#160;`syntax-highlighting`&#160;adr:&#160;`Syntax&#160;Highlighting`&#160;|&#160;(**status:**&#160;`accepted`)</text><text class="terminal-2984306408-r1" x="1366.4" y="239.6" textLength="12.2" clip-path="url(#terminal-2984306408-line-9)">
+</text><text class="terminal-2984306408-r1" x="1366.4" y="264" textLength="12.2" clip-path="url(#terminal-2984306408-line-10)">
+</text><text class="terminal-2984306408-r1" x="0" y="288.4" textLength="170.8" clip-path="url(#terminal-2984306408-line-11)">&#160;&#160;&#160;##&#160;Decision</text><text class="terminal-2984306408-r1" x="1366.4" y="288.4" textLength="12.2" clip-path="url(#terminal-2984306408-line-11)">
+</text><text class="terminal-2984306408-r1" x="1366.4" y="312.8" textLength="12.2" clip-path="url(#terminal-2984306408-line-12)">
+</text><text class="terminal-2984306408-r1" x="0" y="337.2" textLength="1354.2" clip-path="url(#terminal-2984306408-line-13)">&#160;&#160;&#160;Colour&#160;fenced&#160;code&#160;by&#160;scopes&#160;from&#160;a&#160;per-language&#160;grammar&#160;table,&#160;loaded&#160;on&#160;first&#160;use,&#160;and&#160;keep&#160;that&#160;tokeniser</text><text class="terminal-2984306408-r1" x="1366.4" y="337.2" textLength="12.2" clip-path="url(#terminal-2984306408-line-13)">
+</text><text class="terminal-2984306408-r1" x="0" y="361.6" textLength="524.6" clip-path="url(#terminal-2984306408-line-14)">3.&#160;.vault/adr/2026-02-05-grid-layout-adr.md</text><text class="terminal-2984306408-r1" x="1366.4" y="361.6" textLength="12.2" clip-path="url(#terminal-2984306408-line-14)">
+</text><text class="terminal-2984306408-r1" x="0" y="386" textLength="1366.4" clip-path="url(#terminal-2984306408-line-15)">&#160;&#160;&#160;adr&#160;|&#160;feature:&#160;grid-layout&#160;|&#160;status:&#160;accepted&#160;|&#160;2026-02-05&#160;|&#160;related:&#160;[[2026-02-05-grid-layout-research]],&#160;[…</text><text class="terminal-2984306408-r1" x="1366.4" y="386" textLength="12.2" clip-path="url(#terminal-2984306408-line-15)">
+</text><text class="terminal-2984306408-r2" x="0" y="410.4" textLength="36.6" clip-path="url(#terminal-2984306408-line-16)">&#160;&#160;…</text><text class="terminal-2984306408-r1" x="1366.4" y="410.4" textLength="12.2" clip-path="url(#terminal-2984306408-line-16)">
 </text>
     </g>
     </g>

@@ -28,8 +28,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.usefixtures("preserved_no_color")]
 DIRECTORY_TAGS = frozenset({"research", "reference", "adr", "plan", "exec"})
 
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
-TAG_LINE = re.compile(r'^\s*-\s*"#([^"]+)"\s*$', re.MULTILINE)
+TAG_LINE = re.compile(r"""^\s*-\s*["']#([^"']+)["']\s*$""", re.MULTILINE)
 STEP_ROW = re.compile(r"^- \[(x| )\] `(P\d+)\.(S\d+)`", re.MULTILINE)
+LEDGER_ROW = re.compile(r"^- `(S\d+)` `[AMDR]` ", re.MULTILINE)
 DATE_STAMP = re.compile(r"^(date|modified): '([\d-]+)'$", re.MULTILINE)
 
 
@@ -97,32 +98,50 @@ def test_demo_documents_carry_exactly_the_required_tag_pair(
 def test_demo_documents_carry_matching_date_and_modified_stamps(
     demo_vault: Path,
 ) -> None:
-    """Scaffolded documents stamp ``modified`` equal to ``date``."""
-    for document in sorted(demo_vault.rglob("*.md")):
+    """Authored documents stamp ``modified`` equal to ``date``.
+
+    The ledgers are excluded: the logging verb owns their ``modified`` stamp
+    and refreshes it to the day each row is appended.
+    """
+    documents = sorted(
+        document
+        for document in demo_vault.rglob("*.md")
+        if document.relative_to(demo_vault).parts[0] != "exec"
+    )
+    assert documents, "build_demo_vault wrote no documents"
+    for document in documents:
         stamps = DATE_STAMP.findall(frontmatter_of(document))
         assert len(stamps) == 2, f"{document} frontmatter: {stamps}"
         assert stamps[0][1] == stamps[1][1], f"{document} stamps disagree: {stamps}"
 
 
-def test_every_checked_step_gets_an_execution_record(demo_vault: Path) -> None:
-    """The status render reads as tracked work only if the records exist."""
+def test_every_checked_step_is_logged_to_its_plan_ledger(demo_vault: Path) -> None:
+    """The status render reads as tracked work only if the ledger covers it."""
     checked_total = 0
     open_total = 0
     for plan in sorted(demo_vault.glob("plan/*.md")):
         prefix = plan.stem.removesuffix("-plan")
-        exec_dir = demo_vault / "exec" / prefix
+        ledgers = list((demo_vault / "exec").rglob(f"{prefix}-ledger.md"))
+        assert len(ledgers) == 1, f"{plan.name} has ledgers {ledgers}"
+        logged = set(LEDGER_ROW.findall(ledgers[0].read_text(encoding="utf-8")))
         rows = STEP_ROW.findall(plan.read_text(encoding="utf-8"))
         assert rows, f"{plan} declares no Step rows"
-        for box, phase_id, step_id in rows:
-            record = exec_dir / f"{prefix}-{phase_id}-{step_id}.md"
+        for box, _phase_id, step_id in rows:
             if box == "x":
                 checked_total += 1
-                assert record.is_file(), f"checked Step has no record: {record}"
+                assert step_id in logged, f"checked {step_id} of {plan.name} unlogged"
             else:
                 open_total += 1
-                assert not record.exists(), f"open Step has a record: {record}"
+                assert step_id not in logged, f"open {step_id} of {plan.name} logged"
     assert checked_total, "the demo corpus checks no Steps at all"
     assert open_total, "the demo corpus has no open Steps, so status shows no work"
+
+
+def test_demo_corpus_writes_no_per_step_execution_records(demo_vault: Path) -> None:
+    """The ledger is the only execution artifact ``vault check`` accepts."""
+    records = sorted(demo_vault.glob("exec/**/*.md"))
+    assert records, "build_demo_vault wrote no ledgers"
+    assert all(record.name.endswith("-ledger.md") for record in records), records
 
 
 def test_demo_corpus_names_no_feature_of_this_project(
@@ -144,20 +163,63 @@ def test_demo_corpus_names_no_feature_of_this_project(
     assert not demo_features & real_features
 
 
-def test_render_svg_writes_a_themed_terminal_window(tmp_path: Path) -> None:
-    """The export lands on disk with the brand border swapped in."""
-    from docs._render.render_readme_assets import LIGHT_STROKE, RICH_STROKE, render_svg
+#: The traffic-light fills of rich's default macOS window chrome.
+MACOS_BUTTONS = ("#ff5f57", "#febc2e", "#28c840")
+
+VIEWBOX = re.compile(r'viewBox="0 0 ([\d.]+) ([\d.]+)"')
+
+
+def test_render_svg_writes_a_brand_terminal_without_window_buttons(
+    tmp_path: Path,
+) -> None:
+    """The bar names the directory and command; no platform chrome is drawn."""
+    from docs._render.render_readme_assets import VAULTSPEC_THEME, render_svg
 
     out = tmp_path / "term.svg"
-    render_svg("first line\nsecond line\n", str(out), "vaultspec-core status", 40)
+    render_svg(
+        "first line\nsecond line\n",
+        str(out),
+        "vaultspec-core status",
+        40,
+        cwd="~/code/project",
+    )
 
     svg = svg_source(out)
     assert svg.lstrip().startswith("<svg")
-    assert "vaultspec-core status" in svg
+    assert ">~/code/project</text>" in svg
+    assert ">vaultspec-core status</text>" in svg
     assert "first line" in svg
     assert "second line" in svg
-    assert LIGHT_STROKE in svg
-    assert RICH_STROKE not in svg
+    assert f'fill="{VAULTSPEC_THEME.background_color.hex}"' in svg
+    assert "<circle" not in svg
+    assert not [fill for fill in MACOS_BUTTONS if fill in svg]
+
+
+def test_render_svg_frame_grows_by_one_line_pitch_per_row(tmp_path: Path) -> None:
+    """The frame is sized to the capture, so no row is clipped or padded out."""
+    from docs._render.render_readme_assets import LINE_HEIGHT, render_svg
+
+    def viewbox(rows: int) -> tuple[float, float]:
+        out = tmp_path / f"rows-{rows}.svg"
+        render_svg("\n".join(f"row{i}" for i in range(rows)), str(out), "t", 40)
+        match = VIEWBOX.search(out.read_text(encoding="utf-8"))
+        assert match is not None, f"{out} has no viewBox"
+        return float(match.group(1)), float(match.group(2))
+
+    two_wide, two_high = viewbox(2)
+    five_wide, five_high = viewbox(5)
+    assert five_wide == two_wide
+    assert five_high - two_high == pytest.approx(3 * LINE_HEIGHT)
+
+
+def test_render_svg_keeps_braces_in_the_title_bar(tmp_path: Path) -> None:
+    """A command naming a placeholder must not be read as a template field."""
+    from docs._render.render_readme_assets import render_svg
+
+    out = tmp_path / "braces.svg"
+    render_svg("body\n", str(out), "vaultspec-core vault add --feature {feature}", 40)
+
+    assert "--feature {feature}</text>" in svg_source(out)
 
 
 def test_render_svg_truncates_to_max_lines_and_marks_the_cut(tmp_path: Path) -> None:
