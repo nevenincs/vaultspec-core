@@ -1,30 +1,35 @@
-<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/logo.png" width="150" alt="Vaultspec logo">
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/logo.png" width="170" alt="Vaultspec logo">
 
 # vaultspec-core
 
-Decision-driven harness for coding agents, and humans.
+## Decision-driven harness for coding agents, and humans
 
 Vaultspec is a coding harness: it implements a structured coding workflow focused on
 #features, decision records and the documents grounding them. It bundles rules, agents,
 skills, and tools to author the documents that describe and track a feature's
 development.
 
-The harness supports Claude Code, Codex, Gemini CLI, and Antigravity.
-
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/ci/nevenincs/vaultspec-core.svg?workflow=main-health.yml&amp;branch=main&amp;label=ci&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="CI status of main" src="https://shieldcn.dev/github/ci/nevenincs/vaultspec-core.svg?workflow=main-health.yml&amp;branch=main&amp;label=ci&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://github.com/nevenincs/vaultspec-core/actions/workflows/main-health.yml)
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/pypi/v/vaultspec-core.svg?label=pypi&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="PyPI version" src="https://shieldcn.dev/pypi/v/vaultspec-core.svg?label=pypi&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://pypi.org/project/vaultspec-core/)
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/python-3.13%20%7C%203.14.svg?logo=python&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="Supported Python versions" src="https://shieldcn.dev/badge/python-3.13%20%7C%203.14.svg?logo=python&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://www.python.org/downloads/)
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/license/nevenincs/vaultspec-core.svg?label=license&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="License" src="https://shieldcn.dev/github/license/nevenincs/vaultspec-core.svg?label=license&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)
 
-[Install](#install) · [Start a feature](#start-a-feature) ·
-[Documentation](#documentation) · [Optional services](#optional-services)
+**[Install](#install)** · **[Start a feature](#start-a-feature)** ·
+**[Documentation](#documentation)** · **[Optional services](#optional-services)**
 
-The agent works through a CLI you can run yourself, shown here taking one feature from
-install to a plan with its first Step logged:
+<br>
 
-<p align="center">
 <img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/demo.gif" alt="Installing Vaultspec, scaffolding the search-api research, ADR, and plan, then checking the records, drawing the feature graph, and showing the plan at one of two Steps done" width="880">
-</p>
+
+*The agent works through a CLI you can run yourself. Here it takes one feature from
+install to a plan with its first Step logged.*
+
+</div>
+
+<br>
+<br>
 
 ## Install
 
@@ -55,17 +60,17 @@ uvx vaultspec-core doctor
 
 It reports installation and record problems;
 [checking a workspace](https://github.com/nevenincs/vaultspec-core/blob/main/docs/verification.md)
-explains how to repair them.
-
-Keep the `uvx` prefix when running commands yourself. For persistent or project-local
-installation, see
+explains how to repair them. Keep the `uvx` prefix when running commands yourself. For
+persistent or project-local installation, see
 [installation options](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md#installation-options).
 
-[Scoop and Homebrew](https://github.com/nevenincs/vaultspec-core/blob/main/docs/channels.md)
-provide binaries for Windows x86-64, Linux, and Apple silicon Macs. Each carries its own
-interpreter, Vaultspec and every dependency, so it needs no separate Python install and
-no network. A binary puts `vaultspec-core` on your PATH: run the commands in this README
-without the `uvx` prefix. On an Intel Mac, install with uv.
+> [!TIP]
+> Prefer a single binary that needs neither uv nor a network?
+> [Scoop and Homebrew](https://github.com/nevenincs/vaultspec-core/blob/main/docs/channels.md)
+> provide binaries for Windows x86-64, Linux, and Apple silicon Macs. Each carries its
+> own interpreter, Vaultspec and every dependency, so a first launch runs offline. A
+> binary puts `vaultspec-core` on your PATH: run the commands in this README without the
+> `uvx` prefix. On an Intel Mac, install with uv.
 
 ## Start a feature
 
@@ -75,6 +80,26 @@ Open your repository in your coding agent and describe the work:
 > decisions first, and show me any new decision and implementation plan for approval.
 
 The agent uses the parts of the workflow the task needs:
+
+```mermaid
+flowchart LR
+    ask([Your request]) --> need{What does<br/>the work need?}
+    need -- routine change --> direct[Change it directly]
+    need -- costly-to-reverse choice --> adr[Evidence, then an ADR<br/>you approve]
+    need -- durable sequencing --> plan[A plan<br/>you approve]
+    adr -- fits one session --> direct
+    adr -- needs sequencing --> plan
+    plan --> steps[Implement, verify, and log<br/>each Step in the ledger]
+    steps --> review[Review the<br/>integrated result]
+    classDef decision fill:#b4a6d4,stroke:#b4a6d4,color:#141816
+    classDef sequence fill:#dca05a,stroke:#dca05a,color:#141816
+    classDef ledger fill:#84b6d6,stroke:#84b6d6,color:#141816
+    classDef audit fill:#e57a86,stroke:#e57a86,color:#141816
+    class adr decision
+    class plan sequence
+    class steps ledger
+    class review audit
+```
 
 - Routine changes can proceed directly within your request.
 - A costly-to-reverse choice needs evidence and an approved architecture decision record
@@ -114,23 +139,21 @@ explains how to choose a route, approve work, and continue across sessions.
 
 ## Documentation
 
-- [Documentation index](https://github.com/nevenincs/vaultspec-core/blob/main/docs/README.md):
-  choose a guide for your task.
-- [Framework manual](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md):
-  run the workflow and customize its rules.
-- [Document syntax](https://github.com/nevenincs/vaultspec-core/blob/main/docs/syntax.md):
-  edit prose and manage document structure.
-- [Checking a workspace](https://github.com/nevenincs/vaultspec-core/blob/main/docs/verification.md):
-  check the setup and repair errors.
-- [Reviewing an implementation](https://github.com/nevenincs/vaultspec-core/blob/main/docs/correctness.md):
-  review a change against its scope and test evidence.
-- [CLI reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/CLI.md) and
-  [MCP reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/MCP.md):
-  commands, tools, and configuration.
+| Guide                                                                                                    | Purpose                                              |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [Documentation index](https://github.com/nevenincs/vaultspec-core/blob/main/docs/README.md)              | Choose a guide for your task.                        |
+| [Framework manual](https://github.com/nevenincs/vaultspec-core/blob/main/docs/framework.md)              | Run the workflow and customize its rules.            |
+| [Document syntax](https://github.com/nevenincs/vaultspec-core/blob/main/docs/syntax.md)                  | Edit prose and manage document structure.            |
+| [Checking a workspace](https://github.com/nevenincs/vaultspec-core/blob/main/docs/verification.md)       | Check the setup and repair errors.                   |
+| [Reviewing an implementation](https://github.com/nevenincs/vaultspec-core/blob/main/docs/correctness.md) | Review a change against its scope and test evidence. |
+| [CLI reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/CLI.md)                       | Look up commands, flags, and configuration.          |
+| [MCP reference](https://github.com/nevenincs/vaultspec-core/blob/main/docs/MCP.md)                       | Set up the MCP server and look up its tools.         |
 
 ## Optional services
 
-Open `.vault/` in [Obsidian](https://obsidian.md) to browse its linked documents.
+Open `.vault/` in [Obsidian](https://obsidian.md) to browse its linked documents. In the
+graph view, each feature's records gather around its index, and shared decisions bridge
+the clusters:
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/obsidian-vault.png" alt="A vault opened in Obsidian, showing the documents as a linked graph beside an accepted ADR" width="880">
@@ -161,11 +184,14 @@ lists every place the key can come from. The key enables:
   rank coordination work and review evidence. Pass `--no-hosted` to skip the hosted
   request.
 
-These calls send data to the TypeSafe API: vault text for search and cross-referencing,
-the objective and up to twelve shortlisted work-item summaries for project context, and
-the review objective, bounded diff and candidate passages for review context. Without a
-key, they send nothing. Search and cross-referencing then name a discovery fallback: a
-vaultspec-rag vault search when the workspace provisions vaultspec-rag, otherwise
+> [!IMPORTANT]
+> These calls send data to the TypeSafe API: vault text for search and
+> cross-referencing, the objective and up to twelve shortlisted work-item summaries for
+> project context, and the review objective, bounded diff and candidate passages for
+> review context. Without a key, they send nothing.
+
+Search and cross-referencing then name a discovery fallback: a vaultspec-rag vault
+search when the workspace provisions vaultspec-rag, otherwise
 `vaultspec-core vault list`, plus grep for search. The workflow can continue with that
 evidence. Project and review context order their results from local signals. Code search
 is always vaultspec-rag's job.
