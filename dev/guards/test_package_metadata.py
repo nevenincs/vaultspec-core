@@ -14,9 +14,8 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.repo]
 
 #: The README's runtime badge, whose message states the supported interpreters.
-RUNTIME_BADGE = re.compile(
-    r"!\[runtime\]\(https://img\.shields\.io/badge/runtime-([^-]+)-"
-)
+#: It is drawn once per colour scheme, so every rendering carries the claim.
+RUNTIME_BADGE = re.compile(r"https://shieldcn\.dev/badge/python-(.+?)\.svg")
 
 #: A ``3.13``-style version inside prose or a badge message.
 MINOR_VERSION = re.compile(r"3\.\d+")
@@ -75,17 +74,17 @@ def test_the_runtime_badge_names_every_supported_interpreter_and_no_other(
     metadata it describes.
     """
     readme = (repo_root / "README.md").read_text(encoding="utf-8")
-    badge = RUNTIME_BADGE.search(readme)
-    assert badge is not None, "no runtime badge found in README.md"
+    messages = [urllib.parse.unquote(m) for m in RUNTIME_BADGE.findall(readme)]
+    assert messages, "no runtime badge found in README.md"
 
-    claimed = MINOR_VERSION.findall(urllib.parse.unquote(badge.group(1)))
     supported = _supported_minors(pyproject["project"]["requires-python"])
-
-    assert claimed == supported, (
-        f"runtime badge claims {claimed} but requires-python admits {supported}"
-    )
-    # An open-ended marker re-introduces the same lie without changing a number.
-    assert "+" not in urllib.parse.unquote(badge.group(1))
+    for message in messages:
+        claimed = MINOR_VERSION.findall(message)
+        assert claimed == supported, (
+            f"runtime badge claims {claimed} but requires-python admits {supported}"
+        )
+        # An open-ended marker re-introduces the same lie without changing a number.
+        assert "+" not in message
 
 
 def test_the_readme_states_how_to_get_uv_before_telling_you_to_use_it(
