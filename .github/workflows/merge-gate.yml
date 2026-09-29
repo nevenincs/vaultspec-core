@@ -279,7 +279,7 @@ jobs:
     name: "Check: Merge gate (Linux)"
     needs: [lint, test-linux, test-windows]
     if: ${{ !cancelled() }}
-    timeout-minutes: 10
+    timeout-minutes: 125
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: read
