@@ -476,7 +476,7 @@ jobs:
         run: rm -rf "${RUNNER_TEMP}/brew" "${RUNNER_TEMP}/brew-home" "${RUNNER_TEMP}/brew-proj" || true
 
   acquire-windows:
-    timeout-minutes: 60
+    timeout-minutes: 136
     name: "Test: Release acquisition (Windows)"
     # NATIVE, like the macOS leg and for the same reason: the container on the
     # Linux legs exists to supply an OLDER libc than the build host, and Windows
@@ -490,6 +490,8 @@ jobs:
     # correct digest for a binary that cannot start is exactly what the 0.1.60
     # empty-hash failure taught us to stop trusting on its own.
     runs-on: [self-hosted, Windows, X64]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 60
     steps:
       - name: Acquire the published binary
         shell: pwsh
