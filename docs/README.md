@@ -40,8 +40,10 @@ skipped or repeated harmlessly.
 
 The terminal renders and the demo GIF in `assets/` are produced by the renderers in
 `_render/`, which run `vaultspec-core` against a throwaway vault. Edit the renderer
-rather than the SVG, then run `just docs` to regenerate. That covers `demo.gif` and the
-`term-*.svg` files; the logo and the Obsidian screenshot are not generated.
+rather than the SVG, then run `just docs-all` to regenerate. That covers `demo.gif` and
+the `term-*.svg` files; the logo and the Obsidian screenshot are not generated. The GIF
+needs [agg](https://github.com/asciinema/agg) on `PATH`, and `term-rag.svg` needs a
+running vaultspec-rag service; without one, that render is skipped with a warning.
 
 ### Update package-manager manifests
 
