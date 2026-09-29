@@ -21,6 +21,8 @@ from typing import IO, TYPE_CHECKING
 
 import pytest
 
+from .conftest import STDIO_SESSION_TIMEOUT
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -96,7 +98,7 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
         startup_lines: list[str] = []
         # Generous deadline: a cold subprocess + import on a busy CI runner can
         # take several seconds to emit its first startup line.
-        deadline = time.time() + 15
+        deadline = time.time() + STDIO_SESSION_TIMEOUT
         while time.time() < deadline:
             try:
                 line = stderr_queue.get(timeout=0.25).decode("utf-8", errors="replace")
@@ -122,7 +124,7 @@ def test_mcp_entrypoint_starts_and_keeps_stdout_clean(tmp_path: Path) -> None:
         assert proc.stdin is not None
         proc.stdin.write((json.dumps(_INITIALIZE_REQUEST) + "\n").encode("utf-8"))
         proc.stdin.flush()
-        response_line = stdout_queue.get(timeout=15)
+        response_line = stdout_queue.get(timeout=STDIO_SESSION_TIMEOUT)
         response = json.loads(response_line)
         assert response["id"] == 1, response
         name = response["result"]["serverInfo"]["name"]
@@ -163,23 +165,40 @@ def test_mcp_entrypoint_exits_cleanly_on_stdin_eof_while_serving(
         stderr=subprocess.DEVNULL,
         env=env,
     )
+    assert proc.stdin is not None and proc.stdout is not None
+    # The reader thread keeps stdout drained, so a server that never answers
+    # fails the bounded get below instead of blocking the test on readline.
+    stdout_queue: queue.Queue[bytes] = queue.Queue()
+    threading.Thread(
+        target=_read_startup_line,
+        args=(proc.stdout, stdout_queue),
+        daemon=True,
+    ).start()
     try:
-        assert proc.stdin is not None and proc.stdout is not None
         proc.stdin.write((json.dumps(_INITIALIZE_REQUEST) + "\n").encode("utf-8"))
         proc.stdin.flush()
-        response = json.loads(proc.stdout.readline())
+        try:
+            response_line = stdout_queue.get(timeout=STDIO_SESSION_TIMEOUT)
+        except queue.Empty:
+            pytest.fail(
+                "MCP stdio server did not answer initialize within "
+                f"{STDIO_SESSION_TIMEOUT:g}s."
+            )
+        response = json.loads(response_line)
         name = response["result"]["serverInfo"]["name"]
         assert name == "vaultspec-core-mcp", response
 
         proc.stdin.close()
-        returncode = proc.wait(timeout=20)
+        returncode = proc.wait(timeout=STDIO_SESSION_TIMEOUT)
     except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait(timeout=5)
         pytest.fail(
-            "MCP stdio server did not exit on stdin EOF within 20s; "
-            "possible busy-loop or hang (#137)."
+            "MCP stdio server did not exit on stdin EOF within "
+            f"{STDIO_SESSION_TIMEOUT:g}s; possible busy-loop or hang (#137)."
         )
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=5)
     assert returncode == 0
 
 
@@ -207,12 +226,16 @@ def test_mcp_entrypoint_exits_on_immediate_eof_before_any_request(
         stderr=subprocess.PIPE,
         env=env,
     )
+    # communicate() drains both pipes while it waits: a bare wait() on piped
+    # output can deadlock once the server's logging fills the pipe buffer,
+    # and that reads exactly like the wedge this test exists to catch.
     try:
-        returncode = proc.wait(timeout=20)
+        _, stderr = proc.communicate(timeout=STDIO_SESSION_TIMEOUT)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=5)
-        pytest.fail("MCP stdio server did not exit on immediate stdin EOF within 20s.")
-    stderr = proc.stderr
-    assert stderr is not None
-    assert returncode == 0, stderr.read().decode("utf-8", errors="replace")
+        pytest.fail(
+            "MCP stdio server did not exit on immediate stdin EOF within "
+            f"{STDIO_SESSION_TIMEOUT:g}s."
+        )
+    assert proc.returncode == 0, stderr.decode("utf-8", errors="replace")
