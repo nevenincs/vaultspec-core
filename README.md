@@ -262,7 +262,7 @@ folder of linked notes. In the graph view, each feature's records gather around 
 index, and shared decisions bridge the clusters:
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/obsidian-vault.png" alt="A vault opened in Obsidian, showing the records as a linked graph beside an accepted ADR" width="880">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/obsidian-vault.png" alt="Three framed panels, each showing one third of a different project vault's Obsidian graph, with records coloured by type and gathered into feature clusters" width="640">
 </p>
 
 The separate [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package indexes
