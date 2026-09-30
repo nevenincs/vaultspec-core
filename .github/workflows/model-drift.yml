@@ -49,11 +49,8 @@ on:
   #   - cron: "0 7 * * 1"
   workflow_dispatch:
 
-# Write scope is needed because the job's whole purpose is to push a branch
-# and open a PR. It never pushes to the default branch - see the prompt.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: model-drift-${{ github.workflow }}
@@ -68,6 +65,11 @@ jobs:
     timeout-minutes: 180
     name: "Check: Model drift (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
+    # Write scope is needed because the job's whole purpose is to push a branch
+    # and open a PR. It never pushes to the default branch - see the prompt.
+    permissions:
+      contents: write
+      pull-requests: write
     env:
       CI_EXEC_BUDGET_MINUTES: 60
     steps:
