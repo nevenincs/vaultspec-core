@@ -1,13 +1,8 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/logo.png" width="170" alt="Vaultspec logo">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/logo.png" width="119" alt="Vaultspec logo">
 
-# vaultspec-core
-
-## Decision-driven harness for coding agents, and humans
-
-Every coding-agent session starts without memory of the last one. Settled decisions get
-re-argued, and rejected ideas come back.
+# vaultspec-core: Decision-driven harness for coding agents, and humans
 
 Vaultspec wraps your agent in a written workflow: research, decide, plan, execute, and
 review. Each stage leaves a Markdown record in your repository's `.vault/` folder, and
@@ -17,6 +12,7 @@ work from then on. It's in beta.
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/ci/nevenincs/vaultspec-core.svg?workflow=main-health.yml&amp;branch=main&amp;label=ci&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="CI status of main" src="https://shieldcn.dev/github/ci/nevenincs/vaultspec-core.svg?workflow=main-health.yml&amp;branch=main&amp;label=ci&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://github.com/nevenincs/vaultspec-core/actions/workflows/main-health.yml)
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/pypi/v/vaultspec-core.svg?label=pypi&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="PyPI version" src="https://shieldcn.dev/pypi/v/vaultspec-core.svg?label=pypi&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://pypi.org/project/vaultspec-core/)
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/python-3.13%20%7C%203.14.svg?logo=python&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="Supported Python versions" src="https://shieldcn.dev/badge/python-3.13%20%7C%203.14.svg?logo=python&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://www.python.org/downloads/)
+[<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/badge/cli%20%7C%20mcp.svg?variant=secondary&amp;size=xs&amp;mode=dark"><img alt="Interfaces: CLI and MCP" src="https://shieldcn.dev/badge/cli%20%7C%20mcp.svg?variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://github.com/nevenincs/vaultspec-core#documentation)
 [<picture><source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/github/license/nevenincs/vaultspec-core.svg?label=license&amp;variant=secondary&amp;size=xs&amp;mode=dark"><img alt="License" src="https://shieldcn.dev/github/license/nevenincs/vaultspec-core.svg?label=license&amp;variant=secondary&amp;size=xs&amp;mode=light"></picture>](https://github.com/nevenincs/vaultspec-core/blob/main/LICENSE)
 
 **[How it works](#how-it-works)** · **[Install](#install)** ·
