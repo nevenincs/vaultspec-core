@@ -5,7 +5,7 @@ tags:
 date: '2026-09-30'
 modified: '2026-09-30'
 body_schema: 'body-v2'
-body_hash: 'sha256:50a56675b0544826f88c6bc468e90067ea513c76f3634c21f5c09a82f26768cb'
+body_hash: 'sha256:0e08274bab336d8dd606f99fdc9903dff8155c40dc41f3cbe3816d287d1c59ae'
 related:
   - "[[2026-09-30-release-standard-plan]]"
 ---
@@ -34,7 +34,18 @@ related:
 - `S05` `M` `docs/README.md`
 - `S05` `verify:` `just check-markdown` -> `pass`
 - `S05` `verify:` `just check-links` -> `pass`
+- `S10` `M` `.github/workflows/merge-gate.yml`
+- `S10` `verify:` `just check-workflow` -> `pass`
+- `S10` `verify:` `shellcheck -s bash merge-gate.yml gate run blocks` -> `pass`
+- `S11` `M` `dev/guards/test_ci_check_shape.py`
+- `S11` `verify:` `pytest dev/guards` -> `pass`
+- `S11` `verify:` `guard mutation proofs for the author clause and the untrusted refusal` -> `pass`
+- `S12` `M` `.github/workflows/model-drift.yml`
+- `S12` `verify:` `just check-workflow` -> `pass`
+- `S13` `M` `.github/workflows/main-health.yml`
+- `S13` `verify:` `just check-workflow` -> `pass`
 
 ## Notes
 
 - `S02` S02, S03 and S04 share one commit: the cut, the retired relay and the rewritten guards only pass together
+- `S10` S10 and S11 share one commit: the guard fails without the rule it pins

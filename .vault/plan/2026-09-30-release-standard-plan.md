@@ -8,7 +8,7 @@ related:
   - '[[2026-09-30-release-standard-adr]]'
 modified: '2026-09-30'
 body_schema: body-v2
-body_hash: 'sha256:c87df2282a4be0b86319bd2c31b945cf7a67de73f2f1101b92cc1f3c409aaf4a'
+body_hash: 'sha256:d9d49b84ce03720bb1326e3a983c114428285d383ba8b8b7e1f70e3cedfa0740'
 ---
 
 # `release-standard` plan
@@ -63,10 +63,10 @@ Core releases only through a maintainer-dispatched cut that proves, merges and t
 
 Only trusted contributors can cause a job on the self-hosted fleet, with the smallest token scopes, and core's guards fail if that ever stops holding.
 
-- [ ] `P02.S10` - run a pull request's self-hosted jobs only for an owner or collaborator author or a collaborator's ci:full label, and fail the gate otherwise; `.github/workflows/merge-gate.yml`.
-- [ ] `P02.S11` - pin that trust rule over every job a pull request can reach, proven to fail; `dev/guards/test_ci_check_shape.py`.
-- [ ] `P02.S12` - move model-drift's write scopes from the workflow to the one job that writes; `.github/workflows/model-drift.yml`.
-- [ ] `P02.S13` - declare a read-only token default for main-health; `.github/workflows/main-health.yml`.
+- [x] `P02.S10` - run a pull request's self-hosted jobs only for an owner or collaborator author or a collaborator's ci:full label, and fail the gate otherwise; `.github/workflows/merge-gate.yml`.
+- [x] `P02.S11` - pin that trust rule over every job a pull request can reach, proven to fail; `dev/guards/test_ci_check_shape.py`.
+- [x] `P02.S12` - move model-drift's write scopes from the workflow to the one job that writes; `.github/workflows/model-drift.yml`.
+- [x] `P02.S13` - declare a read-only token default for main-health; `.github/workflows/main-health.yml`.
 - [ ] `P02.S14` - turn off token pull-request approval, require SHA-pinned actions, restrict the pypi environment to main, and drop the write deploy key's ruleset bypass once its use is confirmed; `GitHub settings: nevenincs/vaultspec-core`.
 
 ### Phase `P03` - converge every other vaultspec repository
