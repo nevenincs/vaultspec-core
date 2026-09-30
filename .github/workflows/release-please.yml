@@ -29,6 +29,41 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      # GITHUB_TOKEN never holds the `workflows` permission, and without it
+      # GitHub refuses any tag or release that targets a commit whose workflow
+      # files differ from the branch head, even once the tag exists. When a
+      # workflow change merges before a release commit's own run gets a
+      # runner, release-please fails "Resource not accessible by integration"
+      # on every later run. The API error names neither the tag nor the cause,
+      # so this step does.
+      - name: Name a release this token cannot tag
+        if: failure() && steps.release.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUNBOOK: docs/README.md
+        run: |
+          set -euo pipefail
+          repo="repos/${GITHUB_REPOSITORY}"
+          tip=$(gh api "${repo}/commits/${GITHUB_REF_NAME}" --jq .sha)
+          gh pr list --repo "${GITHUB_REPOSITORY}" --base "${GITHUB_REF_NAME}" \
+            --state merged --label "autorelease: pending" \
+            --json number,mergeCommit --jq '.[] | "\(.number) \(.mergeCommit.oid)"' |
+            while read -r number sha; do
+              package=$(gh api "${repo}/contents/release-please-config.json?ref=${sha}" \
+                --jq '.content | @base64d | fromjson | .packages["."]["package-name"]')
+              version=$(gh api "${repo}/contents/.release-please-manifest.json?ref=${sha}" \
+                --jq '.content | @base64d | fromjson | ."."')
+              tag="${package}-v${version}"
+              if gh api "${repo}/git/ref/tags/${tag}" >/dev/null 2>&1; then
+                continue
+              fi
+              changed=$(gh api "${repo}/compare/${sha}...${tip}" \
+                --jq '[.files[]?.filename | select(startswith(".github/workflows/"))] | join(", ")')
+              if [ -n "${changed}" ]; then
+                echo "::error::${tag} cannot be created by this job: #${number} merged it at ${sha}, and ${GITHUB_REF_NAME} has since changed ${changed}. Rerunning cannot finish it; release it with maintainer credentials as ${RUNBOOK} describes."
+              fi
+            done
+
       - name: Check out the release branch
         if: steps.release.outputs.pr && !steps.release.outputs.release_created
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the lockfile commit to the release branch

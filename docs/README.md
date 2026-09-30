@@ -38,6 +38,34 @@ nobody has been shown rather than a half-finished release to walk back. Fix the 
 and re-dispatch `Core Release` for the same tag; the steps that already succeeded are
 skipped or repeated harmlessly.
 
+A merged release can also stop before that lane starts: `Core Release Please` fails with
+`Resource not accessible by integration`, and its `Name a release this token cannot tag`
+step names the tag. The workflow token never holds the `workflows` permission, and
+without it GitHub refuses any tag or release that targets a commit whose workflow files
+differ from `main`, even once the tag exists. A workflow change that merged before the
+release commit's own run started therefore blocks the release for good: no rerun can
+finish it. Finish it with your own credentials, as release-please would have,
+relabelling the release pull request first so later runs stop retrying it:
+
+```sh
+REPO=nevenincs/vaultspec-core
+PR=<release pull request number>
+VERSION=<version>
+TAG="vaultspec-core-v$VERSION"
+SHA=$(gh pr view "$PR" --repo "$REPO" --json mergeCommit --jq .mergeCommit.oid)
+
+gh pr edit "$PR" --repo "$REPO" \
+  --remove-label "autorelease: pending" --add-label "autorelease: tagged"
+git fetch origin "$SHA"
+git push origin "$SHA:refs/tags/$TAG"
+git show "$SHA:CHANGELOG.md" \
+  | awk -v h="## [$VERSION]" 'index($0, "## [") == 1 { p = index($0, h) == 1 } p' \
+  > release-notes.md
+gh release create "$TAG" --repo "$REPO" --verify-tag --draft \
+  --title "vaultspec-core: v$VERSION" --notes-file release-notes.md
+gh workflow run release.yml --repo "$REPO" --ref main -f tag="$TAG"
+```
+
 The terminal renders and the demo GIF in `assets/` are produced by the renderers in
 `_render/`, which run `vaultspec-core` against a throwaway vault. Edit the renderer
 rather than the SVG, then run `just docs-all` to regenerate. That covers `demo.gif` and
