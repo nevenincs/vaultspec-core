@@ -32,10 +32,10 @@ jobs:
       # GITHUB_TOKEN never holds the `workflows` permission, and without it
       # GitHub refuses any tag or release that targets a commit whose workflow
       # files differ from the branch head, even once the tag exists. When a
-      # workflow change merges before a release commit's own run gets a
-      # runner, release-please fails "Resource not accessible by integration"
-      # on every later run. The API error names neither the tag nor the cause,
-      # so this step does.
+      # workflow change lands between a release commit's merge and its tag,
+      # release-please fails "Resource not accessible by integration" on every
+      # later run. The API error names neither the tag nor the cause, so this
+      # step does.
       - name: Name a release this token cannot tag
         if: failure() && steps.release.outcome == 'failure'
         env:
