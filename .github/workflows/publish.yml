@@ -402,11 +402,9 @@ jobs:
       # `curl` against the releases API - so it cannot see a draft and has to
       # be asked after the publication above, not before it.
       #
-      # It must be asked at all because a release published with the default
-      # token raises no workflow events, so acquisition.yml's own
-      # `release: published` trigger never fires for anything this lane
-      # produces; only its weekly schedule does, which is days of blindness
-      # after every release. A dispatch is explicitly exempt from that rule.
+      # It must be asked: acquisition.yml starts only from this dispatch and its
+      # weekly schedule, never from a tag or a release event, so without the
+      # dispatch a new release would wait days for its first acquisition.
       #
       # A failure to dispatch does not fail the release: it is published and
       # verified by this point, and the weekly run still covers it. It warns

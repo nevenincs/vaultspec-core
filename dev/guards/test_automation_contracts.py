@@ -1478,6 +1478,39 @@ def test_release_please_is_the_single_release_authority() -> None:
     )
 
 
+def test_nothing_starts_from_a_tag_push_or_a_release_event() -> None:
+    """No workflow starts itself from a tag push or a release event.
+
+    Every lane after the tag is dispatched by the one before it. A trigger on
+    the tag or the release would start that lane a second time, outside the
+    dispatch chain, the moment anyone publishes with their own credentials -
+    which is exactly what the recovery for an untaggable release does.
+
+    Mutation proof: restoring `release: {types: [published]}` on
+    `acquisition.yml` makes this fail naming it; restoring the workflow makes
+    this pass.
+    """
+    offenders: list[str] = []
+    for path in _workflow_paths():
+        workflow = cast(
+            "dict[str, object]",
+            yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader),
+        )
+        triggers = workflow.get("on")
+        if not isinstance(triggers, dict):
+            continue
+        events = cast("dict[str, object]", triggers)
+        if "release" in events:
+            offenders.append(f"{path.name}: release")
+        push = events.get("push")
+        if isinstance(push, dict) and {"tags", "tags-ignore"} & set(push):
+            offenders.append(f"{path.name}: push tags")
+    assert not offenders, (
+        f"these workflows start from a tag push or a release event: {offenders}; "
+        "dispatch the lane from the one before it instead"
+    )
+
+
 def test_the_release_is_proven_before_anything_is_tagged() -> None:
     """The cut merges and tags only the head the full merge gate passed.
 

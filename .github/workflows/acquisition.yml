@@ -10,8 +10,6 @@ name: Core Acquisition
 # release, a renamed asset, a channel pointer that no longer installs.
 
 on:
-  release:
-    types: [published]
   schedule:
     # Weekly, off the hour: nothing here is urgent and the fleet is shared.
     - cron: '17 6 * * 1'
@@ -27,8 +25,8 @@ permissions:
 
 # The only workflow here that could overlap with itself and had no group.
 #
-# Three triggers reach it - a weekly cron, `release: published`, and dispatch -
-# and a release published on a Monday morning can land on top of the cron. The
+# Two triggers reach it - a weekly cron and the dispatch the publication lane
+# sends - and a release published on a Monday morning can land on top of the cron. The
 # macOS leg runs on the power-gated host, where a job does not fail when the
 # host is asleep, it QUEUES; overlapping runs therefore stack on that host
 # rather than racing and resolving.
@@ -73,12 +71,11 @@ jobs:
       - name: Acquire the published binary
         env:
           REPO: ${{ github.repository }}
-          EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
           TARGET: ${{ matrix.target }}
         run: |
           set -eux
-          tag="${EVENT_TAG:-${INPUT_TAG:-}}"
+          tag="${INPUT_TAG:-}"
           if [ -z "${tag}" ]; then
             tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
                   | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
@@ -154,11 +151,10 @@ jobs:
       - name: Acquire the published binary
         env:
           REPO: ${{ github.repository }}
-          EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -eux
-          tag="${EVENT_TAG:-${INPUT_TAG:-}}"
+          tag="${INPUT_TAG:-}"
           if [ -z "${tag}" ]; then
             tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
                   | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
@@ -285,11 +281,10 @@ jobs:
       - name: Provision a private Homebrew
         env:
           REPO: ${{ github.repository }}
-          EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -eux
-          tag="${EVENT_TAG:-${INPUT_TAG:-}}"
+          tag="${INPUT_TAG:-}"
           if [ -z "${tag}" ]; then
             tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
                   | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
@@ -497,11 +492,10 @@ jobs:
         shell: pwsh
         env:
           REPO: ${{ github.repository }}
-          EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = if ($env:EVENT_TAG) { $env:EVENT_TAG } elseif ($env:INPUT_TAG) { $env:INPUT_TAG } else { '' }
+          $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { '' }
           if (-not $tag) {
             $latest = Invoke-RestMethod "https://api.github.com/repos/$env:REPO/releases/latest"
             $tag = $latest.tag_name
