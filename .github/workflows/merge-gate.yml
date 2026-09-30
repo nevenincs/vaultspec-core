@@ -26,12 +26,23 @@ name: Core Merge Gate
 # request therefore re-proves the commit it produced, and a commit is never
 # merged on a verdict earned by a different tree.
 #
+# ONLY TRUSTED AUTHORS REACH THE FLEET. A pull request runs its jobs on the
+# self-hosted fleet only when its author is the owner or a collaborator, or
+# once a user - never a bot - has applied `ci:full` to it, which takes triage
+# rights. Everyone else, Dependabot included, runs nothing here until a
+# collaborator has read the change, and the gate refuses the commit until
+# then. A fork's pull request runs the fork's own copy of this file, so for
+# forks these conditions only back up the repository's requirement that an
+# outside contributor's runs be approved; for every other author they are the
+# control itself.
+#
 # `push: main` is deliberately absent. main is ruleset-protected, so every
 # commit reaching it passed this gate on its pull request; a direct push is an
-# administrator override and is not re-litigated here. release.yml calls this
-# workflow against the release tag before anything is built, and
-# release-please.yml dispatches it on the release branch, whose pull request
-# the default token cannot trigger a run for.
+# administrator override and is not re-litigated here. The release cut in
+# release-please.yml calls this workflow on the proposal's exact head before
+# it merges or tags anything, and the proposal path dispatches it on the
+# release branch, whose pull request the default token cannot trigger a run
+# for.
 
 on:
   pull_request:
@@ -71,11 +82,11 @@ env:
   FORCE_COLOR: "0"
 
 jobs:
-  # Fork pull requests never reach the self-hosted fleet: every job below is
-  # skipped for them, and the gate then refuses the commit as unproven.
+  # Fork pull requests and untrusted authors never reach the self-hosted fleet:
+  # every job below is skipped for them, and the gate then refuses the commit.
   lint:
     name: "Check: Lint (Linux)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' || github.event.label.name == 'ci:full')) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action != 'labeled' && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR')) || (github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User'))) }}
     timeout-minutes: 150
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -145,7 +156,7 @@ jobs:
 
   test-linux:
     name: "Test: Full suite (Linux)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User') || (github.event.action != 'labeled' && github.event.pull_request.draft == false && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR')))) }}
     timeout-minutes: 240
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -236,7 +247,7 @@ jobs:
   # Independent of the Linux suite: it must start even when that one fails.
   test-windows:
     name: "Test: Library suite (Windows)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User') || (github.event.action != 'labeled' && github.event.pull_request.draft == false && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR')))) }}
     timeout-minutes: 166
     runs-on: [self-hosted, Windows, X64]
     env:
@@ -294,6 +305,8 @@ jobs:
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      ASSOCIATION: ${{ github.event.pull_request.author_association }}
       LINT: ${{ needs.lint.result }}
       LINUX: ${{ needs.test-linux.result }}
       WINDOWS: ${{ needs.test-windows.result }}
@@ -335,5 +348,11 @@ jobs:
             echo "the full suites already passed on ${HEAD_SHA}"
             exit 0
           fi
+          # An untrusted author's commit ran nothing, so no earlier verdict can
+          # exist unless a collaborator's ci:full proved it; refuse it by name.
+          case "${ASSOCIATION}" in OWNER | COLLABORATOR) ;; *)
+            echo "::error::pull requests by ${AUTHOR} (${ASSOCIATION}) run nothing on the self-hosted fleet; a collaborator reviews the change and applies the ci:full label to run it"
+            exit 1 ;;
+          esac
           echo "::error::the full suites have not run on ${HEAD_SHA}; mark the pull request ready for review to run them, or add the ci:full label to prove it while it stays a draft"
           exit 1

@@ -1404,23 +1404,42 @@ def test_the_harness_carries_no_second_duration_reporter() -> None:
     )
 
 
-def test_release_please_is_the_single_release_authority() -> None:
-    """A release creates exactly one proof, one publish run and one build run.
+def _release_please_jobs() -> dict[str, dict[str, object]]:
+    """Return the Release Please workflow's jobs, parsed as plain strings."""
+    workflow = cast(
+        "dict[str, object]",
+        yaml.load(
+            _read(".github/workflows/release-please.yml"), Loader=yaml.BaseLoader
+        ),
+    )
+    return cast("dict[str, dict[str, object]]", workflow["jobs"])
 
-    release-please dispatches release.yml once it creates the immutable tag;
-    release.yml proves the tagged tree with the merge gate and only then
+
+def _steps(job: dict[str, object]) -> list[dict[str, object]]:
+    """Return one job's steps."""
+    return cast("list[dict[str, object]]", job.get("steps", []))
+
+
+def test_release_please_is_the_single_release_authority() -> None:
+    """Only the dispatched cut creates a release, and it starts exactly one lane.
+
+    The proposal path refreshes the release pull request and never releases. A
+    maintainer dispatches the cut, which proves, merges and tags, then
     dispatches the binaries build, which dispatches the publication in turn. If
-    a consumer also listened for the tag push, the same release could race an
-    unproven run through publication.
+    a lane also listened for the tag push, or the proposal path could release,
+    the same release could race an unproven run through publication.
+
+    Mutation proof: dropping `skip-github-release` from the proposal step makes
+    this fail on the release-creating jobs; restoring it makes this pass.
     """
-    for name in ("release.yml", "publish.yml", "binaries.yml"):
+    for name in ("publish.yml", "binaries.yml"):
         workflow = cast(
             "dict[str, object]",
             yaml.load(_read(f".github/workflows/{name}"), Loader=yaml.BaseLoader),
         )
         triggers = cast("dict[str, object]", workflow["on"])
         assert set(triggers) == {"workflow_dispatch"}, (
-            f"{name} must be dispatch-only; release-please owns release "
+            f"{name} must be dispatch-only; the release cut owns release "
             f"initiation, but it also declares {sorted(triggers)}"
         )
         dispatch = cast("dict[str, object]", triggers["workflow_dispatch"])
@@ -1430,52 +1449,73 @@ def test_release_please_is_the_single_release_authority() -> None:
             f"{name} must require the immutable release tag"
         )
 
+    creators = sorted(
+        job_id
+        for job_id, job in _release_please_jobs().items()
+        for step in _steps(job)
+        if str(step.get("uses", "")).startswith("googleapis/release-please-action@")
+        and cast("dict[str, str]", step.get("with", {})).get("skip-github-release")
+        != "true"
+    )
+    assert creators == ["cut"], (
+        "only the dispatched cut may create a release; the proposal path must "
+        f"run with `skip-github-release`, but these jobs can release: {creators}"
+    )
+
     authority = _read(".github/workflows/release-please.yml")
-    assert "gh workflow run release.yml" in authority, (
-        "release-please no longer dispatches the release workflow"
+    dispatch = (
+        'gh workflow run binaries.yml --repo "${GITHUB_REPOSITORY}" '
+        '--ref main -f "tag=${TAG}"'
     )
-    assert '-f "tag=${TAG}"' in authority, (
-        "the release workflow must receive release-please's immutable tag"
+    assert dispatch in authority, (
+        "the cut no longer dispatches the binaries lane with its immutable tag"
     )
-    for consumer in ("publish.yml", "binaries.yml"):
-        assert consumer not in authority, (
-            f"release-please dispatches {consumer} directly, skipping the "
-            "release workflow's merge gate"
-        )
-
-
-def test_the_release_is_proven_before_anything_is_published() -> None:
-    """The consumers are dispatched only after the merge gate passed the tag."""
-    release = cast(
-        "dict[str, dict[str, dict[str, object]]]",
-        yaml.safe_load(_read(".github/workflows/release.yml")),
-    )
-    jobs = release["jobs"]
-    assert jobs["health"]["uses"] == "./.github/workflows/merge-gate.yml"
-    health_inputs = cast("dict[str, str]", jobs["health"]["with"])
-    assert health_inputs["ref"] == "${{ inputs.tag }}", (
-        "the release gate must prove the tag, not the dispatch ref"
+    assert "publish.yml" not in authority, (
+        "the cut dispatches the publication beside the binaries build. PyPI "
+        "cannot be unpublished, so a version reaches the index while the build "
+        "that justifies it can still fail. The binaries lane dispatches the "
+        "publication once every declared target is proven"
     )
 
-    dispatch = jobs["dispatch"]
-    assert dispatch["needs"] == "health", "the consumers must wait on the release gate"
-    assert "if" not in dispatch, (
-        "a condition on the dispatch job would override the default success "
-        "check and let a failed gate publish"
+
+def test_the_release_is_proven_before_anything_is_tagged() -> None:
+    """The cut merges and tags only the head the full merge gate passed.
+
+    A release tag cannot be deleted under the tag ruleset, so the proof comes
+    before it. The cut waits on the merge gate called on the candidate's exact
+    head, carries no condition that could override that success, merges only
+    that head, and refuses a merged tree that differs from the proven one
+    before Release Please creates anything.
+
+    Mutation proof: removing `prove-gate` from the cut's `needs` makes this
+    fail on the gate dependency; restoring it makes this pass.
+    """
+    jobs = _release_please_jobs()
+    prove = jobs["prove-gate"]
+    assert prove["uses"] == "./.github/workflows/merge-gate.yml"
+    assert cast("dict[str, str]", prove["with"])["ref"] == (
+        "${{ needs.candidate.outputs.sha }}"
+    ), "the release gate must prove the candidate's exact head"
+
+    cut = jobs["cut"]
+    assert "prove-gate" in cast("list[str]", cut["needs"]), (
+        "the cut must wait on the release gate"
     )
-    runs = " ".join(
-        str(step.get("run", ""))
-        for step in cast("list[dict[str, object]]", dispatch["steps"])
+    assert "if" not in cut, (
+        "a condition on the cut would override the default success check and "
+        "let a failed gate tag a release"
     )
-    assert "gh workflow run binaries.yml" in runs, (
-        "the release workflow no longer dispatches the binaries build"
+    steps = _steps(cut)
+    names = [str(step.get("name")) for step in steps]
+    merge = names.index("Merge the proven release pull request")
+    create = names.index("Create the release for the merged proposal")
+    assert merge < create, "the cut must merge before it creates the release"
+    merge_run = str(steps[merge]["run"])
+    assert '--match-head-commit "${SHA}"' in merge_run, (
+        "the cut must merge only the head the gate proved"
     )
-    assert "gh workflow run publish.yml" not in runs, (
-        "the release workflow dispatches the publication beside the binaries "
-        "build again. PyPI cannot be unpublished, so a version reaches the "
-        "index while the build that justifies it can still fail - which is how "
-        "a release can exist on PyPI with no binaries behind it. The binaries "
-        "lane dispatches the publication once every declared target is proven"
+    assert "tree.sha" in merge_run, (
+        "the cut must refuse a merged tree that differs from the proven tree"
     )
 
 
@@ -1650,7 +1690,7 @@ def test_an_incomplete_release_is_never_edited_into_shape() -> None:
     mechanism has no domain left - and a dormant recovery path is
     indistinguishable from a working one until the day it is needed.
     """
-    for name in ("binaries.yml", "publish.yml", "release.yml"):
+    for name in ("binaries.yml", "publish.yml", "release-please.yml"):
         source = _read(f".github/workflows/{name}")
         assert "--prerelease" not in source, (
             f"{name} still edits a release's prerelease flag. The release is "

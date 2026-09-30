@@ -27,6 +27,9 @@ on:
     - cron: "23 4 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: main-health
   cancel-in-progress: true

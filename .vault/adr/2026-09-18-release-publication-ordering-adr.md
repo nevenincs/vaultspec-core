@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#release-publication-ordering'
 date: '2026-09-18'
-modified: '2026-09-18'
+modified: '2026-09-30'
 body_schema: 'body-v2'
-body_hash: 'sha256:870cc7e017c848008355b55b9ad60a85ed23a4a266f6a802aa29972ad8318de0'
+body_hash: 'sha256:2a6b9226359aa0136b5aeb334d3c26623b1d7e989b6230b56a97fdb7850053c4'
 related:
   - "[[2026-09-18-release-publication-ordering-release-object-lifecycle-research]]"
   - "[[2026-03-22-clci-release-adr]]"
@@ -94,7 +94,9 @@ when binaries, attestations and channel pointers did not yet exist.
 release-please gains `draft` and `force-tag-creation`, so a merged release pull request
 produces a tag and an unpublished release rather than a public one. Nothing downstream
 changes shape: every job still checks out the tag for its source, and both consumer
-workflows stay dispatched rather than called.
+workflows stay dispatched rather than called. Amended 2026-09-30 by
+`2026-09-30-release-standard-adr`: the tag and the draft are produced by the
+maintainer-dispatched cut rather than by the merge; the publication order is unchanged.
 
 The lanes attach to the draft exactly as they attach today. The release-proven gate in
 the binaries workflow keeps its existing judgment - every declared target present, its

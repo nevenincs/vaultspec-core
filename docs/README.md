@@ -23,20 +23,59 @@ Start with [the framework workflow](../README.md#start-a-feature), then
 
 ## For maintainers
 
+CI runs on self-hosted machines, so a pull request runs its checks there only when you
+or a collaborator wrote it. A pull request from anyone else, Dependabot included, runs
+nothing and its merge gate stays red until you have read the change and applied the
+`ci:full` label, which runs the full checks once on that commit. Pull requests from
+forks are refused; re-open an outside change from a branch in this repository.
+
 Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
-maintains a release pull request with the next version and changelog. Merging it creates
-the tag and an unpublished draft release, then starts the lane that fills it: the
-binaries are built for every supported target, proved to start with no network, and
-attached to the draft with their checksums and provenance; only once all of them are
-there does the wheel and sdist build, smoke-test, and publish to PyPI using OIDC trusted
-publishing.
+maintains a release pull request with the next version and changelog, rebuilt on every
+commit that lands on `main`. Merging it does not release anything. To release, dispatch
+`Core Release Please`: the cut proves the pull request's head with the full merge gate,
+squash-merges it, and seconds later creates the tag and an unpublished draft release,
+then starts the lane that fills it: the binaries are built for every supported target,
+proved to start with no network, and attached to the draft with their checksums and
+provenance; only once all of them are there does the wheel and sdist build, smoke-test,
+and publish to PyPI using OIDC trusted publishing. A release pull request merged by hand
+is released by the next dispatched cut.
 
 Publishing the draft is the last step, and the Scoop and Homebrew pointers are updated
 immediately after it, never before. A release that is visible is therefore a release
 that carries everything it claims to, and a failure anywhere in the lane leaves a draft
 nobody has been shown rather than a half-finished release to walk back. Fix the cause
-and re-dispatch `Core Release` for the same tag; the steps that already succeeded are
+and re-dispatch `Core Binaries` for the same tag; the steps that already succeeded are
 skipped or repeated harmlessly.
+
+A cut can also stop before that lane starts: it fails in
+`Create the release for the merged proposal` with
+`Resource not accessible by integration`, and its `Name a release this token cannot tag`
+step names the tag. The workflow token never holds the `workflows` permission, and
+without it GitHub refuses any tag or release that targets a commit whose workflow files
+differ from `main`, even once the tag exists. A workflow change that landed between the
+release commit's merge and its tag, as when a pull request merged by hand waits for its
+cut, therefore blocks the release for good: no rerun or later cut can finish it. Finish
+it with your own credentials, as the cut would have, relabelling the release pull
+request first so the next cut does not pick it up again:
+
+```sh
+REPO=nevenincs/vaultspec-core
+PR=<release pull request number>
+VERSION=<version>
+TAG="vaultspec-core-v$VERSION"
+SHA=$(gh pr view "$PR" --repo "$REPO" --json mergeCommit --jq .mergeCommit.oid)
+
+gh pr edit "$PR" --repo "$REPO" \
+  --remove-label "autorelease: pending" --add-label "autorelease: tagged"
+git fetch origin "$SHA"
+git push origin "$SHA:refs/tags/$TAG"
+git show "$SHA:CHANGELOG.md" \
+  | awk -v h="## [$VERSION]" 'index($0, "## [") == 1 { p = index($0, h) == 1 } p' \
+  > release-notes.md
+gh release create "$TAG" --repo "$REPO" --verify-tag --draft \
+  --title "vaultspec-core: v$VERSION" --notes-file release-notes.md
+gh workflow run binaries.yml --repo "$REPO" --ref main -f tag="$TAG"
+```
 
 The terminal renders and the demo GIF in `assets/` are produced by the renderers in
 `_render/`, which run `vaultspec-core` against a throwaway vault. Edit the renderer
