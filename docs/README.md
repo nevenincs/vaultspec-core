@@ -23,6 +23,12 @@ Start with [the framework workflow](../README.md#start-a-feature), then
 
 ## For maintainers
 
+CI runs on self-hosted machines, so a pull request runs its checks there only when you
+or a collaborator wrote it. A pull request from anyone else, Dependabot included, runs
+nothing and its merge gate stays red until you have read the change and applied the
+`ci:full` label, which runs the full checks once on that commit. Pull requests from
+forks are refused; re-open an outside change from a branch in this repository.
+
 Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
 maintains a release pull request with the next version and changelog, rebuilt on every
 commit that lands on `main`. Merging it does not release anything. To release, dispatch
