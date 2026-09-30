@@ -263,9 +263,12 @@ index, and shared decisions bridge the clusters:
 <img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/obsidian-vault.png" alt="Three framed panels, each showing one third of a different project vault's Obsidian graph, with records coloured by type and gathered into feature clusters" width="640">
 </p>
 
-The separate [vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) package indexes
-the records and your source code on your machine for search by meaning. Ask why
-something was decided, and it returns the ADR. Its README covers installation.
+[vaultspec-rag](https://github.com/nevenincs/vaultspec-rag) is Vaultspec's companion
+search toolkit: a semantic retrieval engine that indexes the records and your source
+code on your own GPU. It fuses dense semantic embeddings with exact-term matching and
+reranks the top candidates on their full content, so asking why something was decided
+returns the ADR passage that answers it. It's a separate package, and its README covers
+installation.
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-rag.svg" alt="vaultspec-rag search answering how the parser tokenizes markdown with the editor-demo ADR and its decision passage" width="880">

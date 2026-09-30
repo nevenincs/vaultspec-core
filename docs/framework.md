@@ -111,9 +111,9 @@ types when the workspace provisions RAG, otherwise `vaultspec-core vault list` (
 [`vaultspec-core vault search` reference](CLI.md#vaultspec-core-vault-search) and the
 [`search` tool](MCP.md#search) for the reply fields.
 
-To search code by meaning,
+To search code with semantic retrieval,
 [install RAG](https://github.com/nevenincs/vaultspec-rag#install) and
-[index your project](https://github.com/nevenincs/vaultspec-rag#use-it) first. RAG is a
+[index your project](https://github.com/nevenincs/vaultspec-rag#search) first. RAG is a
 separate package; Core doesn't install it. Hosted vault search doesn't search code.
 
 ```bash
