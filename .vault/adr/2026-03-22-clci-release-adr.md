@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#clci-release'
 date: '2026-03-22'
-modified: '2026-06-13'
-body_hash: 'sha256:178b6a641ba65e7ad0771351eeb959c7d6b7654d42813f560dc0f274bdd32fac'
+modified: '2026-09-30'
+body_hash: 'sha256:7c069aacf62b7e9ce0029c7fef5f54629f3f0f74bf25955a016a789d789c3bec'
 related:
   - '[[2026-03-22-clci-release-research]]'
   - '[[2026-03-21-cli-release-readiness-audit]]'
@@ -87,7 +87,10 @@ so a dedicated binary is cleaner than subcommand routing.
   `config-file` and `manifest-file` inputs pointing to the repo-root
   config files (no inline `release-type` - manifest mode only).
   Creates/updates the Release PR. When the Release PR merges,
-  release-please creates a GitHub Release with a git tag.
+  release-please creates a GitHub Release with a git tag. Amended
+  2026-09-30 by `2026-09-30-release-standard-adr`: the release is
+  created when a maintainer dispatches the cut, not when the Release PR
+  merges.
 - `publish.yml` (replace existing) - triggers on
   `workflow_dispatch` with a required `tag` input. `release-please.yml`
   dispatches it explicitly via `gh api .../actions/workflows/publish.yml/dispatches`
