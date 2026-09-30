@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import re
 import shutil
@@ -39,6 +40,7 @@ import time
 from html import escape
 from pathlib import Path
 from string import Template
+from typing import cast
 
 from rich.console import Console
 from rich.terminal_theme import TerminalTheme
@@ -433,13 +435,41 @@ def resolve_rag() -> str | None:
     )
 
 
+def _rag_env() -> dict[str, str]:
+    """The environment a captured ``vaultspec-rag`` runs in.
+
+    Colour is forced so the capture carries the CLI's own styling through the
+    pipe, and output is UTF-8 so a passage's punctuation survives decoding.
+    """
+    env = {key: value for key, value in os.environ.items() if key != "NO_COLOR"}
+    env["FORCE_COLOR"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
+
+
+def _vault_count(stdout: str) -> int:
+    """Read the indexed vault document count from ``status --json`` output."""
+    try:
+        envelope: object = json.loads(stdout)
+    except ValueError:
+        return 0
+    if not isinstance(envelope, dict):
+        return 0
+    data = cast("dict[str, object]", envelope).get("data")
+    if not isinstance(data, dict):
+        return 0
+    count = cast("dict[str, object]", data).get("vault_count")
+    return count if isinstance(count, int) else 0
+
+
 def index_demo_vault(exe: str, demo_root: str, timeout: float = 90.0) -> bool:
     """Index the demo vault on the search service and wait for it to land.
 
     The service indexes asynchronously, so the ``index`` call only queues a
-    job; poll ``status`` until the vault documents become queryable. Returns
-    ``True`` once they are, ``False`` when the backend is unavailable or the
-    index does not populate within *timeout* seconds.
+    job; poll ``status --json`` until the vault documents become queryable.
+    The JSON envelope is the scripting contract; the human status wording is
+    free to change. Returns ``True`` once they are, ``False`` when the backend
+    is unavailable or the index does not populate within *timeout* seconds.
     """
     try:
         # The demo root is always a project the service has never seen, and
@@ -466,18 +496,16 @@ def index_demo_vault(exe: str, demo_root: str, timeout: float = 90.0) -> bool:
         time.sleep(3)
         try:
             status = subprocess.run(
-                [exe, "--target", demo_root, "status"],
+                [exe, "--target", demo_root, "status", "--json"],
                 capture_output=True,
-                text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=30,
             )
         except subprocess.TimeoutExpired:
             continue
-        for line in status.stdout.splitlines():
-            if "Vault documents" in line:
-                _, _, count = line.partition(":")
-                if count.strip().isdigit() and int(count.strip()) > 0:
-                    return True
+        if _vault_count(status.stdout) > 0:
+            return True
     print(
         "warning: skipping vaultspec-rag render "
         "(demo vault did not finish indexing in time)",
@@ -492,9 +520,11 @@ def run_rag(exe: str, args: list[str], cwd: str) -> str | None:
         proc = subprocess.run(
             [exe, *args],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=120,
             cwd=cwd,
+            env=_rag_env(),
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         print(f"warning: skipping vaultspec-rag render ({exc})", file=sys.stderr)
