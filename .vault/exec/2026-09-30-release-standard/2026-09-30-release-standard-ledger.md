@@ -5,7 +5,7 @@ tags:
 date: '2026-09-30'
 modified: '2026-09-30'
 body_schema: 'body-v2'
-body_hash: 'sha256:0e08274bab336d8dd606f99fdc9903dff8155c40dc41f3cbe3816d287d1c59ae'
+body_hash: 'sha256:178248771306fb7dd927d95b4684d114030da849c3dcd79752437be2d886ac8d'
 related:
   - "[[2026-09-30-release-standard-plan]]"
 ---
@@ -44,8 +44,12 @@ related:
 - `S12` `verify:` `just check-workflow` -> `pass`
 - `S13` `M` `.github/workflows/main-health.yml`
 - `S13` `verify:` `just check-workflow` -> `pass`
+- `S10` `M` `dev/guards/test_ci_check_shape.py`
+- `S10` `verify:` `pytest dev/guards/test_ci_check_shape.py` -> `pass`
+- `S10` `verify:` `guard mutation proofs for the author clause and the untrusted refusal` -> `pass`
 
 ## Notes
 
 - `S02` S02, S03 and S04 share one commit: the cut, the retired relay and the rewritten guards only pass together
 - `S10` S10 and S11 share one commit: the guard fails without the rule it pins
+- `S10` the author clause is written as two equality comparisons rather than contains(fromJSON()), so every repository's guard evaluator can decide it

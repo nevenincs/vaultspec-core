@@ -66,8 +66,8 @@ FULL_LABEL = "ci:full"
 #: The pull request authors whose code may reach the fleet unreviewed. This is a
 #: personal account, so there are no organisation members.
 TRUSTED_AUTHOR = (
-    'contains(fromJSON(\'["OWNER", "COLLABORATOR"]\'), '
-    "github.event.pull_request.author_association)"
+    "(github.event.pull_request.author_association == 'OWNER' || "
+    "github.event.pull_request.author_association == 'COLLABORATOR')"
 )
 
 #: Applying a label takes triage rights; a bot applying `ci:full` does not count.
