@@ -63,6 +63,16 @@ EXPECTED_NAMES = {
 #: The label that asks for one full run.
 FULL_LABEL = "ci:full"
 
+#: The pull request authors whose code may reach the fleet unreviewed. This is a
+#: personal account, so there are no organisation members.
+TRUSTED_AUTHOR = (
+    'contains(fromJSON(\'["OWNER", "COLLABORATOR"]\'), '
+    "github.event.pull_request.author_association)"
+)
+
+#: Applying a label takes triage rights; a bot applying `ci:full` does not count.
+LABEL_BY_USER = "github.event.sender.type == 'User'"
+
 #: The only workflow a push to main may start. main is ruleset-protected, so a
 #: commit reaching it already passed the gate; release-please is the one lane
 #: whose work begins when a release-bearing commit lands.
@@ -371,11 +381,38 @@ def test_the_full_suites_run_on_a_ready_pull_request_or_on_demand() -> None:
     )
 
 
+def test_only_a_trusted_author_or_a_users_label_reaches_the_fleet() -> None:
+    """A pull request runs fleet jobs only for a trusted author or a user's label.
+
+    Dependabot and every other author who is neither the owner nor a
+    collaborator push branches of this repository, so the fork clause never
+    stops them, and the approval requirement for outside contributors does not
+    cover them. Their code reaches the self-hosted fleet only after a user with
+    triage rights applies `ci:full`; a bot applying it does not count.
+
+    Mutation proof: dropping the author clause from `test-linux`'s condition
+    makes this fail on that job; restoring it makes this pass.
+    """
+    jobs = _jobs()
+    for job_id in (LINT_JOB, LINUX_JOB, WINDOWS_JOB):
+        condition = str(jobs[job_id].get("if", ""))
+        assert TRUSTED_AUTHOR in condition, (
+            f"`{job_id}` would run a pull request by any author on the "
+            "self-hosted fleet, Dependabot included"
+        )
+        assert LABEL_BY_USER in condition, (
+            f"`{job_id}` would let a bot's `{FULL_LABEL}` label start it"
+        )
+
+
 def test_the_gate_always_reaches_a_verdict() -> None:
     """The required check is never skipped, and it weighs every tier.
 
     A required check whose job is skipped counts as passed, so a gate with a
     narrower condition would let an unrelated label merge an unproven commit.
+
+    Mutation proof: deleting the untrusted-author refusal from the judgement
+    makes this fail on that refusal; restoring it makes this pass.
     """
     gate = _jobs()[GATE_JOB]
     assert gate.get("if") == "${{ !cancelled() }}"
@@ -402,6 +439,23 @@ def test_the_gate_always_reaches_a_verdict() -> None:
     refusal = script.index('[ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]')
     assert refusal < script.index("exit 0"), (
         "a fork pull request must be refused before any path can pass the gate"
+    )
+    assert (
+        env.get("ASSOCIATION") == "${{ github.event.pull_request.author_association }}"
+    ), "the gate no longer reads the pull request author's association"
+    marker = 'case "${ASSOCIATION}" in OWNER | COLLABORATOR) ;;'
+    assert marker in script, (
+        "the gate no longer refuses a commit by an author who is neither the "
+        "owner nor a collaborator"
+    )
+    untrusted = script.index(marker)
+    assert script.index("check_name=Check:%20Merge%20gate") < untrusted, (
+        "an untrusted author's commit a collaborator's ci:full already proved "
+        "must keep its verdict"
+    )
+    assert untrusted < script.index("the full suites have not run"), (
+        "an untrusted author's commit must be refused by name, not told to mark "
+        "the pull request ready"
     )
 
     release = steps["Release the ci:full label"]
