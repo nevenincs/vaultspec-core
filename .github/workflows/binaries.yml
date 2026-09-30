@@ -1353,9 +1353,9 @@ jobs:
           echo "::error::${TAG} is INCOMPLETE - missing ${missing[*]} (release job=${RELEASE_RESULT}). It stays a draft, so nothing has been advertised. Fix the build and re-dispatch this workflow for this tag."
           exit 1
 
-      # THE HANDOFF. release.yml used to dispatch publish.yml beside this whole
-      # workflow, so PyPI - the one step no re-dispatch can take back - raced a
-      # build that could still fail. Here it cannot: this step is reached only
+      # THE HANDOFF. publish.yml is dispatched from here, never beside this
+      # workflow, because PyPI - the one step no re-dispatch can take back -
+      # must not race a build that could still fail. This step is reached only
       # when the gate above found every declared target on the draft, and when
       # the release job that attached them succeeded.
       #

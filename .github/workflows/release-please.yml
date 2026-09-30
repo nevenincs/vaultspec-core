@@ -1,26 +1,57 @@
 name: Core Release Please
 
+# THE PROPOSAL KEEPS UP; THE RELEASE WAITS TO BE ASKED FOR.
+#
+# - PROPOSAL. Every commit that lands on main refreshes the release pull
+#   request. `always-update` in the config rebuilds its branch on main's newest
+#   head every time, so the proposal is never behind main. This path never
+#   creates a release, a tag or a publication, and merging the proposal by hand
+#   does not release it either.
+# - CUT. A maintainer dispatches this workflow when a release is wanted. It
+#   proves the proposal's head with the full merge gate, squash-merges it, and
+#   has Release Please force the tag and create the draft release seconds
+#   later, then starts the binaries lane. The draft is published last, by the
+#   publication lane, once everything it claims is attached.
+#
+# The proof comes before the merge because the release tag ruleset forbids
+# deleting a tag: a release commit that fails its gate after its tag exists
+# stays a permanent tag of a commit nobody can ship.
+#
+# The tag follows the merge with nothing in between because the default token
+# cannot create a tag on a commit whose `.github/workflows` differ from main's
+# head. A workflow change that lands between a merge and its tag leaves the
+# release untaggable by any later run.
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
-  actions: write
+  contents: read
 
 concurrency:
-  group: release-please
+  # One group per path. A proposal refresh still waiting for a runner is
+  # superseded by the next push: Release Please reads main's head, so the
+  # newest refresh does the work of every one it replaces. A cut never waits
+  # behind a proposal, and a second cut queues behind the first.
+  group: release-please-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
   release-please:
-    timeout-minutes: 150
     name: "Build: Release proposal (Linux)"
+    if: github.event_name == 'push'
+    timeout-minutes: 150
     runs-on: [self-hosted, Linux, X64, build]
     env:
       CI_EXEC_BUDGET_MINUTES: 30
+    # Opens and rewrites the release pull request, pushes its lock refresh and
+    # dispatches its gate.
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
     steps:
       - name: Run release-please
         id: release
@@ -28,6 +59,194 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # Releases are cut on dispatch only.
+          skip-github-release: true
+
+      - name: Check out the release branch
+        if: steps.release.outputs.pr
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the lockfile commit to the release branch
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+
+      - name: Set up uv for the release branch
+        if: steps.release.outputs.pr
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          # A release lane must not restore a cache any branch could have written.
+          enable-cache: false
+
+      - name: Regenerate and push uv.lock onto the release branch
+        if: steps.release.outputs.pr
+        run: |
+          uv lock
+          if git diff --quiet uv.lock; then
+            echo "uv.lock is already up to date"
+          else
+            git add uv.lock
+            # Scoped to the commit, never written to the checkout's config,
+            # so the bot identity never outlives this commit.
+            git \
+              -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore: update uv.lock for release"
+            git push
+          fi
+
+      # The default token's pushes and pull requests start no workflow runs,
+      # so the release pull request would never report the required merge
+      # gate. A dispatch is exempt from that rule, and its check run lands on
+      # the branch head the pull request is waiting on. Last, so it validates
+      # the lockfile commit pushed above.
+      - name: Dispatch the merge gate for the release pull request
+        if: steps.release.outputs.pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Guarded, because a step's `env` is prepared before its `if` is
+          # weighed, and a bare `fromJSON('')` fails the step the condition
+          # was about to skip.
+          HEAD_BRANCH: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
+        run: gh workflow run merge-gate.yml --repo "${GITHUB_REPOSITORY}" --ref "${HEAD_BRANCH}" -f "ref=${HEAD_BRANCH}"
+
+  candidate:
+    name: "Check: Release candidate (Linux)"
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 130
+    runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      number: ${{ steps.find.outputs.number }}
+      sha: ${{ steps.find.outputs.sha }}
+      merged: ${{ steps.find.outputs.merged }}
+    steps:
+      # A proposal merged by hand and not yet tagged is finished first: Release
+      # Please opens no new proposal while one is pending, so it is the only
+      # candidate there can be.
+      - name: Find the release pull request and the commit to prove
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PENDING: "autorelease: pending"
+        run: |
+          set -euo pipefail
+          merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state merged \
+            --label "$PENDING" --json number,mergeCommit \
+            --jq '.[] | "\(.number) \(.mergeCommit.oid)"')
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
+            --label "$PENDING" --json number,headRefOid \
+            --jq '.[] | "\(.number) \(.headRefOid)"')
+          if [ -n "${merged}" ]; then
+            [ "$(printf '%s\n' "${merged}" | wc -l)" -eq 1 ] || {
+              echo "::error::more than one merged release pull request awaits a tag: ${merged}"; exit 1;
+            }
+            read -r number sha <<<"${merged}"
+            state=true
+          elif [ -n "${open}" ]; then
+            [ "$(printf '%s\n' "${open}" | wc -l)" -eq 1 ] || {
+              echo "::error::more than one open release pull request: ${open}"; exit 1;
+            }
+            read -r number sha <<<"${open}"
+            state=false
+            behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...${sha}" --jq '.behind_by')
+            if [ "${behind}" != "0" ]; then
+              echo "::error::release pull request #${number} is ${behind} commit(s) behind main. Release Please rebuilds it on main's next push; dispatch again after that."
+              exit 1
+            fi
+          else
+            echo "::error::there is no release pull request to cut"
+            exit 1
+          fi
+          if ! [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::release pull request #${number} resolved to no commit"
+            exit 1
+          fi
+          {
+            echo "number=${number}"
+            echo "sha=${sha}"
+            echo "merged=${state}"
+          } >> "$GITHUB_OUTPUT"
+          echo "cutting #${number} at ${sha} (merged=${state})"
+
+  # The full merge gate, on the exact head that will merge.
+  prove-gate:
+    name: "Test: Release gate (Linux, Windows)"
+    needs: candidate
+    uses: ./.github/workflows/merge-gate.yml
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: write
+    with:
+      ref: ${{ needs.candidate.outputs.sha }}
+    secrets:
+      VAULTSPEC_CORE_TYPESAFE_API_KEY: ${{ secrets.VAULTSPEC_CORE_TYPESAFE_API_KEY }}
+
+  # Reached only when the gate passed: a job's default condition is the success
+  # of everything it needs, and a called workflow's result is its gate job's.
+  cut:
+    name: "Build: Release cut (Linux)"
+    needs: [candidate, prove-gate]
+    timeout-minutes: 130
+    runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 10
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NUMBER: ${{ needs.candidate.outputs.number }}
+      SHA: ${{ needs.candidate.outputs.sha }}
+      MERGED: ${{ needs.candidate.outputs.merged }}
+    # Merges the proposal, creates the tag and draft, and dispatches the
+    # binaries lane.
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      # A squash of a head that is not behind main is exactly the proven tree;
+      # the comparison below refuses to tag anything else.
+      - name: Merge the proven release pull request
+        id: merge
+        run: |
+          set -euo pipefail
+          if [ "${MERGED}" = "true" ]; then
+            echo "commit=${SHA}" >> "$GITHUB_OUTPUT"
+            echo "#${NUMBER} was merged by hand at ${SHA}"
+            exit 0
+          fi
+          head=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" \
+            --json state,headRefOid --jq '"\(.state) \(.headRefOid)"')
+          if [ "${head}" != "OPEN ${SHA}" ]; then
+            echo "::error::release pull request #${NUMBER} is now '${head}', not the proven ${SHA}; dispatch again"
+            exit 1
+          fi
+          behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...${SHA}" --jq '.behind_by')
+          if [ "${behind}" != "0" ]; then
+            echo "::error::main moved while ${SHA} was proven; dispatch again once Release Please has rebuilt the proposal"
+            exit 1
+          fi
+          gh pr merge "${NUMBER}" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "${SHA}" || {
+            echo "::error::could not merge #${NUMBER}. Merge it by hand and dispatch again: the cut then tags the merged commit."
+            exit 1
+          }
+          commit=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid')
+          proven=$(gh api "repos/$GITHUB_REPOSITORY/commits/${SHA}" --jq '.commit.tree.sha')
+          landed=$(gh api "repos/$GITHUB_REPOSITORY/commits/${commit}" --jq '.commit.tree.sha')
+          if [ "${proven}" != "${landed}" ]; then
+            echo "::error::merged commit ${commit} does not carry the proven tree of ${SHA}; dispatch again to prove and tag ${commit}"
+            exit 1
+          fi
+          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
+          echo "merged #${NUMBER} as ${commit}"
+
+      - name: Create the release for the merged proposal
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-pull-request: true
 
       # GITHUB_TOKEN never holds the `workflows` permission, and without it
       # GitHub refuses any tag or release that targets a commit whose workflow
@@ -64,107 +283,38 @@ jobs:
               fi
             done
 
-      - name: Check out the release branch
-        if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the lockfile commit to the release branch
-        with:
-          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
-
-      - name: Set up uv for the release branch
-        if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-        with:
-          # A release lane must not restore a cache any branch could have written.
-          enable-cache: false
-
-      - name: Regenerate and push uv.lock onto the release branch
-        if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        run: |
-          uv lock
-          if git diff --quiet uv.lock; then
-            echo "uv.lock is already up to date"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add uv.lock
-            git commit -m "chore: update uv.lock for release"
-            git push
-          fi
-
-      # The push above lands a few seconds after release-please makes the pull
-      # request mergeable, so a release merged inside that window ships the
-      # previous version's lockfile and leaves main failing every job at
-      # dependency install. Main is ruleset-protected and cannot be pushed to
-      # directly, so reconcile through a pull request instead of assuming the
-      # window was never hit.
-      - name: Check out main to verify the released lockfile
-        if: steps.release.outputs.release_created == 'true'
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the reconciling lockfile branch
-        with:
-          ref: main
-
-      - name: Set up uv for the lockfile verification
-        if: steps.release.outputs.release_created == 'true'
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-        with:
-          # A release lane must not restore a cache any branch could have written.
-          enable-cache: false
-
-      - name: Open a reconciling pull request when the lockfile drifted
-        if: steps.release.outputs.release_created == 'true'
+      # The draft creates no tag of its own; `force-tag-creation` does, and the
+      # whole lane builds from it. Refuse a tag on anything but the proven tree.
+      - name: Require the tag on the proven commit
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CREATED: ${{ steps.release.outputs.release_created }}
           TAG: ${{ steps.release.outputs.tag_name }}
+          COMMIT: ${{ steps.merge.outputs.commit }}
         run: |
-          if uv lock --locked; then
-            echo "uv.lock on main matches the released version"
-            exit 0
+          set -euo pipefail
+          if [ "${CREATED}" != "true" ] || [ -z "${TAG}" ]; then
+            echo "::error::Release Please created no release for ${COMMIT}"
+            exit 1
           fi
-          echo "::warning::uv.lock on main did not match the released version; opening a reconciling pull request"
-          uv lock
-          BRANCH="chore/reconcile-uv-lock-${TAG}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "${BRANCH}"
-          git add uv.lock
-          git commit -m "chore(deps): reconcile uv.lock with ${TAG}"
-          git push --set-upstream origin "${BRANCH}"
-          gh pr create --base main --head "${BRANCH}" \
-            --title "chore(deps): reconcile uv.lock with ${TAG}" \
-            --body "The release for \`${TAG}\` was merged before the lockfile update reached its branch, so main carries the previous version's \`uv.lock\`. Every job installing with \`--locked\` fails until this merges."
-          echo "Opened a lockfile reconciliation pull request for ${TAG}" >> "$GITHUB_STEP_SUMMARY"
+          refs=$(git ls-remote --tags "https://github.com/${GITHUB_REPOSITORY}.git" "${TAG}")
+          tagged=$(awk -v ref="refs/tags/${TAG}" '$2 == ref "^{}" { print $1; exit }' <<<"${refs}")
+          [ -n "${tagged}" ] || tagged=$(awk -v ref="refs/tags/${TAG}" '$2 == ref { print $1; exit }' <<<"${refs}")
+          if [ "${tagged}" != "${COMMIT}" ]; then
+            echo "::error::${TAG} points at ${tagged}, not the proven ${COMMIT}"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_ENV"
 
-      # The default token's pushes and pull requests start no workflow runs,
-      # so the release pull request would never report the required merge
-      # gate. A dispatch is exempt from that rule, and its check run lands on
-      # the branch head the pull request is waiting on. Last, so it validates
-      # the lockfile commit pushed above.
-      - name: Dispatch the merge gate for the release pull request
-        if: steps.release.outputs.pr && !steps.release.outputs.release_created
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Guarded, because a step's `env` is prepared before its `if` is
-          # weighed: on the run that CREATES the release there is no pull
-          # request, `pr` is empty, and a bare `fromJSON('')` fails the step
-          # that the condition was about to skip. That failure then skipped
-          # the release dispatch below, and v0.2.2 was tagged with nothing
-          # built or published behind it.
-          HEAD_BRANCH: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
-        run: gh workflow run merge-gate.yml --repo "${GITHUB_REPOSITORY}" --ref "${HEAD_BRANCH}" -f "ref=${HEAD_BRANCH}"
-
-      # ONE consumer. release.yml proves the tagged tree with the full merge
-      # gate and only then dispatches the PyPI publication and the binary
-      # build, so nothing is published from a tree that has not passed.
+      # ONE consumer. The binaries lane attaches every declared target to the
+      # draft and, from the gate that judges them complete, dispatches the
+      # publication, which flips the draft last.
       #
       # `ref=main`, NOT `ref=${TAG}`: the dispatch ref resolves the WORKFLOW -
-      # the matrix and release policy stay current - while release.yml and
-      # everything it dispatches check out the tag for the SOURCE.
-      # vaultspec-core-v0.1.66 is why: dispatched at its tag, it built the
-      # macos-x86_64 leg #372 had just removed, and the tap moved onto a binary
-      # that cannot start.
-      - name: Dispatch the release workflow
-        if: steps.release.outputs.release_created == 'true'
+      # the matrix and release policy stay current - while the lane checks out
+      # the tag for the SOURCE. vaultspec-core-v0.1.66 is why: dispatched at its
+      # tag, it built the macos-x86_64 leg #372 had just removed, and the tap
+      # moved onto a binary that cannot start.
+      - name: Dispatch the binaries lane
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"
+        run: gh workflow run binaries.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"

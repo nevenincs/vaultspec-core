@@ -24,28 +24,33 @@ Start with [the framework workflow](../README.md#start-a-feature), then
 ## For maintainers
 
 Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
-maintains a release pull request with the next version and changelog. Merging it creates
-the tag and an unpublished draft release, then starts the lane that fills it: the
-binaries are built for every supported target, proved to start with no network, and
-attached to the draft with their checksums and provenance; only once all of them are
-there does the wheel and sdist build, smoke-test, and publish to PyPI using OIDC trusted
-publishing.
+maintains a release pull request with the next version and changelog, rebuilt on every
+commit that lands on `main`. Merging it does not release anything. To release, dispatch
+`Core Release Please`: the cut proves the pull request's head with the full merge gate,
+squash-merges it, and seconds later creates the tag and an unpublished draft release,
+then starts the lane that fills it: the binaries are built for every supported target,
+proved to start with no network, and attached to the draft with their checksums and
+provenance; only once all of them are there does the wheel and sdist build, smoke-test,
+and publish to PyPI using OIDC trusted publishing. A release pull request merged by hand
+is released by the next dispatched cut.
 
 Publishing the draft is the last step, and the Scoop and Homebrew pointers are updated
 immediately after it, never before. A release that is visible is therefore a release
 that carries everything it claims to, and a failure anywhere in the lane leaves a draft
 nobody has been shown rather than a half-finished release to walk back. Fix the cause
-and re-dispatch `Core Release` for the same tag; the steps that already succeeded are
+and re-dispatch `Core Binaries` for the same tag; the steps that already succeeded are
 skipped or repeated harmlessly.
 
-A merged release can also stop before that lane starts: `Core Release Please` fails with
+A cut can also stop before that lane starts: it fails in
+`Create the release for the merged proposal` with
 `Resource not accessible by integration`, and its `Name a release this token cannot tag`
 step names the tag. The workflow token never holds the `workflows` permission, and
 without it GitHub refuses any tag or release that targets a commit whose workflow files
-differ from `main`, even once the tag exists. A workflow change that merged before the
-release commit's own run started therefore blocks the release for good: no rerun can
-finish it. Finish it with your own credentials, as release-please would have,
-relabelling the release pull request first so later runs stop retrying it:
+differ from `main`, even once the tag exists. A workflow change that landed between the
+release commit's merge and its tag, as when a pull request merged by hand waits for its
+cut, therefore blocks the release for good: no rerun or later cut can finish it. Finish
+it with your own credentials, as the cut would have, relabelling the release pull
+request first so the next cut does not pick it up again:
 
 ```sh
 REPO=nevenincs/vaultspec-core
@@ -63,7 +68,7 @@ git show "$SHA:CHANGELOG.md" \
   > release-notes.md
 gh release create "$TAG" --repo "$REPO" --verify-tag --draft \
   --title "vaultspec-core: v$VERSION" --notes-file release-notes.md
-gh workflow run release.yml --repo "$REPO" --ref main -f tag="$TAG"
+gh workflow run binaries.yml --repo "$REPO" --ref main -f tag="$TAG"
 ```
 
 The terminal renders and the demo GIF in `assets/` are produced by the renderers in

@@ -28,10 +28,11 @@ name: Core Merge Gate
 #
 # `push: main` is deliberately absent. main is ruleset-protected, so every
 # commit reaching it passed this gate on its pull request; a direct push is an
-# administrator override and is not re-litigated here. release.yml calls this
-# workflow against the release tag before anything is built, and
-# release-please.yml dispatches it on the release branch, whose pull request
-# the default token cannot trigger a run for.
+# administrator override and is not re-litigated here. The release cut in
+# release-please.yml calls this workflow on the proposal's exact head before
+# it merges or tags anything, and the proposal path dispatches it on the
+# release branch, whose pull request the default token cannot trigger a run
+# for.
 
 on:
   pull_request:
