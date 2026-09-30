@@ -271,7 +271,7 @@ returns the ADR passage that answers it. It's a separate package, and its README
 installation.
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-rag.svg" alt="vaultspec-rag search answering how the parser tokenizes markdown with the editor-demo ADR and its decision passage" width="880">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/term-rag.svg" alt="vaultspec-rag search answering how the parser tokenizes markdown with the editor-demo and syntax-highlighting ADRs and the decision passage from each" width="880">
 </p>
 
 Hosted search and ranking come from TypeSafe, an external hosted service, and are

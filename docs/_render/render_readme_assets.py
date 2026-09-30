@@ -678,7 +678,9 @@ def main() -> None:
                 f"{outdir}/term-rag.svg",
                 f'vaultspec-rag search "{rag_query}" --type vault --doc-type adr',
                 112,
-                max_lines=16,
+                # The two hits. A demo vault indexed seconds ago always trails
+                # a readiness note, which says nothing about the search.
+                max_lines=6,
             )
     finally:
         os.chdir(origin)
