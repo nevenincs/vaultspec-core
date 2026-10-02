@@ -40,7 +40,7 @@ WHAT IT ASSERTS, AND WHY EACH RULE EARNS ITS PLACE.
    forbidden, with no carve-out: a `runs-on:` that does not name
    `self-hosted`, a matrix leg it resolves to that does not, and any GitHub
    hosted image label (`ubuntu-latest`, `ubuntu-24.04-arm`, `windows-2022`,
-   `macos-15`, ...) written as a workflow value are all violations. The
+   `macos-15`, ...) used as a runner selector are all violations. The
    allowlist cannot excuse one. A hosted leg crept back into the fleet more
    than once through a matrix entry nobody re-read, which is why the matrix
    values are read and not only the `runs-on:` line. A runner expression
@@ -49,9 +49,8 @@ WHAT IT ASSERTS, AND WHY EACH RULE EARNS ITS PLACE.
    because where that workflow runs cannot be read here.
    `--runner-placement-only` runs this rule alone, as the runner-policy gate.
 
-Stdlib only, and no YAML parser: these repos hold their `dev/` dispatch core
-to the standard library so it behaves identically on every platform, and a
-line-oriented reader is enough to answer the questions above.
+Runner placement parses YAML with pinned PyYAML. Recipe checks use a
+line-oriented reader.
 """
 
 from __future__ import annotations
@@ -90,11 +89,10 @@ BANNED_INSTALLS = (
 ALLOWED_COMMANDS = ("just", "gh")
 
 #: The one step the runner-policy gate runs. It is exempt from the shape
-#: rule because it is the gate itself, and it needs nothing beyond the
-#: standard library.
+#: rule because it is the gate itself. Its YAML parser is provisioned here.
 RUNNER_POLICY_COMMAND = (
-    "uv run --isolated --no-project --python 3.13 "
-    "dev/ci_contract.py --runner-placement-only"
+    "uv run --isolated --no-project --with PyYAML==6.0.3 --python 3.13 "
+    + "dev/ci_contract.py --runner-placement-only"
 )
 
 ALLOWLIST_NAME = "ci-contract-allow.txt"
@@ -253,7 +251,7 @@ def _local_action_texts(text: str, root: Path) -> list[str]:
 
 
 HOSTED_FORBIDDEN = (
-    "GitHub-hosted runners are forbidden; run the job on [self-hosted, ...]"
+    "GitHub-hosted runners are forbidden; " + "run the job on [self-hosted, ...]"
 )
 PLACEMENT = "runner-placement"
 
@@ -351,9 +349,9 @@ def _matrix_values(
 
 
 _GUARDED_MATRIX = re.compile(
-    r"\$\{\{ startsWith\(toJSON\((matrix\.[\w-]+)\), '\['\)"
-    r" && contains\(\1, 'self-hosted'\)"
-    r" && \1 \|\| fromJSON\('\[\"self-hosted\",\"unmapped-fleet-runner\"\]'\) \}\}"
+    r"\$\{\{ startsWith\(toJSON\((matrix\.[\w-]+)\), '\['\) "
+    + r"&& contains\(\1, 'self-hosted'\)"
+    + r" && \1 \|\| fromJSON\('\[\"self-hosted\",\"unmapped-fleet-runner\"\]'\) \}\}"
 )
 _CLOSED_MAPPING = re.compile(
     r"\$\{\{ fromJSON\((?:matrix\.[\w-]+ == '[^']+' && '\[[^']+\]' \|\| )+"
@@ -363,8 +361,10 @@ _MATRIX_ONLY = re.compile(r"\$\{\{\s*matrix\.([A-Za-z_][\w-]*)\s*\}\}")
 
 
 def _names_self_hosted(labels: list[str]) -> bool:
-    """Whether `self-hosted` is one of the labels, exactly."""
-    return "self-hosted" in {label.lower() for label in labels}
+    """Whether the selector names self-hosted and no hosted image label."""
+    return "self-hosted" in {label.lower() for label in labels} and not any(
+        _HOSTED_LABEL.fullmatch(label) for label in labels
+    )
 
 
 def _closed_mapping(value: str) -> bool:
@@ -424,7 +424,14 @@ def _external_reusable_jobs(lines: list[str]) -> list[tuple[int, str]]:
     return found
 
 
-def runner_placement(path: Path, text: str) -> list[Finding]:
+def _literal_placement(value: str) -> bool:
+    if value.startswith("{"):
+        listed = re.search(r"labels:\s*(\[[^\]]*\]|[^,}]+)", value)
+        return bool(listed and _names_self_hosted(_labels(listed.group(1))))
+    return _names_self_hosted(_labels(value))
+
+
+def _runner_placement_lines(path: Path, text: str) -> list[Finding]:
     """Return every job placement in `text` not proven to run self-hosted."""
     lines = text.splitlines()
     findings: list[Finding] = []
@@ -434,19 +441,11 @@ def runner_placement(path: Path, text: str) -> list[Finding]:
             Finding(path, index + 1, PLACEMENT, f"{detail}. {HOSTED_FORBIDDEN}")
         )
 
-    for index, line in enumerate(lines):
-        if not _meaningful(line):
-            continue
-        keyed = _VALUE.match(line)
-        for label in _labels(keyed.group(1) if keyed else ""):
-            if _HOSTED_LABEL.match(label):
-                refuse(index, f"`{label}` is a GitHub-hosted image label")
-
     for index, target in _external_reusable_jobs(lines):
         refuse(
             index,
             f"`{target}` is an external reusable workflow; "
-            "its placement is unobservable",
+            + "its placement is unobservable",
         )
 
     for index, line in enumerate(lines):
@@ -454,44 +453,107 @@ def runner_placement(path: Path, text: str) -> list[Finding]:
         if not match or not _meaningful(line):
             continue
         value = _strip_comment(match.group(2))
-        for number, detail in _runs_on_refusals(lines, index, value):
-            refuse(number, detail)
+        if not value:
+            if not _names_self_hosted(_nested_labels(lines, index)):
+                refuse(index, "runs-on names no self-hosted label")
+            continue
+        if value.startswith(("{", "[")) or "${{" not in value:
+            if not _literal_placement(value):
+                refuse(index, f"runs-on `{value[:60]}` names no self-hosted label")
+            continue
+        if _GUARDED_MATRIX.fullmatch(value) or _closed_mapping(value):
+            continue
+        only = _MATRIX_ONLY.fullmatch(value)
+        legs = _matrix_values(lines, index, {only.group(1)}) if only else []
+        if not legs:
+            refuse(
+                index,
+                f"runs-on `{value[:60]}` is an unresolved expression; "
+                + "it cannot be proven self-hosted",
+            )
+            continue
+        for number, leg in legs:
+            if not _names_self_hosted(_labels(leg)):
+                refuse(number, f"matrix leg `{leg[:60]}` names no self-hosted label")
     return findings
 
 
-def _runs_on_refusals(
-    lines: list[str], index: int, value: str
-) -> list[tuple[int, str]]:
-    """Return `(line index, detail)` for each part of one `runs-on:` not self-hosted."""
-    unlabelled = [(index, "runs-on names no self-hosted label")]
-    if not value:
-        return [] if _names_self_hosted(_nested_labels(lines, index)) else unlabelled
-    if value.startswith("{"):
-        listed = re.search(r"labels:\s*(\[[^\]]*\]|[^,}]+)", value)
-        if listed and _names_self_hosted(_labels(listed.group(1))):
-            return []
-        return unlabelled
-    if value.startswith("[") or "${{" not in value:
-        if _names_self_hosted(_labels(value)):
-            return []
-        return [(index, f"runs-on `{value[:60]}` names no self-hosted label")]
-    if _GUARDED_MATRIX.fullmatch(value) or _closed_mapping(value):
-        return []
-    only = _MATRIX_ONLY.fullmatch(value)
-    legs = _matrix_values(lines, index, {only.group(1)}) if only else []
-    if not legs:
-        return [
-            (
-                index,
-                f"runs-on `{value[:60]}` is an unresolved expression; "
-                "it cannot be proven self-hosted",
+def _matrix_proven(matrix, key, depth):
+    if not isinstance(matrix, dict):
+        return False
+    axis = matrix.get(key)
+    values = list(axis) if isinstance(axis, list) else []
+    include = matrix.get("include", [])
+    if not isinstance(include, list):
+        return False
+    for row in include:
+        if not isinstance(row, dict):
+            return False
+        if key in row:
+            values.append(row[key])
+        elif not isinstance(axis, list):
+            return False
+    return bool(values) and all(
+        _selector_proven(value, {}, depth + 1) for value in values
+    )
+
+
+def _selector_proven(raw, matrix, depth=0):
+    if depth > 20 or not isinstance(raw, (str, list, dict)):
+        return False
+    if isinstance(raw, dict):
+        return _selector_proven(raw.get("labels"), matrix, depth + 1)
+    if isinstance(raw, list):
+        return all(isinstance(label, str) for label in raw) and _names_self_hosted(raw)
+    raw = raw.strip()
+    if _GUARDED_MATRIX.fullmatch(raw) or _closed_mapping(raw):
+        return True
+    ref = _MATRIX_ONLY.fullmatch(raw)
+    if ref:
+        return _matrix_proven(matrix, ref[1], depth)
+    return "${{" not in raw and _names_self_hosted([raw])
+
+
+def runner_placement(path: Path, text: str) -> list[Finding]:
+    """Parse every actual job and prove each runner selector stays self-hosted."""
+    import yaml
+
+    def fail(detail: str) -> list[Finding]:
+        return [Finding(path, 1, PLACEMENT, f"{detail}. {HOSTED_FORBIDDEN}")]
+
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        return fail(f"invalid workflow YAML: {error}")
+    if not isinstance(document, dict) or not isinstance(document.get("jobs"), dict):
+        return fail("workflow has no jobs mapping")
+
+    findings = []
+    for name, job in document["jobs"].items():
+        if not isinstance(job, dict):
+            return fail(f"{name}: invalid job mapping")
+        if "uses" in job and "runs-on" not in job:
+            target = job["uses"]
+            if not isinstance(target, str) or not target.startswith(
+                "./.github/workflows/"
+            ):
+                return fail(
+                    f"{name}: {target} is an external reusable workflow; "
+                    + "placement is unobservable"
+                )
+            continue
+        strategy = job.get("strategy", {})
+        if not isinstance(strategy, dict):
+            return fail(f"{name}: invalid strategy mapping")
+        if not _selector_proven(job.get("runs-on"), strategy.get("matrix")):
+            findings.extend(
+                fail(
+                    f"{name}: unresolved expression or "
+                    + "selector names no self-hosted label"
+                )
             )
-        ]
-    return [
-        (number, f"matrix leg `{leg[:60]}` names no self-hosted label")
-        for number, leg in legs
-        if not _names_self_hosted(_labels(leg))
-    ]
+    # Preserve original source locations when the ordinary block form supplies them.
+    return (_runner_placement_lines(path, text) or findings) if findings else []
 
 
 def audit(root: Path) -> list[Finding]:
@@ -541,10 +603,12 @@ def audit(root: Path) -> list[Finding]:
                 )
 
         for number, step, command in _run_commands(text):
-            if command.strip() == RUNNER_POLICY_COMMAND:
-                continue
             key = f"{name}:{step}"
-            if key in allowlist or name in allowlist:
+            if (
+                command.strip() == RUNNER_POLICY_COMMAND
+                or key in allowlist
+                or name in allowlist
+            ):
                 continue
             word = _first_word(command)
             if word == "just":
@@ -616,8 +680,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "PASS: every workflow runs self-hosted."
         if placement_only
-        else "PASS: every workflow runs self-hosted, calls recipes "
-        "and installs one pinned `just`."
+        else "PASS: every workflow runs self-hosted, "
+        + "calls recipes and installs one pinned `just`."
     )
     return 0
 
