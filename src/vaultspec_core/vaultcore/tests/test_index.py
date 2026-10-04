@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from ...config import reset_config
+from ...core.exceptions import VaultSpecError
 from ...graph.api import DocNode
 from ..index import feature_index_lock_target, generate_feature_index_result
 from ..models import DocType
@@ -52,6 +53,82 @@ def _gen(tmp_path: Path, feat: str, nodes: list[DocNode]) -> Path:
 
 
 class TestGenerateFeatureIndex:
+    @pytest.mark.parametrize(
+        "feature",
+        [
+            "../escape",
+            "a/b",
+            "a\\b",
+            "/escape",
+            "C:\\escape",
+            "C:escape",
+            "\\\\server\\share",
+            "",
+            ".",
+            "..",
+            "#feat",
+            "Feat",
+            "feat ",
+            "feat\n",
+            "feat:stream",
+            "con",
+            "nul",
+            "com1",
+        ],
+    )
+    @pytest.mark.parametrize("dry_run", [False, True])
+    def test_unsafe_feature_is_rejected_before_side_effects(
+        self, tmp_path: Path, feature: str, dry_run: bool
+    ) -> None:
+        with pytest.raises(VaultSpecError, match="feature"):
+            generate_feature_index_result(tmp_path, feature, nodes=[], dry_run=dry_run)
+        with pytest.raises(VaultSpecError, match="feature"):
+            feature_index_lock_target(tmp_path / ".vault", feature)
+        assert list(tmp_path.iterdir()) == []
+
+    @pytest.mark.parametrize("feature", ["my-feature", "2fa", "feature-", "a--b"])
+    def test_canonical_features_preserve_identity(
+        self, tmp_path: Path, feature: str
+    ) -> None:
+        nodes = [_node(tmp_path, "a", "research", feature, "2026-03-01", "A")]
+        path = _gen(tmp_path, feature, nodes)
+        assert path == tmp_path / ".vault" / "index" / f"{feature}.index.md"
+        assert f"'#{feature}'" in path.read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize("target", ["index", "lock", "index-dir", "lock-dir"])
+    @pytest.mark.parametrize("dry_run", [False, True])
+    def test_symlink_target_cannot_escape_managed_root(
+        self, tmp_path: Path, target: str, dry_run: bool
+    ) -> None:
+        outside = tmp_path / "outside"
+        directory = target.endswith("-dir")
+        if directory:
+            outside.mkdir()
+        else:
+            outside.write_text("untouched", encoding="utf-8")
+        docs = tmp_path / ".vault"
+        link = (
+            docs / "index" / "f.index.md"
+            if target == "index"
+            else docs / "data" / "index" / "f.lock"
+        )
+        if directory:
+            link = docs / "index" if target == "index-dir" else docs / "data" / "index"
+        link.parent.mkdir(parents=True)
+        link.symlink_to(outside, target_is_directory=directory)
+        nodes = [_node(tmp_path, "a", "research", "f", "2026-03-01", "A")]
+        with pytest.raises(VaultSpecError, match="outside"):
+            generate_feature_index_result(tmp_path, "f", nodes=nodes, dry_run=dry_run)
+        if directory:
+            assert list(outside.iterdir()) == []
+        else:
+            assert outside.read_text(encoding="utf-8") == "untouched"
+        assert link.is_symlink()
+        if target.startswith("index"):
+            assert not (docs / "data").exists()
+        else:
+            assert not (docs / "index").exists()
+
     def test_creates_index_file(self, tmp_path: Path) -> None:
         nodes = [
             _node(tmp_path, "d1", "research", "f", "2026-03-01", "R"),

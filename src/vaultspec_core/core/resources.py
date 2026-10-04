@@ -8,6 +8,7 @@ surfaces can stay focused on resource-specific paths and transforms.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,6 +18,51 @@ from .helpers import ensure_dir, rmtree_robust
 logger = logging.getLogger(__name__)
 
 
+def resource_destination(name: str, base_dir: Path, *, is_dir: bool = False) -> Path:
+    """Build a contained destination from a portable resource identifier."""
+    _validate_name(name)
+    filename = name if is_dir or name.endswith(".md") else f"{name}.md"
+    path = _checked_path(base_dir, base_dir / filename)
+    if is_dir:
+        _checked_path(base_dir, path / "SKILL.md")
+    return path
+
+
+def _validate_name(name: str) -> None:
+    # Dots support builtin and versioned names, but never traversal, device
+    # names, alternate data streams, separators, or Windows trailing aliases.
+    if (
+        re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", name) is None
+        or ".." in name
+        or name.endswith(".")
+        or name.split(".", 1)[0].upper()
+        in {
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            *(f"COM{i}" for i in range(1, 10)),
+            *(f"LPT{i}" for i in range(1, 10)),
+        }
+    ):
+        raise VaultSpecError(f"Invalid resource name: {name!r}")
+
+
+def _checked_path(base_dir: Path, path: Path) -> Path:
+    """Reject links and require strict containment before using a resource."""
+    from ..vaultcore.rename_engine import assert_within
+
+    for component in (path, *path.parents):
+        if component == base_dir:
+            break
+        if component.is_symlink() or component.is_junction():
+            raise VaultSpecError(f"Refusing linked resource path: {component}")
+    assert_within(base_dir, path)
+    if path.resolve() == base_dir.resolve():
+        raise VaultSpecError(f"Resource path must be beneath its managed root: {path}")
+    return path
+
+
 def _resolve_path(name: str, base_dir: Path, is_dir: bool) -> tuple[str, Path]:
     """Resolve a resource name to its canonical name and file path.
 
@@ -24,14 +70,22 @@ def _resolve_path(name: str, base_dir: Path, is_dir: bool) -> tuple[str, Path]:
     For directory resources (skills): ``base_dir/name/SKILL.md``
     """
     if is_dir:
-        dir_path = base_dir / name
-        return name, dir_path / "SKILL.md"
+        dir_path = resource_destination(name, base_dir, is_dir=True)
+        return name, _checked_path(base_dir, dir_path / "SKILL.md")
+    # Preserve only the explicit, single-level legacy project namespace.
+    normalized = name.replace("\\", "/")
+    if normalized.startswith("project/"):
+        leaf = normalized.removeprefix("project/")
+        _validate_name(leaf)
+        file_name = leaf if leaf.endswith(".md") else f"{leaf}.md"
+        return f"project/{file_name}", _checked_path(
+            base_dir, base_dir / "project" / file_name
+        )
+    _validate_name(name)
     file_name = name if name.endswith(".md") else f"{name}.md"
-    if file_name.replace("\\", "/").startswith("project/"):
-        return file_name, base_dir / file_name
-    path = base_dir / file_name
+    path = _checked_path(base_dir, base_dir / file_name)
     if not path.exists():
-        project_path = base_dir / "project" / file_name
+        project_path = _checked_path(base_dir, base_dir / "project" / file_name)
         if project_path.exists():
             return f"project/{file_name}", project_path
     return file_name, path
@@ -168,8 +222,10 @@ def resource_remove(
             return False
 
     if is_dir:
+        _checked_path(base_dir, check_path)
         rmtree_robust(check_path)
     else:
+        _checked_path(base_dir, file_path)
         file_path.unlink()
     logger.info("Removed %s: %s", label, name)
     return True
@@ -232,8 +288,8 @@ def resource_rename(
         lock_target = None
 
     if is_dir:
-        old_path = base_dir / old_name
-        new_path = base_dir / new_name
+        old_path = resource_destination(old_name, base_dir, is_dir=True)
+        new_path = resource_destination(new_name, base_dir, is_dir=True)
 
         # Contain the directory endpoints (not just SKILL.md) before any work.
         assert_within(base_dir, old_path)
@@ -242,7 +298,7 @@ def resource_rename(
         if not old_path.exists():
             raise ResourceNotFoundError(f"{label} '{old_name}' not found.")
 
-        old_file = old_path / "SKILL.md"
+        old_file = _checked_path(base_dir, old_path / "SKILL.md")
         if not old_file.exists():
             raise ResourceNotFoundError(
                 f"{label} '{old_name}' not found (SKILL.md missing)."
@@ -278,11 +334,10 @@ def resource_rename(
 
     else:
         _old_canonical, old_path = _resolve_path(old_name, base_dir, is_dir)
-        new_file = new_name if new_name.endswith(".md") else f"{new_name}.md"
         # Always rename to the flat root: nested resource folders (e.g. a
         # legacy ``project/`` rule subdir) are not supported, so a rename also
         # de-nests rather than re-creating the nested location.
-        new_path = base_dir / new_file
+        new_path = resource_destination(new_name, base_dir)
 
         assert_within(base_dir, old_path)
         assert_within(base_dir, new_path)

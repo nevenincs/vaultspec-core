@@ -9,18 +9,23 @@ from typing import TYPE_CHECKING
 from ..config import get_config
 from ..core.exceptions import VaultSpecError
 from .checks.exec_mapping import link_stem
-from .exclusions import is_excluded_vault_path
+from .exclusions import EXCLUDED_VAULT_DIR_NAMES, is_excluded_vault_path
 from .parser import parse_vault_metadata
 from .rename_engine import RenameTransaction, assert_within, docs_lock_target
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 
 __all__ = [
     "ArchiveDocumentsError",
     "ArchiveDocumentsResult",
     "RestoreDocumentsError",
     "RestoreDocumentsResult",
+    # Shared with feature discovery so validation precedes traversal and reads.
+    "_assert_docs_dir",
+    "_assert_runtime_dir",
+    "_iter_safe_documents",
+    "_require_no_symlink_components",
     "archive_documents",
     "restore_documents",
 ]
@@ -158,6 +163,8 @@ def archive_documents(
         tx.snapshot(move.source for move in moves)
         for move in moves:
             _create_destination_parent(tx, docs_dir, move.destination.parent)
+            _assert_docs_dir(root, docs_dir)
+            _require_no_symlink_components(docs_dir, move.source)
             _require_regular_document(move.source)
             try:
                 moved = tx.rename(move.source, move.destination)
@@ -216,7 +223,20 @@ def restore_documents(
         cross_links = _restore_cross_link_paths(root, docs_dir, moves)
         tx.snapshot(move.source for move in moves)
         for move in moves:
+            _assert_docs_dir(root, docs_dir, error_type=RestoreDocumentsError)
+            _require_no_symlink_components(
+                docs_dir,
+                move.source,
+                error_type=RestoreDocumentsError,
+                operation="restore",
+            )
             if move.deduplicate:
+                _require_no_symlink_components(
+                    docs_dir,
+                    move.destination,
+                    error_type=RestoreDocumentsError,
+                    operation="restore",
+                )
                 _require_identical_restore_duplicate(move.source, move.destination)
                 try:
                     move.source.unlink()
@@ -258,7 +278,7 @@ def _assert_docs_dir(
         ArchiveDocumentsError
     ),
 ) -> None:
-    if docs_dir.is_symlink() or not docs_dir.is_dir():
+    if _is_link(docs_dir) or not docs_dir.is_dir():
         raise error_type(
             f"Vault document directory must be a real directory: {docs_dir}"
         )
@@ -269,6 +289,7 @@ def _assert_docs_dir(
         raise error_type(
             f"Configured vault directory escapes the project root: {docs_dir}"
         ) from exc
+    _require_no_symlink_components(root, docs_dir, error_type=error_type)
 
 
 def _assert_runtime_dir(
@@ -296,9 +317,9 @@ def _assert_runtime_dir(
             concrete class.
     """
     runtime_dir = docs_dir / "data"
-    if runtime_dir.is_symlink():
+    if _is_link(runtime_dir):
         raise error_type(
-            f"Vault runtime directory must not be a symlink: {runtime_dir}"
+            f"Vault runtime directory must not be a symlink or junction: {runtime_dir}"
         )
     if runtime_dir.exists() and not runtime_dir.is_dir():
         raise error_type(f"Vault runtime path is not a directory: {runtime_dir}")
@@ -333,6 +354,7 @@ def _create_runtime_dir(
 def _preflight(
     root: Path, docs_dir: Path, relative_paths: tuple[str | Path, ...]
 ) -> tuple[_ArchiveMove, ...]:
+    _assert_docs_dir(root, docs_dir)
     if not relative_paths:
         raise ArchiveDocumentsError("Archive requires at least one document path.")
 
@@ -365,6 +387,7 @@ def _restore_preflight(
     *,
     deduplicate_identical: bool,
 ) -> tuple[_RestoreMove, ...]:
+    _assert_docs_dir(root, docs_dir, error_type=RestoreDocumentsError)
     if not relative_paths:
         raise RestoreDocumentsError("Restore requires at least one document path.")
 
@@ -385,6 +408,12 @@ def _restore_preflight(
         if destination in seen_destinations:
             raise RestoreDocumentsError(f"Restore destination collision: {destination}")
         deduplicate = False
+        _require_safe_destination_parent(
+            docs_dir,
+            destination.parent,
+            error_type=RestoreDocumentsError,
+            operation="restore",
+        )
         if destination.exists() or destination.is_symlink():
             if not deduplicate_identical:
                 raise RestoreDocumentsError(
@@ -392,13 +421,6 @@ def _restore_preflight(
                 )
             _require_identical_restore_duplicate(source, destination)
             deduplicate = True
-        else:
-            _require_safe_destination_parent(
-                docs_dir,
-                destination.parent,
-                error_type=RestoreDocumentsError,
-                operation="restore",
-            )
         seen_sources.add(source)
         seen_destinations.add(destination)
         moves.append(
@@ -480,7 +502,7 @@ def _require_regular_document(
     ),
     operation: str = "archive",
 ) -> None:
-    if path.is_symlink() or not path.is_file():
+    if _is_link(path) or not path.is_file():
         raise error_type(
             f"{operation.capitalize()} source is not a regular file: {path}"
         )
@@ -495,7 +517,7 @@ def _require_identical_restore_duplicate(source: Path, destination: Path) -> Non
     _require_regular_document(
         source, error_type=RestoreDocumentsError, operation="restore"
     )
-    if destination.is_symlink() or not destination.is_file():
+    if _is_link(destination) or not destination.is_file():
         raise RestoreDocumentsError(
             f"Restore deduplication destination is not a regular file: {destination}"
         )
@@ -527,13 +549,68 @@ def _require_no_symlink_components(
             f"{operation.capitalize()} source escapes vault: {path}"
         ) from exc
     current = docs_dir
+    if _is_link(current):
+        raise error_type(
+            f"Vault directory must not be a symlink or junction: {current}"
+        )
     for part in relative.parts:
         current /= part
-        if current.is_symlink():
+        if _is_link(current):
             raise error_type(
-                f"{operation.capitalize()} source contains a symlink component: "
+                f"{operation.capitalize()} source contains a symlink or junction "
+                "component: "
                 f"{current}"
             )
+    try:
+        assert_within(docs_dir, path)
+    except VaultSpecError as exc:
+        raise error_type(
+            f"{operation.capitalize()} path escapes vault: {path}"
+        ) from exc
+
+
+def _is_link(path: Path) -> bool:
+    return path.is_symlink() or path.is_junction()
+
+
+def _iter_safe_documents(
+    docs_dir: Path,
+    directory: Path,
+    *,
+    excluded: frozenset[str] = EXCLUDED_VAULT_DIR_NAMES,
+    reject_links: bool = False,
+) -> Iterator[Path]:
+    """Walk real directories only, validating ancestry before descent or reads.
+
+    Feature discovery rejects linked corpus entries. Advisory cross-link scans
+    skip them, as they are not regular managed documents.
+    """
+    _require_no_symlink_components(docs_dir, directory)
+    for parent, dirnames, filenames in directory.walk(follow_symlinks=False):
+        _require_no_symlink_components(docs_dir, parent)
+        safe_dirs: list[str] = []
+        for name in dirnames:
+            if name in excluded:
+                continue
+            child = parent / name
+            if _is_link(child):
+                if reject_links:
+                    _require_no_symlink_components(docs_dir, child)
+                continue
+            _require_no_symlink_components(docs_dir, child)
+            safe_dirs.append(name)
+        dirnames[:] = safe_dirs
+        for name in filenames:
+            child = parent / name
+            if name in excluded:
+                continue
+            if _is_link(child):
+                if reject_links:
+                    _require_no_symlink_components(docs_dir, child)
+                continue
+            if child.match("*.md"):
+                _require_no_symlink_components(docs_dir, child)
+                yield child
 
 
 def _require_safe_destination_parent(
@@ -552,14 +629,12 @@ def _require_safe_destination_parent(
             f"{operation.capitalize()} destination parent escapes vault: {parent}"
         ) from exc
     current = docs_dir
+    _require_no_symlink_components(
+        docs_dir, parent, error_type=error_type, operation=operation
+    )
     relative = parent.relative_to(docs_dir)
     for part in relative.parts:
         current /= part
-        if current.is_symlink():
-            raise error_type(
-                f"{operation.capitalize()} destination parent must not be a "
-                f"symlink: {current}"
-            )
         if current.exists() and not current.is_dir():
             raise error_type(
                 f"{operation.capitalize()} destination parent is not a "
@@ -588,6 +663,9 @@ def _create_destination_parent(
     for directory in reversed(missing):
         directory.mkdir()
         transaction.record_created_dir(directory)
+    _require_safe_destination_parent(
+        docs_dir, parent, error_type=error_type, operation=operation
+    )
 
 
 def _cross_link_paths(
@@ -596,7 +674,7 @@ def _cross_link_paths(
     archived_stems = {move.source.stem for move in moves}
     source_paths = {move.source for move in moves}
     linked: list[Path] = []
-    for path in docs_dir.rglob("*.md"):
+    for path in _iter_safe_documents(docs_dir, docs_dir):
         try:
             relative = path.relative_to(docs_dir)
         except ValueError:
@@ -634,7 +712,7 @@ def _restore_cross_link_paths(
 ) -> tuple[Path, ...]:
     restored_stems = {move.source.stem for move in moves}
     linked: list[Path] = []
-    for path in docs_dir.rglob("*.md"):
+    for path in _iter_safe_documents(docs_dir, docs_dir):
         try:
             relative = path.relative_to(docs_dir)
         except ValueError:

@@ -166,22 +166,22 @@ class TestSpecCliDispatchRouting:
         content = rule_file.read_text(encoding="utf-8")
         assert "test-rule" in content
 
-    def test_rules_add_sanitizes_nested_name(self, tmp_path: Path):
-        """A nested or project-prefixed rule name is sanitized to a flat file."""
+    def test_rules_add_preserves_project_alias_but_rejects_paths(self, tmp_path: Path):
+        """Only the supported legacy project namespace becomes a flat file."""
         from ...core import init_paths, rules_add
         from ...core import types as _t
+        from ...core.exceptions import VaultSpecError
 
         setup_rules_dir(tmp_path)
         init_paths(tmp_path)
 
-        # A legacy ``project/`` prefix and a deeper nested path both collapse to
-        # the basename: nested rule folders are never created.
         rules_add(name="project/legacy-rule", content="Body.", force=False)
-        rules_add(name="sub/deep-rule", content="Body.", force=False)
+        with pytest.raises(VaultSpecError, match="Invalid resource name"):
+            rules_add(name="sub/deep-rule", content="Body.", force=False)
 
         rules_src = _t.get_context().rules_src_dir
         assert (rules_src / "legacy-rule.md").exists()
-        assert (rules_src / "deep-rule.md").exists()
+        assert not (rules_src / "deep-rule.md").exists()
         assert not (rules_src / "project").exists()
         assert not (rules_src / "sub").exists()
         # The sanitized stem (not the nested path) is written into frontmatter.

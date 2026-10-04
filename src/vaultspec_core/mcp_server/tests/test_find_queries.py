@@ -18,7 +18,10 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from mcp import Client
 
+from vaultspec_core.graph import VaultGraph
+from vaultspec_core.graph.cache import cache_path
 from vaultspec_core.mcp_server.app import create_server
+from vaultspec_core.vaultcore.orientation import compute_rollup
 
 from .conftest import data_of
 
@@ -99,6 +102,64 @@ async def test_find_json_returns_enriched_metadata(vault_root: Path) -> None:
         assert feat["status"] == "Planned"
         assert "adr" in feat["types"]
         assert "plan" in feat["types"]
+
+
+@pytest.mark.parametrize("read_only", [True, False])
+@pytest.mark.parametrize("enriched", [True, False])
+@pytest.mark.parametrize("cache_state", ["absent", "valid", "corrupt", "stale"])
+async def test_find_features_does_not_persist_graph(
+    vault_root: Path, read_only: bool, enriched: bool, cache_state: str
+) -> None:
+    """Feature reads leave the workspace untouched even on a cache miss."""
+    path = cache_path(vault_root)
+    assert not path.exists()
+    if cache_state == "corrupt":
+        path.parent.mkdir(parents=True)
+        path.write_text("invalid cache", encoding="utf-8")
+    elif cache_state == "stale":
+        VaultGraph(vault_root)
+        assert path.is_file()  # Default graph clients still persist caches.
+
+    _write_doc(vault_root, "adr", "cache-feat", "2026-03-06", "# ADR")
+    _write_doc(vault_root, "plan", "cache-feat", "2026-03-06", "# Plan")
+    if cache_state == "valid":
+        VaultGraph(vault_root)
+        assert path.is_file()
+    expected_weight = dict(
+        VaultGraph(vault_root, use_cache=False).get_feature_rankings(limit=100)
+    )["cache-feat"]
+    before = {
+        p.relative_to(vault_root): (p.stat().st_mtime_ns, p.read_bytes())
+        if p.is_file()
+        else None
+        for p in vault_root.rglob("*")
+    }
+
+    async with Client(create_server(read_only=read_only)) as client:
+        features = data_of(await client.call_tool("find", {"json": enriched}))
+    feat = next(f for f in features if f["name"] == "cache-feat")
+    assert feat["doc_count"] == 2
+    assert feat["weight"] == expected_weight
+    if enriched:
+        assert feat["status"] == "Planned"
+        assert set(feat["types"]) == {"adr", "plan"}
+    after = {
+        p.relative_to(vault_root): (p.stat().st_mtime_ns, p.read_bytes())
+        if p.is_file()
+        else None
+        for p in vault_root.rglob("*")
+    }
+    assert after == before
+
+
+async def test_feature_rollup_fallback_does_not_persist_graph(vault_root: Path) -> None:
+    """The graph-less rollup used after ranking failure also respects no-cache."""
+    _write_doc(vault_root, "adr", "fallback-feat", "2026-03-06", "# ADR")
+    path = cache_path(vault_root)
+    assert not path.parent.exists()
+    rollup = compute_rollup(vault_root, use_cache=False)
+    assert any(f.name == "fallback-feat" for f in rollup.active_features)
+    assert not path.parent.exists()
 
 
 async def test_find_by_feature(vault_root: Path) -> None:

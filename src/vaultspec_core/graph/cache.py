@@ -66,6 +66,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+from ..core.corpus_io import UnsafeDocumentError, corpus_path_info, open_document
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
@@ -143,7 +145,7 @@ def cache_path(root_dir: Path) -> Path:
     return docs_dir / "data" / ".graph-cache" / "graph.json"
 
 
-def hash_file(path: Path) -> str:
+def hash_file(path: Path, *, root_dir: Path | None = None) -> str:
     """Return the hex SHA-256 of *path*'s bytes.
 
     Shared with :mod:`vaultspec_core.vaultcore.repair`, which fingerprints
@@ -161,7 +163,7 @@ def hash_file(path: Path) -> str:
         OSError: When the file cannot be read.
     """
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
+    with open_document(path, root_dir=root_dir) as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
@@ -215,13 +217,13 @@ def fingerprint_vault(
     manifest: dict[str, Fingerprint] = {}
     for path in scanned_files:
         try:
-            stat = path.stat()
+            _, stat = corpus_path_info(path, root_dir)
         except OSError:
             continue
         content_hash = known.get(path)
         if content_hash is None:
             try:
-                content_hash = hash_file(path)
+                content_hash = hash_file(path, root_dir=root_dir)
             except OSError:
                 continue
         manifest[_manifest_key(path, root_dir)] = (
@@ -267,7 +269,9 @@ def validate(
     seen: set[str] = set()
     for path in scanned_files:
         try:
-            stat = path.stat()
+            _, stat = corpus_path_info(path, root_dir)
+        except UnsafeDocumentError:
+            return False
         except OSError:
             # A vanished file is absent from the seen set; the final
             # file-set equality check reports the divergence.
@@ -283,7 +287,7 @@ def validate(
         racy = cache_mtime_ns is None or stat.st_mtime_ns >= cache_mtime_ns
         if deep or racy:
             try:
-                if hash_file(path) != content_hash:
+                if hash_file(path, root_dir=root_dir) != content_hash:
                     return False
             except OSError:
                 return False

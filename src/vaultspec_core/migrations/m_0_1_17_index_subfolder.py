@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 from ..core.helpers import atomic_write
 from ..vaultcore.rename_engine import assert_within
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_path, check_tree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -51,9 +52,17 @@ def _legacy_indexes(workspace: Path) -> tuple[list[Path], Path]:
     run after filling it.
     """
     from ..config import get_config
-    from ..vaultcore.exclusions import is_excluded_vault_path
+    from ..vaultcore.exclusions import EXCLUDED_VAULT_DIR_NAMES, is_excluded_vault_path
 
     cfg = get_config()
+    check_tree(
+        workspace,
+        workspace / cfg.docs_dir,
+        skip_linked_indexes=True,
+        excluded_dirs=EXCLUDED_VAULT_DIR_NAMES,
+    )
+    check_tree(workspace, workspace / cfg.docs_dir / cfg.index_dir)
+
     docs_dir = workspace / cfg.docs_dir
     index_dir = docs_dir / cfg.index_dir
     if not docs_dir.is_dir():
@@ -152,9 +161,19 @@ def migrate(workspace: Path) -> MigrationResult:
     """
     from ..config import get_config
     from ..vaultcore.checks.structure import ensure_index_directory_tag
+    from ..vaultcore.exclusions import EXCLUDED_VAULT_DIR_NAMES
     from ..vaultcore.trash import SnapshotError, TrashWriter
 
     cfg = get_config()
+    check_tree(
+        workspace,
+        workspace / cfg.docs_dir,
+        skip_linked_indexes=True,
+        excluded_dirs=EXCLUDED_VAULT_DIR_NAMES,
+    )
+    check_tree(workspace, workspace / cfg.docs_dir / cfg.index_dir)
+    check_path(workspace, workspace / cfg.docs_dir / ".trash")
+
     docs_dir = workspace / cfg.docs_dir
     counts = {"moved": 0, "tagged": 0, "removed": 0}
     if not docs_dir.is_dir():

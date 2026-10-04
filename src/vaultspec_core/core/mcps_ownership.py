@@ -3,7 +3,7 @@
 Split out of :mod:`vaultspec_core.core.mcps`. See that module's docstring for
 the ownership-fingerprint convergence story this package implements.
 
-Ownership is recorded outside host schemas (``.vaultspec/mcp-ownership.json``)
+Ownership is recorded in the operator's home, outside repositories and host schemas,
 so unrelated entries in a provider's native configuration remain untouched. A
 name is recorded alongside a content fingerprint, which is what lets
 :func:`~vaultspec_core.core.mcps_sync.mcp_sync` distinguish an entry that
@@ -65,17 +65,23 @@ __all__ = [
 
 
 def ownership_path(root: Path, scope: McpScope) -> Path:
-    """Return the ownership sidecar path for *scope*."""
+    """Return host-local authority; never import repository ownership claims.
+
+    Project/local state is isolated by canonical workspace identity, including
+    local targets that share a host file but address different project maps.
+    Old repository sidecars require explicit adoption with ``--force``.
+    """
     if scope in {McpScope.PROJECT, McpScope.LOCAL}:
-        return root / ".vaultspec" / _OWNERSHIP_FILENAME
+        workspace = hashlib.sha256(str(root.resolve()).encode()).hexdigest()
+        return (
+            core_home_layout().root / "mcp-ownership" / workspace / _OWNERSHIP_FILENAME
+        )
     return core_home_layout().root / _OWNERSHIP_FILENAME
 
 
 def ownership_target_key(target: McpTarget) -> str:
     base = f"{target.provider.value}:{target.scope.value}"
-    if target.scope is McpScope.USER:
-        return f"{base}:{target.path.resolve()}"
-    return base
+    return f"{base}:{target.path.resolve()}"
 
 
 def read_ownership(path: Path) -> OwnershipState:
@@ -101,16 +107,50 @@ def read_ownership(path: Path) -> OwnershipState:
             hint="Expected an object with a 'targets' object.",
         )
     version = raw.get("version")
-    if version != _OWNERSHIP_VERSION:
+    if type(version) is not int or version != _OWNERSHIP_VERSION:
         raise VaultSpecError(f"Unsupported MCP ownership version at {path}: {version}")
-    # Invariant: the three checks above already prove this shape - `raw` is a
-    # dict, `raw["targets"]` is a dict, and `raw["version"]` is exactly
-    # `_OWNERSHIP_VERSION`. The `dict[str, Any]` -> `OwnershipState` cast is
-    # still routed through `object` because a plain dict and a TypedDict are
-    # never considered sufficiently overlapping types for a direct cast,
-    # regardless of prior validation; the intermediate `object` step is
-    # required to express that, not evidence the shape is unproven.
+    for key, record in raw["targets"].items():
+        if not _valid_target_record(key, record):
+            raise VaultSpecError(
+                f"Invalid MCP ownership record at {path}: {key}",
+                hint="Repair or remove the corrupt sidecar before reconciling MCPs.",
+            )
     return cast("OwnershipState", cast("object", raw))
+
+
+def _valid_target_record(key: str, record: object) -> bool:
+    if not isinstance(record, dict):
+        return False
+    record = cast("dict[object, object]", record)
+    provider, scope, path = (
+        record.get(field) for field in ("provider", "scope", "path")
+    )
+    if (
+        not isinstance(provider, str)
+        or not isinstance(scope, str)
+        or not isinstance(path, str)
+    ):
+        return False
+    if not all((provider, scope, path)):
+        return False
+    if key != f"{provider}:{scope}:{path}" or not Path(path).is_absolute():
+        return False
+    managed = record.get("managed")
+    if not isinstance(managed, dict):
+        return False
+    return all(
+        isinstance(name, str)
+        and bool(name)
+        and (
+            value is None
+            or (
+                isinstance(value, str)
+                and len(value) == 64
+                and all(char in "0123456789abcdef" for char in value)
+            )
+        )
+        for name, value in cast("dict[object, object]", managed).items()
+    )
 
 
 def write_ownership(path: Path, state: OwnershipState) -> None:

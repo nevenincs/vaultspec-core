@@ -27,6 +27,9 @@ def scaffold_core(target: Path, *, dry_run: bool = False) -> list[tuple[str, str
         List of ``(relative_path, label)`` tuples for all directories created
         or that would be created.
     """
+    from ..config.workspace import validate_managed_roots
+
+    validate_managed_roots(target)
     fw_dir = target / ".vaultspec"
     vault_dir = target / ".vault"
     created: list[tuple[str, str]] = []

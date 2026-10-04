@@ -223,3 +223,43 @@ def operator_home(tmp_path: Path) -> Iterator[Path]:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+@pytest.fixture(autouse=True)
+def _hook_ownership_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep hook deletion authority out of the developer's real home."""
+    from vaultspec_core.core import provider_hooks
+    from vaultspec_core.core.home import CoreHomeLayout, core_home_layout
+
+    def isolated_layout(home: Path | None = None) -> CoreHomeLayout:
+        return core_home_layout(home or tmp_path / "hook-operator-home")
+
+    monkeypatch.setattr(
+        provider_hooks,
+        "core_home_layout",
+        isolated_layout,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _mcp_ownership_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep MCP authority writes out of the developer's real home."""
+    from vaultspec_core.core import mcps_ownership
+    from vaultspec_core.core.home import core_home_layout
+
+    monkeypatch.setattr(
+        mcps_ownership,
+        "core_home_layout",
+        lambda: core_home_layout(tmp_path / "mcp-operator-home"),
+    )
+    from vaultspec_core.core import mcps_trust
+    from vaultspec_core.core.home import CoreHomeLayout
+
+    def consent_layout(home: Path | None = None) -> CoreHomeLayout:
+        return core_home_layout(home or tmp_path / "mcp-operator-home")
+
+    monkeypatch.setattr(
+        mcps_trust,
+        "core_home_layout",
+        consent_layout,
+    )

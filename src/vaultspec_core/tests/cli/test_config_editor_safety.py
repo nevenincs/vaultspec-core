@@ -157,6 +157,8 @@ class TestEditorResolution:
         ed_vaultspec = _write_probe_editor(bindir, "vsed-vaultspec")
         ed_config = _write_probe_editor(bindir, "nano")
         ed_flag = _write_probe_editor(bindir, "micro")
+        project = tmp_path / "project"
+        project.mkdir()
 
         # Save old values
         old_path = os.environ.get("PATH")
@@ -175,35 +177,34 @@ class TestEditorResolution:
             # 1. Fallback to vi (if vi is on PATH, otherwise raises Error)
             vi_exists = shutil.which("vi") is not None
             if vi_exists:
-                assert resolve_editor(target_dir=tmp_path) == "vi"
+                assert resolve_editor(target_dir=project) == "vi"
             else:
                 with pytest.raises(EditorResolutionError) as excinfo:
-                    resolve_editor(target_dir=tmp_path)
+                    resolve_editor(target_dir=project)
                 assert "Could not resolve a working text editor" in str(excinfo.value)
 
             # 2. EDITOR env var should take precedence over vi
             os.environ["EDITOR"] = ed_editor
-            assert resolve_editor(target_dir=tmp_path) == ed_editor
+            assert resolve_editor(target_dir=project) == ed_editor
 
             # 3. VISUAL env var should take precedence over EDITOR
             os.environ["VISUAL"] = ed_visual
-            assert resolve_editor(target_dir=tmp_path) == ed_visual
+            assert resolve_editor(target_dir=project) == ed_visual
 
             # 4. The committed config key should take precedence over VISUAL
             from vaultspec_core.core.local_config import set_config_value
 
-            get_local_config_path(tmp_path)
-            set_config_value("editor", ed_config, target_dir=tmp_path)
-            assert resolve_editor(target_dir=tmp_path) == ed_config
+            set_config_value("editor", ed_config, target_dir=project)
+            assert resolve_editor(target_dir=project) == ed_config
 
             # 5. The operator's own variable outranks the committed file, as
             # git ranks GIT_EDITOR over core.editor.
             os.environ["VAULTSPEC_EDITOR"] = ed_vaultspec
-            assert resolve_editor(target_dir=tmp_path) == ed_vaultspec
+            assert resolve_editor(target_dir=project) == ed_vaultspec
 
             # 6. Editor override flag should take precedence over everything
             assert (
-                resolve_editor(editor_override=ed_flag, target_dir=tmp_path) == ed_flag
+                resolve_editor(editor_override=ed_flag, target_dir=project) == ed_flag
             )
 
         finally:

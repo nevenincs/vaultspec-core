@@ -39,6 +39,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_tree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -79,7 +80,13 @@ def migrate(workspace: Path) -> MigrationResult:
     from ..config import get_config
     from ..vaultcore import normalize_date, parse_vault_metadata
     from ..vaultcore.checks.modified_stamp import filename_date, write_stamp
-    from ..vaultcore.exclusions import is_excluded_vault_path
+    from ..vaultcore.exclusions import EXCLUDED_VAULT_DIR_NAMES, is_excluded_vault_path
+
+    check_tree(
+        workspace,
+        workspace / get_config().docs_dir,
+        excluded_dirs=EXCLUDED_VAULT_DIR_NAMES,
+    )
 
     cfg = get_config()
     docs_dir = workspace / cfg.docs_dir

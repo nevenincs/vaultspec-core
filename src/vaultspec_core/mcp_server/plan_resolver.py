@@ -1,7 +1,7 @@
 """Shared feature-or-stem plan resolver for the plan-domain MCP tools.
 
 The ``plan_progress`` and ``plan_edit`` tools address a plan by either its
-filename stem (or path) or its feature tag.  Both route the address through
+filename stem or its feature tag. Both route the address through
 :func:`resolve_plan`, which reuses
 :func:`~vaultspec_core.vaultcore.query.list_documents` so the resolver and the
 rest of the surface agree on what a plan is.  A feature that maps to more than
@@ -34,11 +34,15 @@ class PlanResolutionError(ValueError):
             matched.
     """
 
-    def __init__(self, target: str, candidates: list[str]) -> None:
+    def __init__(
+        self, target: str, candidates: list[str], *, reason: str | None = None
+    ) -> None:
         self.target = target
         self.candidates = candidates
-        if not candidates:
-            detail = "no plan document matches it by stem, path, or feature tag"
+        if reason is not None:
+            detail = reason
+        elif not candidates:
+            detail = "no plan document matches it by stem or feature tag"
         else:
             joined = ", ".join(candidates)
             detail = (
@@ -66,16 +70,14 @@ class ResolvedPlan:
 def resolve_plan(root_dir: Path, target: str) -> ResolvedPlan:
     """Resolve a plan address to a unique plan document.
 
-    Resolution precedence mirrors the orientation trace resolver: an exact
-    plan stem (or a path whose stem matches a plan) wins first, then a
-    feature tag matching exactly one plan.  A feature tag matching several
-    plans is ambiguous and raises rather than picking one.
+    An exact plan stem wins first, then a feature tag matching exactly one
+    plan. A feature tag matching several plans is ambiguous and raises
+    rather than picking one.
 
     Args:
         root_dir: The project root whose ``.vault/`` is searched.
-        target: A plan stem, a plan path (absolute or relative, with or
-            without ``.md``), or a feature tag (with or without a leading
-            ``#``).
+        target: A plan stem (with or without ``.md``), or a feature tag
+            (with or without a leading ``#``).
 
     Returns:
         The uniquely :class:`ResolvedPlan`.
@@ -84,26 +86,38 @@ def resolve_plan(root_dir: Path, target: str) -> ResolvedPlan:
         PlanResolutionError: When the address matches no plan, or matches a
             feature that owns more than one plan.
     """
+    from vaultspec_core.plan.targets import (
+        validate_plan_identifier,
+        workspace_plan_directory,
+        workspace_plan_file,
+    )
     from vaultspec_core.vaultcore.query import list_documents
 
     cleaned = target.strip()
+    try:
+        validate_plan_identifier(cleaned)
+        workspace_plan_directory(root_dir)
+    except ValueError as exc:
+        raise PlanResolutionError(target, [], reason=str(exc)) from exc
     plans = list_documents(root_dir, doc_type="plan")
+
+    def resolved_plan(doc: VaultDocument) -> ResolvedPlan:
+        try:
+            path = workspace_plan_file(root_dir, doc.path)
+        except ValueError as exc:
+            raise PlanResolutionError(target, [], reason=str(exc)) from exc
+        return ResolvedPlan(path=path, stem=doc.name, feature=doc.feature)
 
     stem_wanted = Path(cleaned).stem if cleaned else cleaned
     for doc in plans:
         if doc.name in (cleaned, stem_wanted):
-            return _to_resolved(doc)
+            return resolved_plan(doc)
 
     feature = cleaned.lstrip("#")
     feature_matches = [doc for doc in plans if doc.feature == feature]
     if len(feature_matches) == 1:
-        return _to_resolved(feature_matches[0])
+        return resolved_plan(feature_matches[0])
     if len(feature_matches) > 1:
         raise PlanResolutionError(target, sorted(doc.name for doc in feature_matches))
 
     raise PlanResolutionError(target, [])
-
-
-def _to_resolved(doc: VaultDocument) -> ResolvedPlan:
-    """Adapt a :class:`VaultDocument` into a :class:`ResolvedPlan`."""
-    return ResolvedPlan(path=doc.path, stem=doc.name, feature=doc.feature)

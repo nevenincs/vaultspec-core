@@ -410,7 +410,11 @@ def test_the_recording_lane_reads_the_latest_release_and_lands_by_pull_request()
 
     runs = _job_runs("surface.yml", "record")
     recording = next(
-        (i for i, run in enumerate(runs) if run == "just release-record-surface"),
+        (
+            i
+            for i, run in enumerate(runs)
+            if "published_surface record --from-file" in run
+        ),
         None,
     )
     assert recording is not None, "surface.yml no longer records the surface"
@@ -436,6 +440,33 @@ def test_the_surface_is_recorded_only_after_publication() -> None:
     assert recording > published, (
         "the recording is dispatched before the release is published, when "
         "the latest release is still the previous one"
+    )
+
+
+def test_release_execution_is_separated_from_surface_write_permissions() -> None:
+    """Release code receives neither write credentials nor persistent host access."""
+    jobs = cast("dict[str, dict[str, object]]", _workflow("surface.yml")["jobs"])
+    collect = jobs["collect"]
+    record = jobs["record"]
+    assert collect["runs-on"] == ["self-hosted", "Linux", "X64", "build"]
+    permissions = cast("dict[str, str]", collect["permissions"])
+    assert all(value == "read" for value in permissions.values())
+    checkout = next(
+        step
+        for step in _steps("surface.yml", "collect")
+        if "actions/checkout@" in str(step.get("uses", ""))
+    )
+    assert cast("dict[str, object]", checkout["with"])["persist-credentials"] is False
+    assert any(
+        "published_surface emit --container" in run
+        for run in _job_runs("surface.yml", "collect")
+    )
+    assert record["needs"] == "collect"
+    runs = _job_runs("surface.yml", "record")
+    assert any("published_surface record --from-file" in run for run in runs)
+    assert not any(
+        "release-record-surface" in run or "published_surface emit" in run
+        for run in runs
     )
 
 

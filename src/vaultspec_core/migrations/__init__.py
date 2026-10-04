@@ -403,6 +403,7 @@ def _build_registry() -> list[Migration]:
     from .m_0_1_74_exec_ledger_only import MIGRATION as M_EXEC_LEDGER_ONLY
     from .m_0_2_4_trigger_split import MIGRATION as M_TRIGGER_SPLIT
     from .m_0_2_5_commit_gate import MIGRATION as M_COMMIT_GATE
+    from .m_0_3_2_mcp_ownership import MIGRATION as M_MCP_OWNERSHIP
 
     entries: list[Migration] = [
         M_INDEX_SUBFOLDER,
@@ -417,6 +418,7 @@ def _build_registry() -> list[Migration]:
         M_EXEC_LEDGER_ONLY,
         M_TRIGGER_SPLIT,
         M_COMMIT_GATE,
+        M_MCP_OWNERSHIP,
     ]
     return sorted(entries, key=lambda m: parse_version_tuple(m.target_version))
 
@@ -740,10 +742,14 @@ def run_pending_migrations(
         return []
 
     manifest_path = workspace / ".vaultspec" / MANIFEST_FILENAME
+    from ._paths import check_path
+
+    check_path(workspace, manifest_path)
+    check_path(workspace, manifest_path.with_suffix(manifest_path.suffix + ".lock"))
     if not manifest_path.exists():
         # Non-vaultspec directory or freshly-scaffolded workspace
         # without a manifest yet. Skip the lock acquisition entirely
-        # so the cost on these paths is one ``Path.exists`` syscall.
+        # after validating the manifest and its lock destination.
         return []
 
     with advisory_lock(manifest_path):

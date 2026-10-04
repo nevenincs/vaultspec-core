@@ -958,7 +958,7 @@ def _vault_file_fingerprints(
             ):
                 content_hash = prior[2]
             else:
-                content_hash = hash_file(path)
+                content_hash = hash_file(path, root_dir=root_dir)
             fingerprints[rel] = (size, mtime_ns, content_hash)
         except OSError:
             continue

@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from vaultspec_core.core.document_io import read_document_text
 from vaultspec_core.vaultcore.exec_ledger import (
     StepEvidence,
     is_ledger_stem,
@@ -167,7 +168,7 @@ class ExecRecordIndex:
                 name = node.path.stem
 
                 if feature and is_ledger_stem(name):
-                    _index_ledger(index, feature, name, node.path)
+                    _index_ledger(index, feature, name, node.path, root_dir=root_dir)
                 elif feature and step_id:
                     index.by_step[(feature, step_id)] = name
                 elif feature:
@@ -181,7 +182,7 @@ class ExecRecordIndex:
             feature = doc.feature
             step_id = None
             try:
-                content = doc.path.read_text(encoding="utf-8")
+                content = read_document_text(doc.path, root_dir=root_dir)
                 meta, _ = parse_frontmatter(content)
                 raw_step_id = meta.get("step_id")
                 if raw_step_id:
@@ -190,7 +191,7 @@ class ExecRecordIndex:
                 pass
 
             if feature and is_ledger_stem(doc.name):
-                _index_ledger(index, feature, doc.name, doc.path)
+                _index_ledger(index, feature, doc.name, doc.path, root_dir=root_dir)
             elif feature and step_id:
                 index.by_step[(feature, step_id)] = doc.name
             elif feature:
@@ -224,6 +225,8 @@ def _index_ledger(
     feature: str,
     stem: str,
     path: Path,
+    *,
+    root_dir: Path,
 ) -> None:
     """Register every Step a consolidated ledger covers against its stem.
 
@@ -239,7 +242,7 @@ def _index_ledger(
     from vaultspec_core.vaultcore.parser import parse_frontmatter
 
     try:
-        _, body = parse_frontmatter(path.read_text(encoding="utf-8"))
+        _, body = parse_frontmatter(read_document_text(path, root_dir=root_dir))
     except (OSError, UnicodeDecodeError, ValueError):
         return
 
@@ -429,7 +432,7 @@ def collect_all_statuses(
     )
     for doc in docs:
         try:
-            content = doc.path.read_text(encoding="utf-8")
+            content = read_document_text(doc.path, root_dir=root_dir)
             plan = parse_plan(content)
         except (OSError, UnicodeDecodeError, ValueError) as exc:
             entries.append(

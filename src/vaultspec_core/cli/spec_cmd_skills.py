@@ -20,6 +20,7 @@ from vaultspec_core.cli.spec_cmd_shared import (
     emit_sync_result,
     print_complete_sync_notice,
     print_source_mutation_notice,
+    require_local_file_import,
     restore_resource_command,
     run_edit_command,
     spec_status_command,
@@ -90,6 +91,8 @@ def cmd_skills_add(
 ) -> None:
     """Add a new skill."""
     apply_target(target)
+    require_local_file_import("--from-file", from_file)
+    require_local_file_import("--template", template)
 
     if from_file and body is not None:
         typer.echo("Error: Cannot specify both --body and --from-file.", err=True)

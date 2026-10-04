@@ -8,14 +8,27 @@ put a version in the references that no user installed.
 
 from __future__ import annotations
 
+import hashlib
+import io
+import json
+import subprocess
+import urllib.request
+from typing import TYPE_CHECKING
+from unittest.mock import Mock
+
 import pytest
 
-from dev.packaging.products import VAULTSPEC_CORE
+from dev.packaging import published_surface as reader
+from dev.packaging.products import VAULTSPEC_CORE, Product
 from dev.packaging.published_surface import (
+    PublishedRelease,
     PublishedSurfaceError,
     parse_latest_release,
     repository,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = pytest.mark.unit
 
@@ -85,3 +98,201 @@ def test_a_wheel_name_carrying_a_path_is_refused(name: str) -> None:
 def test_the_repository_is_derived_from_the_product_homepage() -> None:
     """One declaration of where the product is released, reused here."""
     assert repository(VAULTSPEC_CORE) == "nevenincs/vaultspec-core"
+
+
+@pytest.mark.parametrize("name", [f"x,{WHEEL}", f"x%2f{WHEEL}", f"x\n{WHEEL}"])
+def test_asset_names_cannot_change_url_or_container_mount_syntax(name: str) -> None:
+    with pytest.raises(PublishedSurfaceError, match="unsafe wheel name"):
+        parse_latest_release(_payload(assets=[{"name": name}]), VAULTSPEC_CORE)
+
+
+@pytest.fixture
+def release_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    wheel = tmp_path / WHEEL
+    wheel.write_bytes(b"release wheel bytes")
+    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    (tmp_path / "SHA256SUMS").write_text(
+        f"{digest}  {WHEEL}\n", encoding="utf-8", newline="\n"
+    )
+
+    def downloaded(r: PublishedRelease, p: Product, into: Path, name: str) -> Path:
+        return into / name
+
+    monkeypatch.setattr(reader, "_download_asset", Mock(side_effect=downloaded))
+    monkeypatch.setattr(reader, "_release_commit", Mock(return_value="a" * 40))
+    monkeypatch.setattr(
+        reader,
+        "fetch_latest_release",
+        Mock(return_value=parse_latest_release(_payload(), VAULTSPEC_CORE)),
+    )
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "checksums",
+    [f"{'0' * 64}  {WHEEL}\n", f"{'0' * 64}  other.whl\n", "malformed\n"],
+    ids=["replaced-bytes", "missing-wheel", "malformed-manifest"],
+)
+def test_bad_checksums_never_reach_verifier_or_execution(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path, checksums: str
+) -> None:
+    (release_files / "SHA256SUMS").write_text(checksums, encoding="utf-8", newline="\n")
+    run = Mock()
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(PublishedSurfaceError):
+        reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    run.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", ["wrong-workflow", "wrong-ref", "wrong-commit"])
+def test_rejected_provenance_never_executes_the_wheel(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path, failure: str
+) -> None:
+    run = Mock(return_value=subprocess.CompletedProcess([], 1, "", failure))
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(PublishedSurfaceError, match="provenance did not verify"):
+        reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    assert run.call_count == 1
+    assert run.call_args.args[0][:3] == ["gh", "attestation", "verify"]
+
+
+def test_unavailable_verifier_never_executes_the_wheel(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path
+) -> None:
+    run = Mock(side_effect=FileNotFoundError("gh"))
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(PublishedSurfaceError, match="could not run gh"):
+        reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    assert run.call_count == 1
+
+
+@pytest.mark.parametrize("prefix", ["", "./"])
+def test_verified_bytes_execute_only_after_full_identity_verification(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path, prefix: str
+) -> None:
+    wheel = release_files / WHEEL
+    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    (release_files / "SHA256SUMS").write_text(
+        f"{digest}  {prefix}{WHEEL}\n", encoding="utf-8", newline="\n"
+    )
+    document = json.dumps({"version": "0.2.6"})
+    run = Mock(
+        side_effect=[
+            subprocess.CompletedProcess([], 0, "", ""),
+            subprocess.CompletedProcess([], 0, document, ""),
+        ]
+    )
+    monkeypatch.setattr(subprocess, "run", run)
+    release, actual = reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    assert actual == document
+    verify, execute = [call.args[0] for call in run.call_args_list]
+    assert verify == [
+        "gh",
+        "attestation",
+        "verify",
+        str(release_files / WHEEL),
+        "--repo",
+        "nevenincs/vaultspec-core",
+        "--signer-workflow",
+        "nevenincs/vaultspec-core/.github/workflows/publish.yml",
+        "--source-ref",
+        f"refs/tags/{release.tag}",
+        "--source-digest",
+        "a" * 40,
+    ]
+    assert execute[5] == verify[3]
+
+
+def test_conflicting_checksum_spellings_never_reach_execution(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path
+) -> None:
+    digest = hashlib.sha256((release_files / WHEEL).read_bytes()).hexdigest()
+    (release_files / "SHA256SUMS").write_text(
+        f"{digest}  {WHEEL}\n{'0' * 64}  ./{WHEEL}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    run = Mock()
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(PublishedSurfaceError, match="conflicting checksums"):
+        reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    run.assert_not_called()
+
+
+def test_container_receives_only_readonly_wheel_and_no_host_credentials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    run = Mock(return_value=subprocess.CompletedProcess([], 0, "{}", ""))
+    monkeypatch.setattr(subprocess, "run", run)
+    reader.emit_surface(tmp_path / WHEEL, container=True)
+    command = run.call_args.args[0]
+    assert command[:3] == ["docker", "run", "--rm"]
+    assert command.count("--mount") == 1
+    mount = command[command.index("--mount") + 1]
+    assert (
+        mount == f"type=bind,source={(tmp_path / WHEEL).resolve()},"
+        f"target=/wheel/{WHEEL},readonly"
+    )
+    assert "--read-only" in command
+    assert "--cap-drop=ALL" in command
+    assert "--security-opt=no-new-privileges" in command
+    assert command.count("--env") == 1
+    assert command[command.index("--env") + 1] == "UV_CACHE_DIR=/tmp/uv-cache"
+    assert not any("TOKEN" in arg or "docker.sock" in arg for arg in command)
+    assert "env" not in run.call_args.kwargs
+
+
+def test_recording_collected_data_does_not_download_or_execute_release_code(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    surface = tmp_path / "surface.json"
+    surface.write_text('{"version":"0.2.6"}', encoding="utf-8")
+    monkeypatch.setattr(
+        reader,
+        "fetch_latest_release",
+        Mock(return_value=parse_latest_release(_payload(), VAULTSPEC_CORE)),
+    )
+    read = Mock(side_effect=AssertionError("release code must not be executed"))
+    monkeypatch.setattr(reader, "read_published_surface", read)
+    record = Mock()
+    monkeypatch.setattr(reader, "_vaultspec_core", record)
+    assert reader.main(["record", "--from-file", str(surface)]) == 0
+    read.assert_not_called()
+    assert record.call_args_list[0].args[:4] == (
+        "spec",
+        "reference",
+        "snapshot",
+        "--record",
+    )
+    assert record.call_args_list[1].args == ("spec", "reference", "generate")
+
+
+def test_recording_refuses_data_for_a_superseded_release(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    surface = tmp_path / "surface.json"
+    surface.write_text('{"version":"0.2.5"}', encoding="utf-8")
+    monkeypatch.setattr(
+        reader,
+        "fetch_latest_release",
+        Mock(return_value=parse_latest_release(_payload(), VAULTSPEC_CORE)),
+    )
+    record = Mock()
+    monkeypatch.setattr(reader, "_vaultspec_core", record)
+    assert reader.main(["record", "--from-file", str(surface)]) == 1
+    record.assert_not_called()
+
+
+@pytest.mark.parametrize("payload", [{"sha": "b" * 40}, {"sha": "main"}, []])
+def test_release_commit_resolution_requires_a_full_commit_digest(
+    monkeypatch: pytest.MonkeyPatch, payload: object
+) -> None:
+    response = Mock(return_value=io.BytesIO(json.dumps(payload).encode()))
+    monkeypatch.setattr(urllib.request, "urlopen", response)
+    release = parse_latest_release(_payload(), VAULTSPEC_CORE)
+    if isinstance(payload, dict) and payload == {"sha": "b" * 40}:
+        assert reader._release_commit(release, VAULTSPEC_CORE) == "b" * 40
+    else:
+        with pytest.raises(PublishedSurfaceError, match="did not resolve to a commit"):
+            reader._release_commit(release, VAULTSPEC_CORE)
+    assert response.call_args.args[0].endswith("/commits/vaultspec-core-v0.2.6")

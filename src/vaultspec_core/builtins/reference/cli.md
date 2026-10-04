@@ -53,7 +53,16 @@ hand-edit between the markers.
 <!-- vaultspec:generated:begin unreleased-surface -->
 
 Measured against `0.3.2`, the latest published release when this reference was
-generated: every command, flag, and tool documented here is in it.
+generated. What follows is not in that release. The list is computed from the surface
+recorded from that release's published distribution; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core spec mcps trust`
+
+Flags on commands the release already has:
+
+- `vaultspec-core spec reference snapshot` - `--development`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -358,6 +367,8 @@ hand-edit between the markers.
 - `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
 - `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
   enrollment.
+- `vaultspec-core spec mcps trust` - Approve exact MCP commands for enrollment after
+  reviewing them at a terminal.
 - `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
   enrollment.
 
@@ -1049,10 +1060,10 @@ between that record and the live surface, which is why no version caveat in thes
 documents is hand-written. The record is never captured from a source tree. `--emit`
 prints this build's own surface, which is how the published distribution is read back
 inside an isolated install after publication; `--record FILE` writes such a document as
-the record, refusing a malformed one; `--verify FILE` compares such a document against
-the committed record and exits non-zero when they differ. Without a flag the verb only
-reports the recorded version. The three modes are mutually exclusive. `--json` applies
-throughout.
+the record with explicit `--development` consent, refusing a malformed one;
+`--verify FILE` compares such a document against the committed record and exits non-zero
+when they differ. Without a flag the verb only reports the recorded version. The three
+modes are mutually exclusive. `--json` applies throughout.
 
 ### vaultspec-core spec mcps
 
@@ -1071,9 +1082,15 @@ enrollment. Providers are `all`, `claude`, `antigravity`, and `codex`; scopes ar
 | `uninstall` | `[PROVIDER] [--scope SCOPE] [--dry-run] [--force] [--json] [--target PATH]`           | Remove only Vaultspec-owned native enrollment.                      |
 
 The default provider is `all` and the default scope is `project`.
-`vaultspec-core spec mcps sync --force` adopts or replaces a same-name external entry;
-`vaultspec-core spec mcps sync --prune` removes owned enrollment whose canonical source
-was deleted. `uninstall` preserves canonical definitions and external host entries.
+`vaultspec-core spec mcps trust [PROVIDER]` approves exact MCP commands after review and
+confirmation at an interactive terminal. `--source-from-cwd` approves definitions from
+the current working directory for a top-level `vaultspec-core sync` invocation
+destination; use `--target PATH` to select that destination and `--scope SCOPE` to
+select enrollment scope. `--revoke` withdraws existing grants; uninstall removes
+deployed entries. `vaultspec-core spec mcps sync --force` adopts or replaces a same-name
+external entry; `vaultspec-core spec mcps sync --prune` removes owned enrollment whose
+canonical source was deleted. `uninstall` preserves canonical definitions and external
+host entries.
 
 ## Migration commands
 

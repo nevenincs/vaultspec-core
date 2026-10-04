@@ -595,7 +595,7 @@ def _refuse_existing_target(root_dir: pathlib.Path, target_path: pathlib.Path) -
     # different type directory would cause silent overwrites in the
     # graph (nodes are keyed by stem).
     stem = target_path.stem
-    docs_dir = root_dir / get_config().docs_dir
+    docs_dir = root_dir / get_config(root=root_dir).docs_dir
     if not docs_dir.exists():
         return
     for existing in docs_dir.rglob("*.md"):
@@ -730,7 +730,7 @@ def create_vault_doc(
         exec_binding,
     )
 
-    docs_root = root_dir / get_config().docs_dir
+    docs_root = root_dir / get_config(root=root_dir).docs_dir
     target_dir, filename = _scaffold_location(
         docs_root,
         identity,
@@ -837,6 +837,7 @@ def get_template_path(
         the file does not exist on disk.
     """
     from ..config import get_config
+    from ..config.workspace import validate_managed_roots
 
     if ledger and doc_type is DocType.EXEC:
         name: str | None = _EXEC_LEDGER_TEMPLATE
@@ -847,8 +848,9 @@ def get_template_path(
 
     if content_root is not None:
         base = content_root
+        validate_managed_roots(base.parent, framework_dir=base)
     else:
-        cfg = get_config()
+        cfg = get_config(root=root_dir)
         base = root_dir / cfg.framework_dir
 
     templates_dir = base / "templates"

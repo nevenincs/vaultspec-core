@@ -21,13 +21,13 @@ from vaultspec_core.core.mcps import (
     MODE_COMMAND_TOKEN,
     MODE_MODULE_KEY,
     MODE_PACKAGE_KEY,
-    mcp_sync,
     render_launch_for_mode,
 )
 from vaultspec_core.core.workspace_mode import (
     PackageDeclaration,
     write_package_declaration,
 )
+from vaultspec_core.testing.mcp_consent import approved_mcp_sync
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -111,7 +111,7 @@ class TestMixedWorkspacePerPackageSync:
         )
         _bind_context(tmp_path)
 
-        result = mcp_sync()
+        result = approved_mcp_sync()
 
         servers = _read_servers(tmp_path)
         assert servers[_CORE_PACKAGE] == _expected_entry(
@@ -137,7 +137,7 @@ class TestMixedWorkspacePerPackageSync:
             tmp_path, _RAG_PACKAGE, PackageDeclaration(install_mode=InstallMode.TOOL)
         )
         _bind_context(tmp_path)
-        mcp_sync()
+        approved_mcp_sync()
 
         # Corrupt the managed rag entry to core's dependency shape; a renderer
         # that flattened onto core's mode would leave it here under --force.
@@ -148,7 +148,7 @@ class TestMixedWorkspacePerPackageSync:
         )
         mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
 
-        mcp_sync(force=True)
+        approved_mcp_sync(force=True)
 
         servers = _read_servers(tmp_path)
         assert servers[_RAG_PACKAGE] == _expected_entry(
@@ -171,7 +171,7 @@ class TestMixedWorkspacePerPackageSync:
         (tmp_path / ".vaultspec" / "workspace.json").unlink(missing_ok=True)
         _bind_context(tmp_path)
 
-        result = mcp_sync()
+        result = approved_mcp_sync()
 
         servers = _read_servers(tmp_path)
         assert servers[_CORE_PACKAGE] == _expected_entry(
@@ -192,7 +192,7 @@ class TestCoreOnlyWorkspaceZeroChurn:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         before = (tmp_path / ".mcp.json").read_text(encoding="utf-8")
 
-        result = mcp_sync()
+        result = approved_mcp_sync()
 
         after = (tmp_path / ".mcp.json").read_text(encoding="utf-8")
         assert after == before
@@ -236,13 +236,13 @@ class TestFingerprintVerifiedRefresh:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
         _bind_context(tmp_path)
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         # The standard changes: the source definition renders a new shape,
         # while the deployed entry is still exactly what was last written.
         _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
 
-        result = mcp_sync(provider="claude")
+        result = approved_mcp_sync(provider="claude")
 
         servers = _read_servers(tmp_path)
         assert servers["probe"]["args"] == ["-m", "probe", "--new"]
@@ -263,7 +263,7 @@ class TestFingerprintVerifiedRefresh:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
         _bind_context(tmp_path)
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         mcp_path = tmp_path / ".mcp.json"
         raw = json.loads(mcp_path.read_text(encoding="utf-8"))
@@ -271,7 +271,7 @@ class TestFingerprintVerifiedRefresh:
         mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
         before = mcp_path.read_text(encoding="utf-8")
 
-        result = mcp_sync(provider="claude")
+        result = approved_mcp_sync(provider="claude")
 
         after = mcp_path.read_text(encoding="utf-8")
         assert after == before
@@ -289,7 +289,7 @@ class TestFingerprintVerifiedRefresh:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
         _bind_context(tmp_path)
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         from vaultspec_core.core.mcps import (
             ownership_path,
@@ -310,7 +310,7 @@ class TestFingerprintVerifiedRefresh:
         # Change the standard so the entry now differs from its definition.
         _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
 
-        result = mcp_sync(provider="claude")
+        result = approved_mcp_sync(provider="claude")
 
         servers = _read_servers(tmp_path)
         assert servers["probe"]["args"] == ["-m", "probe", "--old"]
@@ -333,7 +333,7 @@ class TestFingerprintVerifiedRefresh:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
         _bind_context(tmp_path)
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         mcp_path = tmp_path / ".mcp.json"
         raw = json.loads(mcp_path.read_text(encoding="utf-8"))
@@ -341,11 +341,11 @@ class TestFingerprintVerifiedRefresh:
         mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
         edited = mcp_path.read_text(encoding="utf-8")
 
-        first = mcp_sync(provider="claude")
+        first = approved_mcp_sync(provider="claude")
         assert ("probe", "[SKIP]") in first.items
         assert mcp_path.read_text(encoding="utf-8") == edited
 
-        second = mcp_sync(provider="claude")
+        second = approved_mcp_sync(provider="claude")
 
         assert ("probe", "[SKIP]") in second.items
         assert not any(action == "[REFRESH]" for _name, action in second.items)
@@ -375,7 +375,7 @@ class TestFingerprintVerifiedRefresh:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
         _bind_context(tmp_path)
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         target = _claude_target(tmp_path)
         key = ownership_target_key(target)
@@ -393,7 +393,7 @@ class TestFingerprintVerifiedRefresh:
         raw["mcpServers"]["probe"]["env"] = {"HAND_ALTERED": "1"}
         mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
 
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         recorded_after = recorded()
         assert recorded_after["probe"] == recorded_before
@@ -413,18 +413,18 @@ class TestFingerprintVerifiedRefresh:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
         _bind_context(tmp_path)
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         mcp_path = tmp_path / ".mcp.json"
         raw = json.loads(mcp_path.read_text(encoding="utf-8"))
         raw["mcpServers"]["probe"]["args"] = ["-m", "probe", "--old", "--read-only"]
         mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
         # Move the standard on, the condition the refresh branch exists for.
         _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
 
-        result = mcp_sync(provider="claude")
+        result = approved_mcp_sync(provider="claude")
 
         assert not any(
             w.startswith("MCP server 'probe' launch refreshed") for w in result.warnings
@@ -445,7 +445,7 @@ class TestFingerprintVerifiedRefresh:
         mcp_path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
         before = json.loads(mcp_path.read_text(encoding="utf-8"))["mcpServers"]["probe"]
 
-        result = mcp_sync(provider="claude")
+        result = approved_mcp_sync(provider="claude")
 
         after = json.loads(mcp_path.read_text(encoding="utf-8"))["mcpServers"]["probe"]
         assert after == before
@@ -459,11 +459,11 @@ class TestFingerprintVerifiedRefresh:
         _provision(tmp_path, InstallMode.DEPENDENCY)
         _write_probe_definition(tmp_path, args=["-m", "probe", "--old"])
         _bind_context(tmp_path)
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
         _write_probe_definition(tmp_path, args=["-m", "probe", "--new"])
-        mcp_sync(provider="claude")
+        approved_mcp_sync(provider="claude")
 
-        result = mcp_sync(provider="claude")
+        result = approved_mcp_sync(provider="claude")
 
         assert ("probe", "[UNCHANGED]") in result.items
         assert result.updated == 0

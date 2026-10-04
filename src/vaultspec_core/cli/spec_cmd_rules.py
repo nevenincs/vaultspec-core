@@ -20,6 +20,7 @@ from vaultspec_core.cli.spec_cmd_shared import (
     emit_sync_result,
     print_complete_sync_notice,
     print_source_mutation_notice,
+    require_local_file_import,
     resource_path,
     restore_resource_command,
     run_edit_command,
@@ -77,6 +78,7 @@ def cmd_rules_add(
 ) -> None:
     """Add a new custom rule source under .vaultspec/."""
     apply_target(target)
+    require_local_file_import("--from-file", from_file)
 
     if from_file and body is not None:
         typer.echo("Error: Cannot specify both --body and --from-file.", err=True)

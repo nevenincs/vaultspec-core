@@ -19,16 +19,19 @@ appended only where the catalog says the verb supports it. Caller argument
 values enter the command solely as discrete, validated argv items, so no
 argument text can inject a shell command.
 
-Argv hygiene alone is not the whole contract, because a few declared flags name
-a command for the CLI to *execute* rather than data for it to process. For
-those, discrete-argv-item handling is beside the point: the value is a command
-either way. Two further measures cover them. The flags in
+The child starts in isolated Python mode from the loaded package directory,
+with Python import-environment overrides removed. Its bootstrap pins the
+package search path to the server's own installation before restoring the
+caller's working directory for CLI path operands. Workspace packages and
+inherited Python search paths therefore cannot replace the CLI implementation.
+
+Argv hygiene alone is not the whole contract: some declared flags execute host
+commands or import host files. Two further measures cover them. The flags in
 :data:`~vaultspec_core.mcp_server.catalog.BLOCKED_FLAGS` are refused whichever
 verb declares them and are withheld from the schemas ``discover`` returns; and
 every spawned child is marked through
 :data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`, so the CLI itself knows
-it has no terminal and declines to open an editor no matter which source the
-editor command came from.
+it has no terminal and declines to open an editor or import files.
 
 The child runs through anyio rather than a blocking :func:`subprocess.run`, so
 the handler stays interruptible while the verb works and a cancelled or
@@ -44,8 +47,11 @@ from __future__ import annotations
 import functools
 import json
 import logging
+import math
 import subprocess
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import anyio
@@ -68,8 +74,6 @@ from ..envelope import LeanResult, compact_result
 from ..isolation import isolated_context as _isolated_context
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from anyio.abc import ByteReceiveStream, Process
     from mcp.server.mcpserver import MCPServer
 
@@ -81,9 +85,33 @@ __all__ = ["register_gateway_tools"]
 #: is low-frequency by definition, so a generous ceiling covers Python startup
 #: plus the verb's own work without letting a wedged verb hang the handler.
 _DEFAULT_TIMEOUT = 60.0
+_MAX_TIMEOUT = 120.0
+_CAPTURE_BYTES = 1024 * 1024
+_INVOKE_RESPONSE_BYTES = 128 * 1024
 
 #: How long a child gets to exit after ``terminate()`` before it is killed.
 _KILL_GRACE = 2.0
+
+# Preserve the interpreter's virtualenv path: resolving a symlink here can
+# select the base interpreter and lose the server's installed dependencies.
+_TRUSTED_PYTHON = str(Path(sys.executable).absolute())
+_TRUSTED_PACKAGE_DIR = Path(__file__).resolve().parents[2]
+_CLI_BOOTSTRAP = (
+    "import os, sys; "
+    "sys.path.insert(0, sys.argv.pop(1)); "
+    "os.chdir(sys.argv.pop(1)); "
+    "from vaultspec_core.__main__ import main; main()"
+)
+# CPython honors executable/venv launcher overrides even with -I, so the
+# environment must not be allowed to redirect interpreter startup either.
+_PYTHON_IMPORT_ENV = (
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "PYTHONUSERBASE",
+    "PYTHONSTARTUP",
+    "PYTHONEXECUTABLE",
+    "__PYVENV_LAUNCHER__",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +193,7 @@ class InvokeError(LeanResult):
 
     Attributes:
         kind: The failure class - ``nonzero_exit``, ``json_parse``, or
-            ``timeout``.
+            ``timeout`` or ``output_limit``.
         exit_code: The subprocess exit code (``-1`` when the verb timed out
             before exiting).
         stderr: The captured standard error, folded in verbatim.
@@ -289,10 +317,11 @@ def _build_argv(
 ) -> list[str]:
     """Build the interpreter-prefixed argv list for a validated verb call.
 
-    The interpreter and module entry mirror how the server itself runs
-    (``sys.executable -m vaultspec_core``), so the gateway invokes the same
-    command surface whether installed as a console script or run from this
-    development environment. ``--target`` is injected at the global position;
+    The isolated interpreter bootstraps the package from the server's loaded
+    installation, including editable installs. The two bootstrap operands are
+    removed from ``sys.argv`` before entering the existing CLI, and the original
+    working directory is restored without adding it to Python's search path.
+    ``--target`` is injected at the global position;
     the caller's ordered positionals are placed immediately after the verb
     path (their canonical operand slots, ahead of any options so a value-flag
     never swallows an operand); rendered flags follow; ``--json`` is appended
@@ -313,9 +342,12 @@ def _build_argv(
         ToolError: When an argument names a reserved or undeclared flag.
     """
     argv: list[str] = [
-        sys.executable,
-        "-m",
-        "vaultspec_core",
+        _TRUSTED_PYTHON,
+        "-I",
+        "-c",
+        _CLI_BOOTSTRAP,
+        str(_TRUSTED_PACKAGE_DIR.parent),
+        str(Path.cwd()),
         "--target",
         str(root_dir),
         *entry.verb_path,
@@ -383,10 +415,8 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
     smuggle an unknown token.
 
     Flags listed in :data:`~vaultspec_core.mcp_server.catalog.BLOCKED_FLAGS`
-    are rejected even though the verb declares them: a declared flag whose
-    *value* is a command to execute is screened by neither of the other two
-    checks, because the name is legitimate and the value is never examined
-    here.
+    are rejected even though the verb declares them: host commands and file
+    imports exceed the gateway's authority even with well-formed argv.
 
     Args:
         flag_lookup: The entry's ``flag(name)`` resolver.
@@ -409,9 +439,8 @@ def _render_flags(flag_lookup: Any, arguments: dict[str, Any]) -> list[str]:
             raise ToolError(msg)
         if flag_name in BLOCKED_FLAGS:
             msg = (
-                f"flag {flag_name!r} is not available through the gateway; it "
-                "names a command for the CLI to execute, which is meaningful "
-                "only for an invocation that has a terminal attached"
+                f"flag {flag_name!r} is not available through the gateway; "
+                "host commands and file imports are restricted to the local CLI"
             )
             raise ToolError(msg)
         declared = flag_lookup(flag_name)
@@ -436,7 +465,7 @@ def _parse_verb(verb: str) -> tuple[str, ...]:
 def _child_environment() -> dict[str, str]:
     """Build the environment for an ``invoke`` subprocess.
 
-    The server's own environment plus one marker,
+    The server's environment without Python import overrides, plus one marker,
     :data:`~vaultspec_core.config.VAULTSPEC_MCP_GATEWAY_INVOCATION`, telling the child
     that it was started by a tool call rather than by a person at a terminal.
     The child refuses to launch an interactive editor when it sees the marker.
@@ -451,7 +480,10 @@ def _child_environment() -> dict[str, str]:
     Returns:
         The environment mapping to hand to the child process.
     """
-    return child_environment((VAULTSPEC_MCP_GATEWAY_INVOCATION, "1"))
+    env = child_environment((VAULTSPEC_MCP_GATEWAY_INVOCATION, "1"))
+    for name in _PYTHON_IMPORT_ENV:
+        env.pop(name, None)
+    return env
 
 
 # ---------------------------------------------------------------------------
@@ -477,8 +509,32 @@ def _decode(chunks: list[bytes]) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-async def _drain(stream: ByteReceiveStream | None, chunks: list[bytes]) -> None:
-    """Accumulate one child stream to EOF.
+class OutputLimitError(RuntimeError):
+    """The combined stdout/stderr capture exceeded the server limit."""
+
+
+@dataclass
+class _CaptureBudget:
+    """Shared across both readers, which update it without yielding."""
+
+    remaining: int = _CAPTURE_BYTES
+    exceeded: bool = False
+
+
+def _bounded_timeout(timeout: float) -> float:
+    """Reject invalid deadlines and clamp valid ones to the server maximum."""
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ToolError("timeout must be finite and greater than zero")
+    return min(timeout, _MAX_TIMEOUT)
+
+
+async def _drain(
+    stream: ByteReceiveStream | None,
+    chunks: list[bytes],
+    budget: _CaptureBudget,
+    scope: anyio.CancelScope,
+) -> None:
+    """Capture one child stream within the shared stdout/stderr byte budget.
 
     Both streams are drained concurrently by the caller, because a child that
     fills one pipe buffer while the reader waits on the other deadlocks - the
@@ -487,10 +543,17 @@ async def _drain(stream: ByteReceiveStream | None, chunks: list[bytes]) -> None:
     Args:
         stream: The child stream, or ``None`` when it was not piped.
         chunks: The list to append received chunks to.
+        budget: The combined captured-output ceiling.
+        scope: Cancel both readers as soon as output exceeds the ceiling.
     """
     if stream is None:
         return
     async for chunk in stream:
+        if len(chunk) > budget.remaining:
+            budget.exceeded = True
+            scope.cancel()
+            return
+        budget.remaining -= len(chunk)
         chunks.append(chunk)
 
 
@@ -514,7 +577,7 @@ async def _reap(process: Process) -> None:
     Only the child itself is reaped, one level, never a tree. On Windows
     ``terminate()`` and ``kill()`` are both ``TerminateProcess`` and neither
     reaps descendants, which is accepted here: the child is
-    ``sys.executable -m vaultspec_core`` directly with no ``uv`` wrapper,
+    the isolated interpreter directly with no ``uv`` wrapper,
     editor spawning is refused by the non-interactive environment marker, and
     the hook and sync verbs are denylisted, so the only possible grandchildren
     are short-lived git invocations that exit on their own. Job Objects are
@@ -565,7 +628,10 @@ async def _run_verb(
 
     Raises:
         TimeoutError: When the child outlives *timeout*; it is reaped first.
+        OutputLimitError: When captured output exceeds the shared byte limit.
     """
+    timeout = _bounded_timeout(timeout)
+    budget = _CaptureBudget()
     stdout_chunks: list[bytes] = []
     stderr_chunks: list[bytes] = []
     async with await anyio.open_process(
@@ -574,6 +640,7 @@ async def _run_verb(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,
+        cwd=_TRUSTED_PACKAGE_DIR,
     ) as process:
         # The child can now be terminated out from under itself, so its pid is
         # what correlates a killed or wedged verb with what the OS saw.
@@ -581,8 +648,24 @@ async def _run_verb(
         try:
             with anyio.fail_after(timeout):
                 async with anyio.create_task_group() as streams:
-                    streams.start_soon(_drain, process.stdout, stdout_chunks)
-                    streams.start_soon(_drain, process.stderr, stderr_chunks)
+                    streams.start_soon(
+                        _drain,
+                        process.stdout,
+                        stdout_chunks,
+                        budget,
+                        streams.cancel_scope,
+                    )
+                    streams.start_soon(
+                        _drain,
+                        process.stderr,
+                        stderr_chunks,
+                        budget,
+                        streams.cancel_scope,
+                    )
+                if budget.exceeded:
+                    raise OutputLimitError(
+                        "combined stdout/stderr capture limit exceeded"
+                    )
                 returncode = await process.wait()
         except BaseException:
             await _reap(process)
@@ -707,7 +790,7 @@ def register_gateway_tools(
         ]
         return DiscoverResult(query=query, count=len(verbs), verbs=verbs)
 
-    @compact_result(_invoke_summary)
+    @compact_result(_invoke_summary, max_response_bytes=_INVOKE_RESPONSE_BYTES)
     @_isolated_context
     async def invoke(
         ctx: Context[Any, Any],
@@ -736,7 +819,7 @@ def register_gateway_tools(
                 ``vault plan step check``, the ``OLD`` and ``NEW`` of ``vault
                 feature rename``), in command-line order. Validated against the
                 verb's declared argument count before any spawn.
-            timeout: The subprocess wall-clock budget in seconds.
+            timeout: Wall-clock seconds, capped at 120.
 
         Returns:
             The :class:`InvokeResult` carrying parsed data or text, or the
@@ -750,6 +833,7 @@ def register_gateway_tools(
                 error before any process is spawned.
         """
         _ = ctx
+        timeout = _bounded_timeout(timeout)
         verb_path = _parse_verb(verb)
         catalog = _active_catalog()
 
@@ -782,6 +866,19 @@ def register_gateway_tools(
         command = ["vaultspec-core", *argv[argv.index("--target") :]]
         try:
             completed = await _run_verb(argv, _child_environment(), timeout)
+        except OutputLimitError:
+            return InvokeResult(
+                verb=entry.verb,
+                ok=False,
+                exit_code=-1,
+                format="text",
+                error=InvokeError(
+                    kind="output_limit",
+                    exit_code=-1,
+                    message=f"combined stdout/stderr exceeds {_CAPTURE_BYTES} bytes",
+                ),
+                command=command,
+            )
         except TimeoutError:
             logger.warning("invoke: verb=%r timed out after %ss", verb, timeout)
             return InvokeResult(

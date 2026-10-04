@@ -364,7 +364,8 @@ def load_published_surface(path: Path | None = None) -> Surface:
         raise SurfaceSnapshotError(
             f"no published-surface snapshot at {snapshot}; record one from the "
             "latest published release's distribution with "
-            "'vaultspec-core spec reference snapshot --record <surface.json>'"
+            "'vaultspec-core spec reference snapshot --record <surface.json> "
+            "--development'"
         )
     return deserialize_surface(snapshot.read_text(encoding="utf-8"))
 

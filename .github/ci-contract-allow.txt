@@ -118,6 +118,14 @@ publish.yml:Publish to PyPI
 publish.yml:Generate checksums
 publish.yml:Verify the attached distribution carries provenance
 
+# Surface handoff: the collector uses only stdlib verification on the host and
+# runs artifact code in a disposable container without host credentials. Its
+# JSON output is explicitly redirected outside the checkout; the writer accepts
+# only that data file. These CI-only paths must not call the local wheel-running
+# release-record-surface recipe in the write-capable job.
+surface.yml:Verify the release and collect its surface without credentials
+surface.yml:Record the latest published release's surface
+
 # Reports the model identifiers currently pinned, for the agent step below it
 # to reconcile. Recipe needed: `audit-model-pins`.
 model-drift.yml:Report currently pinned identifiers

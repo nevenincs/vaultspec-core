@@ -18,6 +18,7 @@ import pytest
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.mcps import mcp_sync
 from vaultspec_core.migrations.m_0_1_48_launch_convergence import migrate
+from vaultspec_core.testing.mcp_consent import approve_mcp_definitions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -63,6 +64,7 @@ def _write_probe(root: Path, *, args: list[str]) -> None:
         json.dumps({"command": "python", "args": args}, indent=2) + "\n",
         encoding="utf-8",
     )
+    approve_mcp_definitions(root)
 
 
 def _servers(root: Path) -> dict[str, dict[str, object]]:

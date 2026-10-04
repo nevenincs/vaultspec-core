@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from vaultspec_core.core.enums import InstallMode
+from vaultspec_core.core.enums import InstallMode, McpScope
+from vaultspec_core.core.mcps_ownership import ownership_path as host_ownership_path
 from vaultspec_core.core.workspace_mode import WORKSPACE_FILENAME
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
@@ -121,9 +122,10 @@ class TestAgyMcpConfig:
         assert "mcpServers" in raw
         assert "_vaultspecManaged" not in raw
         ownership = json.loads(
-            (tmp_path / ".vaultspec" / "mcp-ownership.json").read_text(encoding="utf-8")
+            host_ownership_path(tmp_path, McpScope.PROJECT).read_text(encoding="utf-8")
         )
-        managed = ownership["targets"]["antigravity:project"]["managed"]
+        target = (tmp_path / ".agents" / "mcp_config.json").resolve()
+        managed = ownership["targets"][f"antigravity:project:{target}"]["managed"]
         assert "vaultspec-core" in managed
 
     def test_not_written_when_antigravity_not_installed(self, tmp_path: Path) -> None:

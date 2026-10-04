@@ -16,7 +16,10 @@ import logging
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..config.workspace import WorkspaceLayout
 
 from .enums import (
     DirName,
@@ -186,6 +189,7 @@ class WorkspaceContext:
         hooks_dir: Source directory for provider hook files.
         triggers_dir: Source directory for lifecycle trigger files.
         tool_configs: Per-tool configuration mapping.
+        layout: Original managed-root anchors for revalidation on reuse.
     """
 
     root_dir: Path
@@ -199,6 +203,7 @@ class WorkspaceContext:
     triggers_dir: Path
     mcps_src_dir: Path | None = None
     tool_configs: dict[Tool, ToolConfig] = field(default_factory=dict)
+    layout: WorkspaceLayout | None = None
 
 
 workspace_ctx: ContextVar[WorkspaceContext] = ContextVar("workspace_ctx")
@@ -211,7 +216,14 @@ def get_context() -> WorkspaceContext:
         LookupError: If :func:`init_paths` has not been called in this
             execution context.
     """
-    return workspace_ctx.get()
+    from ..config.workspace import validate_managed_roots
+
+    ctx = workspace_ctx.get()
+    if ctx.layout is not None:
+        ctx.layout.validate_roots()
+    if ctx.layout is None or ctx.target_dir != ctx.layout.target_dir:
+        validate_managed_roots(ctx.target_dir)
+    return ctx
 
 
 def set_context(ctx: WorkspaceContext) -> None:
@@ -260,6 +272,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
         # Backward compatibility for tests passing a Path root
         layout = resolve_workspace(target_override=layout)
 
+    layout.validate_roots()
     cfg = get_config(root=layout.target_dir)
 
     target = layout.target_dir
@@ -382,6 +395,7 @@ def init_paths(layout: Any) -> WorkspaceContext:
         triggers_dir=triggers_dir,
         mcps_src_dir=mcps_src_dir,
         tool_configs=tool_configs,
+        layout=layout,
     )
     workspace_ctx.set(ctx)
     return ctx

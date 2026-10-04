@@ -64,6 +64,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_path, check_tree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -125,6 +126,8 @@ def _plan_folders(workspace: Path) -> list[_FolderFold]:
     from ..vaultcore import parse_vault_metadata
     from ..vaultcore.body_schema import CURRENT_BODY_SCHEMA
     from ..vaultcore.exec_fold import plan_fold, sources_from
+
+    check_tree(workspace, workspace / get_config().docs_dir / "exec")
 
     exec_dir = workspace / get_config().docs_dir / "exec"
     if not exec_dir.is_dir():
@@ -212,9 +215,16 @@ def migrate(workspace: Path) -> MigrationResult:
     """
     from ..config import get_config
     from ..vaultcore.exec_fold import apply_fold
+    from ..vaultcore.rename_engine import docs_lock_target
     from ..vaultcore.trash import SnapshotError, TrashWriter
 
+    check_tree(workspace, workspace / get_config().docs_dir / "exec")
+
     cfg = get_config()
+    check_path(workspace, workspace / cfg.docs_dir / ".trash")
+    lock_target = docs_lock_target(workspace / cfg.docs_dir)
+    check_path(workspace, lock_target.with_suffix(lock_target.suffix + ".lock"))
+    check_tree(workspace, workspace / cfg.framework_dir / "templates")
     counts = {
         "folders": 0,
         "folded": 0,

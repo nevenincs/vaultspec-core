@@ -6,6 +6,7 @@ the ownership-fingerprint convergence story this package implements.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import tomllib
@@ -87,6 +88,8 @@ def collect_mcp_servers(
     warnings: list[str] | None = None,
     mode: InstallMode | None = None,
     target: Path | None = None,
+    *,
+    digests: dict[Path, str] | None = None,
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
     """Collect MCP server definitions from ``.vaultspec/mcps/``.
 
@@ -118,6 +121,8 @@ def collect_mcp_servers(
         target: Workspace root directory used to resolve each definition's own
             declaring-package render mode when *mode* is supplied. ``None``
             skips the per-package lookup, so every definition renders at *mode*.
+        digests: Optional output map of source-file digests, computed from the
+            same bytes parsed here so consent cannot bind a later file read.
 
     Returns:
         Mapping of server name to ``(source_path, config_dict)``.
@@ -129,7 +134,8 @@ def collect_mcp_servers(
     sources: dict[str, tuple[Path, dict[str, Any]]] = {}
     for f in sorted(mcps_dir.glob("*.json")):
         try:
-            raw = json.loads(f.read_text(encoding="utf-8"))
+            content = f.read_bytes()
+            raw = json.loads(content.decode("utf-8"))
             if not isinstance(raw, dict):
                 msg = f"MCP definition {f.name} is not a JSON object"
                 logger.error(msg)
@@ -143,7 +149,9 @@ def collect_mcp_servers(
             if mode is not None:
                 payload = render_definition_for_sync(payload, mode, target)
             sources[name] = (f, payload)
-        except (json.JSONDecodeError, OSError) as e:
+            if digests is not None:
+                digests[f] = "sha256:" + hashlib.sha256(content).hexdigest()
+        except (json.JSONDecodeError, OSError, UnicodeError) as e:
             msg = f"Failed to read/parse MCP definition {f}: {e}"
             logger.error(msg)
             if warnings is not None:
@@ -243,7 +251,11 @@ def _read_target_native_state(
                 for name, config in native.items()
                 if isinstance(config, dict)
             }
-            legacy = payload.get(LEGACY_MANAGED_KEY, [])
+            legacy: object = (
+                payload.get(LEGACY_MANAGED_KEY, [])
+                if target.scope is not McpScope.PROJECT
+                else []
+            )
             if isinstance(legacy, list):
                 legacy_items = cast("list[Any]", legacy)
                 managed.update(name for name in legacy_items if isinstance(name, str))
@@ -252,7 +264,8 @@ def _read_target_native_state(
             outside = toml_servers(strip_block(content, TOML_BLOCK_TYPE))
             block = toml_servers(managed_toml_content(content))
             servers = {**outside, **block}
-            managed.update(block)
+            if target.scope is not McpScope.PROJECT:
+                managed.update(block)
     except (
         json.JSONDecodeError,
         OSError,

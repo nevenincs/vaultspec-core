@@ -35,6 +35,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_path, check_tree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -88,7 +89,10 @@ def _plan_folds(workspace: Path) -> list[_FolderFold]:
     )
     from ..vaultcore.parser import parse_vault_metadata
 
+    check_tree(workspace, workspace / get_config().docs_dir / "exec")
+
     cfg = get_config()
+    check_tree(workspace, workspace / cfg.framework_dir / "templates")
     docs_dir = workspace / cfg.docs_dir
     exec_dir = docs_dir / "exec"
     if not exec_dir.is_dir():
@@ -116,6 +120,7 @@ def _plan_folds(workspace: Path) -> list[_FolderFold]:
         records, plan_stem, covered = collect_sources(paths)
         plan_stem = plan_stem or f"{folder_name}-plan"
         plan_path = docs_dir / "plan" / f"{plan_stem}.md"
+        check_path(workspace, plan_path)
         folds.append(
             _FolderFold(
                 folder_name=folder_name,
@@ -181,9 +186,15 @@ def migrate(workspace: Path) -> MigrationResult:
     """
     from ..config import get_config
     from ..vaultcore.exec_fold import apply_fold
+    from ..vaultcore.rename_engine import docs_lock_target
     from ..vaultcore.trash import SnapshotError, TrashWriter
 
+    check_tree(workspace, workspace / get_config().docs_dir / "exec")
+
     cfg = get_config()
+    check_path(workspace, workspace / cfg.docs_dir / ".trash")
+    lock_target = docs_lock_target(workspace / cfg.docs_dir)
+    check_path(workspace, lock_target.with_suffix(lock_target.suffix + ".lock"))
     counts = {
         "folders": 0,
         "folded": 0,

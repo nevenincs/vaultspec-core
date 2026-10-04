@@ -266,7 +266,15 @@ def test_snapshot_record_of_the_committed_bytes_reports_unchanged(
 
     result = _RUNNER.invoke(
         app,
-        ["spec", "reference", "snapshot", "--record", str(document), "--json"],
+        [
+            "spec",
+            "reference",
+            "snapshot",
+            "--record",
+            str(document),
+            "--development",
+            "--json",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -283,12 +291,33 @@ def test_snapshot_record_refuses_a_malformed_document(tmp_path: Path) -> None:
     document.write_text(f'{{"schema": {SNAPSHOT_SCHEMA}}}', encoding="utf-8")
 
     result = _RUNNER.invoke(
-        app, ["spec", "reference", "snapshot", "--record", str(document)]
+        app,
+        ["spec", "reference", "snapshot", "--record", str(document), "--development"],
     )
 
     assert result.exit_code == 1
     assert "no version" in result.output
     assert published_surface_path().read_bytes() == before
+
+
+def test_trusted_snapshot_record_writes_a_new_surface(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit development recording still writes a valid release document."""
+    snapshot = tmp_path / "published-surface.json"
+    monkeypatch.setattr(
+        "vaultspec_core.cli.reference_surface.published_surface_path", lambda: snapshot
+    )
+    surface = _surface(version="9.8.7")
+    result = _RUNNER.invoke(
+        app,
+        ["spec", "reference", "snapshot", "--record", "-", "--development", "--json"],
+        input=serialize_surface(surface),
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["status"] == "updated"
+    assert deserialize_surface(snapshot.read_text(encoding="utf-8")) == surface
 
 
 def test_snapshot_refuses_two_modes_at_once(tmp_path: Path) -> None:

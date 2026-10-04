@@ -1,24 +1,14 @@
-"""The gateway verb catalog parsed from the shipped CLI reference.
+"""The gateway verb catalog bound to the installed CLI command tree.
 
-The stateless ``discover`` / ``invoke`` gateway needs one closed, drift-free
-inventory of every verb the installed binary declares, so that discovery can
-never advertise, and invocation can never accept, a verb the binary lacks. That
-inventory is machine-generated between the ``vaultspec:generated`` markers in
-``.vaultspec/reference/cli.md`` (the same block the ``spec reference generate``
-verb owns), and it ships in the same wheel as the binary, so it cannot fall out
-of step with the installed command surface. This module reads that marker block
-into an in-memory :class:`CommandCatalog`.
+The ``vaultspec:generated`` inventory in ``.vaultspec/reference/cli.md`` supplies
+candidate verb paths and curated descriptions for ``discover`` / ``invoke``.
+That workspace copy is mutable, so it cannot grant execution authority. Only
+exact visible leaf paths in the installed Typer tree are admitted; operands,
+options, groups, and unknown commands in the inventory are excluded.
 
-The marker block is the authoritative verb-existence source per the accepted
-ADR (Q7): the set of valid verb paths and their curated help text come from it,
-and its absence is raised loudly rather than silently yielding an empty catalog.
-The block carries no structured per-verb flag data, so each verb's flag schema
-and its ``--json`` support are enriched from the installed Typer command tree -
-the very source the marker block is generated from, introspected read-only at
-build time - giving :func:`~vaultspec_core.mcp_server.tools.gateway` accurate
-parameter schemas for ``discover`` and an accurate ``--json`` signal for
-``invoke``. Both sources live in the same wheel and regenerate together, so the
-single-source-of-truth guarantee the ADR relies on is preserved.
+The same live tree supplies each admitted verb's flags, positional arguments,
+and ``--json`` support. Missing inventory markers still raise loudly, and a
+stale reference can omit installed verbs but cannot introduce executable ones.
 
 A small static denylist (``uninstall``, ``sync``, the hook lifecycle verbs,
 MCP-registry mutation, and index hand-authoring) is removed at build time and
@@ -98,6 +88,10 @@ DENYLIST: frozenset[tuple[str, ...]] = frozenset(
         ("uninstall",),
         ("install",),
         ("sync",),
+        # Reference maintenance writes the installation/source tree, outside
+        # the workspace authority granted to MCP. Keep it terminal-only.
+        ("spec", "reference", "generate"),
+        ("spec", "reference", "snapshot"),
         ("spec", "hooks", "sync"),
         ("spec", "hooks", "trust"),
         # The deprecated ``spec hooks add`` / ``run`` aliases delegate to the
@@ -111,6 +105,7 @@ DENYLIST: frozenset[tuple[str, ...]] = frozenset(
         ("spec", "mcps", "add"),
         ("spec", "mcps", "remove"),
         ("spec", "mcps", "sync"),
+        ("spec", "mcps", "trust"),
         ("spec", "mcps", "uninstall"),
         ("vault", "feature", "index"),
     }
@@ -136,11 +131,17 @@ RESERVED_FLAGS: frozenset[str] = frozenset({"--target", _JSON_FLAG, "--help"})
 #: the rest of each verb reachable and states the actual rule, and it does not
 #: have to be revisited every time another verb grows an ``--editor``.
 #:
+#: ``--from-file`` and ``--template`` import host file contents. Those paths
+#: are not confined to an approved workspace import root, so exposing either
+#: option would let a caller copy arbitrary local files into a resource and
+#: retrieve their contents with ``show``. File imports remain local CLI modes;
+#: MCP callers can supply resource content with ``--body``.
+#:
 #: This screens the *name*, which is the half the gateway can decide with
 #: certainty. It is paired with, not a substitute for, the marker the gateway
 #: puts in the child environment and the validation the CLI performs on the
 #: value; either alone would be one mistake away from reopening the hole.
-BLOCKED_FLAGS: frozenset[str] = frozenset({"--editor"})
+BLOCKED_FLAGS: frozenset[str] = frozenset({"--editor", "--from-file", "--template"})
 
 
 class CatalogParseError(ValueError):
@@ -556,12 +557,11 @@ def build_catalog(
 ) -> CommandCatalog:
     """Build the gateway verb catalog from the CLI reference and Typer app.
 
-    The verb-existence set and descriptions come from the ``vaultspec:generated``
-    marker block in *reference_path* (the ADR-authoritative source), with the
-    static :data:`DENYLIST` removed. Each surviving verb is enriched with the
-    option schema, its ordered positional arguments, and ``--json`` support
-    introspected from *typer_app* so the gateway can present accurate parameter
-    schemas and build correct argv (flags and positionals alike).
+    Candidates and descriptions come from the ``vaultspec:generated`` marker
+    block in *reference_path*. Only exact leaf command paths in *typer_app*
+    survive, with the static :data:`DENYLIST` removed from those canonical
+    identities. Their live option and positional schemas govern argv building;
+    workspace documentation cannot embed additional operands or options.
 
     Args:
         reference_path: Path to the shipped CLI reference (``cli.md``).
@@ -583,9 +583,9 @@ def build_catalog(
 
     entries: dict[tuple[str, ...], CatalogEntry] = {}
     for verb_path, description in descriptions.items():
-        if verb_path in DENYLIST:
+        if verb_path not in command_schemas or verb_path in DENYLIST:
             continue
-        flags, arguments = command_schemas.get(verb_path, ((), ()))
+        flags, arguments = command_schemas[verb_path]
         supports_json = any(flag.name == _JSON_FLAG for flag in flags)
         entries[verb_path] = CatalogEntry(
             verb_path=verb_path,

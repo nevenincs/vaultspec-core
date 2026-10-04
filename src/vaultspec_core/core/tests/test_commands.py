@@ -17,6 +17,7 @@ from vaultspec_core.core.commands import (
 )
 from vaultspec_core.core.enums import InstallMode
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
+from vaultspec_core.testing.mcp_consent import approved_mcp_sync
 
 
 @pytest.mark.unit
@@ -35,6 +36,11 @@ def test_init_run_scaffolds_antigravity_workspace_layout(tmp_path: Path) -> None
         assert (tmp_path / ".codex" / "config.toml").is_file()
         # Antigravity discovers workspace subagents at `.agents/agents/`.
         assert (tmp_path / ".agents" / "agents").is_dir()
+        # Installation seeds definitions but cannot consent to launching them.
+        # Model operator approval before checking the native MCP rendering.
+        assert not (tmp_path / ".mcp.json").exists()
+        result = approved_mcp_sync(target_dir=tmp_path)
+        assert not result.errors
         mcp_config = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         server = mcp_config["mcpServers"]["vaultspec-core"]
         assert server["command"] == "uvx"

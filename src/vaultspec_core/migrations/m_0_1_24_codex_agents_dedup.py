@@ -27,6 +27,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_path
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -64,6 +65,8 @@ def migrate(workspace: Path) -> MigrationResult:
         sanitize_legacy_codex_agents,
     )
     from ..core.helpers import atomic_write
+
+    check_path(workspace, workspace / ".codex" / "config.toml")
 
     counts = {"deduped": 0}
 

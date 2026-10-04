@@ -29,6 +29,7 @@ import shutil
 from typing import TYPE_CHECKING
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_tree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -84,10 +85,8 @@ def _move_tree(src: Path, dst: Path) -> None:
     stay on :meth:`pathlib.Path.replace` rather than routing through the
     atomic writer. A rename replaces the destination *entry*; it never
     opens the destination and so never follows a symlink sitting there to
-    clobber what it names. A symlinked child that is relocated stays a
-    symlink and stays inside ``.vaultspec/``, where it was already being
-    read before the move, so the migration neither creates nor widens an
-    exposure - it only changes which managed directory the entry sits in.
+    clobber what it names. The migration preflight rejects linked sources
+    and destinations before this recursive merge can enumerate their children.
 
     A colliding file is overwritten by the rename itself, with no preceding
     ``unlink``. :meth:`pathlib.Path.replace` overwrites an existing
@@ -138,6 +137,8 @@ def migrate(workspace: Path) -> MigrationResult:
             the next invocation retries from the same starting version.
     """
     from ..config import get_config
+
+    check_tree(workspace, workspace / get_config().framework_dir)
 
     cfg = get_config()
     vaultspec_dir = workspace / cfg.framework_dir

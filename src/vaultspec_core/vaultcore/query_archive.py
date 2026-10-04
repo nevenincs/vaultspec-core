@@ -11,6 +11,15 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, TypedDict
 
+from ..core.document_io import read_document_text
+from .batch_archive import (
+    _assert_docs_dir,
+    _assert_runtime_dir,
+    _iter_safe_documents,
+    _require_no_symlink_components,
+    archive_documents,
+    restore_documents,
+)
 from .query_listing import feature_from_tags_or_meta, list_documents
 
 if TYPE_CHECKING:
@@ -59,8 +68,6 @@ def archive_feature(
     Returns:
         A :class:`FeatureArchiveResult`.
     """
-    import shutil
-
     from ..config import get_config
     from ..core.exceptions import VaultSpecError
 
@@ -72,8 +79,17 @@ def archive_feature(
         )
 
     cfg = get_config()
+    root_dir = root_dir.resolve()
     vault_dir = root_dir / cfg.docs_dir
-    archive_dir = vault_dir / "_archive"
+    _require_no_symlink_components(root_dir, vault_dir)
+    if not vault_dir.exists():
+        raise VaultSpecError(f"Feature tag '{feature}' matches zero documents.")
+    _assert_docs_dir(root_dir, vault_dir)
+    _assert_runtime_dir(vault_dir)
+    # Validate the corpus before the graph/listing can read linked documents
+    # or populate a cache through a linked runtime directory.
+    for _path in _iter_safe_documents(vault_dir, vault_dir, reject_links=True):
+        pass
 
     docs = list_documents(root_dir, feature=feature)
 
@@ -107,15 +123,10 @@ def archive_feature(
     except Exception as e:
         logger.warning("Could not analyze cross-feature links: %s", e)
 
-    archived: list[str] = []
-    for doc in docs:
-        # Preserve subdirectory (e.g., adr/, plan/)
-        rel = doc.path.relative_to(vault_dir)
-        dest = archive_dir / rel
-        if not dry_run:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(doc.path), str(dest))
-        archived.append(str(dest.relative_to(root_dir)))
+    result = archive_documents(
+        root_dir, (doc.path.relative_to(root_dir) for doc in docs), dry_run=dry_run
+    )
+    archived = [str(path) for path in result.paths]
 
     return {
         "archived_count": len(archived),
@@ -139,8 +150,6 @@ def unarchive_feature(
     Returns:
         A :class:`FeatureUnarchiveResult`.
     """
-    import shutil
-
     from ..config import get_config
     from ..core.exceptions import VaultSpecError
     from .models import DocType
@@ -153,8 +162,17 @@ def unarchive_feature(
         )
 
     cfg = get_config()
+    root_dir = root_dir.resolve()
     vault_dir = root_dir / cfg.docs_dir
     archive_dir = vault_dir / "_archive"
+    _require_no_symlink_components(root_dir, vault_dir)
+    if not vault_dir.exists():
+        raise VaultSpecError(
+            f"Feature tag '{feature}' matches zero archived documents."
+        )
+    _assert_docs_dir(root_dir, vault_dir)
+    _assert_runtime_dir(vault_dir)
+    _require_no_symlink_components(vault_dir, archive_dir)
 
     if not archive_dir.exists():
         raise VaultSpecError(
@@ -162,11 +180,11 @@ def unarchive_feature(
         )
 
     archived_docs: list[tuple[Path, Path]] = []
-    for doc_path in archive_dir.rglob("*.md"):
-        if ".obsidian" in doc_path.parts:
-            continue
+    for doc_path in _iter_safe_documents(
+        vault_dir, archive_dir, excluded=frozenset({".obsidian"}), reject_links=True
+    ):
         try:
-            content = doc_path.read_text(encoding="utf-8")
+            content = read_document_text(doc_path, root_dir=root_dir)
         except (OSError, UnicodeDecodeError):
             continue
         meta, _ = parse_frontmatter(content)
@@ -191,16 +209,15 @@ def unarchive_feature(
             f"Feature tag '{feature}' matches zero archived documents."
         )
 
-    unarchived_paths: list[str] = []
-    for doc_path, rel_path in archived_docs:
-        dest = vault_dir / rel_path
-        if not dry_run:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(doc_path), str(dest))
-        unarchived_paths.append(str(dest.relative_to(root_dir)))
+    result = restore_documents(
+        root_dir,
+        (doc_path.relative_to(root_dir) for doc_path, _rel_path in archived_docs),
+        dry_run=dry_run,
+    )
+    unarchived_paths = [str(path) for path in result.paths]
 
     if not dry_run:
-        _cleanup_empty_dirs(archive_dir)
+        _cleanup_empty_dirs(vault_dir, archive_dir)
 
     return {
         "unarchived_count": len(unarchived_paths),
@@ -209,13 +226,16 @@ def unarchive_feature(
     }
 
 
-def _cleanup_empty_dirs(directory: Path) -> None:
-    """Recursively delete empty subdirectories."""
+def _cleanup_empty_dirs(vault_dir: Path, directory: Path) -> None:
+    """Recursively delete empty real subdirectories inside the vault."""
+    if directory.is_symlink() or directory.is_junction():
+        return
+    _require_no_symlink_components(vault_dir, directory)
     if not directory.exists() or not directory.is_dir():
         return
     for child in list(directory.iterdir()):
-        if child.is_dir():
-            _cleanup_empty_dirs(child)
+        if child.is_dir() and not (child.is_symlink() or child.is_junction()):
+            _cleanup_empty_dirs(vault_dir, child)
     if directory.is_dir() and not list(directory.iterdir()):
         import contextlib
 

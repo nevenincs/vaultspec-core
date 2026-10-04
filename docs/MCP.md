@@ -8,7 +8,29 @@ For the workflow and document types, see
 
 ## Setup
 
-Vaultspec keeps provider-neutral MCP definitions in `.vaultspec/mcps/*.json`.
+Vaultspec keeps provider-neutral MCP definitions in `.vaultspec/mcps/*.json`. Executable
+definitions, including builtins, require host-local operator approval before
+installation or sync can enroll them. After installing the workspace, run
+`vaultspec-core spec mcps trust` at a terminal, review the complete commands, arguments,
+environment, and provider targets, and confirm. Then run
+`vaultspec-core spec mcps sync`. Use the same provider and `--scope` for approval and
+sync when selecting a specific target.
+
+Approval lives in `~/.vaultspec/mcp-trust.json` and binds the workspace, source path,
+definition digest, rendered launch, provider, scope, and native target. Edits, pulls,
+and changes in install mode require fresh approval. Noninteractive runs and `--json`
+cannot grant consent; `--force` only controls overwrite/adoption. Unapproved definitions
+are skipped with warnings while other resources still sync.
+`vaultspec-core spec mcps trust --revoke` withdraws this workspace's grants for future
+enrollment; use `vaultspec-core spec mcps uninstall` to remove previously deployed
+entries.
+
+When top-level `vaultspec-core sync --target DIR` reads definitions from the current
+workspace and writes them into another workspace, approve that same source and
+destination pair with `vaultspec-core spec mcps trust --source-from-cwd --target DIR`.
+Approval for the destination's own definitions does not authorize commands from another
+workspace.
+
 Installation and `vaultspec-core spec mcps sync` render those definitions into each
 selected supported MCP provider's native configuration:
 
@@ -20,9 +42,18 @@ selected supported MCP provider's native configuration:
 
 Project scope is the safe default. Select user or local scope explicitly. Native host
 files contain only host-valid configuration; vaultspec records project and local
-ownership in the workspace's `.vaultspec/mcp-ownership.json` and user ownership in
-`~/.vaultspec/mcp-ownership.json`, so unrelated host entries remain external. Use
-`vaultspec-core install --skip mcp` if you manage enrollment yourself.
+ownership under `~/.vaultspec/mcp-ownership/<workspace-hash>/mcp-ownership.json` (using
+the canonical workspace path) and user ownership in `~/.vaultspec/mcp-ownership.json`,
+so unrelated host entries remain external. Use `vaultspec-core install --skip mcp` if
+you manage enrollment yourself.
+
+Ownership records bind entries to canonical target paths. Repository ownership sidecars
+and project legacy ownership markers are ignored as authority. The 0.3.2 environment
+migration removes the obsolete repository sidecar during explicit upgrades or
+`vaultspec-core migrations run`, preserving MCP configurations and existing host-local
+ownership. It never imports repository fingerprints into trusted state. After upgrading,
+review and approve definitions, then use `vaultspec-core spec mcps sync --force` to
+explicitly adopt existing entries; ordinary sync preserves them until adoption.
 
 Configure your client to launch the server with the project root as its working
 directory, or [set an explicit workspace](#point-the-server-at-a-different-workspace).
@@ -96,19 +127,24 @@ See [install mode selection](CLI.md#install) for precedence and dependency decla
 
 ### Convergence on upgrade
 
-Launch entries that vaultspec wrote converge to the current standard automatically. A
-managed entry whose bytes still match the fingerprint recorded when vaultspec last wrote
-it is provably untouched, so `vaultspec-core sync`, `vaultspec-core spec mcps sync`, and
-`vaultspec-core install --upgrade` all refresh it in place - no `--force` required - and
-print exactly what changed: the entry name, the old launch command, the new launch
-command, and why. A registered migration applies the same refresh, so a launch rendered
-before the `--no-sync` guard existed (a bare `uv run` shape) converges whatever its
-provisioned version - but it converges when a converging command runs, not on any
-contact with the CLI. Those commands are `vaultspec-core install --upgrade`,
-`vaultspec-core migrations run`, `vaultspec-core vault repair`,
-`vaultspec-core vault add`, `vaultspec-core vault feature index`, and the MCP `create`
-tool. Everything else, reads included, observes the workspace as it finds it and reports
-any pending migrations as a warning.
+Approved launch entries that vaultspec wrote converge to the current standard
+automatically. A managed entry whose bytes still match the fingerprint recorded when
+vaultspec last wrote it is provably untouched, so `vaultspec-core sync`,
+`vaultspec-core spec mcps sync`, and `vaultspec-core install --upgrade` all refresh it
+in place - no `--force` required - and print exactly what changed: the entry name, the
+old launch command, the new launch command, and why. A registered migration applies the
+same refresh, so a launch rendered before the `--no-sync` guard existed (a bare `uv run`
+shape) converges whatever its provisioned version - but it converges when a converging
+command runs, not on any contact with the CLI. Those commands are
+`vaultspec-core install --upgrade`, `vaultspec-core migrations run`,
+`vaultspec-core vault repair`, `vaultspec-core vault add`,
+`vaultspec-core vault feature index`, and the MCP `create` tool. Everything else, reads
+included, observes the workspace as it finds it and reports any pending migrations as a
+warning.
+
+Every refresh also requires approval for the current definition and rendered launch.
+When either changes, approve it with `vaultspec-core spec mcps trust` before convergence
+can resume; ownership fingerprints and migrations do not grant consent.
 
 Two kinds of entry never converge automatically. An entry you edited by hand (its bytes
 no longer match the recorded fingerprint) is skipped with a warning and requires an
@@ -327,6 +363,12 @@ Behavior notes:
   schema validation instead of matching nothing.
 - `find` and `search` share their `feature`, `date`, and `type` filters, so each
   argument selects the same records on both tools.
+- Both `find` modes enforce a 1 MiB per-file limit and a 128 MiB budget across document
+  reads, including graph construction and repeated reads. Oversized documents fail the
+  call before being read in full. The serialized response is capped at 128 KiB,
+  including JSON escaping; reduce `limit` or use `excerpt` when full bodies exceed it.
+  Limits raise a protocol error rather than returning partial documents or hashes of
+  incomplete content.
 
 Example feature-listing response:
 
@@ -909,14 +951,19 @@ idempotent. Not read-only, not destructive, idempotent.
 
 | Parameter | Type                       | Default                          | Description                                                                                                                                                                                                     |
 | --------- | -------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plan`    | string                     | - (required)                     | A feature tag or a plan stem/path.                                                                                                                                                                              |
+| `plan`    | string                     | - (required)                     | A feature tag or a plan stem (optionally ending in `.md`).                                                                                                                                                      |
 | `steps`   | list of step-state changes | - (required, at least one entry) | Each entry is `{step_id, state}`, where `state` is `"checked"` or `"unchecked"`. `step_id` accepts a canonical leaf ID (`S01`) or a full display path (`P01.S01`, `W01.P01.S01`) when disambiguation is needed. |
 
 Plan resolution follows one rule across every tool that accepts a `plan` parameter: an
-exact stem or path match wins first; failing that, a feature tag resolves only when it
-matches exactly one plan. A feature with several plans refuses the call and lists the
-candidate stems rather than guessing. An unresolvable or ambiguous plan fails the whole
-call with a protocol error, as does an empty `steps` list.
+exact stem match wins first; failing that, a feature tag resolves only when it matches
+exactly one plan. A feature with several plans refuses the call and lists the candidate
+stems rather than guessing. An unresolvable or ambiguous plan fails the whole call with
+a protocol error, as does an empty `steps` list.
+
+MCP plan mutation tools and gateway plan verbs accept stems and feature handles only.
+They reject filesystem paths and require the resolved plan to be a regular file beneath
+the workspace's `.vault/plan`, including after resolving filesystem links. Literal plan
+paths remain available through the trusted local CLI.
 
 Each step change reports its own outcome:
 
@@ -953,10 +1000,10 @@ ______________________________________________________________________
 Author plan steps: add, insert, edit, or remove step rows. Not read-only, destructive -
 removing a step retires its ID permanently - and not idempotent.
 
-| Parameter    | Type                         | Default                          | Description                                                                     |
-| ------------ | ---------------------------- | -------------------------------- | ------------------------------------------------------------------------------- |
-| `plan`       | string                       | - (required)                     | A feature tag or a plan stem/path, resolved the same way as in `plan_progress`. |
-| `operations` | list of plan-edit operations | - (required, at least one entry) | See the operation fields below.                                                 |
+| Parameter    | Type                         | Default                          | Description                                                                |
+| ------------ | ---------------------------- | -------------------------------- | -------------------------------------------------------------------------- |
+| `plan`       | string                       | - (required)                     | A feature tag or a plan stem, resolved the same way as in `plan_progress`. |
+| `operations` | list of plan-edit operations | - (required, at least one entry) | See the operation fields below.                                            |
 
 Each operation has these fields. Omit a field that does not apply rather than sending
 `null`:
@@ -1108,12 +1155,17 @@ depends on the verb invoked.
 | `verb`        | string                  | **required** | The space-joined verb path returned by `discover`, for example `"vault list"`.                    |
 | `arguments`   | object or null          | `null`       | The verb's flags as a mapping. A list value repeats the flag; a boolean passes `true` or `false`. |
 | `positionals` | list of strings or null | `null`       | The verb's positional operands, in CLI order.                                                     |
-| `timeout`     | number                  | `60`         | Subprocess wall-clock budget in seconds.                                                          |
+| `timeout`     | number                  | `60`         | Positive, finite wall-clock seconds; values above 120 are clamped to 120.                         |
 
 Three flags are reserved for the server: `--target`, `--json`, and `--help`. Do not pass
 them in `arguments`. The server sets `--target` to the resolved workspace and adds
 `--json` automatically when the verb supports it, and supplying a reserved flag fails
 the call before any process starts.
+
+`--editor`, `--from-file`, and `--template` are restricted to the local CLI. They are
+omitted from discovery and rejected by `invoke` before a process starts. MCP-launched
+CLI processes also refuse file imports. To add rules, skills, or agents through MCP,
+pass their content in `body`.
 
 At the user level, `invoke` runs the named verb as a subprocess of the installed
 `vaultspec-core` binary against the resolved workspace. When the verb supports `--json`,
@@ -1152,10 +1204,10 @@ process spawns and raise a protocol error: an unknown verb path, a denylisted ve
 an invalid argument (a reserved or undeclared flag, or a malformed positional). Nothing
 runs when one of these fires.
 
-Once the verb runs, its outcome is a per-call result, not a protocol error. The
-response's `ok` field is `true` only when the process exits zero and its output parses
-successfully. A verb that runs and exits non-zero returns `ok: false` with a populated
-`error`, and the call itself still succeeds:
+Once the verb runs, its outcome is normally a per-call result. The response's `ok` field
+is `true` only when the process exits zero and its output parses successfully. A verb
+that runs and exits non-zero returns `ok: false` with a populated `error`, and the call
+itself still succeeds:
 
 ```json
 {
@@ -1181,9 +1233,15 @@ successfully. A verb that runs and exits non-zero returns `ok: false` with a pop
 }
 ```
 
-`error.kind` takes one of three values: `nonzero_exit` (the process exited with a
+`error.kind` takes one of four values: `nonzero_exit` (the process exited with a
 non-zero status), `json_parse` (the process exited zero, but its declared JSON output
-didn't parse), or `timeout` (the process didn't finish within the timeout budget).
+didn't parse), `timeout` (the process didn't finish within the timeout budget), or
+`output_limit` (combined stdout and stderr exceeded 1 MiB; the child was stopped and its
+output discarded).
+
+The serialized response, including JSON escaping and command metadata, is capped at 128
+KiB. A larger response raises a protocol error after the verb has run; this does not
+undo its effects. Check the workspace state before retrying a mutating verb.
 
 #### The denylist
 

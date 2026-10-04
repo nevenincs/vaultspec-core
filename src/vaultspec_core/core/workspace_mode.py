@@ -314,6 +314,9 @@ class WorkspaceDeclaration:
 
 
 def _workspace_path(target: Path) -> Path:
+    from ..config.workspace import validate_managed_roots
+
+    validate_managed_roots(target)
     return target / ".vaultspec" / WORKSPACE_FILENAME
 
 

@@ -26,6 +26,8 @@ extracted archive.
 
 from __future__ import annotations
 
+import json
+import re
 from typing import TYPE_CHECKING
 
 from dev.packaging import products
@@ -44,6 +46,16 @@ _PLATFORMS = (
 )
 
 
+def _ruby_string(value: str) -> str:
+    """Render a double-quoted Ruby literal with interpolation disabled.
+
+    JSON quotes and escapes quotes, backslashes and control characters using
+    escapes Ruby also accepts. Escaping hashes additionally blocks Ruby's
+    expression, instance-variable and global-variable interpolation forms.
+    """
+    return json.dumps(value, ensure_ascii=False).replace("#", r"\#")
+
+
 def _cpu_block(
     product: Product,
     cpu: str,
@@ -56,8 +68,8 @@ def _cpu_block(
     asset = product.bundle_name(version, target)
     lines = [
         f"    {cpu} do",
-        f'      url "{base}/{asset}"',
-        f'      sha256 "{require(digests, asset)}"',
+        f"      url {_ruby_string(f'{base}/{asset}')}",
+        f"      sha256 {_ruby_string(require(digests, asset))}",
     ]
     lines.append("    end")
     return lines
@@ -94,7 +106,10 @@ def _install_body(product: Product) -> list[str]:
     """Return the ``install`` method for the bundle's stable names."""
     lines = [
         "  def install",
-        *(f'    bin.install "{executable.name}"' for executable in product.executables),
+        *(
+            f"    bin.install {_ruby_string(executable.name)}"
+            for executable in product.executables
+        ),
     ]
     lines.append("  end")
     return lines
@@ -111,10 +126,11 @@ def _caveats_body(product: Product) -> list[str]:
     """
     if not product.notes:
         return []
-    lines = ["  def caveats", "    <<~EOS"]
-    lines.extend(f"      {note}" for note in product.notes)
-    lines.extend(["    EOS", "  end"])
-    return lines
+    return [
+        "  def caveats",
+        f"    {_ruby_string(''.join(f'{note}\n' for note in product.notes))}",
+        "  end",
+    ]
 
 
 def render(
@@ -134,6 +150,9 @@ def render(
     triple Homebrew serves - means the renderer cannot offer a platform the
     product raises on, even when called without an explicit list.
     """
+    products.validate_version(version)
+    if re.fullmatch(r"[A-Z][A-Za-z0-9]*", product.formula_class) is None:
+        raise ValueError(f"invalid Ruby formula class: {product.formula_class!r}")
     if available is None:
         available = tuple(
             target for target in products.HOMEBREW_TARGETS if product.serves(target)
@@ -141,18 +160,20 @@ def render(
     else:
         available = tuple(target for target in available if product.serves(target))
     primary = product.executables[0]
+    livecheck = "^" + re.escape(product.tag_prefix) + r"(\d+(?:\.\d+)+)$"
+    test_command = _ruby_string(f"/{primary.name} --version")
     lines = [
         f"class {product.formula_class} < Formula",
-        f'  desc "{product.description}"',
-        f'  homepage "{product.homepage}"',
-        f'  version "{version}"',
-        f'  license "{product.license}"',
+        f"  desc {_ruby_string(product.description)}",
+        f"  homepage {_ruby_string(product.homepage)}",
+        f"  version {_ruby_string(version)}",
+        f"  license {_ruby_string(product.license)}",
         "",
         # Parity with the Scoop manifest's checkver stanza: both channels let
         # maintainer tooling discover the next release from the tag scheme.
         "  livecheck do",
         "    url :stable",
-        f"    regex(/^{product.tag_prefix}(\\d+(?:\\.\\d+)+)$/i)",
+        f"    regex(Regexp.new({_ruby_string(livecheck)}, Regexp::IGNORECASE))",
         "    strategy :github_latest",
         "  end",
         "",
@@ -169,8 +190,7 @@ def render(
         # index. `brew test` runs it networked, so the offline property is not
         # what is proved here - .github/workflows/binaries.yml proves that
         # before the asset exists. This proves placement and startup.
-        "    assert_match version.to_s, "
-        f'shell_output("#{{bin}}/{primary.name} --version")',
+        f"    assert_match version.to_s, shell_output(bin.to_s + {test_command})",
         "  end",
         "end",
     ]

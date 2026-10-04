@@ -132,18 +132,16 @@ def rules_add(
     Raises:
         ResourceExistsError: If the rule exists and *force* is ``False``.
     """
-    rules_src_dir = _t.get_context().rules_src_dir
-    ensure_dir(rules_src_dir)
+    from .resources import resource_destination
 
-    # Custom rules live flat directly under the rules root alongside the
-    # ``*.builtin.md`` builtins; nested rule folders are not supported. Reduce
-    # the requested name to its basename so any directory components (including
-    # a legacy ``project/`` prefix) are sanitized away rather than creating a
-    # nested rule.
-    base_name = Path(name.replace("\\", "/")).name
-    file_name = base_name if base_name.endswith(".md") else f"{base_name}.md"
+    rules_src_dir = _t.get_context().rules_src_dir
+    # Legacy project rules are still created flat; validate the entire leaf
+    # instead of silently discarding arbitrary path components.
+    resource_name = name.replace("\\", "/").removeprefix("project/")
+    file_path = resource_destination(resource_name, rules_src_dir)
+    ensure_dir(rules_src_dir)
+    file_name = file_path.name
     rule_stem = file_name[:-3]
-    file_path = rules_src_dir / file_name
 
     if file_path.exists() and not force:
         raise ResourceExistsError(

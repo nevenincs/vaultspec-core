@@ -22,6 +22,7 @@ rather than by patching the interpreter's view of it.
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import TYPE_CHECKING
 
@@ -35,7 +36,7 @@ from vaultspec_core.core.editor import (
     editor_program_name,
     validate_editor_command,
 )
-from vaultspec_core.core.local_config import get_local_config_path
+from vaultspec_core.core.local_config import get_local_config_path, resolve_editor
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -218,15 +219,40 @@ class TestEditorCommandRules:
             trust="trusted",
         ) == ["/opt/some-obscure-editor", "--wait"]
 
-    def test_a_path_qualified_editor_is_recognized_by_its_program_name(self) -> None:
-        """A full path to an allowlisted editor is still that editor."""
+    def test_a_path_qualified_editor_requires_a_trusted_source(self) -> None:
+        """An allowlisted basename does not authorize an untrusted path."""
         if sys.platform == "win32":
             command = r'"C:\Program Files\Microsoft VS Code\Code.exe" --wait'
         else:
             command = "/usr/local/bin/code --wait"
+        with pytest.raises(EditorValidationError, match="bare program name"):
+            validate_editor_command(
+                command, source="the --editor flag", trust="untrusted"
+            )
         assert validate_editor_command(
-            command, source="the --editor flag", trust="untrusted"
+            command, source="the $EDITOR variable", trust="trusted"
         )
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            ".vaultspec/vim",
+            "./vim",
+            "/usr/bin/vim",
+            r'".vaultspec\vim.exe"',
+            "C:vim",
+            r'"C:\tools\vim.exe"',
+            r'"\\server\share\vim.exe"',
+            r'"\vim.exe"',
+        ],
+    )
+    def test_untrusted_path_forms_are_refused_even_when_missing(
+        self, command: str
+    ) -> None:
+        with pytest.raises(EditorValidationError, match="bare program name"):
+            validate_editor_command(
+                command, source="the project config", trust="untrusted"
+            )
 
     def test_program_name_normalization_ignores_directory_and_case(self) -> None:
         """The allowlist is keyed by a normalized bare program name."""
@@ -498,3 +524,335 @@ class TestNonInteractiveInvocation:
         assert result.exit_code == 2, result.output
         assert "no terminal" in result.output
         assert not marker.exists(), "an editor was launched for a marked invocation"
+
+
+class TestRepositoryEditorBoundary:
+    """Repository executables cannot impersonate allowlisted editors."""
+
+    @pytest.mark.parametrize("channel", ["config", "flag"])
+    @pytest.mark.parametrize("resource", ["rules", "skills", "agents", "triggers"])
+    def test_repository_editor_path_is_refused(
+        self,
+        runner: CliRunner,
+        synthetic_project: Path,
+        tmp_path: Path,
+        channel: str,
+        resource: str,
+    ) -> None:
+        marker = tmp_path / "repository-editor-ran.txt"
+        _write_marker_probe(synthetic_project / ".vaultspec", "vim", marker)
+        command = ".vaultspec/vim.cmd" if sys.platform == "win32" else ".vaultspec/vim"
+        created = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "spec",
+                resource,
+                "add",
+                "repository-editor-rule",
+                "--body",
+                "content",
+            ],
+        )
+        assert created.exit_code == 0, created.output
+        args = [
+            "--target",
+            str(synthetic_project),
+            "spec",
+            resource,
+            "edit",
+            "repository-editor-rule",
+        ]
+        if channel == "config":
+            get_local_config_path(synthetic_project).write_text(
+                f'editor = "{command}"\n', encoding="utf-8"
+            )
+        else:
+            args.extend(["--editor", command])
+
+        previous_cwd = os.getcwd()
+        try:
+            os.chdir(synthetic_project)
+            result = runner.invoke(app, args, env=_clean_env(tmp_path))
+        finally:
+            os.chdir(previous_cwd)
+
+        assert result.exit_code == 2, result.output
+        assert "bare program name" in result.output
+        assert not marker.exists(), "the repository executable was launched"
+
+    @pytest.mark.parametrize("path_entry", ["", ".", "bin", "absolute", "implicit"])
+    def test_repository_path_entries_do_not_shadow_external_editor(
+        self,
+        runner: CliRunner,
+        synthetic_project: Path,
+        tmp_path: Path,
+        path_entry: str,
+    ) -> None:
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        trusted_marker = tmp_path / "external-editor-ran.txt"
+        repository_marker = tmp_path / "repository-editor-ran.txt"
+        _write_marker_probe(bindir, "micro", trusted_marker)
+        repository_bin = synthetic_project / "bin"
+        repository_bin.mkdir()
+        _write_marker_probe(synthetic_project, "micro", repository_marker)
+        _write_marker_probe(repository_bin, "micro", repository_marker)
+        _add_rule(runner, synthetic_project, "path-shadow-rule")
+        get_local_config_path(synthetic_project).write_text(
+            'editor = "micro -q"\n', encoding="utf-8"
+        )
+        env = _clean_env(bindir)
+        entry = str(repository_bin) if path_entry == "absolute" else path_entry
+        if path_entry != "implicit":
+            env["PATH"] = entry + os.pathsep + env["PATH"]
+        previous_cwd = os.getcwd()
+        try:
+            os.chdir(synthetic_project)
+            result = runner.invoke(
+                app,
+                [
+                    "--target",
+                    str(synthetic_project),
+                    "spec",
+                    "rules",
+                    "edit",
+                    "path-shadow-rule",
+                ],
+                env=env,
+            )
+        finally:
+            os.chdir(previous_cwd)
+
+        assert result.exit_code == 0, result.output
+        assert trusted_marker.exists(), "the external editor was not launched"
+        assert not repository_marker.exists(), "PATH selected a repository executable"
+
+    @pytest.mark.parametrize("use_context", [False, True])
+    def test_untrusted_resolution_remains_untrusted_when_path_changes(
+        self,
+        runner: CliRunner,
+        synthetic_project: Path,
+        tmp_path: Path,
+        use_context: bool,
+    ) -> None:
+        from vaultspec_core.core.editor import spawn_editor
+        from vaultspec_core.core.exceptions import EditorResolutionError
+
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        external_marker = tmp_path / "external-editor-ran.txt"
+        repository_marker = tmp_path / "repository-editor-ran.txt"
+        _write_marker_probe(bindir, "micro", external_marker)
+        repository_bin = synthetic_project / "bin"
+        repository_bin.mkdir()
+        _write_marker_probe(repository_bin, "micro", repository_marker)
+        with runner.isolation(env=_clean_env(bindir)):
+            command = resolve_editor(
+                "micro -q", None if use_context else synthetic_project
+            )
+        env = _clean_env(repository_bin)
+        with runner.isolation(env=env), pytest.raises(EditorResolutionError):
+            spawn_editor(command, tmp_path / "document.md")
+
+        assert not repository_marker.exists(), "resolution lost the untrusted tier"
+        assert not external_marker.exists()
+
+    @pytest.mark.parametrize(
+        "link_kind",
+        [
+            "directory",
+            "executable",
+            "workspace-alias",
+            "indirect-executable",
+            "indirect-directory",
+        ],
+    )
+    def test_linked_paths_cannot_select_repository_executables(
+        self, runner: CliRunner, synthetic_project: Path, tmp_path: Path, link_kind: str
+    ) -> None:
+        from vaultspec_core.core.editor import spawn_editor
+
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        external_marker = tmp_path / "external-editor-ran.txt"
+        repository_marker = tmp_path / "repository-editor-ran.txt"
+        _write_marker_probe(bindir, "micro", external_marker)
+        repository_bin = synthetic_project / "bin"
+        repository_bin.mkdir()
+        _write_marker_probe(repository_bin, "micro", repository_marker)
+        workspace = synthetic_project
+        if link_kind in {"directory", "indirect-directory"}:
+            entry = tmp_path / "linked-bin"
+            if link_kind == "indirect-directory":
+                outside_bin = tmp_path / "outside-bin"
+                outside_bin.mkdir()
+                _write_marker_probe(outside_bin, "micro", repository_marker)
+                relay = repository_bin / "relay"
+                relay.symlink_to(outside_bin, target_is_directory=True)
+                entry.symlink_to(relay, target_is_directory=True)
+            else:
+                entry.symlink_to(repository_bin, target_is_directory=True)
+        elif link_kind in {"executable", "indirect-executable"}:
+            entry = tmp_path / "linked-bin"
+            entry.mkdir()
+            name = "micro.cmd" if sys.platform == "win32" else "micro"
+            if link_kind == "indirect-executable":
+                outside_bin = tmp_path / "outside-bin"
+                outside_bin.mkdir()
+                _write_marker_probe(outside_bin, "micro", repository_marker)
+                relay = repository_bin / f"relay-{name}"
+                relay.symlink_to(outside_bin / name)
+                (entry / name).symlink_to(relay)
+            else:
+                (entry / name).symlink_to(repository_bin / name)
+        else:
+            workspace = tmp_path / "workspace-alias"
+            workspace.symlink_to(synthetic_project, target_is_directory=True)
+            outside_bin = tmp_path / "outside-bin"
+            outside_bin.mkdir()
+            _write_marker_probe(outside_bin, "micro", repository_marker)
+            (synthetic_project / "linked-bin").symlink_to(
+                outside_bin, target_is_directory=True
+            )
+            entry = workspace / "linked-bin"
+        env = _clean_env(bindir)
+        env["PATH"] = str(entry) + os.pathsep + env["PATH"]
+        with runner.isolation(env=_clean_env(bindir)):
+            command = resolve_editor("micro -q", workspace)
+        with runner.isolation(env=env):
+            assert spawn_editor(command, tmp_path / "document.md") == 0
+
+        assert external_marker.exists(), "the eligible external editor was not launched"
+        assert not repository_marker.exists(), "a linked repository executable ran"
+
+    def test_missing_editor_does_not_fall_back_to_repository_vi(
+        self, runner: CliRunner, synthetic_project: Path, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.exceptions import EditorResolutionError
+
+        repository_bin = synthetic_project / "bin"
+        repository_bin.mkdir()
+        marker = tmp_path / "repository-vi-ran.txt"
+        _write_marker_probe(repository_bin, "vi", marker)
+        env = _clean_env(repository_bin)
+        env["PATH"] = str(repository_bin)
+        with runner.isolation(env=env), pytest.raises(EditorResolutionError):
+            resolve_editor("micro", synthetic_project)
+        assert not marker.exists()
+
+    def test_external_editor_alias_keeps_its_invocation_name(
+        self, runner: CliRunner, synthetic_project: Path, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.editor import spawn_editor
+
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        marker = tmp_path / "invocation-name.txt"
+        if sys.platform == "win32":
+            program = bindir / "editor.cmd"
+            alias = bindir / "view.cmd"
+            content = f'@echo off\r\necho %~n0> "{marker}"\r\nexit /b 0\r\n'
+        else:
+            program = bindir / "editor"
+            alias = bindir / "view"
+            content = f'#!/bin/sh\nprintf "%s\\n" "$0" > "{marker}"\nexit 0\n'
+        program.write_text(content, encoding="utf-8")
+        program.chmod(0o755)
+        alias.symlink_to(program)
+        with runner.isolation(env=_clean_env(bindir)):
+            command = resolve_editor("view", synthetic_project)
+            assert spawn_editor(command, tmp_path / "document.md") == 0
+
+        assert marker.read_text(encoding="utf-8").strip() in {"view", str(alias)}
+
+    def test_unresolved_command_cannot_bypass_launch_validation(
+        self, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.editor import spawn_editor
+
+        with pytest.raises(EditorValidationError, match="bare program name"):
+            spawn_editor(".vaultspec/vim", tmp_path / "document.md")
+        with pytest.raises(EditorValidationError, match="not a known text editor"):
+            spawn_editor("python", tmp_path / "document.md")
+
+    def test_config_write_refuses_editor_paths(
+        self, runner: CliRunner, synthetic_project: Path
+    ) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "config",
+                "set",
+                "editor",
+                ".vaultspec/vim",
+            ],
+        )
+        assert result.exit_code != 0, result.output
+        assert "bare program name" in result.output
+        assert not get_local_config_path(synthetic_project).exists()
+
+    def test_interactive_creation_preserves_untrusted_lookup_boundary(
+        self, runner: CliRunner, synthetic_project: Path, tmp_path: Path
+    ) -> None:
+        from vaultspec_core.core.rules import rules_add
+
+        bindir = tmp_path / "bin"
+        bindir.mkdir()
+        external_marker = tmp_path / "creation-editor-ran.txt"
+        repository_marker = tmp_path / "repository-editor-ran.txt"
+        _write_marker_probe(bindir, "micro", external_marker)
+        repository_bin = synthetic_project / "bin"
+        repository_bin.mkdir()
+        _write_marker_probe(repository_bin, "micro", repository_marker)
+        get_local_config_path(synthetic_project).write_text(
+            'editor = "micro -q"\n', encoding="utf-8"
+        )
+        env = _clean_env(bindir)
+        env["PATH"] = str(repository_bin) + os.pathsep + env["PATH"]
+        with runner.isolation(env=env):
+            result = rules_add("interactive-editor-rule", interactive=True)
+
+        assert result.is_file()
+        assert external_marker.exists(), "interactive creation did not open its editor"
+        assert not repository_marker.exists(), "creation lost the workspace boundary"
+
+    @pytest.mark.parametrize("include_system_path", [False, True])
+    def test_explicit_repository_path_remains_available_in_trusted_environment(
+        self,
+        runner: CliRunner,
+        synthetic_project: Path,
+        tmp_path: Path,
+        include_system_path: bool,
+    ) -> None:
+        marker = tmp_path / "trusted-editor-ran.txt"
+        directory = synthetic_project / ".vaultspec" / "editor with spaces"
+        directory.mkdir()
+        _write_marker_probe(directory, "custom-editor", marker)
+        suffix = ".cmd" if sys.platform == "win32" else ""
+        program = directory / f"custom-editor{suffix}"
+        _add_rule(runner, synthetic_project, "trusted-path-rule")
+        env = _clean_env(tmp_path)
+        if not include_system_path:
+            env["PATH"] = str(tmp_path)
+            if sys.platform == "win32":
+                env["PATHEXT"] = ".CMD"
+        env["VAULTSPEC_EDITOR"] = f'"{program}" --wait'
+        result = runner.invoke(
+            app,
+            [
+                "--target",
+                str(synthetic_project),
+                "spec",
+                "rules",
+                "edit",
+                "trusted-path-rule",
+            ],
+            env=env,
+        )
+
+        assert result.exit_code == 0, result.output
+        assert marker.exists(), "the trusted explicit path no longer works"

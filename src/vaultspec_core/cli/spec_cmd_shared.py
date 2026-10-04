@@ -29,6 +29,7 @@ __all__ = [
     "emit_sync_result",
     "print_complete_sync_notice",
     "print_source_mutation_notice",
+    "require_local_file_import",
     "resource_path",
     "restore_resource_command",
     "run_edit_command",
@@ -39,6 +40,20 @@ COMPLETE_SYNC_COMMAND = "vaultspec-core sync"
 PROVIDER_OUTPUTS = (
     "AGENTS.md, CLAUDE.md, GEMINI.md, native MCP configs, and provider directories"
 )
+
+
+def require_local_file_import(option: str, source: Path | str | None) -> None:
+    """Refuse host file imports in a gateway child before reading the source."""
+    if source is None:
+        return
+
+    from vaultspec_core.config import VAULTSPEC_MCP_GATEWAY_INVOCATION, env_value
+
+    if env_value(VAULTSPEC_MCP_GATEWAY_INVOCATION):
+        raise typer.BadParameter(
+            "File imports are unavailable through MCP; use --body to supply content.",
+            param_hint=option,
+        )
 
 
 def print_complete_sync_notice(*, resource: str, mcp: bool = False) -> None:

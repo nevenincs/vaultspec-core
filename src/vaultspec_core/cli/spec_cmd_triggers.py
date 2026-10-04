@@ -23,6 +23,7 @@ from vaultspec_core.cli._target import TargetOption, apply_target
 from vaultspec_core.cli.spec_cmd_shared import (
     emit_json,
     print_source_mutation_notice,
+    require_local_file_import,
 )
 
 triggers_app = make_app(
@@ -119,6 +120,7 @@ def cmd_triggers_add(
 ) -> None:
     """Add a new lifecycle trigger under .vaultspec/triggers/."""
     apply_target(target)
+    require_local_file_import("--from-file", from_file)
 
     if from_file and body is not None:
         typer.echo("Error: Cannot specify both --body and --from-file.", err=True)

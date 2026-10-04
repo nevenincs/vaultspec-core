@@ -188,6 +188,9 @@ class TestModeFlipForcesManagedEntry:
             tmp_path, rag_package, PackageDeclaration(install_mode=InstallMode.TOOL)
         )
         _bind_context(tmp_path)
+        from vaultspec_core.testing.mcp_consent import approve_mcp_definitions
+
+        approve_mcp_definitions(tmp_path)
         mcp_sync(provider="claude")
 
         # Hand-alter both managed entries so their fingerprints no longer
@@ -207,6 +210,8 @@ class TestModeFlipForcesManagedEntry:
             "vaultspec-core",
             PackageDeclaration(install_mode=InstallMode.TOOL),
         )
+
+        approve_mcp_definitions(tmp_path)
 
         WorkspaceFactory(tmp_path).install("all", upgrade=True)
 

@@ -23,6 +23,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from ...core.corpus_io import is_corpus_path
+from ...core.document_io import read_document_text
 from ..exclusions import is_excluded_vault_path
 from ._base import CheckDiagnostic, CheckResult, Severity
 
@@ -108,23 +110,25 @@ def _collect_needles(root_dir: Path, feature: str | None) -> set[str]:
     for path in docs_dir.rglob("*.md"):
         if is_excluded_vault_path(path):
             continue
-        if path.is_symlink() or not path.is_file():
+        if not is_corpus_path(path, root_dir):
             continue
         stem = path.name[: -len(".md")]
-        if feature is not None and not _doc_matches_feature(path, feature):
+        if feature is not None and not _doc_matches_feature(path, feature, root_dir):
             continue
         needles.add(stem)
 
     return needles
 
 
-def _doc_matches_feature(path: Path, feature: str) -> bool:
+def _doc_matches_feature(path: Path, feature: str, root_dir: Path) -> bool:
     """Return ``True`` when the document at *path* carries *feature*'s tag."""
     from ..parser import parse_vault_metadata
     from ._base import extract_feature_tags
 
     try:
-        metadata, _body = parse_vault_metadata(path.read_text(encoding="utf-8"))
+        metadata, _body = parse_vault_metadata(
+            read_document_text(path, root_dir=root_dir)
+        )
     except (OSError, UnicodeDecodeError, ValueError):
         return False
     return feature in extract_feature_tags(metadata.tags)

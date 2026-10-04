@@ -49,6 +49,9 @@ def seed_builtins(
         changed content) or ``[UNCHANGED]`` (already current). Builtins
         skipped because they exist and *force* is False are omitted.
     """
+    from ..config.workspace import validate_managed_roots
+
+    validate_managed_roots(target_dir.parent, framework_dir=target_dir)
     src = builtins_root()
     results: list[tuple[str, str]] = []
 

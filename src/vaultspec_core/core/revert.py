@@ -11,6 +11,7 @@ import logging
 import shutil
 from pathlib import Path
 
+from ..config.workspace import validate_managed_roots
 from .helpers import atomic_write
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ def snapshot_builtins(vaultspec_dir: Path) -> int:
     Returns:
         Number of files snapshotted.
     """
+    validate_managed_roots(vaultspec_dir.parent, framework_dir=vaultspec_dir)
     snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
 
     if not vaultspec_dir.exists():
@@ -89,6 +91,7 @@ def prune_orphan_snapshots(vaultspec_dir: Path) -> int:
     Returns:
         Number of orphan snapshot files removed.
     """
+    validate_managed_roots(vaultspec_dir.parent, framework_dir=vaultspec_dir)
     snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
     if not snapshot_dir.exists():
         return 0
@@ -134,6 +137,7 @@ def get_snapshot_content(
     Returns:
         Original content string, or None if no snapshot exists.
     """
+    validate_managed_roots(vaultspec_dir.parent, framework_dir=vaultspec_dir)
     snapshot_path = vaultspec_dir / _SNAPSHOT_DIR / category / filename
     if not snapshot_path.exists():
         return None
@@ -208,6 +212,7 @@ def list_modified_builtins(vaultspec_dir: Path) -> list[dict[str, object]]:
         ``"missing"``, or ``"ok"``.  Returns an empty list when no snapshots
         exist.
     """
+    validate_managed_roots(vaultspec_dir.parent, framework_dir=vaultspec_dir)
     snapshot_dir = vaultspec_dir / _SNAPSHOT_DIR
     results: list[dict[str, object]] = []
 

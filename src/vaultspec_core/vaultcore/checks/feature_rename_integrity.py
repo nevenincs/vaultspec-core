@@ -117,7 +117,7 @@ def check_feature_rename_integrity(
     else:
         if not exec_dir.exists():
             return result
-        conflicts_by_folder = _conflicts_from_disk(exec_dir)
+        conflicts_by_folder = _conflicts_from_disk(exec_dir, root_dir)
 
     for folder, folder_feature, conflicting in conflicts_by_folder:
         rel_folder = folder.relative_to(root_dir) if folder.is_absolute() else folder
@@ -190,14 +190,17 @@ def _conflicts_from_snapshot(
 
 def _conflicts_from_disk(
     exec_dir: Path,
+    root_dir: Path,
 ) -> list[tuple[Path, str, dict[str, Path]]]:
     """Derive per-folder tag conflicts by walking the exec tree directly."""
+    from ...core.corpus_io import is_corpus_path
+    from ...core.document_io import read_document_text
     from ..exclusions import is_excluded_vault_path
     from ..parser import parse_frontmatter
 
     conflicts: list[tuple[Path, str, dict[str, Path]]] = []
     for folder in sorted(exec_dir.iterdir()):
-        if folder.is_symlink() or not folder.is_dir():
+        if not is_corpus_path(folder, root_dir, directory=True):
             continue
         if is_excluded_vault_path(folder):
             continue
@@ -211,10 +214,10 @@ def _conflicts_from_disk(
         # record in a large folder.
         conflicting: dict[str, Path] = {}
         for record in sorted(folder.glob("*.md")):
-            if record.is_symlink() or not record.is_file():
+            if not is_corpus_path(record, root_dir):
                 continue
             try:
-                content = record.read_text(encoding="utf-8")
+                content = read_document_text(record, root_dir=root_dir)
             except (OSError, UnicodeDecodeError):
                 # Unreadable / non-UTF-8 records are surfaced by check_encoding;
                 # they carry no parseable tag to compare here.
