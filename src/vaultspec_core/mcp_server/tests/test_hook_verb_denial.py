@@ -48,6 +48,7 @@ SHELL_REACHING_VERBS = (
     "spec triggers add",
     "spec triggers run",
     "spec triggers trust",
+    "spec mcps trust",
 )
 
 #: Both systems' read surfaces. Denying the runners must not cost an agent the

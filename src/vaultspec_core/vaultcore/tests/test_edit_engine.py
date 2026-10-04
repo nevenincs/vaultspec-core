@@ -738,7 +738,7 @@ class TestVanishedDocument:
     ``execute_edit``'s contract is that every reachable failure arrives as an
     ``EditResult`` with ``status == "failed"``. That did not hold when the
     target vanished between resolution and write: ``atomic_write_restore``
-    copies the original to a ``.bak`` BEFORE its own ``try``, so the read
+    reads the original bytes BEFORE its own ``try``, so the read
     raised ``FileNotFoundError`` outside every handler and the bare ``OSError``
     escaped the engine entirely.
 

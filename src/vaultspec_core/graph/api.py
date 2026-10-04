@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import networkx as nx
 
+from ..core.document_io import document_budget_active, read_document_bytes
 from ..vaultcore import (
     DocType,
     extract_related_links,
@@ -147,7 +148,7 @@ class VaultGraph:
         #: read so the cache manifest need not read the corpus a second time.
         self._content_hashes: dict[pathlib.Path, str] = {}
         self._encoding_issues: list[EncodingIssue] = []
-        self._build_graph(use_cache=use_cache)
+        self._build_graph(use_cache=use_cache and not document_budget_active())
 
     @classmethod
     def from_ref(cls, root_dir: pathlib.Path, ref: str) -> VaultGraph:
@@ -242,7 +243,7 @@ class VaultGraph:
                     cache_mtime_ns=cache_mtime_ns,
                 ):
                     logger.info("Graph cache hit at %s; skipping re-parse", path)
-                    self._load_from_cache(payload)
+                    self._load_from_cache(payload, scanned_files)
                     return
             logger.info("Graph cache miss at %s; rebuilding", path)
 
@@ -274,7 +275,9 @@ class VaultGraph:
 
         return to_cache_graph(self._digraph, self.nodes, self._raw_texts)
 
-    def _load_from_cache(self, payload: cache.GraphCachePayload) -> None:
+    def _load_from_cache(
+        self, payload: cache.GraphCachePayload, scanned_files: list[pathlib.Path]
+    ) -> None:
         """Adopt the graph state rebuilt from a validated cache payload.
 
         The reconstruction itself lives in
@@ -287,7 +290,7 @@ class VaultGraph:
         """
         from .cache_io import restore_graph
 
-        restored = restore_graph(payload)
+        restored = restore_graph(payload, document_paths=scanned_files)
         self._digraph = restored.digraph
         self.nodes = restored.nodes
         self._stem_index = restored.stem_index
@@ -354,7 +357,7 @@ class VaultGraph:
             not be read or decoded.
         """
         try:
-            raw_bytes = path.read_bytes()
+            raw_bytes = read_document_bytes(path, root_dir=self.root_dir)
         except OSError as e:
             self._encoding_issues.append(EncodingIssue(path, "read", str(e), None))
             logger.warning("Failed to read metadata from %s: %s", path, e)

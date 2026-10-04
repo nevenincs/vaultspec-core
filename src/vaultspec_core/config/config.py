@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING, Any, Final
 from ..core.enums import DirName
 from ..core.exceptions import ConfigurationError
 from ..env_values import BOOL_SHAPE, is_blank, parse_bool, rejection
+from .parsing import parse_csv_list, parse_float_or_none, parse_int_or_none
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -80,52 +81,6 @@ __all__ = [
 
 #: The package whose registry this module declares.
 PACKAGE: Final = "vaultspec-core"
-
-
-def parse_csv_list(value: str) -> list[str]:
-    """Split a comma-separated string into a list of stripped, non-empty items.
-
-    Args:
-        value: Comma-separated string to split.
-
-    Returns:
-        List of non-empty, whitespace-stripped tokens.
-    """
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-def parse_int_or_none(value: str | None) -> int | None:
-    """Parse *value* as an ``int``, returning ``None`` on failure.
-
-    Args:
-        value: String to parse.
-
-    Returns:
-        Parsed integer, or ``None`` if the string cannot be converted.
-    """
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def parse_float_or_none(value: str | None) -> float | None:
-    """Parse *value* as a ``float``, returning ``None`` on failure.
-
-    Args:
-        value: String to parse.
-
-    Returns:
-        Parsed float, or ``None`` if the string cannot be converted.
-    """
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        return None
 
 
 @dataclass
@@ -1203,6 +1158,21 @@ _cached_inputs: tuple[object, ...] | None = None
 _config_lock = threading.Lock()
 
 
+def _validate_config_roots(root: Path, config: VaultSpecConfig) -> None:
+    """Check configured roots, preserving explicitly named external vaults."""
+    from .workspace import validate_managed_directory
+
+    for name in (config.docs_dir, config.framework_dir):
+        directory = root / name
+        # Absolute configuration deliberately selects a separate content root.
+        # Relative names remain anchored to this workspace, including ancestors.
+        external = Path(name).is_absolute() and not directory.absolute().is_relative_to(
+            root.absolute()
+        )
+        anchor = directory.parent if external else root
+        validate_managed_directory(anchor, directory)
+
+
 def get_config(
     overrides: dict[str, Any] | None = None, *, root: Path | None = None
 ) -> VaultSpecConfig:
@@ -1225,11 +1195,15 @@ def get_config(
     global _cached_config, _cached_inputs
 
     from .local_env import read_local_environment, store_root
+    from .workspace import validate_managed_roots
 
     root = store_root(root)
+    validate_managed_roots(root)
 
     if overrides is not None:
-        return VaultSpecConfig.from_environment(overrides, root=root)
+        config = VaultSpecConfig.from_environment(overrides, root=root)
+        _validate_config_roots(root, config)
+        return config
 
     with _config_lock:
         inputs = (
@@ -1240,6 +1214,7 @@ def get_config(
         if _cached_config is None or inputs != _cached_inputs:
             _cached_config = VaultSpecConfig.from_environment(root=root)
             _cached_inputs = inputs
+        _validate_config_roots(root, _cached_config)
         return _cached_config
 
 

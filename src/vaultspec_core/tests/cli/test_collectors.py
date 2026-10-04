@@ -1507,6 +1507,9 @@ class TestInstallModeDevEndToEnd:
         install = factory.run("install", "--mode", "dev")
         assert install.exit_code == 0, self._combined(install)
 
+        # Review and approve the newly provisioned definitions before enrollment.
+        factory.sync()
+
         # Dependency-shaped MCP launch (uv run --no-sync), not the uvx tool shape.
         mcp = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         core_server = mcp["mcpServers"]["vaultspec-core"]

@@ -17,6 +17,8 @@ import os
 import pathlib
 from typing import TYPE_CHECKING, cast
 
+from ..core.corpus_io import is_corpus_path
+from ..core.document_io import read_document_text
 from .exclusions import EXCLUDED_VAULT_DIR_NAMES
 from .models import DocType
 
@@ -67,13 +69,23 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
         Absolute paths to each ``.md`` file found.
     """
     from ..config import get_config
+    from ..config.workspace import validate_managed_directory, validate_managed_roots
     from ..migrations import warn_if_pending
 
+    validate_managed_roots(root_dir)
     warn_if_pending(root_dir)
 
-    docs_dir = root_dir / get_config().docs_dir
+    configured_docs = pathlib.Path(get_config().docs_dir)
+    docs_dir = root_dir / configured_docs
+    external = configured_docs.is_absolute() and not docs_dir.absolute().is_relative_to(
+        root_dir.absolute()
+    )
+    anchor = docs_dir.parent if external else root_dir
+    validate_managed_directory(anchor, docs_dir)
     if not docs_dir.exists():
         logger.debug("Docs directory does not exist: %s", docs_dir)
+        return
+    if not is_corpus_path(docs_dir, root_dir, directory=True):
         return
 
     # ``os.walk`` rather than ``Path.rglob``: the excluded subtrees are pruned
@@ -86,10 +98,17 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
     for dirpath, dirnames, filenames in os.walk(docs_dir):
         # Pruned in place, which is what stops os.walk descending. Archived
         # documents alone are 504 files this never has to look at.
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_VAULT_DIR_NAMES]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in EXCLUDED_VAULT_DIR_NAMES
+            and is_corpus_path(pathlib.Path(dirpath, d), root_dir, directory=True)
+        ]
         for name in filenames:
             if name.endswith(".md"):
-                paths.append(pathlib.Path(dirpath, name))
+                path = pathlib.Path(dirpath, name)
+                if is_corpus_path(path, root_dir):
+                    paths.append(path)
 
     # Sorted rather than left in walk order. Neither rglob nor os.walk
     # promises an order, and the two disagree, so the corpus is reported in a
@@ -116,7 +135,7 @@ def list_features(root_dir: pathlib.Path) -> set[str]:
     skip_count = 0
     for path in scan_vault(root_dir):
         try:
-            content = path.read_text(encoding="utf-8")
+            content = read_document_text(path, root_dir=root_dir)
             metadata, _ = parse_vault_metadata(content)
             for tag in metadata.tags:
                 if not DocType.from_tag(tag):

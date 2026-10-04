@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypedDict
 
+from ..core.document_io import read_document_text
 from .models import DocType
 from .parser import parse_frontmatter
 from .scanner import doc_type_resolver, scan_vault
@@ -141,7 +142,7 @@ def scan_all(root_dir: Path, *, doc_type: str | None = None) -> list[VaultDocume
         if doc_type is not None and dt_str != doc_type:
             continue
         try:
-            content = doc_path.read_text(encoding="utf-8")
+            content = read_document_text(doc_path, root_dir=root_dir)
         except (OSError, UnicodeDecodeError):
             continue
         meta, _ = parse_frontmatter(content)

@@ -318,6 +318,9 @@ def test_expired_source_budget_sends_no_http_request(
     assert provider.received == []
 
 
+# Corpus reads share the production source deadline. This test checks question
+# content and request counts, so keep parallel disk traffic out of its budget.
+@pytest.mark.serial
 def test_a_large_vault_sends_bounded_sanitised_choice_questions(
     tmp_path: Path, provider: ScriptedProvider, judge: Judge
 ) -> None:

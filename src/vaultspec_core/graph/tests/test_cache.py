@@ -508,12 +508,16 @@ class TestValidateRacilyClean:
     def _corpus(
         self, tmp_path: Path
     ) -> tuple[list[Path], dict[str, cache_mod.Fingerprint]]:
-        a = tmp_path / "a.md"
-        b = tmp_path / "b.md"
+        docs = tmp_path / ".vault" / "adr"
+        docs.mkdir(parents=True)
+        a = docs / "a.md"
+        b = docs / "b.md"
         a.write_text("alpha document body\n", encoding="utf-8")
         b.write_text("beta document body\n", encoding="utf-8")
         files = [a, b]
-        return files, cache_mod.fingerprint_vault(files, tmp_path)
+        manifest = cache_mod.fingerprint_vault(files, tmp_path)
+        assert len(manifest) == len(files)
+        return files, manifest
 
     @staticmethod
     def _max_mtime_ns(files: list[Path]) -> int:
@@ -593,7 +597,7 @@ class TestValidateRacilyClean:
 
     def test_added_file_invalidates(self, tmp_path: Path) -> None:
         files, manifest = self._corpus(tmp_path)
-        extra = tmp_path / "c.md"
+        extra = files[0].with_name("c.md")
         extra.write_text("gamma document body\n", encoding="utf-8")
         newer = self._max_mtime_ns([*files, extra]) + 1
         assert (

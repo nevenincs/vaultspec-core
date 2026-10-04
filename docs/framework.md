@@ -475,7 +475,7 @@ Write seconds; Core multiplies where it has to.
 
 ### Where they land
 
-| Provider    | Rendered into                        | How Core marks its own entries  |
+| Provider    | Rendered into                        | Render report or owned hookset  |
 | ----------- | ------------------------------------ | ------------------------------- |
 | claude      | `.claude/settings.json`, `hooks` key | `.claude/.vaultspec-hooks.json` |
 | codex       | `.codex/hooks.json`                  | `.codex/.vaultspec-hooks.json`  |
@@ -491,18 +491,26 @@ Hooks are source content, like rules and skills: they're read from the workspace
 the command in and written into the target. Triggers are read from the target, because a
 trigger reacts to something that happened to that workspace.
 
-Hooks you wrote into those files by hand are preserved. Core records exactly what it
-wrote last sync in the sidecar beside the file, so the next sync removes precisely its
-own previous entries and leaves everything else alone. The record sits in a sidecar
-rather than inside the file because some providers reject a hooks file carrying any key
-they don't recognize, and would discard the whole thing.
+Hooks you wrote into those files by hand are preserved, including groups identical to
+the current render. The sidecar beside each flat provider config describes the last
+render for status reporting. It grants no authority to remove hooks. Native files stay
+free of ownership fields because some providers reject unknown keys.
+
+Deletion authority lives in `~/.vaultspec/hook-ownership/<native-path-hash>.json`,
+outside the workspace. Each record binds groups Core actually inserted to the canonical
+native path and a digest of the complete native `hooks` mapping. Sync replaces or
+removes those groups only while that mapping still matches. Changes to unrelated
+settings do not invalidate ownership. If hooks have been edited, or the host record is
+missing or invalid, existing groups remain external and are preserved. Review and remove
+obsolete groups manually in that case. Legacy workspace sidecars are never imported as
+authority.
 
 Antigravity needs no sidecar: it groups hooks under named hooksets, and Core owns the
 one called `vaultspec`.
 
-Don't edit the sidecars. Deleting one makes Core forget what it wrote, so the entries
-from before become indistinguishable from yours. The next sync re-adopts the ones it
-still renders and abandons the rest in place, where nothing will clean them up.
+Deleting a workspace sidecar affects status reporting; the next sync rebuilds it.
+Deleting a host ownership record makes Core forget what it inserted. Sync never adopts
+an existing equal group solely because it matches the current render.
 
 ### Approve before they render
 

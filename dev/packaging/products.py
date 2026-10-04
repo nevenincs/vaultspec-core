@@ -9,7 +9,29 @@ formula cut from the same release from disagreeing about what the product is.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+
+# Canonical PyPI versions, including prerelease, postrelease and local suffixes.
+# Reject aliases instead of normalizing them into a different release asset URL.
+_NUMBER = r"(?:0|[1-9][0-9]*)"
+_VERSION = re.compile(
+    rf"(?:{_NUMBER}!)?{_NUMBER}(?:\.{_NUMBER})*"
+    rf"(?:(?:a|b|rc){_NUMBER})?(?:\.post{_NUMBER})?(?:\.dev{_NUMBER})?"
+    r"(?:\+(?:[a-z0-9]+)(?:\.[a-z0-9]+)*)?"
+)
+
+
+class ReleaseTagError(ValueError):
+    """A release tag does not name a canonical version."""
+
+
+def validate_version(version: str) -> str:
+    """Accept a complete canonical version without changing asset identity."""
+    if _VERSION.fullmatch(version) is None:
+        raise ReleaseTagError(f"invalid release version: {version!r}")
+    return version
+
 
 #: Rust target triples the delivery matrix builds, mapped to the channel that
 #: consumes each one. A triple absent here is not deliverable: it may exist as
@@ -78,12 +100,12 @@ class Product:
 
         Accepts the canonical ``<prefix><version>`` tag and the bare ``v``
         and unprefixed forms a maintainer may pass when reproducing a
-        release locally.
+        release locally. The complete suffix must be a canonical PyPI version.
         """
         for prefix in (self.tag_prefix, "v"):
             if tag.startswith(prefix):
-                return tag[len(prefix) :]
-        return tag
+                return validate_version(tag[len(prefix) :])
+        return validate_version(tag)
 
     def tag_for(self, version: str) -> str:
         """Return the release tag that publishes ``version``."""

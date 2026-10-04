@@ -596,7 +596,7 @@ def _write_proposed(doc_path: Path, proposed_lf: str, source_newline: str) -> No
         EditError: When the destination cannot be written - most often
             because it vanished between resolution and write.
             :func:`~vaultspec_core.vaultcore.related_surgery.atomic_write_restore`
-            copies the original to a ``.bak`` before its own ``try``, so a
+            reads the original bytes before its own ``try``, so a
             missing file raises there rather than through its restore path.
             The advisory lock serializes vaultspec-core's own mutators
             against each other, but nothing binds an external actor: an open

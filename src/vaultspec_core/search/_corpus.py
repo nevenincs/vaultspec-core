@@ -38,6 +38,7 @@ from dataclasses import dataclass, replace
 from functools import cache
 from typing import TYPE_CHECKING, Final
 
+from ..core.document_io import read_document_bytes
 from ..core.windowing import clip_text
 from ..vaultcore.blob_hash import git_blob_oid
 from ..vaultcore.body_schema import BODY_SCHEMA_REGISTRY
@@ -125,6 +126,8 @@ class Record:
             record has no title.
         body: The text after the frontmatter, as whole lines of the file.
         body_line: The 1-based file line the body starts on.
+        workspace_root: The workspace that authorizes subsequent file reads;
+            in-memory records without one cannot be read from disk.
     """
 
     name: str
@@ -136,6 +139,7 @@ class Record:
     title: str
     body: str
     body_line: int
+    workspace_root: Path | None = None
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -207,6 +211,7 @@ def load_records(
                 title=titles.get(doc.path) or doc.name,
                 body=split.body,
                 body_line=split.body_line,
+                workspace_root=root,
             )
         )
     records.sort(key=lambda record: record.rel_path)
@@ -350,8 +355,10 @@ def read_version(record: Record) -> RecordVersion | None:
     """
     from ..graph.api import decode_document
 
+    if record.workspace_root is None:
+        return None
     try:
-        raw = record.path.read_bytes()
+        raw = read_document_bytes(record.path, root_dir=record.workspace_root)
         text = decode_document(raw)
     except (OSError, UnicodeDecodeError):
         logger.debug("record file unreadable for its full read: %s", record.rel_path)

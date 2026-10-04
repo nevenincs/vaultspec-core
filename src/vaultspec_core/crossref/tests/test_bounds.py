@@ -72,6 +72,10 @@ def _client(provider: ScriptedProvider) -> JevClient:
     return JevClient(KEY, endpoint=provider.endpoint, max_concurrency=4)
 
 
+# The source's 15-second deadline includes reading this 200-document corpus.
+# Parallel disk traffic can consume it before the provider stage starts; this
+# test measures request counts, so run it in the existing contention-free lane.
+@pytest.mark.serial
 def test_the_worst_case_source_sends_exactly_its_ceiling(
     tmp_path: Path, provider: ScriptedProvider, judge_answers: Judge
 ) -> None:
@@ -98,7 +102,7 @@ def test_the_worst_case_source_sends_exactly_its_ceiling(
 
     outcome = crossref_adr(tmp_path, SOURCE, environ=ENV, client=_client(provider))
 
-    assert outcome.status is CrossrefStatus.OK
+    assert outcome.status is CrossrefStatus.OK, outcome
     assert outcome.usage is not None
     assert outcome.usage.requests == max_evaluations()
     assert judge_answers.choices == math.ceil(POOL / CHOICE_CHUNK)

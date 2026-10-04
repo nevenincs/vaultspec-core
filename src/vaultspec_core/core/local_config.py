@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-import shutil
 import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .editor import EditorTrust, validate_editor_command
+from .editor import (
+    EditorTrust,
+    ResolvedEditor,
+    resolve_editor_executable,
+    validate_editor_command,
+)
 from .exceptions import EditorResolutionError, VaultSpecError
 from .helpers import atomic_write, ensure_dir
 
@@ -24,7 +28,9 @@ KNOWN_KEYS = {"editor"}
 _EXECUTED_KEYS = {"editor"}
 
 
-def _accept_editor_candidate(command: str, source: str, trust: EditorTrust) -> bool:
+def _accept_editor_candidate(
+    command: str, source: str, trust: EditorTrust, target_dir: Path | None = None
+) -> bool:
     """Decide whether one rung of the editor ladder yields a usable command.
 
     The two ways a rung can fail are deliberately asymmetrical.
@@ -47,17 +53,24 @@ def _accept_editor_candidate(command: str, source: str, trust: EditorTrust) -> b
         command: The candidate editor command from this rung.
         source: Human-readable description of the rung, for error messages.
         trust: The trust tier of the rung.
+        target_dir: Workspace excluded from untrusted executable lookup.
 
     Returns:
         ``True`` when *command* should be used, ``False`` when the ladder
         should fall through to the next rung.
 
     Raises:
-        EditorValidationError: When *command* is malformed, or when it
-            resolves but names a program an untrusted channel may not name.
+        EditorValidationError: When *command* is malformed or path-qualified
+            in an untrusted channel, or when it resolves but names a program
+            an untrusted channel may not name.
     """
     tokens = validate_editor_command(command, source=source, trust="trusted")
-    if shutil.which(tokens[0]) is None:
+    if (
+        resolve_editor_executable(
+            tokens[0], source=source, trust=trust, target_dir=target_dir
+        )
+        is None
+    ):
         return False
     if trust == "untrusted":
         validate_editor_command(command, source=source, trust=trust)
@@ -217,7 +230,8 @@ def resolve_editor(
         target_dir: Workspace root whose ``.vaultspec/config.toml`` to consult.
 
     Returns:
-        The resolved editor command string, which may carry arguments.
+        A string-compatible setting that retains its source, trust tier and
+        workspace for validation at launch. It may carry arguments.
 
     Raises:
         EditorValidationError: When a rung names something this package will
@@ -226,11 +240,19 @@ def resolve_editor(
         EditorResolutionError: When no rung yields a working editor.
     """
     sources_tried: list[str] = []
+    workspace = get_local_config_path(target_dir).parent.parent
 
     if editor_override:
         sources_tried.append(f"--editor flag ({editor_override!r})")
-        if _accept_editor_candidate(editor_override, "the --editor flag", "untrusted"):
-            return editor_override
+        if _accept_editor_candidate(
+            editor_override, "the --editor flag", "untrusted", workspace
+        ):
+            return ResolvedEditor(
+                editor_override,
+                source="the --editor flag",
+                trust="untrusted",
+                target_dir=workspace,
+            )
 
     from ..config import EDITOR, VAULTSPEC_EDITOR, VISUAL, env_value
 
@@ -242,7 +264,12 @@ def resolve_editor(
         if _accept_editor_candidate(
             env_editor, f"the ${var.env_name} environment variable", "trusted"
         ):
-            return env_editor
+            return ResolvedEditor(
+                env_editor,
+                source=f"the ${var.env_name} environment variable",
+                trust="trusted",
+                target_dir=workspace,
+            )
         return None
 
     own = _from_variable(VAULTSPEC_EDITOR)
@@ -256,8 +283,14 @@ def resolve_editor(
             str(local_editor),
             "the project-local config key 'editor'",
             "untrusted",
+            workspace,
         ):
-            return str(local_editor)
+            return ResolvedEditor(
+                str(local_editor),
+                source="the project-local config key 'editor'",
+                trust="untrusted",
+                target_dir=workspace,
+            )
 
     for var in (VISUAL, EDITOR):
         generic = _from_variable(var)
@@ -265,8 +298,10 @@ def resolve_editor(
             return generic
 
     sources_tried.append("fallback 'vi'")
-    if shutil.which("vi"):
-        return "vi"
+    if _accept_editor_candidate("vi", "the fallback editor", "untrusted", workspace):
+        return ResolvedEditor(
+            "vi", source="the fallback editor", trust="untrusted", target_dir=workspace
+        )
 
     raise EditorResolutionError(
         "Could not resolve a working text editor from any of the configured sources.\n"

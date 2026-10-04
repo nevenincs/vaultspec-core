@@ -35,6 +35,7 @@ and a table cell is only as good as that check.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -44,7 +45,8 @@ from typing import Any, cast
 
 from . import types as _t
 from .enums import DirName, ProviderCapability, Tool
-from .helpers import atomic_write, ensure_dir
+from .helpers import advisory_lock, atomic_write, ensure_dir
+from .home import core_home_layout
 from .types import SyncResult
 
 logger = logging.getLogger(__name__)
@@ -433,13 +435,51 @@ _HOOK_FILES: dict[Tool, tuple[str, str]] = {
     Tool.ANTIGRAVITY: (DirName.ANTIGRAVITY.value, "hooks.json"),
 }
 
-# Per-provider ownership record. It lives in a sidecar file *beside* (not
+# Per-provider render report. It lives in a sidecar file *beside* (not
 # inside) the native hook config, because some providers - notably codex -
 # enforce a strict schema and reject the entire hooks file if it carries an
-# unknown top-level key. The sidecar records exactly the groups vaultspec wrote
-# last sync so a re-sync removes precisely those and never disturbs
-# user-authored hooks. agy needs no sidecar: it owns a named hookset.
+# unknown top-level key. The workspace sidecar describes the last render for
+# status reporting only; deletion authority lives in the operator's home.
+# agy needs no sidecar: it owns a named hookset.
 _SIDECAR_NAME = ".vaultspec-hooks.json"
+
+
+def _ownership_path(native: Path, home: Path | None = None) -> Path:
+    """Isolate deletion authority by canonical native path, outside checkouts."""
+    key = hashlib.sha256(str(native.resolve()).encode()).hexdigest()
+    return core_home_layout(home).root / "hook-ownership" / f"{key}.json"
+
+
+def _ownership_record(
+    native: Path, content: dict[str, Any], managed: dict[str, Any]
+) -> dict[str, Any]:
+    """Bind inserted groups to their native path and complete hook content.
+
+    A changed hook mapping invalidates the receipt rather than allowing an
+    edited or copied group to be removed. Unrelated settings do not invalidate it.
+    """
+    if not managed:
+        return {}
+    hooks = json.dumps(content.get("hooks"), sort_keys=True, separators=(",", ":"))
+    return {
+        "version": 1,
+        "path": str(native.resolve()),
+        "hooks_digest": hashlib.sha256(hooks.encode()).hexdigest(),
+        "managed": managed,
+    }
+
+
+def _verified_managed(
+    native: Path, existing: dict[str, Any], record: dict[str, Any]
+) -> dict[str, Any]:
+    """Accept only a host-local receipt matching this native hook mapping."""
+    managed = record.get("managed")
+    if not isinstance(managed, dict):
+        return {}
+    managed = cast("dict[str, Any]", managed)
+    if not all(isinstance(groups, list) for groups in managed.values()):
+        return {}
+    return managed if record == _ownership_record(native, existing, managed) else {}
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -447,7 +487,7 @@ def _read_json(path: Path) -> dict[str, Any]:
         return {}
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, UnicodeError):
         return {}
     if not isinstance(raw, dict):
         return {}
@@ -461,11 +501,12 @@ def compose_flat_hooks(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Compose the next native dict for a ``hooks``-keyed provider file.
 
-    Removes the previously vaultspec-managed groups (*prev_managed*, read from
-    the sidecar), re-adds the current *payload*, and preserves every
+    Removes the previously vaultspec-managed groups (*prev_managed*, verified
+    against host-local authority by the caller), re-adds *payload*, and preserves every
     user-authored group and unrelated top-level key. The returned native dict
     carries **no** vaultspec ownership key. Returns ``(native, new_managed)``
-    where *new_managed* is the ownership record to persist in the sidecar.
+    where *new_managed* contains only groups actually inserted by this call.
+    Existing equal external groups are never adopted.
     """
     out = dict(existing)
     raw_hooks = out.get("hooks")
@@ -475,7 +516,10 @@ def compose_flat_hooks(
 
     for event, groups in prev_managed.items():
         if event in hooks and isinstance(hooks[event], list):
-            kept = [g for g in hooks[event] if g not in groups]
+            kept = list(hooks[event])
+            for group in groups:
+                if group in kept:
+                    kept.remove(group)
             if kept:
                 hooks[event] = kept
             else:
@@ -490,8 +534,8 @@ def compose_flat_hooks(
             for group in groups:
                 if group not in current:
                     current.append(group)
+                    new_managed.setdefault(event, []).append(group)
             hooks[event] = current
-            new_managed[event] = groups
 
     if hooks:
         out["hooks"] = hooks
@@ -520,7 +564,7 @@ def _write_or_remove(
     """Write *content* (or remove the file when empty). Returns the action.
 
     Returns ``None`` when nothing changed. Used for both native files and
-    sidecar ownership files.
+    render reports and host-local ownership files.
     """
     if not content:
         if path.exists():
@@ -536,7 +580,30 @@ def _write_or_remove(
 
 
 def _sync_one(
-    tool: Tool, target_dir: Path, specs: list[HookSpec], *, dry_run: bool
+    tool: Tool,
+    target_dir: Path,
+    specs: list[HookSpec],
+    *,
+    dry_run: bool,
+    home: Path | None = None,
+) -> SyncResult:
+    subdir, filename = _HOOK_FILES[tool]
+    authority = _ownership_path(target_dir / subdir / filename, home)
+    if dry_run or tool is Tool.ANTIGRAVITY:
+        return _sync_one_locked(tool, target_dir, specs, authority, dry_run=dry_run)
+    ensure_dir(authority.parent)
+    # Serialize the native read, composition, and receipt write as one operation.
+    with advisory_lock(authority):
+        return _sync_one_locked(tool, target_dir, specs, authority, dry_run=dry_run)
+
+
+def _sync_one_locked(
+    tool: Tool,
+    target_dir: Path,
+    specs: list[HookSpec],
+    authority: Path,
+    *,
+    dry_run: bool,
 ) -> SyncResult:
     result = SyncResult()
     subdir, filename = _HOOK_FILES[tool]
@@ -549,6 +616,8 @@ def _sync_one(
 
     existing = _read_json(path)
     existed = path.exists()
+    prior_record = _read_json(authority) if tool is not Tool.ANTIGRAVITY else {}
+    new_record: dict[str, Any] = {}
 
     if tool is Tool.ANTIGRAVITY:
         composed = _compose_agy_hooks(existing, payload)
@@ -557,13 +626,21 @@ def _sync_one(
         new_managed: dict[str, Any] = {}
     else:
         sidecar_path = target_dir / subdir / _SIDECAR_NAME
-        prev_managed = _read_json(sidecar_path)
+        prev_managed = _verified_managed(path, existing, prior_record)
         composed, new_managed = compose_flat_hooks(existing, prev_managed, payload)
+        new_record = _ownership_record(path, composed, new_managed)
+        if prior_record and not prev_managed:
+            result.warnings.append(
+                f"Hook ownership no longer matches {rel}; preserving existing groups."
+            )
 
     native_changed = composed != existing
-    sidecar_changed = sidecar_path is not None and new_managed != prev_managed
+    # The beside-native sidecar remains a render report, never deletion authority.
+    report = payload or {}
+    sidecar_changed = sidecar_path is not None and report != _read_json(sidecar_path)
+    authority_changed = new_record != prior_record
 
-    if not native_changed and not sidecar_changed:
+    if not native_changed and not sidecar_changed and not authority_changed:
         result.unchanged = 1
         return result
 
@@ -573,14 +650,16 @@ def _sync_one(
         else None
     )
     if sidecar_changed and sidecar_path is not None:
-        _write_or_remove(
-            sidecar_path, new_managed, sidecar_path.exists(), dry_run=dry_run
-        )
+        _write_or_remove(sidecar_path, report, sidecar_path.exists(), dry_run=dry_run)
+    if authority_changed:
+        _write_or_remove(authority, new_record, authority.exists(), dry_run=dry_run)
 
     if action == "[DELETE]":
         result.pruned = 1
         result.items.append((rel, "[DELETE]"))
-    elif action == "[UPDATE]" or (action is None and sidecar_changed):
+    elif action == "[UPDATE]" or (
+        action is None and (sidecar_changed or authority_changed)
+    ):
         result.updated = 1
         if dry_run and action is not None:
             result.items.append((rel, action))
@@ -636,7 +715,7 @@ def provider_hooks_sync(dry_run: bool = False, home: Path | None = None) -> Sync
 
     Args:
         dry_run: When ``True``, compute actions without writing.
-        home: Machine-global VaultSpec home holding the consent ledger.
+        home: Machine-global VaultSpec home holding consent and ownership records.
             Defaults to the operator's real home, which is what every
             production caller wants; real-filesystem tests pass their own so
             they neither read nor write the operator's approvals.
@@ -666,7 +745,7 @@ def provider_hooks_sync(dry_run: bool = False, home: Path | None = None) -> Sync
 
     target_dir = _t.get_context().target_dir
     for tool, _native, _sidecar in hook_targets():
-        result = _sync_one(tool, target_dir, specs, dry_run=dry_run)
+        result = _sync_one(tool, target_dir, specs, dry_run=dry_run, home=home)
         total.merge(result)
         total.per_tool[tool.value] = result
     return total

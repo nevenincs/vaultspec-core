@@ -42,6 +42,7 @@ import logging
 from typing import TYPE_CHECKING, cast
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_tree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -169,6 +170,9 @@ def migrate(workspace: Path) -> MigrationResult:
             invocation retries.
     """
     from ..core.enums import Resource
+
+    check_tree(workspace, workspace / ".vaultspec" / "hooks")
+    check_tree(workspace, workspace / ".vaultspec" / "triggers")
 
     counts = {"moved": 0, "left": 0}
 

@@ -26,6 +26,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from . import Migration, MigrationError, MigrationResult, MigrationScope
+from ._paths import check_path, check_tree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -115,6 +116,10 @@ def migrate(workspace: Path) -> MigrationResult:
         get_recommended_entries,
     )
     from ..core.rules import converge_spec_layer_gitignore
+
+    check_tree(workspace, workspace / ".vaultspec" / "rules" / "rules")
+    check_path(workspace, workspace / ".gitignore")
+    check_path(workspace, workspace / ".gitignore.lock")
 
     counts = {"rewritten": 0, "skipped": 0, "nested_gitignore": 0}
 

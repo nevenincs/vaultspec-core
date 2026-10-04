@@ -54,11 +54,11 @@ def read_preserve_newlines(path: Path) -> tuple[str, str]:
 
 
 def atomic_write_restore(path: Path, content: str) -> None:
-    """Write *content* to *path* atomically; restore from .bak on failure.
+    """Write *content* atomically, keeping original bytes in memory for recovery.
 
-    A ``.bak`` copy of the original is written before the atomic write and
-    removed on success.  If the write fails the original is restored from
-    the ``.bak`` copy.
+    Both the update and any recovery use the shared atomic writer. Predictable
+    ``.bak`` entries are never opened, replaced, or removed: the document's
+    directory may contain backup links owned by someone else.
 
     Args:
         path: Destination file path.
@@ -68,17 +68,21 @@ def atomic_write_restore(path: Path, content: str) -> None:
 
     Raises:
         Exception: Re-raises any exception from the underlying write after
-            restoring the backup.
+            restoring the original bytes if they changed.
     """
-    bak = path.with_suffix(path.suffix + ".bak")
-    bak.write_bytes(path.read_bytes())
+    original = path.read_bytes()
     try:
         atomic_write_bytes(path, content.encode("utf-8", errors="surrogateescape"))
     except Exception:
-        if bak.exists():
-            bak.replace(path)
+        # A failed preparation or rename leaves the original untouched. In
+        # particular, a refused primary symlink must not be replaced by recovery.
+        try:
+            unchanged = path.read_bytes() == original
+        except OSError:
+            unchanged = False
+        if not unchanged:
+            atomic_write_bytes(path, original)
         raise
-    bak.unlink(missing_ok=True)
 
 
 def remove_related_entries(path: Path, targets: list[str]) -> int:

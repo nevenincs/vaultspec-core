@@ -35,6 +35,8 @@ from typing import TYPE_CHECKING, Final
 
 from ..config import get_config
 from ..core.adr import adr_status_from_body
+from ..core.corpus_io import is_corpus_path
+from ..core.document_io import read_document_text
 from ..graph.algorithms import extract_feature
 from ..vaultcore.markdown import (
     HTML_COMMENT_RE,
@@ -280,7 +282,7 @@ def with_body(record: AdrRecord, body: str) -> AdrRecord:
 def _read(path: Path, root: Path) -> AdrRecord | None:
     """Read one ADR file, or ``None`` when it cannot be read as text."""
     try:
-        text = path.read_text(encoding="utf-8")
+        text = read_document_text(path, root_dir=root)
     except (OSError, UnicodeDecodeError) as exc:
         logger.debug("crossref skipped unreadable ADR %s: %s", path.name, exc)
         return None
@@ -323,9 +325,11 @@ def load_adrs(root: Path) -> list[AdrRecord]:
             nothing is read then.
     """
     directory = adr_dir(root)
-    if not directory.is_dir():
+    if not is_corpus_path(directory, root, directory=True):
         return []
-    paths = sorted(path for path in directory.glob("*.md") if path.is_file())
+    paths = sorted(
+        path for path in directory.glob("*.md") if is_corpus_path(path, root)
+    )
     if len(paths) > MAX_CORPUS:
         raise CorpusTooLargeError(len(paths))
     records = [record for path in paths if (record := _read(path, root)) is not None]

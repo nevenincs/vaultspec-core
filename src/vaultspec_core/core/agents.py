@@ -784,11 +784,12 @@ def agents_add(
     Raises:
         ResourceExistsError: If the agent exists and *force* is ``False``.
     """
-    agents_src_dir = _t.get_context().agents_src_dir
-    ensure_dir(agents_src_dir)
+    from .resources import resource_destination
 
-    file_name = name if name.endswith(".md") else f"{name}.md"
-    file_path = agents_src_dir / file_name
+    agents_src_dir = _t.get_context().agents_src_dir
+    file_path = resource_destination(name, agents_src_dir)
+    file_name = file_path.name
+    ensure_dir(agents_src_dir)
 
     if file_path.exists() and not force:
         raise ResourceExistsError(

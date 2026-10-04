@@ -79,8 +79,6 @@ def _write(path: Path, content: str) -> None:
 def generate(root: Path, product: Product, tag: str, checksums: Path) -> list[Path]:
     """Write both channel pointers for one release and return their paths."""
     version = product.version_from_tag(tag)
-    if not version:
-        raise SystemExit(f"tag {tag!r} names no version")
     digests = read_checksums(checksums)
 
     manifest = scoop_path(root, product)
@@ -142,7 +140,7 @@ def main() -> int:
         written = generate(
             args.root, product, args.tag, args.checksums.resolve(strict=True)
         )
-    except (ChecksumError, PointerError) as exc:
+    except (ChecksumError, PointerError, products.ReleaseTagError) as exc:
         print(f"::error::{exc}", file=sys.stderr, flush=True)
         return 1
     for path in written:

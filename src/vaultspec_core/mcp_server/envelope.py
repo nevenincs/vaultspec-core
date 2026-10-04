@@ -45,9 +45,11 @@ from __future__ import annotations
 
 import functools
 import inspect
+import json
 import re
 from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast, override
 
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult, TextContent
 from pydantic import BaseModel, GetJsonSchemaHandler, TypeAdapter
 
@@ -758,6 +760,8 @@ def describe(payload: object) -> str:
 
 def compact_result(
     summarise: _Summariser | None = None,
+    *,
+    max_response_bytes: int | None = None,
 ) -> Callable[
     [Callable[_P, Awaitable[_R]]],
     Callable[_P, Awaitable[_R]],
@@ -774,6 +778,7 @@ def compact_result(
     Args:
         summarise: Renders the one-line text summary. Defaults to
             :func:`describe`, which reports shape only.
+        max_response_bytes: Optional ceiling including escaped JSON and envelope.
 
     Returns:
         A decorator that adapts a tool coroutine in place.
@@ -788,10 +793,19 @@ def compact_result(
                 summary = render(payload)
             except Exception:
                 summary = describe(payload)
-            return CallToolResult(
+            result = CallToolResult(
                 content=[TextContent(type="text", text=summary[:_MAX_SUMMARY_CHARS])],
                 structured_content=_structured(payload),
             )
+            if max_response_bytes is not None:
+                # ASCII escaping is a conservative bound even for transports
+                # that emit UTF-8 directly. Include metadata and the summary.
+                size = len(json.dumps(result.model_dump(mode="json", by_alias=True)))
+                if size > max_response_bytes:
+                    raise ToolError(
+                        f"Response exceeds {max_response_bytes} bytes; tool already ran"
+                    )
+            return result
 
         wrapper.__doc__ = tool_description(fn)
         return wrapper

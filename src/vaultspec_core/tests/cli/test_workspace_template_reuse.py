@@ -26,7 +26,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from vaultspec_core.core.enums import DirName
+from vaultspec_core.core.enums import DirName, McpScope
+from vaultspec_core.core.mcps_ownership import ownership_path as host_ownership_path
 from vaultspec_core.tests.cli.workspace_factory import WorkspaceFactory
 
 if TYPE_CHECKING:
@@ -79,7 +80,7 @@ class TestACopiedWorkspaceMatchesABuiltOne:
 
     def test_the_ownership_record_names_this_workspace(self, tmp_path: Path) -> None:
         workspace = WorkspaceFactory(tmp_path / "workspace").install().path
-        ownership = workspace / DirName.VAULTSPEC / "mcp-ownership.json"
+        ownership = host_ownership_path(workspace, McpScope.PROJECT)
 
         assert ownership.is_file(), "install did not write an ownership record"
         recorded = ownership.read_text(encoding="utf-8")

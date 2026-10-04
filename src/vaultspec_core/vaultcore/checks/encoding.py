@@ -22,6 +22,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from ...core.corpus_io import is_corpus_path
+from ...core.document_io import read_document_bytes
 from ..exclusions import is_excluded_vault_path
 from ._base import CheckDiagnostic, CheckResult, Severity
 
@@ -132,13 +134,13 @@ def check_encoding(root_dir: Path, *, graph: VaultGraph | None = None) -> CheckR
     for path in sorted(docs_dir.rglob("*.md")):
         if is_excluded_vault_path(path):
             continue
-        if path.is_symlink() or not path.is_file():
+        if not is_corpus_path(path, root_dir):
             continue
 
         rel_path = path.relative_to(root_dir) if path.is_absolute() else path
 
         try:
-            raw = path.read_bytes()
+            raw = read_document_bytes(path, root_dir=root_dir)
         except OSError as exc:
             result.diagnostics.append(
                 CheckDiagnostic(

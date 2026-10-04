@@ -55,8 +55,20 @@ def _profile_counts(fn: Callable[[], object]) -> Counter[str]:
         if event != "call":
             return
         name = frame.f_code.co_name
-        if name in ("read_bytes", "read_text"):
-            target = frame.f_locals.get("self")
+        if name in ("read_bytes", "read_text", "read_document_bytes"):
+            # Contained reads now use a pinned descriptor instead of Path I/O.
+            # Count that byte-ingress boundary and any direct Path reads, without
+            # counting the helper's unbounded Path fallback a second time.
+            parent = frame.f_back
+            if (
+                name != "read_document_bytes"
+                and parent is not None
+                and parent.f_code.co_name == "read_document_bytes"
+            ):
+                return
+            target = frame.f_locals.get(
+                "path" if name == "read_document_bytes" else "self"
+            )
             parts = target.parts if isinstance(target, Path) else None
             if parts and ".vault" in parts and str(target).endswith(".md"):
                 counts["corpus_reads"] += 1

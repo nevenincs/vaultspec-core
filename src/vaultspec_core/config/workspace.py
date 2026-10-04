@@ -17,6 +17,7 @@ its own package-scoped entry, so one order holds everywhere.
 from __future__ import annotations
 
 import logging
+import stat
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 from pathlib import Path
@@ -44,6 +45,8 @@ __all__ = [
     "discover_git",
     "resolve_target",
     "resolve_workspace",
+    "validate_managed_directory",
+    "validate_managed_roots",
 ]
 
 
@@ -93,6 +96,8 @@ class WorkspaceLayout:
         vaultspec_dir: Path to the ``.vaultspec/`` framework directory.
         mode: How the layout was resolved (standalone or explicit).
         git: Discovered git repository metadata, or ``None`` if not in a repo.
+        framework_target_dir: Explicit source workspace for split-source sync;
+            ``None`` anchors framework content to ``target_dir``.
     """
 
     target_dir: Path
@@ -100,6 +105,22 @@ class WorkspaceLayout:
     vaultspec_dir: Path
     mode: LayoutMode
     git: GitInfo | None
+    framework_target_dir: Path | None = None
+
+    def validate_roots(self) -> None:
+        """Recheck roots before using a layout, including pre-install layouts."""
+        if (
+            self.framework_target_dir is None
+            or self.framework_target_dir == self.target_dir
+        ):
+            validate_managed_roots(
+                self.target_dir,
+                vault_dir=self.vault_dir,
+                framework_dir=self.vaultspec_dir,
+            )
+            return
+        validate_managed_roots(self.target_dir, vault_dir=self.vault_dir)
+        validate_managed_directory(self.framework_target_dir, self.vaultspec_dir)
 
 
 def _strip_unc(path: Path) -> Path:
@@ -301,6 +322,62 @@ class WorkspaceError(VaultSpecError):
     """
 
 
+def validate_managed_directory(root: Path, directory: Path) -> None:
+    """Require a contained directory with no redirected components.
+
+    Missing directories are allowed for provisioning. Inspect with lstat before
+    resolving so dangling links and Windows junctions cannot disappear into a
+    canonical path. The selected workspace itself may have been named by alias.
+    """
+    try:
+        relative = directory.absolute().relative_to(root.absolute())
+        if not relative.parts or ".." in relative.parts:
+            raise WorkspaceError(f"Managed root must be beneath {root}: {directory}")
+        current = root
+        for component in relative.parts:
+            current /= component
+            try:
+                metadata = current.lstat()
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(metadata.st_mode) or (
+                getattr(metadata, "st_file_attributes", 0)
+                & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+            ):
+                raise WorkspaceError(
+                    f"Managed root cannot use redirected paths: {current}"
+                )
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise WorkspaceError(f"Managed root is not a directory: {current}")
+        resolved_root = root.resolve()
+        resolved = directory.resolve()
+        if resolved == resolved_root or not resolved.is_relative_to(resolved_root):
+            raise WorkspaceError(f"Managed root escapes workspace {root}: {directory}")
+    except (OSError, ValueError) as exc:
+        raise WorkspaceError(
+            f"Cannot validate managed root {directory}: {exc}"
+        ) from exc
+
+
+def validate_managed_roots(
+    target_dir: Path,
+    *,
+    vault_dir: Path | None = None,
+    framework_dir: Path | None = None,
+) -> None:
+    """Check default and configured roots, allowing absent roots for installs."""
+    directories = dict.fromkeys(
+        (
+            target_dir / ".vault",
+            target_dir / ".vaultspec",
+            vault_dir or target_dir / ".vault",
+            framework_dir or target_dir / ".vaultspec",
+        )
+    )
+    for directory in directories:
+        validate_managed_directory(target_dir, directory)
+
+
 def _validate(layout: WorkspaceLayout) -> None:
     """Validate a resolved ``WorkspaceLayout``.
 
@@ -311,6 +388,7 @@ def _validate(layout: WorkspaceLayout) -> None:
         WorkspaceError: If ``vaultspec_dir`` is not an existing directory or
             ``target_dir`` does not exist.
     """
+    layout.validate_roots()
     if not layout.vaultspec_dir.is_dir():
         raise WorkspaceError(
             f"vaultspec_dir does not exist or is not a directory: "
@@ -514,6 +592,7 @@ def resolve_workspace(
             vaultspec_dir=fw_root,
             mode=LayoutMode.EXPLICIT,
             git=discover_git(target_dir),
+            framework_target_dir=framework_root.parent if framework_root else None,
         )
         _validate(layout)
         return layout
@@ -533,6 +612,7 @@ def resolve_workspace(
             vaultspec_dir=fw_root,
             mode=LayoutMode.STANDALONE,
             git=git,
+            framework_target_dir=framework_root.parent if framework_root else None,
         )
         _validate(layout)
         return layout

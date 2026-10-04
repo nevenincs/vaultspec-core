@@ -432,7 +432,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
         Args:
             ctx: The MCP request context (unused; logging routes through the
                 module logger instead of the deprecated client-facing channel).
-            plan: A feature tag or plan stem/path addressing one plan.
+            plan: A feature tag or plan stem addressing one plan in .vault/plan.
             steps: The batch of step-state changes.
 
         Returns:
@@ -493,7 +493,7 @@ def register_plan_tools(mcp: MCPServer[None]) -> None:
         Args:
             ctx: The MCP request context (unused; logging routes through the
                 module logger instead of the deprecated client-facing channel).
-            plan: A feature tag or plan stem/path addressing one plan.
+            plan: A feature tag or plan stem addressing one plan in .vault/plan.
             operations: The batch of step-authoring operations.
 
         Returns:

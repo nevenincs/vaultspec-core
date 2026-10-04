@@ -1503,7 +1503,9 @@ def test_nothing_starts_from_a_tag_push_or_a_release_event() -> None:
         if "release" in events:
             offenders.append(f"{path.name}: release")
         push = events.get("push")
-        if isinstance(push, dict) and {"tags", "tags-ignore"} & set(push):
+        if isinstance(push, dict) and {"tags", "tags-ignore"} & set(
+            cast("dict[str, object]", push)
+        ):
             offenders.append(f"{path.name}: push tags")
     assert not offenders, (
         f"these workflows start from a tag push or a release event: {offenders}; "

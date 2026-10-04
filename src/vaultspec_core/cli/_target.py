@@ -287,7 +287,7 @@ def _plan_near_matches(base: Path, raw: str) -> list[str]:
     return sorted(matches)[:5]
 
 
-def resolve_plan_target(value: Path) -> Path:
+def resolve_plan_target(value: Path | str) -> Path:
     """Resolve a plan stem, plan path, or feature handle to a plan file.
 
     Accepts (in precedence order): an existing literal path (absolute or
@@ -297,8 +297,12 @@ def resolve_plan_target(value: Path) -> Path:
     unresolvable value raises :class:`typer.BadParameter` carrying
     near-matches, never a raw ``FileNotFoundError`` traceback.
 
+    MCP gateway invocations accept only stems and feature handles, and every
+    resolved target must be a regular file beneath the workspace's
+    ``.vault/plan``. Literal paths belong to the trusted local CLI surface.
+
     Args:
-        value: The raw argument as Typer parsed it into a path.
+        value: The raw argument string or its parsed path.
 
     Returns:
         The resolved plan-document path.
@@ -307,11 +311,34 @@ def resolve_plan_target(value: Path) -> Path:
         typer.BadParameter: When the value resolves to no plan, with a
             "Did you mean: ..." hint when near-matches exist.
     """
-    if value.exists():
-        return value
+    from vaultspec_core.config import VAULTSPEC_MCP_GATEWAY_INVOCATION, env_value
+    from vaultspec_core.plan.targets import (
+        validate_plan_identifier,
+        workspace_plan_directory,
+        workspace_plan_file,
+    )
 
+    gateway = bool(env_value(VAULTSPEC_MCP_GATEWAY_INVOCATION))
     raw = str(value)
+    if not gateway and Path(value).exists():
+        return Path(value)
+
     base = _vault_base()
+    if gateway:
+        try:
+            validate_plan_identifier(raw)
+            workspace_plan_directory(base)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
+    def resolved_plan(path: Path) -> Path:
+        if not gateway:
+            return path
+        try:
+            return workspace_plan_file(base, path)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
     plan_dir = base / ".vault" / "plan"
 
     stem = Path(raw).name
@@ -319,14 +346,14 @@ def resolve_plan_target(value: Path) -> Path:
         stem = stem[:-3]
     candidate = plan_dir / f"{stem}.md"
     if candidate.exists():
-        return candidate
+        return resolved_plan(candidate)
 
     feature = raw.lstrip("#")
     feature_plans = [
         doc.path for doc in _plan_documents(base) if doc.feature == feature
     ]
     if len(feature_plans) == 1:
-        return feature_plans[0]
+        return resolved_plan(feature_plans[0])
     if len(feature_plans) > 1:
         stems = ", ".join(sorted(p.stem for p in feature_plans))
         raise typer.BadParameter(
@@ -337,6 +364,19 @@ def resolve_plan_target(value: Path) -> Path:
     near = _plan_near_matches(base, raw)
     hint = f" Did you mean: {', '.join(near)}?" if near else ""
     raise typer.BadParameter(f"could not resolve plan target {raw!r}.{hint}")
+
+
+def _parse_plan_path(value: str) -> Path:
+    """Validate untrusted syntax before Path can normalize it away."""
+    from vaultspec_core.config import VAULTSPEC_MCP_GATEWAY_INVOCATION, env_value
+    from vaultspec_core.plan.targets import validate_plan_identifier
+
+    if env_value(VAULTSPEC_MCP_GATEWAY_INVOCATION):
+        try:
+            validate_plan_identifier(value)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+    return Path(value)
 
 
 def _resolve_plan_path_callback(value: Path | None) -> Path | None:
@@ -353,6 +393,9 @@ PlanPathArg = Annotated[
     Path,
     typer.Argument(
         help="Plan document path, stem, or feature handle",
+        # Preserve raw syntax until the MCP identifier check has run: Path
+        # would normalize './stem.md' and 'stem/.' into otherwise valid stems.
+        parser=_parse_plan_path,
         callback=_resolve_plan_path_callback,
     ),
 ]

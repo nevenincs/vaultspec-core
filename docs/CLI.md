@@ -124,7 +124,16 @@ the markers.
 <!-- vaultspec:generated:begin unreleased-surface -->
 
 Measured against `0.3.2`, the latest published release when this reference was
-generated: every command, flag, and tool documented here is in it.
+generated. What follows is not in that release. The list is computed from the surface
+recorded from that release's published distribution; it is never hand-maintained.
+
+Commands:
+
+- `vaultspec-core spec mcps trust`
+
+Flags on commands the release already has:
+
+- `vaultspec-core spec reference snapshot` - `--development`
 
 <!-- vaultspec:generated:end unreleased-surface -->
 
@@ -428,6 +437,8 @@ full options.
 - `vaultspec-core spec mcps remove` - Remove a canonical MCP server definition.
 - `vaultspec-core spec mcps sync` - Reconcile canonical definitions into provider-native
   enrollment.
+- `vaultspec-core spec mcps trust` - Approve exact MCP commands for enrollment after
+  reviewing them at a terminal.
 - `vaultspec-core spec mcps uninstall` - Remove Vaultspec-owned provider-native MCP
   enrollment.
 
@@ -3093,6 +3104,11 @@ outputs.
 #### Subcommands
 
 - `vaultspec-core spec mcps list` - List all registered MCP server definitions.
+- `vaultspec-core spec mcps trust [PROVIDER]` (`--scope SCOPE`, `--target PATH`,
+  `--source-from-cwd`, `--revoke`) - Approve exact MCP commands after review and
+  confirmation at an interactive terminal. `--source-from-cwd` approves definitions from
+  the current working directory for a top-level `vaultspec-core sync` invocation
+  destination. `--revoke` withdraws existing grants; uninstall removes deployed entries.
 - `vaultspec-core spec mcps status [PROVIDER]` (`--scope SCOPE`, `--json`,
   `--target PATH`) - Inspect enrollment and ownership state without starting or probing
   MCP servers.
@@ -3206,7 +3222,9 @@ them is hand-written.
 - `--verify FILE` - Compare a surface document (from `--emit`) against the committed
   record; exit non-zero when they differ.
 - `--record FILE` - Write a surface document (from `--emit`, run inside the latest
-  published release's distribution) as the committed record.
+  published release's distribution) as the committed record; requires `--development`.
+- `--development` (default off) - Explicitly authorize recording from a trusted
+  development invocation. MCP callers cannot authorize reference maintenance.
 - `--json` (default off) - Emit machine-readable output.
 
 The record is never captured from a source tree. After publication, the release's own
@@ -3232,7 +3250,7 @@ exclusive.
 - **Record that surface as the committed record**:
 
   ```bash
-  vaultspec-core spec reference snapshot --record surface.json
+  vaultspec-core spec reference snapshot --record surface.json --development
   ```
 
 - **Prove the committed record matches a published distribution**:

@@ -6,9 +6,13 @@ command group. Delegates to :mod:`vaultspec_core.core` CRUD functions via
 lazy imports to avoid circular-import issues.
 """
 
-from typing import Annotated
+import json
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from vaultspec_core.cli._app import make_app
 from vaultspec_core.cli._errors import handle_error as _handle_error
@@ -230,6 +234,122 @@ def cmd_mcps_sync(
     if not json_output:
         print_complete_sync_notice(resource="MCP", mcp=True)
     emit_sync_result(result, label="MCPs", dry_run=dry_run, json_output=json_output)
+
+
+@mcps_app.command("trust")
+def cmd_mcps_trust(
+    provider: Annotated[str, typer.Argument(help="Provider target to approve")] = "all",
+    scope: Annotated[str, typer.Option("--scope", help="Enrollment scope")] = "project",
+    revoke: Annotated[
+        bool, typer.Option("--revoke", help="Withdraw workspace grants")
+    ] = False,
+    source_from_cwd: Annotated[
+        bool,
+        typer.Option(
+            "--source-from-cwd",
+            help="Approve CWD sources for a top-level sync --target destination",
+        ),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+    target: TargetOption = None,
+) -> None:
+    """Approve exact MCP commands for enrollment after reviewing them at a terminal.
+
+    Approval is host-local and binds definition bytes, rendered command, args,
+    environment, provider, scope, and target. Changes require another approval.
+    Revocation prevents further enrollment; use uninstall to remove deployed entries.
+    """
+    apply_target(target, split_source=source_from_cwd, json_output=json_output)
+    from vaultspec_core.config import is_unattended
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.mcps_definitions import collect_mcp_servers
+    from vaultspec_core.core.mcps_native import normalized_sources
+    from vaultspec_core.core.mcps_targets import resolve_mcp_targets
+    from vaultspec_core.core.mcps_trust import McpApproval, grant
+    from vaultspec_core.core.mcps_trust import revoke as revoke_trust
+    from vaultspec_core.core.types import SyncResult, get_context
+    from vaultspec_core.core.workspace_mode import (
+        CORE_DISTRIBUTION_NAME,
+        resolve_render_mode,
+    )
+
+    root = get_context().target_dir
+    if revoke:
+        removed = revoke_trust(root)
+        if json_output:
+            emit_json("spec.mcps.trust", "removed", {"revoked": removed})
+        else:
+            typer.echo(f"Withdrew {removed} MCP enrollment grant(s).")
+        return
+    if is_unattended(json_output=json_output):
+        _handle_error(
+            VaultSpecError(
+                "MCP approval requires review and confirmation at an "
+                "interactive terminal."
+            ),
+            json_output=json_output,
+        )
+        return
+    try:
+        targets = resolve_mcp_targets(provider, scope=scope, target_dir=root)
+        mode = resolve_render_mode(root, package=CORE_DISTRIBUTION_NAME)
+        digests: dict[Path, str] = {}
+        warnings: list[str] = []
+        sources = collect_mcp_servers(
+            warnings=warnings, mode=mode, target=root, digests=digests
+        )
+        approvals: list[McpApproval] = []
+        for native_target in targets:
+            result = SyncResult()
+            normalized = normalized_sources(sources, native_target, result)
+            warnings.extend(result.warnings)
+            for name, (path, config) in normalized.items():
+                approval = McpApproval.capture(
+                    root, native_target, name, path, config, digests[path]
+                )
+                approvals.append(approval)
+                # JSON escaping makes control characters visible without changing
+                # the snapshot that will be granted after confirmation.
+                typer.echo(
+                    json.dumps(
+                        {
+                            "name": name,
+                            "source": approval.source,
+                            "provider": approval.provider,
+                            "scope": approval.scope,
+                            "target": approval.target,
+                            "definition_digest": approval.definition_digest,
+                            "launch": json.loads(approval.launch),
+                        },
+                        indent=2,
+                    )
+                )
+        for warning in warnings:
+            # Repository filenames also appear in warnings. Escape terminal
+            # controls so an invalid sibling cannot erase the approval display.
+            typer.echo(json.dumps(warning, ensure_ascii=True), err=True)
+        if not approvals:
+            typer.echo("No valid MCP definitions to approve.")
+            return
+        typer.echo(
+            "These repository commands may later be launched by your provider as you, "
+            "with your credentials and environment. Approval is stored outside this "
+            "workspace and applies only to the exact definitions and launches "
+            "shown above."
+        )
+        try:
+            confirmed = typer.confirm("Approve these MCP enrollments?", default=False)
+        except (typer.Abort, EOFError, KeyboardInterrupt):
+            confirmed = False
+        if not confirmed:
+            typer.echo("MCP definitions were not approved.", err=True)
+            raise typer.Exit(code=1)
+        grant(approvals)
+        typer.echo(
+            f"Approved {len(approvals)} MCP enrollment(s); run spec mcps sync next."
+        )
+    except (VaultSpecError, OSError) as exc:
+        _handle_error(VaultSpecError(str(exc)), json_output=json_output)
 
 
 @mcps_app.command("uninstall")

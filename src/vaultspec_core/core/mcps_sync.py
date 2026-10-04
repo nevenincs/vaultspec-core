@@ -42,6 +42,7 @@ from .mcps_ownership import (
     write_ownership,
 )
 from .mcps_targets import coerce_scope, resolve_mcp_targets
+from .mcps_trust import approved_sources
 from .tags import TagError, strip_block, upsert_block
 from .types import McpTarget, SyncResult
 
@@ -208,6 +209,7 @@ def _sync_json_target(
     prune: bool,
     result: SyncResult,
     force_managed: frozenset[str],
+    refused: set[str],
 ) -> None:
     """Reconcile a Claude or Antigravity JSON target without host-only keys."""
     with target_lock(target.path, dry_run=dry_run):
@@ -247,7 +249,7 @@ def _sync_json_target(
         recorded_fingerprints = owned_fingerprints(state, target)
         legacy = raw.pop(LEGACY_MANAGED_KEY, None)
         migrated: set[str] = set()
-        if isinstance(legacy, list):
+        if isinstance(legacy, list) and target.scope is not McpScope.PROJECT:
             legacy_items = cast("list[Any]", legacy)
             migrated = {
                 name
@@ -261,7 +263,7 @@ def _sync_json_target(
                 f"from {target.path}."
             )
         external = set(servers) - managed
-        declined: set[str] = set()
+        declined = set(refused)
         changed = legacy is not None
         changed |= _apply_server_merge(
             servers,
@@ -301,6 +303,7 @@ def _sync_toml_target(
     prune: bool,
     result: SyncResult,
     force_managed: frozenset[str],
+    refused: set[str],
 ) -> None:
     """Reconcile Codex tables inside one comment-bounded managed block."""
     with target_lock(target.path, dry_run=dry_run):
@@ -348,10 +351,14 @@ def _sync_toml_target(
 
         recorded = owned_names(state, target)
         recorded_fingerprints = owned_fingerprints(state, target)
-        managed = (recorded | set(block_servers)) & set(block_servers)
+        managed = (
+            recorded & set(block_servers)
+            if target.scope is McpScope.PROJECT
+            else set(block_servers)
+        )
         servers = {**outside, **block_servers}
-        external = set(outside)
-        declined: set[str] = set()
+        external = set(servers) - managed
+        declined = set(refused)
         changed = _apply_server_merge(
             servers,
             managed,
@@ -380,7 +387,14 @@ def _sync_toml_target(
             ),
         )
         if changed and not dry_run:
-            rendered = render_codex_servers(new_managed)
+            # Repository comment markers carry no ownership authority. Keep
+            # unowned tables in the block when writing other managed entries.
+            preserved = {
+                name: servers[name]
+                for name in set(block_servers) & external
+                if name in servers
+            }
+            rendered = render_codex_servers({**preserved, **new_managed})
             updated = (
                 upsert_block(content, TOML_BLOCK_TYPE, rendered, comment_prefix="# ")
                 if rendered
@@ -453,7 +467,10 @@ def mcp_sync(
         mode = resolve_render_mode(root, package=CORE_DISTRIBUTION_NAME)
 
     parse_warnings: list[str] = []
-    sources = collect_mcp_servers(warnings=parse_warnings, mode=mode, target=root)
+    digests: dict[Path, str] = {}
+    sources = collect_mcp_servers(
+        warnings=parse_warnings, mode=mode, target=root, digests=digests
+    )
     result.warnings.extend(parse_warnings)
     state_path = ownership_path(root, resolved_scope)
     with target_lock(state_path, dry_run=dry_run):
@@ -467,6 +484,13 @@ def mcp_sync(
         for target in targets:
             sub = SyncResult()
             target_sources = normalized_sources(sources, target, sub)
+            candidate_names = set(sources)
+            target_sources = approved_sources(
+                target_sources, digests, root, target, sub
+            )
+            # A refused source did not author the deployed bytes. Keep its
+            # recorded fingerprint rather than adopting a possible hand edit.
+            refused = candidate_names - set(target_sources)
             if target.format is McpTargetFormat.JSON:
                 _sync_json_target(
                     target,
@@ -478,6 +502,7 @@ def mcp_sync(
                     prune=prune,
                     result=sub,
                     force_managed=force_managed,
+                    refused=refused,
                 )
             else:
                 _sync_toml_target(
@@ -489,6 +514,7 @@ def mcp_sync(
                     prune=prune,
                     result=sub,
                     force_managed=force_managed,
+                    refused=refused,
                 )
             result.merge(sub)
             result.per_tool[target.provider.value] = sub

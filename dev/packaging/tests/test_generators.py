@@ -10,6 +10,7 @@ rather than invented, and a pointer never moves backward.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -51,6 +52,116 @@ def write_aggregate(path: Path, digests: dict[str, str]) -> Path:
     body = "".join(f"{digest}  {name}\n" for name, digest in digests.items())
     path.write_text(body, encoding="utf-8", newline="")
     return path
+
+
+@pytest.mark.parametrize("prefix", ["vaultspec-core-v", "v", ""])
+@pytest.mark.parametrize(
+    "version",
+    [
+        VERSION,
+        "1.0.0rc1",
+        "1.0.0a1",
+        "1.0.0b2",
+        "1.0.0.post1",
+        "1.0.0.dev2",
+        "1.0.0+build.1",
+    ],
+)
+def test_release_tag_preserves_canonical_versions(prefix: str, version: str) -> None:
+    assert VAULTSPEC_CORE.version_from_tag(prefix + version) == version
+    formula = homebrew.render(VAULTSPEC_CORE, version, {}, ())
+    assert f'version "{version}"' in formula
+
+
+UNSAFE_VERSIONS = (
+    '0.1.60"; abort; #',
+    "0.1.60#{1+1}",
+    "0.1.60#@value",
+    "0.1.60#$value",
+    "0.1.60\\n",
+    "0.1.60\n",
+    "0.1.60\r\n",
+    "0.1.60\x00",
+    "0.1.60/../../other",
+    "0.1.60%23%7B1%2B1%7D",
+    " 0.1.60",
+    "\uff10.\uff11.\uff16\uff10",
+    "01.1.60",
+    "0.1.60junk",
+    "",
+)
+
+
+@pytest.mark.parametrize(
+    "tag",
+    [
+        prefix + version
+        for prefix in ("vaultspec-core-v", "v", "")
+        for version in UNSAFE_VERSIONS
+    ]
+    + ["vv0.1.60", "vaultspec-core-vv0.1.60", "vaultspec-core-vvaultspec-core-v0.1.60"],
+)
+def test_generate_rejects_invalid_tags_before_writing(tmp_path: Path, tag: str) -> None:
+    with pytest.raises(products.ReleaseTagError, match="invalid release version"):
+        generate(tmp_path, VAULTSPEC_CORE, tag, tmp_path / "missing-checksums")
+    assert not (tmp_path / "bucket").exists()
+    assert not (tmp_path / "Formula").exists()
+
+
+@pytest.mark.parametrize("version", UNSAFE_VERSIONS)
+def test_homebrew_rejects_invalid_direct_versions(version: str) -> None:
+    with pytest.raises(products.ReleaseTagError):
+        homebrew.render(VAULTSPEC_CORE, version, {}, ())
+
+
+def test_injected_release_with_matching_checksums_preserves_channels(
+    tmp_path: Path,
+) -> None:
+    version = VERSION + "#{1+1}"
+    malicious_digests = {
+        VAULTSPEC_CORE.bundle_name(version, target): "a" * 64 for target in ALL_TARGETS
+    }
+    aggregate = write_aggregate(tmp_path / "SHA256SUMS", malicious_digests)
+    channels = (
+        tmp_path / "bucket" / "vaultspec-core.json",
+        tmp_path / "Formula" / "vaultspec-core.rb",
+    )
+    for path in channels:
+        path.parent.mkdir()
+        path.write_text("existing channel pointer", encoding="utf-8")
+
+    with pytest.raises(products.ReleaseTagError):
+        generate(tmp_path, VAULTSPEC_CORE, VAULTSPEC_CORE.tag_for(version), aggregate)
+
+    assert all(
+        path.read_text(encoding="utf-8") == "existing channel pointer"
+        for path in channels
+    )
+
+
+def test_homebrew_escapes_every_dynamic_ruby_literal() -> None:
+    payload = '"\\#{1+1}#@value#$value\nEOS\n\x00 café'
+    literal = '"\\"\\\\\\#{1+1}\\#@value\\#$value\\nEOS\\n\\u0000 café"'
+    product = replace(
+        VAULTSPEC_CORE,
+        description=payload,
+        homepage=payload,
+        license=payload,
+        tag_prefix=payload,
+        executables=(products.Executable(payload, "test"),),
+        notes=(payload,),
+    )
+    target = products.MACOS_ARM64
+    asset = product.bundle_name(VERSION, target)
+    formula = homebrew.render(product, VERSION, {asset: payload}, (target,))
+    for field in ("desc", "homepage", "license", "sha256", "bin.install"):
+        assert f"{field} {literal}" in formula
+    assert "<<~EOS" not in formula
+    assert "shell_output(bin.to_s + " in formula
+    assert 'regex(Regexp.new("' in formula
+    # All interpolation starters from metadata remain escaped in the source.
+    for marker in ("#{", "#@", "#$"):
+        assert marker not in formula.replace("\\" + marker, "")
 
 
 def test_generator_bundle_names_are_target_specific_and_stable() -> None:

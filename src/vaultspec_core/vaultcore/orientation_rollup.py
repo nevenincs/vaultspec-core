@@ -51,6 +51,7 @@ def compute_rollup(
     since_days: int | None = None,
     verbose_exec: bool = False,
     graph: VaultGraph | None = None,
+    use_cache: bool = True,
     today: _dt.date | None = None,
 ) -> Rollup:
     """Compute the vault-wide orientation rollup.
@@ -70,6 +71,8 @@ def compute_rollup(
             excluded from ``recent_documents`` so they never flood the view.
         graph: Optional pre-built :class:`~vaultspec_core.graph.VaultGraph`
             to reuse; one is built from *root_dir* when omitted.
+        use_cache: Whether a newly built graph may read and write its cache.
+            Set to ``False`` for reads that must not persist workspace state.
         today: Reference date for the *since_days* window, defaulting to
             :func:`~vaultspec_core.vaultcore.models.vault_today`. Exposed
             for deterministic tests.
@@ -82,7 +85,7 @@ def compute_rollup(
     from .models import vault_today
     from .query import get_stats
 
-    g = graph if graph is not None else VaultGraph(root_dir)
+    g = graph if graph is not None else VaultGraph(root_dir, use_cache=use_cache)
     reference = today if today is not None else vault_today()
 
     # Index documents are derived aggregates of a feature's other docs;

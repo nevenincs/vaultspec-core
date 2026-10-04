@@ -26,6 +26,7 @@ from .networkx_runtime import node_link_data, node_link_graph
 
 if TYPE_CHECKING:
     import pathlib
+    from collections.abc import Iterable
 
     from . import cache
     from .models import DocNode
@@ -93,12 +94,24 @@ def to_cache_graph(
     return data
 
 
-def restore_graph(payload: cache.GraphCachePayload) -> RestoredGraph:
+def _path_key(path: pathlib.Path) -> pathlib.Path:
+    """Match cache spellings to this scan without making vanished paths fatal."""
+    try:
+        return path.resolve()
+    except OSError:
+        return path
+
+
+def restore_graph(
+    payload: cache.GraphCachePayload,
+    *,
+    document_paths: Iterable[pathlib.Path] = (),
+) -> RestoredGraph:
     """Rebuild the graph state from an already-validated cache *payload*.
 
     The result is behaviourally identical to a fresh build - same nodes,
-    edges, attributes, node-size metrics and document text - and no filesystem
-    read occurs. Restoring the raw-text map is what lets
+    edges, attributes, node-size metrics and document text - and no
+    document bytes are read. Restoring the raw-text map is what lets
     :meth:`~vaultspec_core.graph.api.VaultGraph.ensure_raw_texts` find its work
     already done after a cache hit.
 
@@ -109,6 +122,8 @@ def restore_graph(payload: cache.GraphCachePayload) -> RestoredGraph:
     Args:
         payload: A payload that has passed
             :func:`vaultspec_core.graph.cache.validate`.
+        document_paths: Current scan paths, used to rebase cached workspace
+            aliases before consumers perform contained reads.
 
     Returns:
         The reconstructed :class:`RestoredGraph`.
@@ -121,6 +136,7 @@ def restore_graph(payload: cache.GraphCachePayload) -> RestoredGraph:
     nodes: dict[str, DocNode] = {}
     raw_texts: dict[pathlib.Path, tuple[str, bool]] = {}
     by_stem: dict[str, list[str]] = {}
+    current_paths = {_path_key(path): path for path in document_paths}
 
     for key in digraph.nodes():
         attrs = digraph.nodes[key]
@@ -132,6 +148,9 @@ def restore_graph(payload: cache.GraphCachePayload) -> RestoredGraph:
         crlf = cast("bool", attrs.pop("crlf", False))
         node_path = nodes[key].path
         if node_path is not None:
+            node_path = current_paths.get(_path_key(node_path), node_path)
+            nodes[key].path = node_path
+            attrs["path"] = str(node_path)
             raw_texts[node_path] = (raw, crlf)
         nodes[key].body = split_frontmatter(raw).body if raw else ""
         # Phantoms are excluded from the stem index to match fresh-build
@@ -146,7 +165,14 @@ def restore_graph(payload: cache.GraphCachePayload) -> RestoredGraph:
     # the cache carries these separately; restoring them keeps a warm run's
     # encoding findings identical to a cold one's.
     encoding_issues = [
-        EncodingIssue(pathlib.Path(raw_path), kind, detail, start)
+        EncodingIssue(
+            current_paths.get(
+                _path_key(pathlib.Path(raw_path)), pathlib.Path(raw_path)
+            ),
+            kind,
+            detail,
+            start,
+        )
         for raw_path, kind, detail, start in payload.encoding_issues
     ]
     logger.info(

@@ -220,6 +220,9 @@ jobs:
 
       - name: Run repository-health guards
         if: ${{ !cancelled() && steps.init.outcome == 'success' }}
+        env:
+          # gh verifies the published wheel's attestation before isolated execution.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just test-repo
 
       - name: Run broad test suite

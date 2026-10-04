@@ -154,13 +154,13 @@ def skills_add(
     Raises:
         ResourceExistsError: If the skill exists and *force* is ``False``.
     """
+    from .resources import resource_destination
+
     ctx = _t.get_context()
-    ensure_dir(ctx.skills_src_dir)
-
     skill_name = name
-
-    skill_dir = ctx.skills_src_dir / skill_name
+    skill_dir = resource_destination(name, ctx.skills_src_dir, is_dir=True)
     file_path = skill_dir / "SKILL.md"
+    ensure_dir(ctx.skills_src_dir)
 
     if skill_dir.exists() and not force:
         raise ResourceExistsError(

@@ -59,7 +59,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import override
+from typing import cast, override
 
 #: The one `just` version the whole fleet installs. See rule 3 above.
 JUST_VERSION = "1.38.0"
@@ -478,17 +478,19 @@ def _runner_placement_lines(path: Path, text: str) -> list[Finding]:
     return findings
 
 
-def _matrix_proven(matrix, key, depth):
+def _matrix_proven(matrix: object, key: str, depth: int) -> bool:
     if not isinstance(matrix, dict):
         return False
+    matrix = cast("dict[object, object]", matrix)
     axis = matrix.get(key)
-    values = list(axis) if isinstance(axis, list) else []
+    values = list(cast("list[object]", axis)) if isinstance(axis, list) else []
     include = matrix.get("include", [])
     if not isinstance(include, list):
         return False
-    for row in include:
+    for row in cast("list[object]", include):
         if not isinstance(row, dict):
             return False
+        row = cast("dict[object, object]", row)
         if key in row:
             values.append(row[key])
         elif not isinstance(axis, list):
@@ -498,13 +500,17 @@ def _matrix_proven(matrix, key, depth):
     )
 
 
-def _selector_proven(raw, matrix, depth=0):
+def _selector_proven(raw: object, matrix: object, depth: int = 0) -> bool:
     if depth > 20 or not isinstance(raw, (str, list, dict)):
         return False
     if isinstance(raw, dict):
-        return _selector_proven(raw.get("labels"), matrix, depth + 1)
+        return _selector_proven(
+            cast("dict[object, object]", raw).get("labels"), matrix, depth + 1
+        )
     if isinstance(raw, list):
-        return all(isinstance(label, str) for label in raw) and _names_self_hosted(raw)
+        return all(
+            isinstance(label, str) for label in cast("list[object]", raw)
+        ) and _names_self_hosted(cast("list[str]", raw))
     raw = raw.strip()
     if _GUARDED_MATRIX.fullmatch(raw) or _closed_mapping(raw):
         return True
@@ -522,16 +528,20 @@ def runner_placement(path: Path, text: str) -> list[Finding]:
         return [Finding(path, 1, PLACEMENT, f"{detail}. {HOSTED_FORBIDDEN}")]
 
     try:
-        document = yaml.safe_load(text)
+        document: object = yaml.safe_load(text)
     except yaml.YAMLError as error:
         return fail(f"invalid workflow YAML: {error}")
-    if not isinstance(document, dict) or not isinstance(document.get("jobs"), dict):
+    if not isinstance(document, dict):
+        return fail("workflow has no jobs mapping")
+    jobs = cast("dict[object, object]", document).get("jobs")
+    if not isinstance(jobs, dict):
         return fail("workflow has no jobs mapping")
 
-    findings = []
-    for name, job in document["jobs"].items():
+    findings: list[Finding] = []
+    for name, job in cast("dict[object, object]", jobs).items():
         if not isinstance(job, dict):
             return fail(f"{name}: invalid job mapping")
+        job = cast("dict[object, object]", job)
         if "uses" in job and "runs-on" not in job:
             target = job["uses"]
             if not isinstance(target, str) or not target.startswith(
@@ -545,6 +555,7 @@ def runner_placement(path: Path, text: str) -> list[Finding]:
         strategy = job.get("strategy", {})
         if not isinstance(strategy, dict):
             return fail(f"{name}: invalid strategy mapping")
+        strategy = cast("dict[object, object]", strategy)
         if not _selector_proven(job.get("runs-on"), strategy.get("matrix")):
             findings.extend(
                 fail(

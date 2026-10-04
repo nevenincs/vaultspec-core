@@ -35,6 +35,12 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ...cli._migration_hook import ensure_migrated
+from ...core.corpus_io import UnsafeDocumentError
+from ...core.document_io import (
+    DocumentLimitError,
+    document_read_budget,
+    read_document_bytes,
+)
 from ...core.types import get_context as _get_ctx
 from ...core.windowing import clip_text
 from ...vaultcore.markdown import iter_headings
@@ -785,7 +791,8 @@ def _find_features(limit: int, want_json: bool) -> list[FindEntry]:
     graph_unavailable = False
     graph: VaultGraph | None = None
     try:
-        graph = VaultGraph(root_dir)
+        # ``find`` is read-only on both server surfaces, including cache misses.
+        graph = VaultGraph(root_dir, use_cache=False)
         rankings = dict(graph.get_feature_rankings(limit=100))
     except (OSError, ValueError) as exc:
         logger.warning("Failed to load vault graph rankings: %s", exc)
@@ -797,7 +804,7 @@ def _find_features(limit: int, want_json: bool) -> list[FindEntry]:
         # The orientation rollup is only needed for the enriched lifecycle
         # status; the cheap listing path skips building the graph twice.
         rollup = compute_rollup(
-            root_dir, graph=graph if not graph_unavailable else None
+            root_dir, graph=graph if not graph_unavailable else None, use_cache=False
         )
         active_by_name = {f.name: f for f in rollup.active_features}
 
@@ -841,6 +848,11 @@ _FULL_BODY_MAX_ROWS = 5
 #: bytes, as the reply budget is, so text in a multi-byte script costs no more
 #: than ASCII does.
 _EXCERPT_BYTES = 600
+
+# Include graph ingestion and metadata discovery, not just selected bodies.
+_DOCUMENT_FILE_BYTES = 1024 * 1024
+_DOCUMENT_READ_BYTES = 128 * 1024 * 1024
+_FIND_RESPONSE_BYTES = 128 * 1024
 
 
 def _matches_text(doc: Any, needle: str) -> bool:
@@ -919,7 +931,10 @@ def _find_documents(
     for doc in all_docs[:limit]:
         raw: bytes | None = None
         try:
-            raw = doc.path.read_bytes()
+            raw = read_document_bytes(doc.path, root_dir=root_dir)
+        except UnsafeDocumentError:
+            logger.warning("Skipped unsafe document %s", doc.name)
+            continue
         except OSError:
             logger.warning("Failed to read %s for blob hash", doc.name)
         entry = FindEntry(
@@ -994,7 +1009,7 @@ def register_document_tools(
             open_world_hint=False,
         ),
     )
-    @compact_result()
+    @compact_result(max_response_bytes=_FIND_RESPONSE_BYTES)
     @_isolated_context
     async def find(
         ctx: Context[Any, Any],
@@ -1045,7 +1060,11 @@ def register_document_tools(
         )
 
         if not feature and not type and not date and not text:
-            rows = _find_features(limit, json)
+            try:
+                with document_read_budget(_DOCUMENT_FILE_BYTES, _DOCUMENT_READ_BYTES):
+                    rows = _find_features(limit, json)
+            except DocumentLimitError as exc:
+                raise ToolError(str(exc)) from exc
             logger.debug("Listed %d features.", len(rows))
             return rows
 
@@ -1057,7 +1076,11 @@ def register_document_tools(
                 f"matter."
             )
             raise ToolError(msg)
-        rows = _find_documents(feature, type, date, body, limit, text)
+        try:
+            with document_read_budget(_DOCUMENT_FILE_BYTES, _DOCUMENT_READ_BYTES):
+                rows = _find_documents(feature, type, date, body, limit, text)
+        except DocumentLimitError as exc:
+            raise ToolError(str(exc)) from exc
         logger.debug("Found %d documents.", len(rows))
         return rows
 

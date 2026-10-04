@@ -12,8 +12,10 @@ import pytest
 from typer.testing import CliRunner
 
 from vaultspec_core.cli import app
+from vaultspec_core.core.enums import McpScope
 from vaultspec_core.core.manifest import read_manifest_data, write_manifest_data
 from vaultspec_core.core.mcps import render_mcp_definition_for_mode
+from vaultspec_core.core.mcps_ownership import ownership_path as host_ownership_path
 from vaultspec_core.core.workspace_mode import resolve_render_mode
 
 if TYPE_CHECKING:
@@ -306,9 +308,10 @@ class TestSyncAuthority:
         assert "codex" not in output
 
     def test_provider_scoped_sync_repairs_only_requested_native_mcp_state(
-        self, runner: CliRunner, synthetic_project: Path
+        self, runner: CliRunner, in_synthetic_project: Path
     ) -> None:
         """Provider-scoped sync repairs its native target without touching peers."""
+        synthetic_project = in_synthetic_project
         mcp_path = synthetic_project / ".mcp.json"
         codex_path = synthetic_project / ".codex" / "config.toml"
         codex_before = codex_path.read_bytes()
@@ -326,7 +329,7 @@ class TestSyncAuthority:
         assert repaired["mcpServers"]["vaultspec-core"]["args"] != [
             "run",
             "broken-server",
-        ]
+        ], result.output
         assert codex_path.read_bytes() == codex_before
 
     def test_provider_scoped_sync_respects_skip_for_requested_provider(
@@ -461,7 +464,20 @@ class TestSyncAuthority:
             "command": "node",
             "args": ["user-server.js"],
         }
-        payload["_vaultspecManaged"] = ["stale-managed", "vaultspec-core"]
+        from vaultspec_core.core.mcps_ownership import (
+            fingerprint,
+            read_ownership,
+            write_ownership,
+        )
+
+        state_path = host_ownership_path(synthetic_project, McpScope.PROJECT)
+        state = read_ownership(state_path)
+        target_record = state["targets"][f"claude:project:{mcp_path.resolve()}"]
+        assert "managed" in target_record
+        target_record["managed"]["stale-managed"] = fingerprint(
+            payload["mcpServers"]["stale-managed"]
+        )
+        write_ownership(state_path, state)
         mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
         before = runner.invoke(
@@ -487,13 +503,13 @@ class TestSyncAuthority:
         }
         assert "_vaultspecManaged" not in repaired
         ownership = json.loads(
-            (synthetic_project / ".vaultspec" / "mcp-ownership.json").read_text(
+            host_ownership_path(synthetic_project, McpScope.PROJECT).read_text(
                 encoding="utf-8"
             )
         )
-        assert set(ownership["targets"]["claude:project"]["managed"]) == {
-            "vaultspec-core"
-        }
+        assert set(
+            ownership["targets"][f"claude:project:{mcp_path.resolve()}"]["managed"]
+        ) == {"vaultspec-core"}
 
         after = runner.invoke(
             app,
@@ -530,7 +546,7 @@ class TestSyncAuthority:
             }
         }
         mcp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        ownership_path = synthetic_project / ".vaultspec" / "mcp-ownership.json"
+        ownership_path = host_ownership_path(synthetic_project, McpScope.PROJECT)
         ownership_path.unlink()
 
         plain = runner.invoke(
@@ -540,8 +556,10 @@ class TestSyncAuthority:
         assert "--force" in plain.output
         preserved = json.loads(mcp_path.read_text(encoding="utf-8"))
         assert preserved["mcpServers"]["vaultspec-core"]["args"] == ["user-authored.js"]
-        plain_ownership = json.loads(ownership_path.read_text(encoding="utf-8"))
-        assert "claude:project" not in plain_ownership["targets"]
+        from vaultspec_core.core.mcps_ownership import read_ownership
+
+        plain_ownership = read_ownership(ownership_path)
+        assert f"claude:project:{mcp_path.resolve()}" not in plain_ownership["targets"]
 
         forced = runner.invoke(
             app,
@@ -552,4 +570,7 @@ class TestSyncAuthority:
         assert adopted["mcpServers"]["vaultspec-core"] == expected_config
         assert "_vaultspecManaged" not in adopted
         ownership = json.loads(ownership_path.read_text(encoding="utf-8"))
-        assert "vaultspec-core" in ownership["targets"]["claude:project"]["managed"]
+        assert (
+            "vaultspec-core"
+            in ownership["targets"][f"claude:project:{mcp_path.resolve()}"]["managed"]
+        )

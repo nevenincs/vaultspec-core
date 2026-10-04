@@ -56,11 +56,14 @@ def iter_document_texts(root_dir: Path):
     Yields:
         ``(path, text, has_crlf)`` tuples in scan order.
     """
+    from ...core.document_io import read_document_bytes
     from ..scanner import scan_vault
 
     for doc_path in scan_vault(root_dir):
         try:
-            raw_content = doc_path.read_bytes().decode("utf-8")
+            raw_content = read_document_bytes(doc_path, root_dir=root_dir).decode(
+                "utf-8"
+            )
         except (OSError, UnicodeDecodeError):
             continue
         yield doc_path, raw_content, "\r\n" in raw_content

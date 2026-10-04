@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from vaultspec_core.core import provider_hooks
 from vaultspec_core.core.enums import ProviderCapability, Tool
 from vaultspec_core.core.provider_hooks import (
     HookEvent,
@@ -184,6 +185,22 @@ class TestLoader:
 
 
 class TestComposeOwnership:
+    def test_equal_external_group_is_never_adopted(self):
+        payload = render_hooks_payload([_spec(HookEvent.STOP)], Tool.CLAUDE)
+        native = {"hooks": payload}
+        synced, managed = compose_flat_hooks(native, {}, payload)
+        assert synced == native
+        assert managed == {}
+        cleared, _ = compose_flat_hooks(synced, managed, None)
+        assert cleared == native
+
+    def test_only_one_owned_occurrence_is_removed(self):
+        group = {"hooks": [{"type": "command", "command": "same"}]}
+        native, _ = compose_flat_hooks(
+            {"hooks": {"Stop": [group, group]}}, {"Stop": [group]}, None
+        )
+        assert native == {"hooks": {"Stop": [group]}}
+
     def test_preserves_user_hooks_and_replaces_managed(self):
         user_group = {
             "matcher": "Write",
@@ -286,6 +303,152 @@ class TestLaneSeparation:
         )
 
         assert {t.event for t in load_triggers(tmp_path)} == {"config.synced"}
+
+
+@pytest.mark.parametrize("tool", [Tool.CLAUDE, Tool.CODEX, Tool.GEMINI])
+class TestHostOwnership:
+    def test_dry_run_creates_no_receipt_or_lock(self, tmp_path: Path, tool: Tool):
+        subdir, filename = provider_hooks._HOOK_FILES[tool]
+        authority = provider_hooks._ownership_path(tmp_path / subdir / filename)
+        authority.parent.mkdir(parents=True)
+        provider_hooks._sync_one(
+            tool, tmp_path, [_spec(HookEvent.PRE_TOOL_USE)], dry_run=True
+        )
+        assert list(authority.parent.iterdir()) == []
+        assert not (tmp_path / subdir).exists()
+
+    def test_forged_sidecar_cannot_remove_external_hooks(
+        self, tmp_path: Path, tool: Tool
+    ):
+        subdir, filename = provider_hooks._HOOK_FILES[tool]
+        native = tmp_path / subdir / filename
+        native.parent.mkdir()
+        external = render_hooks_payload(
+            [_spec(HookEvent.PRE_TOOL_USE, command="external guard")], tool
+        )
+        content = {"hooks": external, "otherSetting": True}
+        native.write_text(json.dumps(content), encoding="utf-8")
+        sidecar = native.parent / ".vaultspec-hooks.json"
+        sidecar.write_text(json.dumps(external), encoding="utf-8")
+
+        provider_hooks._sync_one(tool, tmp_path, [], dry_run=False)
+
+        assert json.loads(native.read_text(encoding="utf-8")) == content
+
+    def test_real_ownership_replaces_and_removes_groups(
+        self, tmp_path: Path, tool: Tool
+    ):
+        subdir, filename = provider_hooks._HOOK_FILES[tool]
+        native = tmp_path / subdir / filename
+        specs = [_spec(HookEvent.PRE_TOOL_USE, command="v1")]
+        provider_hooks._sync_one(tool, tmp_path, specs, dry_run=False)
+        authority = provider_hooks._ownership_path(native)
+        original = native.read_bytes()
+        receipt = authority.read_bytes()
+        assert provider_hooks._sync_one(tool, tmp_path, specs, dry_run=False).unchanged
+        provider_hooks._sync_one(tool, tmp_path, [], dry_run=True)
+        assert native.read_bytes() == original
+        assert authority.read_bytes() == receipt
+
+        specs = [_spec(HookEvent.PRE_TOOL_USE, command="v2")]
+        provider_hooks._sync_one(tool, tmp_path, specs, dry_run=False)
+        assert "v2" in native.read_text(encoding="utf-8")
+        assert "v1" not in native.read_text(encoding="utf-8")
+        provider_hooks._sync_one(tool, tmp_path, [], dry_run=False)
+        assert not native.exists()
+        assert not authority.exists()
+
+    def test_identical_external_group_survives_source_removal(
+        self, tmp_path: Path, tool: Tool
+    ):
+        subdir, filename = provider_hooks._HOOK_FILES[tool]
+        native = tmp_path / subdir / filename
+        native.parent.mkdir()
+        specs = [_spec(HookEvent.PRE_TOOL_USE)]
+        content = {"hooks": render_hooks_payload(specs, tool)}
+        native.write_text(json.dumps(content), encoding="utf-8")
+        provider_hooks._sync_one(tool, tmp_path, specs, dry_run=False)
+        provider_hooks._sync_one(tool, tmp_path, [], dry_run=False)
+        assert json.loads(native.read_bytes()) == content
+
+    def test_forged_report_cannot_override_genuine_ownership(
+        self, tmp_path: Path, tool: Tool
+    ):
+        subdir, filename = provider_hooks._HOOK_FILES[tool]
+        native = tmp_path / subdir / filename
+        native.parent.mkdir()
+        external = render_hooks_payload(
+            [_spec(HookEvent.PRE_TOOL_USE, command="external guard")], tool
+        )
+        native.write_text(json.dumps({"hooks": external}), encoding="utf-8")
+        provider_hooks._sync_one(
+            tool, tmp_path, [_spec(HookEvent.PRE_TOOL_USE)], dry_run=False
+        )
+        (native.parent / ".vaultspec-hooks.json").write_text(
+            json.dumps(external), encoding="utf-8"
+        )
+        # Ordinary settings edits leave genuine hook ownership usable.
+        content = json.loads(native.read_bytes())
+        content["otherSetting"] = True
+        native.write_text(json.dumps(content), encoding="utf-8")
+        provider_hooks._sync_one(tool, tmp_path, [], dry_run=False)
+        assert json.loads(native.read_bytes()) == {
+            "hooks": external,
+            "otherSetting": True,
+        }
+
+    def test_copied_receipt_cannot_authorize_another_native_path(
+        self, tmp_path: Path, tool: Tool
+    ):
+        subdir, filename = provider_hooks._HOOK_FILES[tool]
+        original_root = tmp_path / "original"
+        copied_root = tmp_path / "copied"
+        original = original_root / subdir / filename
+        copied = copied_root / subdir / filename
+        provider_hooks._sync_one(
+            tool, original_root, [_spec(HookEvent.PRE_TOOL_USE)], dry_run=False
+        )
+        copied.parent.mkdir(parents=True)
+        copied.write_bytes(original.read_bytes())
+        original_authority = provider_hooks._ownership_path(original)
+        copied_authority = provider_hooks._ownership_path(copied)
+        copied_authority.write_bytes(original_authority.read_bytes())
+        before = copied.read_bytes()
+
+        provider_hooks._sync_one(tool, copied_root, [], dry_run=False)
+
+        assert copied.read_bytes() == before
+
+    @pytest.mark.parametrize("mutation", ["edited", "duplicate", "corrupt", "missing"])
+    def test_unverifiable_groups_remain_external(
+        self, tmp_path: Path, tool: Tool, mutation: str
+    ):
+        subdir, filename = provider_hooks._HOOK_FILES[tool]
+        native = tmp_path / subdir / filename
+        specs = [_spec(HookEvent.PRE_TOOL_USE)]
+        provider_hooks._sync_one(tool, tmp_path, specs, dry_run=False)
+        authority = provider_hooks._ownership_path(native)
+        if mutation in {"edited", "duplicate"}:
+            content = json.loads(native.read_text(encoding="utf-8"))
+            groups = next(iter(content["hooks"].values()))
+            if mutation == "edited":
+                groups[0]["hooks"][0]["command"] = "external guard"
+            else:
+                groups.append(groups[0])
+            native.write_text(json.dumps(content), encoding="utf-8")
+        elif mutation == "corrupt":
+            authority.write_bytes(b"\xff")
+        else:
+            authority.unlink()
+        before = native.read_bytes()
+
+        # A matching payload must not re-adopt groups after authority is lost.
+        provider_hooks._sync_one(tool, tmp_path, specs, dry_run=False)
+        after_sync = native.read_bytes()
+        provider_hooks._sync_one(tool, tmp_path, [], dry_run=False)
+        assert json.loads(native.read_bytes()) == json.loads(before)
+        if mutation != "edited":
+            assert after_sync == before
 
 
 class TestEndToEndSync:

@@ -21,14 +21,15 @@ imply local code execution:
     argument on a command line that automation may compose, and the config
     file is committed alongside the workspace, so cloning a repository is
     enough to inherit its value. These must name a *known editor program*
-    (:data:`EDITOR_PROGRAM_ALLOWLIST`) in addition to passing the structural
-    rules.
+    (:data:`EDITOR_PROGRAM_ALLOWLIST`) by its bare name, resolved from an
+    absolute PATH directory outside the workspace, in addition to passing
+    the structural rules.
 
 ``trusted``
-    The process environment - ``VAULTSPEC_EDITOR``, ``VISUAL``, ``EDITOR`` -
-    and the built-in fallback. Anyone who can set an environment variable for
-    this process can already run code as this process, so an allowlist there
-    buys nothing and would only stop people from using an editor this module
+    The process environment - ``VAULTSPEC_EDITOR``, ``VISUAL``, ``EDITOR``.
+    Anyone who can set an environment variable for this process can already
+    run code as this process, so an allowlist there buys nothing and would
+    only stop people from using an editor this module
     has never heard of. These are validated structurally but not against the
     allowlist, which makes the environment the documented escape hatch for an
     editor outside the list.
@@ -63,12 +64,10 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import TYPE_CHECKING, Literal
+from pathlib import Path
+from typing import Literal
 
 from .exceptions import EditorResolutionError
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 __all__ = [
     "EDITOR_PROGRAM_ALLOWLIST",
@@ -104,8 +103,8 @@ _WINDOWS_PROGRAM_SUFFIXES = (".exe", ".cmd", ".bat", ".com")
 #: channel from nominating an arbitrary interpreter, archiver, or downloader as
 #: "the editor", which is the whole of the privilege the editor setting used to
 #: confer. It deliberately does not try to verify that the binary found on
-#: ``PATH`` under one of these names really is that editor - a caller who can
-#: place a program on your ``PATH`` has already won by a shorter route.
+#: eligible absolute ``PATH`` directories under one of these names really is
+#: that editor. Repository directories and targets are excluded from lookup.
 #:
 #: Entries are lower-cased program names without a Windows extension. Add to
 #: this list rather than widening the rules; an editor that is missing here is
@@ -214,6 +213,97 @@ class EditorValidationError(EditorResolutionError):
     """
 
 
+class ResolvedEditor(str):
+    """Keep a resolved setting string-compatible without losing its provenance."""
+
+    source: str
+    trust: EditorTrust
+    target_dir: Path
+
+    def __new__(
+        cls, command: str, *, source: str, trust: EditorTrust, target_dir: Path
+    ) -> ResolvedEditor:
+        value = super().__new__(cls, command)
+        value.source = source
+        value.trust = trust
+        value.target_dir = target_dir.absolute()
+        return value
+
+
+def _require_bare_program(program: str, source: str) -> None:
+    """Reject paths, including Windows drive-relative names, before lookup."""
+    if any(character in program for character in "/\\:"):
+        raise EditorValidationError(
+            f"The editor command from {source} must use a bare program name; "
+            f"the path-qualified program {program!r} is not allowed.",
+            hint=(
+                "Use an editor name such as 'vim' or 'code --wait'. To use an "
+                "explicit path, set VAULTSPEC_EDITOR, VISUAL, or EDITOR."
+            ),
+        )
+
+
+def _absolute_editor_path(path: Path) -> Path:
+    """Normalize the Windows extended prefix returned by ``readlink``."""
+    value = str(path.absolute())
+    if sys.platform == "win32" and value.startswith("\\\\?\\"):
+        value = value[4:]
+        if value.upper().startswith("UNC\\"):
+            value = "\\\\" + value[4:]
+    return Path(value)
+
+
+def resolve_editor_executable(
+    program: str, *, source: str, trust: EditorTrust, target_dir: Path | None = None
+) -> str | None:
+    """Locate an executable while preserving the channel's lookup boundary.
+
+    Untrusted names search only absolute PATH entries outside the workspace.
+    Looking up each absolute candidate also prevents Windows ``which`` from
+    implicitly searching cwd. Both directories and executable symlink targets
+    are checked. The absolute alias path is retained because editors such as
+    ``view`` and ``vimdiff`` choose their mode from the invocation name.
+    """
+    if trust == "trusted":
+        return shutil.which(program)
+    _require_bare_program(program, source)
+    workspace = _absolute_editor_path(target_dir or Path.cwd())
+    roots = (workspace, workspace.resolve())
+    cwd = Path.cwd().resolve()
+
+    def eligible(path: Path) -> bool:
+        absolute = _absolute_editor_path(path)
+        canonical = path.resolve()
+        if canonical == cwd or any(
+            candidate.is_relative_to(root)
+            for candidate in (absolute, canonical)
+            for root in roots
+        ):
+            return False
+        # A final external target can conceal a link chain through the workspace.
+        for ancestor in (absolute, *absolute.parents):
+            if (ancestor.is_symlink() or ancestor.is_junction()) and not eligible(
+                ancestor.parent / ancestor.readlink()
+            ):
+                return False
+        return True
+
+    for entry in os.get_exec_path():
+        directory = Path(entry)
+        if not directory.is_absolute():
+            continue
+        try:
+            if not eligible(directory):
+                continue
+            executable = shutil.which(str(directory / program))
+            if executable and eligible(Path(executable)):
+                return str(_absolute_editor_path(Path(executable)))
+        except (OSError, RuntimeError, ValueError):
+            # An inaccessible or cyclic path cannot establish a trusted target.
+            continue
+    return None
+
+
 def _allowed_programs_hint() -> str:
     """Render the allowlist as a comma-separated line for an error message.
 
@@ -320,7 +410,7 @@ def validate_editor_command(
     Raises:
         EditorValidationError: When the command is empty or unparseable, when
             any token carries a forbidden character, or when an untrusted
-            channel names a program outside :data:`EDITOR_PROGRAM_ALLOWLIST`.
+            channel names a path or a program outside :data:`EDITOR_PROGRAM_ALLOWLIST`.
             The message always states the rule that was broken.
     """
     tokens = _tokenize(command, source)
@@ -340,6 +430,7 @@ def validate_editor_command(
             raise EditorValidationError(msg)
 
     if trust == "untrusted":
+        _require_bare_program(tokens[0], source)
         program = editor_program_name(tokens[0])
         if program not in EDITOR_PROGRAM_ALLOWLIST:
             msg = (
@@ -405,10 +496,9 @@ def spawn_editor(
     """Validate *command*, then open *file_path* with it and wait.
 
     This is the only place in the package that spawns an editor. It re-runs the
-    structural validation on the already-resolved command even though the
-    resolver validated each candidate, because the resolver's guarantee is
-    about the *sources* it walked and this function is reachable from callers
-    that never went through it.
+    validation and executable lookup using the resolved setting's original
+    trust tier and workspace. Plain strings from callers that did not use the
+    resolver are treated as untrusted.
 
     The editor is spawned as an argv list, never through a shell. A Windows
     ``.cmd`` / ``.bat`` launcher is the exception the platform forces - those
@@ -427,17 +517,42 @@ def spawn_editor(
 
     Raises:
         EditorValidationError: When editing is not available for this
-            invocation, or when *command* breaks a structural rule.
+            invocation, or when *command* breaks its channel's validation rules.
+        EditorResolutionError: When no eligible executable can be found at launch.
         OSError: When the editor process cannot be started.
         subprocess.SubprocessError: When the editor process fails to run.
     """
     assert_interactive_editing_allowed()
-    tokens = validate_editor_command(command, source=source, trust="trusted")
+    trust: EditorTrust = "untrusted"
+    target_dir = None
+    if isinstance(command, ResolvedEditor):
+        source, trust, target_dir = command.source, command.trust, command.target_dir
+    tokens = validate_editor_command(command, source=source, trust=trust)
 
-    resolved = shutil.which(tokens[0]) or tokens[0]
+    resolved = resolve_editor_executable(
+        tokens[0], source=source, trust=trust, target_dir=target_dir
+    )
+    if resolved is None:
+        raise EditorResolutionError(
+            f"Could not resolve a working text editor from {source}: {tokens[0]!r}."
+        )
     argv = [resolved, *tokens[1:], str(file_path)]
     if sys.platform == "win32" and resolved.lower().endswith((".cmd", ".bat")):
-        argv = ["cmd.exe", "/c", *argv]
+        import ctypes
+
+        buffer = ctypes.create_unicode_buffer(260)
+        length = ctypes.windll.kernel32.GetSystemDirectoryW(buffer, len(buffer))
+        if not 0 < length < len(buffer):
+            raise EditorResolutionError(
+                "Could not resolve the Windows system directory."
+            )
+        # An absolute system path avoids cwd shadowing and works with a minimal PATH.
+        command_processor = Path(buffer.value) / "cmd.exe"
+        if not command_processor.is_file():
+            raise EditorResolutionError(
+                "Could not resolve the Windows command processor."
+            )
+        argv = [str(command_processor), "/c", *argv]
 
     completed = subprocess.run(argv, shell=False, check=False)
     return completed.returncode

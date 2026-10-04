@@ -41,6 +41,11 @@ release-please.yml:Find the release pull request and the commit to prove
 release-please.yml:Merge the proven release pull request
 release-please.yml:Name a release this token cannot tag
 release-please.yml:Require the tag on the proven commit
+# Publication authorization runs before checkout; using a recipe would execute
+# the proposed release's code before deciding whether that code is authorized.
+# The publication job also has no checkout and must recheck before OIDC use.
+publish.yml:Authorize the release commit
+publish.yml:Require the authorized tag and release to remain present
 publish.yml:Ask the acquisition check to try this release
 surface.yml:Open a pull request recording the published surface
 # Compares the attached wheel with the built one byte for byte. It runs in the
@@ -112,6 +117,14 @@ publish.yml:Enumerate the distribution to attest
 publish.yml:Publish to PyPI
 publish.yml:Generate checksums
 publish.yml:Verify the attached distribution carries provenance
+
+# Surface handoff: the collector uses only stdlib verification on the host and
+# runs artifact code in a disposable container without host credentials. Its
+# JSON output is explicitly redirected outside the checkout; the writer accepts
+# only that data file. These CI-only paths must not call the local wheel-running
+# release-record-surface recipe in the write-capable job.
+surface.yml:Verify the release and collect its surface without credentials
+surface.yml:Record the latest published release's surface
 
 # Reports the model identifiers currently pinned, for the agent step below it
 # to reconcile. Recipe needed: `audit-model-pins`.

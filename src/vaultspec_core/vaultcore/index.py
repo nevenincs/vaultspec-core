@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from .models import vault_today
+from .normalize import KEBAB_CASE_PATTERN, WINDOWS_RESERVED_NAMES
+from .rename_engine import assert_within
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -43,7 +45,19 @@ class FeatureIndexResult:
 
 def feature_index_lock_target(docs_dir: Path, feature: str) -> Path:
     """Return the ignored per-feature sentinel used by index writers."""
-    return docs_dir / "data" / "index" / feature
+    from ..core.exceptions import VaultSpecError
+
+    # This boundary consumes a graph identity, not user-facing input. Never
+    # normalize it into a different feature before selecting paths or nodes.
+    if KEBAB_CASE_PATTERN.fullmatch(feature) is None:
+        raise VaultSpecError(f"Invalid canonical feature identifier: {feature!r}")
+    if feature in WINDOWS_RESERVED_NAMES:
+        raise VaultSpecError(f"Reserved Windows device name for feature: {feature!r}")
+    lock_dir = assert_within(docs_dir, docs_dir / "data" / "index")
+    target = assert_within(lock_dir, lock_dir / feature)
+    # advisory_lock opens the suffixed path, not the nominal target.
+    assert_within(lock_dir, target.with_suffix(target.suffix + ".lock"))
+    return target
 
 
 def _render_index(
@@ -140,10 +154,10 @@ def generate_feature_index_result(
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
-    index_dir = docs_dir / cfg.index_dir
-    index_path = index_dir / f"{feature}.index.md"
-    today = date_str or vault_today().isoformat()
     lock_target = feature_index_lock_target(docs_dir, feature)
+    index_dir = assert_within(docs_dir, docs_dir / cfg.index_dir)
+    index_path = assert_within(index_dir, index_dir / f"{feature}.index.md")
+    today = date_str or vault_today().isoformat()
     if not dry_run:
         lock_target.parent.mkdir(parents=True, exist_ok=True)
     lock = nullcontext() if dry_run else advisory_lock(lock_target)

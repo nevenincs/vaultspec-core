@@ -325,10 +325,9 @@ class TestSymlinkOutOfBounds:
         for real_doc in _snapshot_real_md(tmp_path).values():
             assert b"EXTERNAL-SECRET" not in real_doc
 
-    def test_symlink_tagged_to_feature_refuses_via_containment(self, tmp_path: Path):
-        # The external target IS tagged to the renamed feature, so the scanner
-        # includes the in-vault symlink in the rename plan; the containment
-        # backstop must refuse before moving it.
+    def test_symlink_tagged_to_feature_is_excluded_from_rename(self, tmp_path: Path):
+        # Even a linked target tagged to the feature is excluded before parsing.
+        # The real feature can still be renamed without reading external content.
         external = tmp_path / "external" / "adr.md"
         _write(external, _doc_text("adr", "real-feature", body="# EXTERNAL-ADR\n"))
         external_before = external.read_bytes()
@@ -339,21 +338,18 @@ class TestSymlinkOutOfBounds:
         if not _plant_symlink(link, external):
             return
 
-        # Sanity: the symlink is discovered as part of the feature.
         names = {d.path.name for d in list_documents(tmp_path, feature="real-feature")}
-        assert f"{DATE}-real-feature-adr.md" in names
+        assert names == {f"{DATE}-real-feature-research.md"}
 
-        before = _snapshot_real_md(tmp_path)
-        with pytest.raises(VaultSpecError) as excinfo:
-            rename_feature(tmp_path, "real-feature", "new-feature")
-        assert "outside the managed directory tree" in str(excinfo.value.__cause__)
-
-        after = _snapshot_real_md(tmp_path)
-        assert set(after) == set(before)
-        for path, original in before.items():
-            assert after[path] == original, f"refused rename mutated {path}"
+        result = rename_feature(tmp_path, "real-feature", "new-feature")
+        assert result["status"] == "updated"
+        assert (
+            tmp_path / ".vault/research" / f"{DATE}-new-feature-research.md"
+        ).is_file()
         assert external.read_bytes() == external_before
         assert link.is_symlink()
+        for real_doc in _snapshot_real_md(tmp_path).values():
+            assert b"EXTERNAL-ADR" not in real_doc
 
     def test_dry_run_does_not_tag_read_symlinked_source(self, tmp_path: Path):
         # A symlinked source tagged to the feature must not be read through during

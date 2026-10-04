@@ -13,6 +13,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vaultspec_core.config import reset_config
+from vaultspec_core.core.enums import McpScope
+from vaultspec_core.core.mcps_ownership import ownership_path as host_ownership_path
+from vaultspec_core.testing.mcp_consent import approved_mcp_sync
 
 if TYPE_CHECKING:
     from vaultspec_core.core.types import WorkspaceContext
@@ -50,9 +53,192 @@ def _init_context(path: Path) -> WorkspaceContext:
 def _owned_names(path: Path, target_key: str = "claude:project") -> set[str]:
     """Read the real external MCP ownership record for one native target."""
     ownership = json.loads(
-        (path / ".vaultspec" / "mcp-ownership.json").read_text(encoding="utf-8")
+        host_ownership_path(path, McpScope.PROJECT).read_text(encoding="utf-8")
     )
-    return set(ownership["targets"][target_key]["managed"])
+    return next(
+        set(record["managed"])
+        for key, record in ownership["targets"].items()
+        if key.startswith(target_key + ":")
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("scope", [McpScope.PROJECT, McpScope.LOCAL])
+@pytest.mark.parametrize("operation", ["refresh", "prune", "uninstall"])
+def test_repository_cannot_forge_mcp_ownership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: McpScope, operation: str
+) -> None:
+    from vaultspec_core.core.enums import Tool
+    from vaultspec_core.core.mcps import mcp_sync, mcp_uninstall
+    from vaultspec_core.core.mcps_ownership import fingerprint
+
+    root, sources = _make_workspace(tmp_path / "repo")
+    host = tmp_path / "claude-home"
+    host.mkdir()
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(host))
+    _init_context(root)
+    external = {"command": "external-user-command"}
+    target = root / ".mcp.json" if scope is McpScope.PROJECT else host / ".claude.json"
+    payload = {"mcpServers": {"victim": external}, "_vaultspecManaged": ["victim"]}
+    if scope is McpScope.LOCAL:
+        payload = {
+            "projects": {
+                root.resolve().as_posix(): {"mcpServers": {"victim": external}}
+            }
+        }
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    forged = {
+        "version": 1,
+        "targets": {
+            "claude:" + scope.value: {
+                "provider": "claude",
+                "scope": scope.value,
+                "path": str(target.resolve()),
+                "managed": {"victim": fingerprint(external)},
+            }
+        },
+    }
+    sidecar = root / ".vaultspec" / "mcp-ownership.json"
+    sidecar.write_text(json.dumps(forged), encoding="utf-8")
+    if operation == "refresh":
+        (sources / "victim.json").write_text(
+            json.dumps({"command": "repo-command"}), encoding="utf-8"
+        )
+    try:
+        if operation == "uninstall":
+            result = mcp_uninstall(root, provider=Tool.CLAUDE, scope=scope)
+        else:
+            result = mcp_sync(
+                target_dir=root,
+                provider=Tool.CLAUDE,
+                scope=scope,
+                prune=operation == "prune",
+            )
+        assert not result.errors
+        observed = json.loads(target.read_text(encoding="utf-8"))
+        servers = (
+            observed["mcpServers"]
+            if scope is McpScope.PROJECT
+            else observed["projects"][root.resolve().as_posix()]["mcpServers"]
+        )
+        assert servers["victim"] == external
+        assert result.updated == result.pruned == 0
+        assert not host_ownership_path(root, scope).exists()
+        assert json.loads(sidecar.read_text(encoding="utf-8")) == forged
+    finally:
+        reset_config()
+
+
+@pytest.mark.unit
+def test_ownership_binds_canonical_targets_and_local_workspaces(tmp_path: Path) -> None:
+    from vaultspec_core.core.enums import McpTargetFormat, Tool
+    from vaultspec_core.core.mcps_ownership import (
+        OwnershipState,
+        fingerprint,
+        owned_fingerprints,
+        owned_names,
+        set_owned_fingerprints,
+    )
+    from vaultspec_core.core.types import McpTarget
+
+    first = McpTarget(
+        provider=Tool.CLAUDE,
+        scope=McpScope.LOCAL,
+        path=tmp_path / "one.json",
+        format=McpTargetFormat.JSON,
+    )
+    second = McpTarget(
+        provider=Tool.CLAUDE,
+        scope=McpScope.LOCAL,
+        path=tmp_path / "two.json",
+        format=McpTargetFormat.JSON,
+    )
+    state: OwnershipState = {"version": 1, "targets": {}}
+    value = fingerprint({"command": "managed"})
+    set_owned_fingerprints(state, first, {"server": value})
+    assert owned_fingerprints(state, first) == {"server": value}
+    assert owned_names(state, second) == set()
+    assert host_ownership_path(tmp_path / "a", McpScope.LOCAL) != host_ownership_path(
+        tmp_path / "b", McpScope.LOCAL
+    )
+    assert host_ownership_path(tmp_path / "a", McpScope.LOCAL) == host_ownership_path(
+        tmp_path / "a" / ".." / "a", McpScope.LOCAL
+    )
+
+
+@pytest.mark.unit
+def test_repository_codex_block_cannot_grant_ownership(tmp_path: Path) -> None:
+    from vaultspec_core.core.enums import Tool
+    from vaultspec_core.core.mcps import mcp_uninstall
+    from vaultspec_core.core.mcps_native import TOML_BLOCK_TYPE, render_codex_servers
+    from vaultspec_core.core.tags import upsert_block
+
+    root, sources = _make_workspace(tmp_path / "repo")
+    target = root / ".codex" / "config.toml"
+    target.parent.mkdir()
+    external = {"command": "user-command"}
+    target.write_text(
+        upsert_block(
+            "",
+            TOML_BLOCK_TYPE,
+            render_codex_servers({"victim": external}),
+            comment_prefix="# ",
+        ),
+        encoding="utf-8",
+    )
+    (sources / "new.json").write_text(
+        json.dumps({"command": "managed"}), encoding="utf-8"
+    )
+    _init_context(root)
+    try:
+        result = approved_mcp_sync(target_dir=root, enrolled={Tool.CODEX}, prune=True)
+        assert not result.errors
+        assert result.added == 1
+        assert result.pruned == 0
+        assert (
+            tomllib.loads(target.read_text(encoding="utf-8"))["mcp_servers"]["victim"]
+            == external
+        )
+        result = mcp_uninstall(root, enrolled={Tool.CODEX})
+        assert not result.errors
+        assert result.pruned == 1
+        assert tomllib.loads(target.read_text(encoding="utf-8"))["mcp_servers"] == {
+            "victim": external
+        }
+    finally:
+        reset_config()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "managed", [["server"], {"server": "not-a-digest"}, {"server": 123}]
+)
+def test_ownership_rejects_malformed_nested_records(
+    tmp_path: Path, managed: object
+) -> None:
+    from vaultspec_core.core.exceptions import VaultSpecError
+    from vaultspec_core.core.mcps_ownership import read_ownership
+
+    target = str((tmp_path / "target.json").resolve())
+    path = tmp_path / "ownership.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "targets": {
+                    f"claude:project:{target}": {
+                        "provider": "claude",
+                        "scope": "project",
+                        "path": target,
+                        "managed": managed,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(VaultSpecError, match="Invalid MCP ownership record"):
+        read_ownership(path)
 
 
 @pytest.mark.unit
@@ -483,9 +669,8 @@ class TestMcpSync:
                 json.dumps(config), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync()
+            result = approved_mcp_sync()
             assert result.added == 1
             assert result.skipped == 0
 
@@ -502,10 +687,9 @@ class TestMcpSync:
                 json.dumps(config), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            mcp_sync()
-            result = mcp_sync()
+            approved_mcp_sync()
+            result = approved_mcp_sync()
             assert result.added == 0
             # A re-sync of an identical entry is `unchanged`, not `skipped`
             # (cli-sync-vocabulary ADR).
@@ -526,11 +710,10 @@ class TestMcpSync:
                 json.dumps(config), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            added = mcp_sync()
+            added = approved_mcp_sync()
             assert ("srv", "[ADD]") in added.items
-            unchanged = mcp_sync()
+            unchanged = approved_mcp_sync()
             assert ("srv", "[UNCHANGED]") in unchanged.items
         finally:
             reset_config()
@@ -547,9 +730,8 @@ class TestMcpSync:
             }
             (path / ".mcp.json").write_text(json.dumps(user_config), encoding="utf-8")
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync()
+            result = approved_mcp_sync()
             assert result.added == 1
 
             mcp_json = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
@@ -567,9 +749,8 @@ class TestMcpSync:
             existing = {"mcpServers": {"srv": {"command": "old"}}}
             (path / ".mcp.json").write_text(json.dumps(existing), encoding="utf-8")
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync(force=False)
+            result = approved_mcp_sync(force=False)
             assert result.skipped == 1
             assert result.updated == 0
             assert any("--force" in w for w in result.warnings)
@@ -586,9 +767,8 @@ class TestMcpSync:
             existing = {"mcpServers": {"srv": {"command": "old"}}}
             (path / ".mcp.json").write_text(json.dumps(existing), encoding="utf-8")
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync(force=True)
+            result = approved_mcp_sync(force=True)
             assert result.updated == 1
 
             mcp_json = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
@@ -603,9 +783,8 @@ class TestMcpSync:
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync(dry_run=True)
+            result = approved_mcp_sync(dry_run=True)
             assert result.added == 1
             assert not (path / ".mcp.json").exists()
         finally:
@@ -621,9 +800,9 @@ class TestMcpUninstall:
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync, mcp_uninstall
+            from vaultspec_core.core.mcps import mcp_uninstall
 
-            mcp_sync()
+            approved_mcp_sync()
             mcp_data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             mcp_data["mcpServers"]["user"] = {"command": "custom"}
             (path / ".mcp.json").write_text(json.dumps(mcp_data), encoding="utf-8")
@@ -645,9 +824,9 @@ class TestMcpUninstall:
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync, mcp_uninstall
+            from vaultspec_core.core.mcps import mcp_uninstall
 
-            mcp_sync()
+            approved_mcp_sync()
             mcp_uninstall(path)
             assert not (path / ".mcp.json").exists()
         finally:
@@ -696,9 +875,8 @@ class TestUninstallRemovesCustomMcps:
             )
 
             # Sync so the custom entry lands in .mcp.json
-            from vaultspec_core.core.mcps import mcp_sync
 
-            mcp_sync(force=True)
+            approved_mcp_sync(force=True)
 
             mcp_before = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "custom-rag" in mcp_before["mcpServers"]
@@ -733,10 +911,9 @@ class TestMcpSyncPrune:
                 encoding="utf-8",
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
             # First sync: install
-            result = mcp_sync()
+            result = approved_mcp_sync()
             assert result.added == 1
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "ephemeral" in data["mcpServers"]
@@ -747,7 +924,7 @@ class TestMcpSyncPrune:
             (mcps_dir / "ephemeral.builtin.json").unlink()
 
             # Second sync with prune=True: should remove the orphan
-            result = mcp_sync(prune=True)
+            result = approved_mcp_sync(prune=True)
             assert result.pruned == 1
             assert ("ephemeral", "[DELETE]") in result.items
 
@@ -763,13 +940,12 @@ class TestMcpSyncPrune:
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            mcp_sync()
+            approved_mcp_sync()
             (mcps_dir / "stay.builtin.json").unlink()
 
             # Default prune=False: orphan stays put
-            result = mcp_sync()
+            result = approved_mcp_sync()
             assert result.pruned == 0
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "stay" in data["mcpServers"]
@@ -787,12 +963,11 @@ class TestMcpSyncPrune:
             }
             (path / ".mcp.json").write_text(json.dumps(user_data), encoding="utf-8")
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            mcp_sync()
+            approved_mcp_sync()
             (mcps_dir / "managed.builtin.json").unlink()
 
-            result = mcp_sync(prune=True)
+            result = approved_mcp_sync(prune=True)
             assert result.pruned == 1
 
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
@@ -826,9 +1001,8 @@ class TestMcpSyncPrune:
             )
 
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync()
+            result = approved_mcp_sync()
             # Should NOT add (entry already there) and NOT enter managed
             assert result.added == 0
             assert result.skipped == 1
@@ -840,7 +1014,7 @@ class TestMcpSyncPrune:
             # User's entry preserved unchanged
             assert data["mcpServers"]["shared"]["command"] == "user-binary"
             # Source name did NOT get added to external ownership state.
-            ownership_path = path / ".vaultspec" / "mcp-ownership.json"
+            ownership_path = host_ownership_path(path, McpScope.PROJECT)
             assert not ownership_path.exists()
         finally:
             reset_config()
@@ -866,24 +1040,19 @@ class TestMcpSyncPrune:
             )
 
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync()
+            result = approved_mcp_sync()
             assert result.skipped == 2
             assert all("externally managed" in warning for warning in result.warnings)
-            assert not (path / ".vaultspec" / "mcp-ownership.json").exists()
+            assert not host_ownership_path(path, McpScope.PROJECT).exists()
         finally:
             reset_config()
 
-    def test_legacy_migration_treats_pre_existing_as_managed(self, tmp_path: Path):
-        """Workspaces created before ownership tracking shipped have
-        an affirmative `_vaultspecManaged` host marker. Migration accepts that
-        marker once, moves ownership into the external sidecar, and removes the
-        legacy field from host configuration.
-        """
+    def test_force_adopts_legacy_entries(self, tmp_path: Path):
+        """Explicit force adopts old entries and removes the legacy marker."""
         path, mcps_dir = _make_workspace(tmp_path)
         try:
-            # An affirmative legacy marker is accepted once as ownership evidence.
+            # Repository legacy markers require explicit force adoption.
             existing = {
                 "mcpServers": {"legacy": {"command": "old"}},
                 "_vaultspecManaged": ["legacy"],
@@ -894,10 +1063,9 @@ class TestMcpSyncPrune:
             )
 
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
             # First sync after upgrade — legacy migration kicks in
-            result = mcp_sync(force=True)
+            result = approved_mcp_sync(force=True)
             assert result.updated == 1
 
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
@@ -917,15 +1085,14 @@ class TestMcpSyncPrune:
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
-            mcp_sync()
+            approved_mcp_sync()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "_vaultspecManaged" not in data
             assert _owned_names(path) == {"alpha", "beta"}
 
             # Re-sync: managed set should remain identical
-            mcp_sync()
+            approved_mcp_sync()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "_vaultspecManaged" not in data
             assert _owned_names(path) == {"alpha", "beta"}
@@ -949,10 +1116,9 @@ class TestMcpSyncPrune:
                 encoding="utf-8",
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
             # First sync: install — entry takes ownership.
-            mcp_sync()
+            approved_mcp_sync()
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "fragile" in data["mcpServers"]
             assert _owned_names(path) == {"fragile"}
@@ -965,7 +1131,7 @@ class TestMcpSyncPrune:
             # Sync with prune=True. The entry MUST survive because the
             # source file is still present on disk — only the parser
             # is failing. A parse warning should be reported.
-            result = mcp_sync(prune=True)
+            result = approved_mcp_sync(prune=True)
             assert result.pruned == 0, (
                 "Entry was destructively pruned despite source file "
                 "being present (parse failure should not trigger prune)"
@@ -978,7 +1144,7 @@ class TestMcpSyncPrune:
 
             # Now genuinely delete the source — prune SHOULD remove it.
             (mcps_dir / "fragile.builtin.json").unlink()
-            result = mcp_sync(prune=True)
+            result = approved_mcp_sync(prune=True)
             assert result.pruned == 1
             assert not (path / ".mcp.json").exists()
         finally:
@@ -996,10 +1162,9 @@ class TestMcpSyncPrune:
                 json.dumps({"command": "uv"}), encoding="utf-8"
             )
             _init_context(path)
-            from vaultspec_core.core.mcps import mcp_sync
 
             # First sync creates host enrollment plus external ownership.
-            mcp_sync()
+            approved_mcp_sync()
 
             # User manually adds a custom top-level key (e.g. inputs).
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
@@ -1008,7 +1173,7 @@ class TestMcpSyncPrune:
 
             # Delete the source and prune.
             (mcps_dir / "ephemeral.builtin.json").unlink()
-            mcp_sync(prune=True)
+            approved_mcp_sync(prune=True)
 
             # File MUST still exist with the user's custom key intact.
             assert (path / ".mcp.json").exists()
@@ -1050,6 +1215,9 @@ class TestMcpSyncPrune:
             )
 
             # Companion install: sync to propagate
+            from vaultspec_core.testing.mcp_consent import approve_mcp_definitions
+
+            approve_mcp_definitions(path)
             sync_provider("all", force=False)
             data = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "companion" in data["mcpServers"]
@@ -1071,7 +1239,7 @@ class TestMcpSyncPrune:
 
 @pytest.mark.unit
 class TestInstallSeedsMcps:
-    def test_install_creates_mcp_json_from_registry(self, tmp_path: Path):
+    def test_install_seeds_definitions_and_requires_approval(self, tmp_path: Path):
         path = tmp_path
         try:
             reset_config()
@@ -1081,6 +1249,10 @@ class TestInstallSeedsMcps:
             install_run(
                 path=path, provider="all", upgrade=False, dry_run=False, force=False
             )
+
+            assert (path / ".vaultspec/mcps/vaultspec-core.builtin.json").exists()
+            assert not (path / ".mcp.json").exists()
+            approved_mcp_sync()
 
             mcp_json = json.loads((path / ".mcp.json").read_text(encoding="utf-8"))
             assert "vaultspec-core" in mcp_json["mcpServers"]
@@ -1128,9 +1300,10 @@ class TestProviderNativeMcpEnrollment:
                 json.dumps(definition), encoding="utf-8"
             )
             reset_config()
+            _init_context(path)
 
             from vaultspec_core.core.enums import InstallMode, Tool
-            from vaultspec_core.core.mcps import mcp_status, mcp_sync
+            from vaultspec_core.core.mcps import mcp_status
             from vaultspec_core.core.workspace_mode import (
                 PackageDeclaration,
                 write_package_declaration,
@@ -1142,7 +1315,7 @@ class TestProviderNativeMcpEnrollment:
                 "vaultspec-rag",
                 PackageDeclaration(install_mode=InstallMode.TOOL),
             )
-            result = mcp_sync(
+            result = approved_mcp_sync(
                 target_dir=path,
                 enrolled=enrolled,
                 mode=InstallMode.TOOL,
@@ -1163,12 +1336,12 @@ class TestProviderNativeMcpEnrollment:
                 assert all(not key.startswith("_vaultspec_") for key in server)
 
             ownership = json.loads(
-                (path / ".vaultspec" / "mcp-ownership.json").read_text(encoding="utf-8")
+                host_ownership_path(path, McpScope.PROJECT).read_text(encoding="utf-8")
             )
-            assert set(ownership["targets"]) == {
-                "claude:project",
-                "antigravity:project",
-                "codex:project",
+            assert {key.split(":", 2)[0] for key in ownership["targets"]} == {
+                "claude",
+                "antigravity",
+                "codex",
             }
             assert "_vaultspecManaged" not in json.loads(
                 (path / ".mcp.json").read_text(encoding="utf-8")
@@ -1182,6 +1355,7 @@ class TestProviderNativeMcpEnrollment:
             )
         finally:
             reset_config()
+            _init_context(path)
 
     def test_dry_run_is_byte_stable_and_creates_no_locks(self, tmp_path: Path):
         path, mcps_dir = _make_workspace(tmp_path)
@@ -1189,19 +1363,22 @@ class TestProviderNativeMcpEnrollment:
             (mcps_dir / "dry.builtin.json").write_text(
                 json.dumps({"command": "dry-server"}), encoding="utf-8"
             )
+            reset_config()
+            _init_context(path)
+            from vaultspec_core.core.enums import InstallMode, Tool
+            from vaultspec_core.core.mcps import mcp_sync
+            from vaultspec_core.testing.mcp_consent import approve_mcp_definitions
+
+            enrolled = {Tool.CLAUDE, Tool.ANTIGRAVITY, Tool.CODEX}
+            approve_mcp_definitions(path, enrolled=enrolled, mode=InstallMode.TOOL)
             before = {
                 file.relative_to(path): file.read_bytes()
                 for file in path.rglob("*")
                 if file.is_file()
             }
-            reset_config()
-
-            from vaultspec_core.core.enums import InstallMode, Tool
-            from vaultspec_core.core.mcps import mcp_sync
-
             result = mcp_sync(
                 target_dir=path,
-                enrolled={Tool.CLAUDE, Tool.ANTIGRAVITY, Tool.CODEX},
+                enrolled=enrolled,
                 mode=InstallMode.TOOL,
                 dry_run=True,
             )
@@ -1216,6 +1393,7 @@ class TestProviderNativeMcpEnrollment:
             assert not list(path.rglob("*.lock"))
         finally:
             reset_config()
+            _init_context(path)
 
     def test_selective_uninstall_preserves_core_and_ownership_fingerprints(
         self, tmp_path: Path
@@ -1227,17 +1405,18 @@ class TestProviderNativeMcpEnrollment:
                     json.dumps({"command": name}), encoding="utf-8"
                 )
             reset_config()
+            _init_context(path)
 
             from vaultspec_core.core.enums import InstallMode, Tool
-            from vaultspec_core.core.mcps import mcp_sync, mcp_uninstall
+            from vaultspec_core.core.mcps import mcp_uninstall
 
             enrolled = {Tool.CLAUDE, Tool.ANTIGRAVITY, Tool.CODEX}
-            mcp_sync(
+            approved_mcp_sync(
                 target_dir=path,
                 enrolled=enrolled,
                 mode=InstallMode.TOOL,
             )
-            ownership_path = path / ".vaultspec" / "mcp-ownership.json"
+            ownership_path = host_ownership_path(path, McpScope.PROJECT)
             before = json.loads(ownership_path.read_text(encoding="utf-8"))
             core_fingerprints = {
                 key: record["managed"]["vaultspec-core"]
@@ -1266,6 +1445,7 @@ class TestProviderNativeMcpEnrollment:
             )
         finally:
             reset_config()
+            _init_context(path)
 
     def test_codex_drift_is_independent_and_force_repairs_only_codex(
         self, tmp_path: Path
@@ -1276,12 +1456,13 @@ class TestProviderNativeMcpEnrollment:
                 json.dumps({"command": "expected"}), encoding="utf-8"
             )
             reset_config()
+            _init_context(path)
 
             from vaultspec_core.core.enums import InstallMode, Tool
-            from vaultspec_core.core.mcps import mcp_status, mcp_sync
+            from vaultspec_core.core.mcps import mcp_status
 
             enrolled = {Tool.CLAUDE, Tool.CODEX}
-            mcp_sync(
+            approved_mcp_sync(
                 target_dir=path,
                 enrolled=enrolled,
                 mode=InstallMode.TOOL,
@@ -1299,7 +1480,7 @@ class TestProviderNativeMcpEnrollment:
             assert status["providers"]["claude"]["status"] == "ok"
             assert status["providers"]["codex"]["drifted"] == ["server"]
 
-            repaired = mcp_sync(
+            repaired = approved_mcp_sync(
                 target_dir=path,
                 enrolled=enrolled,
                 provider=Tool.CODEX,
@@ -1311,6 +1492,7 @@ class TestProviderNativeMcpEnrollment:
             assert (path / ".mcp.json").read_bytes() == claude_before
         finally:
             reset_config()
+            _init_context(path)
 
     def test_codex_local_scope_fails_without_writing(self, tmp_path: Path):
         path, mcps_dir = _make_workspace(tmp_path)
@@ -1319,11 +1501,11 @@ class TestProviderNativeMcpEnrollment:
                 json.dumps({"command": "expected"}), encoding="utf-8"
             )
             reset_config()
+            _init_context(path)
 
             from vaultspec_core.core.enums import Tool
-            from vaultspec_core.core.mcps import mcp_sync
 
-            result = mcp_sync(
+            result = approved_mcp_sync(
                 target_dir=path,
                 enrolled={Tool.CODEX},
                 provider=Tool.CODEX,
@@ -1333,9 +1515,10 @@ class TestProviderNativeMcpEnrollment:
             assert result.errored == 1
             assert any("distinct local MCP scope" in error for error in result.errors)
             assert not (path / ".codex" / "config.toml").exists()
-            assert not (path / ".vaultspec" / "mcp-ownership.json").exists()
+            assert not host_ownership_path(path, McpScope.PROJECT).exists()
         finally:
             reset_config()
+            _init_context(path)
 
 
 class TestUserScopeConfigPaths:

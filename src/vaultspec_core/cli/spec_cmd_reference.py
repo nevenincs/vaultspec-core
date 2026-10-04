@@ -25,6 +25,14 @@ reference_app = make_app(
 )
 
 
+def _require_terminal_maintenance() -> None:
+    """Refuse installation writes in a gateway-originated process."""
+    from vaultspec_core.config import VAULTSPEC_MCP_GATEWAY_INVOCATION, env_value
+
+    if env_value(VAULTSPEC_MCP_GATEWAY_INVOCATION):
+        raise typer.BadParameter("Reference maintenance is unavailable through MCP.")
+
+
 @reference_app.command("generate")
 def cmd_reference_generate(
     check: Annotated[
@@ -56,6 +64,9 @@ def cmd_reference_generate(
         ReferenceMarkerError,
         generate_all,
     )
+
+    if not check:
+        _require_terminal_maintenance()
 
     try:
         results = generate_all(check=check)
@@ -166,6 +177,13 @@ def cmd_reference_snapshot(
             ),
         ),
     ] = None,
+    development: Annotated[
+        bool,
+        typer.Option(
+            "--development",
+            help="Explicitly authorize recording in a trusted development context.",
+        ),
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
 ) -> None:
     """Record or report the published command and MCP tool surface.
@@ -178,7 +196,8 @@ def cmd_reference_snapshot(
     The snapshot is the surface of the latest published release, and it is
     never captured from a source tree. After publication, that release's own
     distribution is installed in isolation and read back with ``--emit``;
-    ``--record`` writes the emitted document as the snapshot. ``--verify``
+    ``--record --development`` writes the emitted document as the snapshot
+    from a trusted development invocation. ``--verify``
     compares such a document against the committed snapshot, which is how the
     snapshot is proven to be what the published distribution exposes.
 
@@ -224,6 +243,11 @@ def cmd_reference_snapshot(
     path = published_surface_path()
 
     if record is not None:
+        _require_terminal_maintenance()
+        if not development:
+            raise typer.BadParameter(
+                "--record requires --development in a trusted development context."
+            )
         try:
             recorded = deserialize_surface(record.read())
         except SurfaceSnapshotError as exc:

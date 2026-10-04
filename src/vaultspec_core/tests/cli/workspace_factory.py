@@ -119,6 +119,10 @@ def _fresh_install_source(provider: str, mode: InstallMode | None) -> Path:
             skip=None,
             mode=mode,
         )
+        # This fixture models a fully enrolled, operator-approved installation.
+        from vaultspec_core.testing.mcp_consent import approved_mcp_sync
+
+        approved_mcp_sync(target_dir=template, mode=mode)
         _install_templates[key] = template
     return template
 
@@ -127,11 +131,8 @@ def _self_referencing_files(template: Path) -> tuple[str, ...]:
     """Return the template-relative files that record the template's own path.
 
     Discovered by reading the tree ONCE, when the template is built, and cached
-    for the life of the process. Today the answer is a single file -
-    ``.vaultspec/mcp-ownership.json``, which stores the absolute path of every
-    provider config it manages - but discovering it beats hard-coding it: the
-    day another absolute path is persisted, the reuse would otherwise start
-    handing out stale references with nothing to notice.
+    for the life of the process. Ownership authority lives outside the tree;
+    any other persisted absolute references must still follow the copied tree.
 
     Doing the discovery per template rather than per clone is the whole point.
     Scanning 245 files on every one of ~400 clones is ~100,000 reads a run to
@@ -169,9 +170,8 @@ def _path_spellings(path: Path) -> tuple[str, ...]:
 def rebase_workspace_paths(template: Path, dest: Path) -> None:
     """Rewrite absolute references to *template* inside *dest* to point at *dest*.
 
-    An installed workspace records where it lives, so a raw copy claims
-    ownership of the TEMPLATE's files - and a test asserting on ownership would
-    pass while describing a directory it has never heard of.
+    Update references within the copied tree and explicitly adopt the trusted
+    template's MCP entries into host-local state for the new workspace.
 
     Only the files the template itself was found to reference are touched; see
     :func:`_self_referencing_files` for why that set is discovered once rather
@@ -196,6 +196,18 @@ def rebase_workspace_paths(template: Path, dest: Path) -> None:
             rewritten = rewritten.replace(needle, value)
         if rewritten != text:
             path.write_text(rewritten, encoding="utf-8")
+
+    # Copies of trusted install templates need fresh host-local authority.
+    from vaultspec_core.config import reset_config
+    from vaultspec_core.config.workspace import resolve_workspace
+    from vaultspec_core.core.types import init_paths
+    from vaultspec_core.testing.mcp_consent import approved_mcp_sync
+
+    reset_config()
+    init_paths(resolve_workspace(target_override=dest))
+    result = approved_mcp_sync(target_dir=dest, force=True)
+    if result.errors:
+        raise RuntimeError(result.errors)
 
 
 def _is_effectively_empty(root: Path) -> bool:
@@ -397,6 +409,10 @@ class WorkspaceFactory:
             skip=skip,
             mode=mode,
         )
+        if not dry_run and (skip is None or not {"mcp", "mcps"} & skip):
+            from vaultspec_core.testing.mcp_consent import approved_mcp_sync
+
+            approved_mcp_sync(target_dir=self.root, mode=mode, force=force)
         self._installed = True
         return self
 
@@ -417,6 +433,10 @@ class WorkspaceFactory:
         reset_config()
         layout = resolve_workspace(target_override=self.root)
         init_paths(layout)
+        from vaultspec_core.testing.mcp_consent import approve_mcp_definitions
+
+        if skip is None or not {"mcp", "mcps"} & skip:
+            approve_mcp_definitions(self.root)
         sync_provider(provider, force=force, dry_run=dry_run, skip=skip)
         return self
 
