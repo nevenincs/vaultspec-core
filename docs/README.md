@@ -47,6 +47,14 @@ nobody has been shown rather than a half-finished release to walk back. Fix the 
 and re-dispatch `Core Binaries` for the same tag; the steps that already succeeded are
 skipped or repeated harmlessly.
 
+Publication runs `publish.yml` from `main`, with the release tag supplied as `tag`.
+Before building, it verifies the exact pushed tag against the merged release proposal
+and its version manifest, then checks out that commit by SHA. Keep the `pypi`
+environment restricted to the `main` branch: this also prevents older tagged copies of
+the publication workflow from obtaining publishing credentials. The GitHub release must
+already exist; recreate a missing draft with maintainer credentials before retrying
+publication.
+
 A cut can also stop before that lane starts: it fails in
 `Create the release for the merged proposal` with
 `Resource not accessible by integration`, and its `Name a release this token cannot tag`

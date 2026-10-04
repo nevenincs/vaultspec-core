@@ -24,7 +24,82 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  authorize:
+    name: "Check: Release authorization (Linux)"
+    timeout-minutes: 130
+    runs-on: [self-hosted, Linux, X64, build]
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      # No checkout or project code runs until the tag is bound to the merged
+      # release proposal. Maintainer repairs use the same proposal and manifest.
+      # Tags need not be signed: release-please and the documented repair both
+      # create lightweight tags. The merged proposal is the release authority.
+      - name: Authorize the release commit
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$TAG" =~ ^vaultspec-core-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::expected a canonical vaultspec-core-vX.Y.Z release tag"
+            exit 1
+          fi
+          # The pypi environment permits only main. Loading the workflow from
+          # main keeps repairs on current policy and denies historical tag
+          # workflows access to the publishing environment.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::dispatch publish.yml with --ref main"
+            exit 1
+          fi
+          refs=$(git ls-remote --tags "https://github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          direct=$(awk -v ref="refs/tags/$TAG" '$2 == ref { print $1 }' <<< "$refs")
+          peeled=$(awk -v ref="refs/tags/$TAG^{}" '$2 == ref { print $1 }' <<< "$refs")
+          sha=${peeled:-$direct}
+          if ! [[ "$direct" =~ ^[0-9a-f]{40}$ && "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::the exact pushed tag must resolve to one immutable commit"
+            exit 1
+          fi
+          repo="repos/$GITHUB_REPOSITORY"
+          status=$(gh api "$repo/compare/${sha}...main" --jq .status)
+          if [ "$status" != "ahead" ] && [ "$status" != "identical" ]; then
+            echo "::error::the release commit is not on main"
+            exit 1
+          fi
+          proposals=$(gh api "$repo/commits/$sha/pulls" --paginate --jq \
+            '.[] | select(.merged_at != null and .merge_commit_sha == "'"$sha"'" and .base.ref == "main" and .base.repo.full_name == "'"$GITHUB_REPOSITORY"'") | select(any(.labels[]; .name == "autorelease: tagged" or .name == "autorelease: pending")) | .number')
+          if ! [[ "$proposals" =~ ^[0-9]+$ ]]; then
+            echo "::error::the tag must name exactly one merged release proposal"
+            exit 1
+          fi
+          version=$(gh api "$repo/contents/.release-please-manifest.json?ref=$sha" \
+            --jq '.content | @base64d | fromjson | ."."')
+          if [ "$TAG" != "vaultspec-core-v$version" ]; then
+            echo "::error::the tag does not match the merged release manifest"
+            exit 1
+          fi
+          # Release creation is the cut's responsibility, never a fallback in
+          # the job that publishes to PyPI. Existing published releases remain
+          # valid for idempotent repair dispatches.
+          release_tag=$(gh api "$repo/releases/tags/$TAG" --jq .tag_name)
+          if [ "$release_tag" != "$TAG" ]; then
+            echo "::error::the authorized release must already exist"
+            exit 1
+          fi
+          {
+            echo "tag=$TAG"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+
   build:
+    needs: authorize
     timeout-minutes: 210
     name: "Build: Distribution (Linux)"
     # On the fleet, like every job in this repository.
@@ -43,7 +118,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.authorize.outputs.sha }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -80,7 +155,7 @@ jobs:
   smoke-test:
     timeout-minutes: 165
     name: "Test: Distribution smoke (Linux)"
-    needs: build
+    needs: [authorize, build]
     runs-on: [self-hosted, Linux, X64, build]
     env:
       CI_EXEC_BUDGET_MINUTES: 45
@@ -89,7 +164,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.authorize.outputs.sha }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -137,7 +212,7 @@ jobs:
   publish-pypi:
     timeout-minutes: 150
     name: "Build: PyPI publication (Linux)"
-    needs: smoke-test
+    needs: [authorize, smoke-test]
     runs-on: [self-hosted, Linux, X64, build]
     env:
       CI_EXEC_BUDGET_MINUTES: 30
@@ -165,6 +240,28 @@ jobs:
       # acquisition acquires unauthenticated, so it cannot see a draft.
       actions: write
     steps:
+      # Check again after the build: deletion or movement of the tag must stop
+      # the job before it requests an OIDC token or publishes any bytes.
+      - name: Require the authorized tag and release to remain present
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.authorize.outputs.tag }}
+          SHA: ${{ needs.authorize.outputs.sha }}
+        run: |
+          set -euo pipefail
+          refs=$(git ls-remote --tags "https://github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          direct=$(awk -v ref="refs/tags/$TAG" '$2 == ref { print $1 }' <<< "$refs")
+          peeled=$(awk -v ref="refs/tags/$TAG^{}" '$2 == ref { print $1 }' <<< "$refs")
+          sha=${peeled:-$direct}
+          if ! [[ "$direct" =~ ^[0-9a-f]{40}$ ]] || [ "$sha" != "$SHA" ]; then
+            echo "::error::the authorized tag changed or disappeared during the build"
+            exit 1
+          fi
+          release_tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .tag_name)
+          [ "$release_tag" = "$TAG" ] || { echo "::error::the authorized release disappeared"; exit 1; }
+
       - name: Download dist artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -236,7 +333,7 @@ jobs:
         working-directory: dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.authorize.outputs.tag }}
         run: |
           set -euo pipefail
           sha256sum ./* > SHA256SUMS
@@ -258,26 +355,10 @@ jobs:
             LC_ALL=C sort -k2 -o SHA256SUMS SHA256SUMS
           fi
 
-      - name: Ensure the GitHub Release exists
-        # release-please creates it, as a draft, before dispatching the lane
-        # that dispatches this workflow. Keep this idempotent guard for repair
-        # dispatches: --verify-tag refuses to invent a release for an unpushed
-        # tag, while "already exists" is the no-op we want.
-        #
-        # `--draft`, so that a release recreated here starts in the same state
-        # release-please would have left it in. Publication is the last step of
-        # this job and nothing else in the lane flips it, so a non-draft
-        # recreation would publish an empty release at the moment it is made.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          gh release create "${TAG}" --repo "$GITHUB_REPOSITORY"             --draft --verify-tag --generate-notes || true
-
       - name: Attach the distribution to the GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.authorize.outputs.tag }}
         run: |
           gh release upload "${TAG}" dist/* --repo "$GITHUB_REPOSITORY" --clobber
 
@@ -288,7 +369,7 @@ jobs:
       - name: Verify the attached distribution carries provenance
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.authorize.outputs.tag }}
           SUBJECTS: ${{ steps.subjects.outputs.paths }}
           EXPECTED: ${{ steps.subjects.outputs.count }}
         run: |
@@ -337,7 +418,7 @@ jobs:
       - name: Verify the attached wheel is the one this run built
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.authorize.outputs.tag }}
         run: |
           set -euo pipefail
           published="${RUNNER_TEMP}/published"
@@ -370,7 +451,7 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.authorize.outputs.tag }}
         run: gh release edit "${TAG}" --repo "$GITHUB_REPOSITORY" --draft=false
 
       # The package-manager pointers, now that there is something for them to
@@ -392,7 +473,7 @@ jobs:
         run: gh workflow run channels.yml --repo "$GITHUB_REPOSITORY" --ref main -f "tag=${TAG}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.authorize.outputs.tag }}
 
       # The record the generated references are measured against, taken from
       # this release now that it is the one GitHub reports as latest. It lands
@@ -422,7 +503,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.authorize.outputs.tag }}
         run: |
           set -euo pipefail
           if gh workflow run acquisition.yml --repo "$GITHUB_REPOSITORY"                --ref main -f tag="$TAG"; then

@@ -1373,15 +1373,14 @@ jobs:
       # before publish.yml has attached it could not receive it afterwards
       # under immutable releases.
       #
-      # `--ref "${TAG}"` deliberately. PyPI trusted publishing matches the
-      # top-level workflow of the run and `gh attestation verify
-      # --signer-workflow` pins the file that signed, so publish.yml must stay
-      # the top-level workflow of its own run and must be read from the
-      # released tree.
+      # Load publication policy from main, as the pypi environment requires.
+      # Loading it from an old tag would restore that tag's permissive policy.
+      # publish.yml remains the top-level signer workflow and independently
+      # authorizes the source tag, then builds only its immutable commit.
       #
       # Safe to re-dispatch. `uv publish --check-url` skips a file the index
       # already carries, so repairing the binaries of an already-published
       # version re-runs this without a duplicate-upload failure.
       - name: Hand the proven draft to the publication lane
         if: ${{ success() }}
-        run: gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref "${TAG}" -f "tag=${TAG}"
+        run: gh workflow run publish.yml --repo "$GITHUB_REPOSITORY" --ref main -f "tag=${TAG}"
