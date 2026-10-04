@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from vaultspec_core.core.enums import McpScope
+from vaultspec_core.core.helpers import package_version
 from vaultspec_core.core.manifest import (
     ManifestData,
     read_manifest_data,
@@ -134,5 +135,6 @@ def test_registered_upgrade_runs_once_and_respects_scope(tmp_path: Path) -> None
     results = run_pending_migrations(workspace, registry=[MIGRATION])
     assert len(results) == 1
     assert results[0].counts == {"retired": 1}
-    assert read_manifest_data(workspace).vaultspec_version == "0.3.2"
+    assert results[0].target_version == "0.3.2"
+    assert read_manifest_data(workspace).vaultspec_version == package_version()
     assert run_pending_migrations(workspace, registry=[MIGRATION]) == []
