@@ -220,6 +220,14 @@ def cmd_adr_crossref(
     hosted-search key it sends nothing and names the search to run instead.
     """
     apply_target(target, json_output=json_output)
+    from vaultspec_core.config import VAULTSPEC_MCP_GATEWAY_INVOCATION, env_value
+
+    if body_file is not None and env_value(VAULTSPEC_MCP_GATEWAY_INVOCATION):
+        raise typer.BadParameter(
+            "File imports are unavailable through MCP; supply body content directly.",
+            param_hint="--body-file",
+        )
+
     from vaultspec_core.core.types import get_context as _get_ctx
     from vaultspec_core.crossref import crossref_adr, crossref_sweep
 

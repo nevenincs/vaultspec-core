@@ -1162,10 +1162,10 @@ them in `arguments`. The server sets `--target` to the resolved workspace and ad
 `--json` automatically when the verb supports it, and supplying a reserved flag fails
 the call before any process starts.
 
-`--editor`, `--from-file`, and `--template` are restricted to the local CLI. They are
-omitted from discovery and rejected by `invoke` before a process starts. MCP-launched
-CLI processes also refuse file imports. To add rules, skills, or agents through MCP,
-pass their content in `body`.
+`--editor`, `--from-file`, `--body-file`, and `--template` are restricted to the local
+CLI. They are omitted from discovery and rejected by `invoke` before a process starts.
+MCP-launched CLI processes also refuse file imports. To add rules, skills, or agents
+through MCP, pass their content in `body`.
 
 At the user level, `invoke` runs the named verb as a subprocess of the installed
 `vaultspec-core` binary against the resolved workspace. When the verb supports `--json`,

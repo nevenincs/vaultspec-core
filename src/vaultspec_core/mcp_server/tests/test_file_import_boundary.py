@@ -24,6 +24,108 @@ pytestmark = [pytest.mark.unit]
 
 _RESOURCES = ("rules", "skills", "agents")
 _SENTINEL = "private host file content\n"
+_BODY_VERBS = ("vault set-body", "vault edit", "vault adr crossref")
+
+
+def _body_document(root: Path) -> Path:
+    path = root / ".vault" / "adr" / "2026-01-01-import-probe-adr.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "---\ntags: ['#adr', '#import-probe']\ndate: '2026-01-01'\n"
+        "modified: '2026-01-01'\nrelated: []\n---\n\nOriginal body.\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.mark.parametrize("verb", _BODY_VERBS)
+async def test_gateway_rejects_body_file_import(vault_root: Path, verb: str) -> None:
+    document = _body_document(vault_root)
+    original = document.read_bytes()
+    source = vault_root.parent / "private.md"
+    source.write_text(_SENTINEL, encoding="utf-8")
+    async with Client(_server()) as client:
+        for key in ("body-file", "body_file", "--body-file", "--body_file"):
+            for value in (str(source), "../private.md", [str(source)]):
+                result = await client.call_tool(
+                    "invoke",
+                    {
+                        "verb": verb,
+                        "positionals": [document.stem],
+                        "arguments": {key: value},
+                    },
+                )
+                assert result.is_error
+                text = " ".join(
+                    item.text
+                    for item in result.content
+                    if isinstance(item, TextContent)
+                )
+                assert "not available through the gateway" in text
+                assert _SENTINEL not in text
+                assert document.read_bytes() == original
+        result = await client.call_tool("discover", {"query": verb, "limit": 50})
+        entry = next(item for item in data_of(result)["verbs"] if item["verb"] == verb)
+        assert "--body-file" not in {flag["name"] for flag in entry["flags"]}
+
+
+@pytest.mark.parametrize("verb", _BODY_VERBS)
+@pytest.mark.parametrize("source_exists", (True, False))
+def test_gateway_child_refuses_body_file_before_reading(
+    vault_root: Path, verb: str, source_exists: bool
+) -> None:
+    document = _body_document(vault_root)
+    original = document.read_bytes()
+    source = vault_root.parent / "private.md"
+    if source_exists:
+        source.write_text(_SENTINEL, encoding="utf-8")
+    result = CliRunner().invoke(
+        app,
+        [
+            "--target",
+            str(vault_root),
+            *verb.split(),
+            document.stem,
+            "--body-file",
+            str(source),
+            "--json",
+        ],
+        env={"VAULTSPEC_MCP_GATEWAY_INVOCATION": "1"},
+    )
+    assert result.exit_code == (2 if verb.endswith("crossref") else 1), result.output
+    assert "unavailable through MCP" in result.output
+    assert "Cannot read" not in result.output
+    assert _SENTINEL not in result.output
+    assert document.read_bytes() == original
+
+
+@pytest.mark.parametrize("verb", ("set-body", "edit"))
+@pytest.mark.parametrize("channel", ("local-file", "gateway-stdin"))
+def test_body_edit_keeps_authorized_channels(
+    vault_root: Path, verb: str, channel: str
+) -> None:
+    document = _body_document(vault_root)
+    source = vault_root.parent / "private.md"
+    source.write_text(_SENTINEL, encoding="utf-8")
+    use_stdin = channel == "gateway-stdin"
+    result = CliRunner().invoke(
+        app,
+        [
+            "--target",
+            str(vault_root),
+            "vault",
+            verb,
+            document.stem,
+            *(["--body-stdin"] if use_stdin else ["--body-file", str(source)]),
+            "--no-check",
+            "--json",
+        ],
+        input=_SENTINEL.replace("\n", "\r\n") if use_stdin else None,
+        env={"VAULTSPEC_MCP_GATEWAY_INVOCATION": "1"} if use_stdin else {},
+    )
+    assert result.exit_code == 0, result.output
+    assert _SENTINEL in document.read_text(encoding="utf-8")
+    assert b"\r\r\n" not in document.read_bytes()
 
 
 def _server() -> MCPServer[None]:

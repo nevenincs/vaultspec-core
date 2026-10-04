@@ -131,8 +131,8 @@ RESERVED_FLAGS: frozenset[str] = frozenset({"--target", _JSON_FLAG, "--help"})
 #: the rest of each verb reachable and states the actual rule, and it does not
 #: have to be revisited every time another verb grows an ``--editor``.
 #:
-#: ``--from-file`` and ``--template`` import host file contents. Those paths
-#: are not confined to an approved workspace import root, so exposing either
+#: ``--from-file``, ``--body-file``, and ``--template`` import host file contents.
+#: Those paths are not confined to an approved workspace import root, so exposing an
 #: option would let a caller copy arbitrary local files into a resource and
 #: retrieve their contents with ``show``. File imports remain local CLI modes;
 #: MCP callers can supply resource content with ``--body``.
@@ -141,7 +141,9 @@ RESERVED_FLAGS: frozenset[str] = frozenset({"--target", _JSON_FLAG, "--help"})
 #: certainty. It is paired with, not a substitute for, the marker the gateway
 #: puts in the child environment and the validation the CLI performs on the
 #: value; either alone would be one mistake away from reopening the hole.
-BLOCKED_FLAGS: frozenset[str] = frozenset({"--editor", "--from-file", "--template"})
+BLOCKED_FLAGS: frozenset[str] = frozenset(
+    {"--editor", "--from-file", "--body-file", "--template"}
+)
 
 
 class CatalogParseError(ValueError):

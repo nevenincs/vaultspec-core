@@ -104,6 +104,14 @@ def _read_body_channel(
         _EditError: When both channels are set, or a required channel is
             absent, or the file cannot be read.
     """
+    from vaultspec_core.config import VAULTSPEC_MCP_GATEWAY_INVOCATION, env_value
+
+    if body_file is not None and env_value(VAULTSPEC_MCP_GATEWAY_INVOCATION):
+        raise _EditError(
+            "File imports are unavailable through MCP; supply body content directly.",
+            {},
+        )
+
     if body_file is not None and body_stdin:
         raise _EditError("--body-file and --body-stdin are mutually exclusive", {})
 
