@@ -53,6 +53,9 @@ class TestFreshInstall:
     def test_install_creates_mcp_json(self, factory: WorkspaceFactory) -> None:
         factory.create_gitignore().run("install")
 
+        # Enrollment follows an explicit operator approval after provisioning.
+        assert not factory.mcp_has_vaultspec_entry()
+        factory.sync()
         assert factory.mcp_has_vaultspec_entry()
 
 
@@ -93,7 +96,8 @@ class TestInstallMergesMcp:
     def test_install_merges_into_existing_mcp(self, factory: WorkspaceFactory) -> None:
         factory.create_user_only_mcp().create_gitignore().run("install")
 
-        assert factory.mcp_has_vaultspec_entry(), "vaultspec entry missing"
+        factory.sync()
+        assert factory.mcp_has_vaultspec_entry(), "approved vaultspec entry missing"
         assert factory.mcp_has_user_entry("my-server"), "user server was dropped"
 
 

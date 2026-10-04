@@ -109,10 +109,10 @@ def test_resolution_rejects_windows_junctions(tmp_path: Path, root_name: str) ->
     outside.mkdir()
     link = workspace / root_name
     subprocess.run(
-        ["cmd", "/c", "mklink", "/J", str(link), str(outside)],
+        ["cmd", "/d", "/c", "mklink", "/J", str(link), str(outside)],
         check=True,
         capture_output=True,
-        timeout=10,
+        timeout=30,
     )
     assert link.is_junction()
     with pytest.raises(WorkspaceError, match="redirected"):

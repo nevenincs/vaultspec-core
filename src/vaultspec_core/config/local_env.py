@@ -304,7 +304,7 @@ def _windows_sid() -> str:
         ],
         capture_output=True,
         text=True,
-        timeout=5,
+        timeout=30,
         check=True,
     )
     sid = next(csv.reader([result.stdout.strip()]))[-1]
@@ -324,7 +324,7 @@ def _restrict_temp(descriptor: int, temporary: Path) -> None:
                 f"*{_windows_sid()}:(F)",
             ],
             capture_output=True,
-            timeout=5,
+            timeout=30,
             check=True,
         )
     else:
@@ -343,8 +343,9 @@ def write_local_environment(root: Path, values: dict[str, str]) -> None:
         atomic_write_bytes(
             path, content, prepare_temp=_restrict_temp, temp_prefix=".env."
         )
-    except (OSError, subprocess.SubprocessError, ValueError, StopIteration):
+    except (OSError, subprocess.SubprocessError, ValueError, StopIteration) as exc:
         raise VaultSpecError(
-            "Cannot securely write local environment settings."
+            "Cannot securely write local environment settings.",
+            hint=f"Permission setup or atomic replacement failed: {exc}",
         ) from None
     _read_cached.cache_clear()

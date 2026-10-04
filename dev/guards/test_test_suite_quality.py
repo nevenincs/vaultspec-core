@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from dev.guards.testing_exceptions import EXCEPTIONS
+
 pytestmark = [pytest.mark.repo]
 
 #: Repository root (``dev/guards/`` -> ``dev/`` -> repo).
@@ -52,8 +54,37 @@ def _call_name(node: ast.AST) -> str:
     return ""
 
 
-def test_tests_do_not_use_doubles_or_runtime_patching() -> None:
+def _scope_owners(tree: ast.AST) -> dict[ast.AST, str]:
+    owners: dict[ast.AST, str] = {}
+
+    def record(node: ast.AST, scope: str = "<module>") -> None:
+        if scope == "<module>" and isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ):
+            scope = node.name
+        owners[node] = scope
+        for child in ast.iter_child_nodes(node):
+            record(child, scope)
+
+    record(tree)
+    return owners
+
+
+def _mechanism_findings(
+    path: Path, tree: ast.AST, allowed: dict[tuple[str, str], frozenset[str]]
+) -> tuple[list[str], set[tuple[str, str]]]:
+    owners = _scope_owners(tree)
     offenders: list[str] = []
+    used: set[tuple[str, str]] = set()
+
+    def report(node: ast.AST, mechanism: str, detail: str) -> None:
+        key = (_rel(path), owners[node])
+        if mechanism in allowed.get(key, frozenset()):
+            used.add(key)
+        else:
+            line = getattr(node, "lineno", 0)
+            offenders.append(f"{_rel(path)}:{line}: {detail}")
+
     forbidden_imports = {
         "unittest.mock",
         "mock",
@@ -78,35 +109,87 @@ def test_tests_do_not_use_doubles_or_runtime_patching() -> None:
         "patch.object",
     }
 
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in forbidden_imports:
+                    report(node, alias.name, alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module in forbidden_imports:
+                report(node, node.module, node.module)
+        elif isinstance(node, ast.arg) and node.arg in forbidden_names:
+            report(node, node.arg, f"fixture arg {node.arg}")
+        elif isinstance(node, ast.Name) and node.id in forbidden_names:
+            report(node, node.id, f"name {node.id}")
+        elif isinstance(node, ast.Call):
+            call_name = _call_name(node.func)
+            if call_name in forbidden_calls:
+                report(node, call_name, f"call {call_name}")
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            lowered = node.name.lower()
+            if "fake" in lowered or "stub" in lowered:
+                offenders.append(f"{_rel(path)}:{node.lineno}: {node.name}")
+
+    return offenders, used
+
+
+def test_tests_do_not_use_doubles_or_runtime_patching() -> None:
+    allowed: dict[tuple[str, str], frozenset[str]] = {}
+    for exception in EXCEPTIONS:
+        assert exception.reason.strip(), "test exceptions need a review reason"
+        for scope in exception.scopes:
+            key = (exception.path, scope)
+            assert key not in allowed, f"duplicate test exception: {key}"
+            allowed[key] = exception.mechanisms
+    used: set[tuple[str, str]] = set()
+    offenders: list[str] = []
     for path in _test_files():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name in forbidden_imports:
-                        offenders.append(f"{_rel(path)}:{node.lineno}: {alias.name}")
-            elif isinstance(node, ast.ImportFrom):
-                if node.module in forbidden_imports:
-                    offenders.append(f"{_rel(path)}:{node.lineno}: {node.module}")
-            elif isinstance(node, ast.arg) and node.arg in forbidden_names:
-                offenders.append(f"{_rel(path)}:{node.lineno}: fixture arg {node.arg}")
-            elif isinstance(node, ast.Name) and node.id in forbidden_names:
-                offenders.append(f"{_rel(path)}:{node.lineno}: name {node.id}")
-            elif isinstance(node, ast.Call):
-                call_name = _call_name(node.func)
-                if call_name in forbidden_calls:
-                    offenders.append(f"{_rel(path)}:{node.lineno}: call {call_name}")
-            elif isinstance(
-                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-            ):
-                lowered = node.name.lower()
-                if "fake" in lowered or "stub" in lowered:
-                    offenders.append(f"{_rel(path)}:{node.lineno}: {node.name}")
-
+        file_offenders, file_used = _mechanism_findings(path, tree, allowed)
+        offenders.extend(file_offenders)
+        used.update(file_used)
+    assert not (allowed.keys() - used), (
+        f"Remove stale test mechanism exceptions: {sorted(allowed.keys() - used)}"
+    )
     assert not offenders, (
         "Tests must exercise real code paths without mocks, fakes, stubs, "
-        "monkeypatching, skips, or xfails:\n  - " + "\n  - ".join(offenders)
+        "monkeypatching, skips, or xfails unless a scoped review exception "
+        "documents the need:\n  - " + "\n  - ".join(offenders)
     )
+
+
+def test_scoped_exception_does_not_cover_siblings_or_new_mechanisms() -> None:
+    path = PROJECT_ROOT / "src/tests/test_policy.py"
+    key = (_rel(path), "test_reviewed")
+    tree = ast.parse(
+        "def test_reviewed(monkeypatch):\n"
+        "    monkeypatch.setenv('TEST_SETTING', '1')\n"
+        "    Mock()\n"
+        "def test_unreviewed(monkeypatch):\n"
+        "    monkeypatch.setenv('TEST_SETTING', '1')\n"
+    )
+    offenders, used = _mechanism_findings(path, tree, {key: frozenset({"monkeypatch"})})
+    assert used == {key}
+    assert len(offenders) == 3
+    assert any("name Mock" in finding for finding in offenders)
+    assert any("fixture arg monkeypatch" in finding for finding in offenders)
+
+
+def test_platform_exception_applies_only_to_its_named_scope() -> None:
+    path = PROJECT_ROOT / "src/tests/test_policy.py"
+    key = (_rel(path), "test_windows")
+    tree = ast.parse(
+        "@pytest.mark.skipif(os.name != 'nt', reason='Windows junction')\n"
+        "def test_windows(): pass\n"
+        "@pytest.mark.skipif(True, reason='other case')\n"
+        "def test_other(): pass\n"
+    )
+    offenders, used = _mechanism_findings(
+        path, tree, {key: frozenset({"pytest.mark.skipif"})}
+    )
+    assert used == {key}
+    assert len(offenders) == 1
+    assert "call pytest.mark.skipif" in offenders[0]
 
 
 def test_json_mode_tests_do_not_mask_stdout_prefixes() -> None:

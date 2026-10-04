@@ -409,7 +409,7 @@ class WorkspaceFactory:
             skip=skip,
             mode=mode,
         )
-        if not dry_run and (skip is None or "mcps" not in skip):
+        if not dry_run and (skip is None or not {"mcp", "mcps"} & skip):
             from vaultspec_core.testing.mcp_consent import approved_mcp_sync
 
             approved_mcp_sync(target_dir=self.root, mode=mode, force=force)
@@ -435,7 +435,7 @@ class WorkspaceFactory:
         init_paths(layout)
         from vaultspec_core.testing.mcp_consent import approve_mcp_definitions
 
-        if skip is None or "mcps" not in skip:
+        if skip is None or not {"mcp", "mcps"} & skip:
             approve_mcp_definitions(self.root)
         sync_provider(provider, force=force, dry_run=dry_run, skip=skip)
         return self
