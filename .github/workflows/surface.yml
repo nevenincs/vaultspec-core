@@ -59,6 +59,7 @@ jobs:
         with:
           # A lane that writes to main must not restore a cache any branch
           # could have written.
+          prune-cache: false
           enable-cache: false
 
       - name: Set up just

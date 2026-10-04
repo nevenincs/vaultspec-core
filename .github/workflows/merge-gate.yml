@@ -109,6 +109,7 @@ jobs:
           # This persistent runner's native uv cache is the hot path. A
           # same-SHA cold run proved that transferring the multi-GB Actions
           # cache increased occupied time, so cloud restore/save stays off.
+          prune-cache: false
           enable-cache: false
 
       - name: Install taplo
@@ -176,6 +177,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          prune-cache: false
           enable-cache: false
 
       - name: Install lychee
@@ -270,6 +272,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          prune-cache: false
           enable-cache: false
 
       - name: Set up just

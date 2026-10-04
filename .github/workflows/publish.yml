@@ -47,6 +47,9 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+          prune-cache: false
 
       - name: Set up just
         uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
@@ -90,6 +93,9 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+          prune-cache: false
 
       - name: Install Python
         run: uv python install 3.13
@@ -167,6 +173,9 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+          prune-cache: false
 
       - name: Set up just
         uses: taiki-e/install-action@6012bba2f8e3e666a2b212f8823c06831704ce92 # just
