@@ -1,0 +1,63 @@
+name: Core Windows Startup Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    name: "Check: Startup and local process timing (Windows)"
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 125
+    env:
+      CI_EXEC_BUDGET_MINUTES: 5
+    steps:
+      - name: Measure local execution
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $first = [DateTime]::UtcNow.ToString('o')
+          $total = [Diagnostics.Stopwatch]::StartNew()
+          $results = [ordered]@{
+            first_script_utc = $first
+            runner = $env:RUNNER_NAME
+            workspace = $env:GITHUB_WORKSPACE
+            uv_cache = $env:UV_CACHE_DIR
+            npm_cache = $env:npm_config_cache
+            processes = @()
+          }
+          Write-Output "FIRST_SCRIPT_UTC=$first"
+          $commands = @(
+            @{name='cmd'; path=$env:ComSpec; arguments=@('/d','/c','exit','0')},
+            @{name='pwsh'; path=(Get-Command pwsh).Source; arguments=@('-NoLogo','-NoProfile','-NonInteractive','-Command','exit 0')}
+          )
+          foreach ($name in @('uv','node','git')) {
+            $command = Get-Command $name -ErrorAction SilentlyContinue
+            if ($command) { $commands += @{name=$name; path=$command.Source; arguments=@('--version')} }
+          }
+          foreach ($command in $commands) {
+            $samples = @(foreach ($i in 1..5) {
+              $timer = [Diagnostics.Stopwatch]::StartNew()
+              & $command.path @($command.arguments) | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw "$($command.name) failed: $LASTEXITCODE" }
+              $timer.Stop()
+              [Math]::Round($timer.Elapsed.TotalMilliseconds, 2)
+            })
+            $results.processes += @{name=$command.name; samples_ms=$samples}
+          }
+          $scratch = Join-Path $env:RUNNER_TEMP ('startup-diagnostic-' + [Guid]::NewGuid() + '.tmp')
+          try {
+            $bytes = [byte[]]::new(8MB)
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+            [IO.File]::WriteAllBytes($scratch, $bytes)
+            $results.write_8mib_ms = [Math]::Round($timer.Elapsed.TotalMilliseconds, 2)
+          } finally {
+            if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch }
+          }
+          $results.total_script_ms = [Math]::Round($total.Elapsed.TotalMilliseconds, 2)
+          $results.last_script_utc = [DateTime]::UtcNow.ToString('o')
+          $json = $results | ConvertTo-Json -Depth 5 -Compress
+          Write-Output "BENCHMARK_JSON=$json"
+          @('```json', ($results | ConvertTo-Json -Depth 5), '```') | Add-Content $env:GITHUB_STEP_SUMMARY

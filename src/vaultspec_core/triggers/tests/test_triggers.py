@@ -346,18 +346,24 @@ class TestReentrantGuard:
     that the guard is released once the in-flight call completes.
 
     These exercise the real guard through the public fire() entry point: a
-    background thread is given a genuinely slow shell action so a second,
-    concurrent fire() call for the same event observes the guard while the
-    first is still running.
+    background thread runs a shell action that announces startup and waits
+    for release, so the concurrent call observes the guard while the first
+    action is still running.
     """
 
     def test_reentrant_trigger_returns_empty(self, tmp_path: Path) -> None:
         marker = tmp_path / "started"
+        release = tmp_path / "release"
         script = tmp_path / "slow.py"
         script.write_text(
             "import pathlib, time\n"
             f"pathlib.Path({str(marker)!r}).touch()\n"
-            "time.sleep(1)\n",
+            f"release = pathlib.Path({str(release)!r})\n"
+            "deadline = time.monotonic() + 45\n"
+            "while not release.exists():\n"
+            "    if time.monotonic() >= deadline:\n"
+            "        raise SystemExit('parent did not release the trigger')\n"
+            "    time.sleep(0.02)\n",
             encoding="utf-8",
         )
         exe = sys.executable.replace("\\", "/")
@@ -374,16 +380,25 @@ class TestReentrantGuard:
         outer_thread = threading.Thread(target=run_outer)
         outer_thread.start()
         try:
-            deadline = time.monotonic() + 5
-            while not marker.exists() and time.monotonic() < deadline:
+            deadline = time.monotonic() + 30
+            while (
+                not marker.exists()
+                and outer_thread.is_alive()
+                and time.monotonic() < deadline
+            ):
                 time.sleep(0.02)
-            assert marker.exists(), "outer trigger's shell action never started"
+            assert marker.exists(), (
+                f"outer trigger's shell action never started: {outer_results}"
+            )
+            assert outer_thread.is_alive(), "outer trigger ended before the nested call"
 
             inner_results = fire(hooks, "config.synced", home=home)
             assert inner_results == []
         finally:
-            outer_thread.join(timeout=5)
+            release.touch()
+            outer_thread.join(timeout=65)
 
+        assert not outer_thread.is_alive(), "outer trigger did not finish after release"
         assert len(outer_results) == 1
         assert outer_results[0].success is True
 
