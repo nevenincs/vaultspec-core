@@ -1084,13 +1084,12 @@ enrollment. Providers are `all`, `claude`, `antigravity`, and `codex`; scopes ar
 The default provider is `all` and the default scope is `project`.
 `vaultspec-core spec mcps trust [PROVIDER]` approves exact MCP commands after review and
 confirmation at an interactive terminal. `--source-from-cwd` approves definitions from
-the current working directory for a top-level `vaultspec-core sync` invocation
-destination; use `--target PATH` to select that destination and `--scope SCOPE` to
-select enrollment scope. `--revoke` withdraws existing grants; uninstall removes
-deployed entries. `vaultspec-core spec mcps sync --force` adopts or replaces a same-name
-external entry; `vaultspec-core spec mcps sync --prune` removes owned enrollment whose
-canonical source was deleted. `uninstall` preserves canonical definitions and external
-host entries.
+the current working directory for a top-level `vaultspec-core sync` invocation; use
+`--target PATH` to select the destination and `--scope SCOPE` to select enrollment
+scope. `--revoke` withdraws existing grants; uninstall removes deployed entries.
+`vaultspec-core spec mcps sync --force` adopts or replaces a same-name external entry;
+`vaultspec-core spec mcps sync --prune` removes owned enrollment whose canonical source
+was deleted. `uninstall` preserves canonical definitions and external host entries.
 
 ## Migration commands
 
