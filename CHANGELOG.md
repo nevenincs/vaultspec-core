@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.3](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.2...vaultspec-core-v0.3.3) (2026-10-04)
+
+
+### Bug Fixes
+
+* **ci:** assert running version after ownership migration ([#587](https://github.com/nevenincs/vaultspec-core/issues/587)) ([5bfee05](https://github.com/nevenincs/vaultspec-core/commit/5bfee05259464b4650b7d84d4184391d800a4753))
+* **ci:** let the Windows jobs and the gate outlast the fleet's admission wait ([#583](https://github.com/nevenincs/vaultspec-core/issues/583)) ([4520cc9](https://github.com/nevenincs/vaultspec-core/commit/4520cc917a47c9a949589fd35a1dba973c2a3a18))
+* **docs:** wait on rag's JSON status, and keep its colours in the capture ([cde9acb](https://github.com/nevenincs/vaultspec-core/commit/cde9acbe7f6104333414b97611cc2c22f15e1e62))
+* **gitignore:** keep every .env file out of Git ([#581](https://github.com/nevenincs/vaultspec-core/issues/581)) ([79063d7](https://github.com/nevenincs/vaultspec-core/commit/79063d7030b342eb184a4a90806ab203789f6586))
+* **security:** harden workspace, MCP, and publishing boundaries ([#586](https://github.com/nevenincs/vaultspec-core/issues/586)) ([4660aba](https://github.com/nevenincs/vaultspec-core/commit/4660aba4eb5bc1b5051e0e090292d591f0cca770))
+* **tests:** bound the MCP entrypoint lifecycle tests by the session ceiling ([#580](https://github.com/nevenincs/vaultspec-core/issues/580)) ([fe71ddc](https://github.com/nevenincs/vaultspec-core/commit/fe71ddc23d1787cddbfd76f866ab313df4ed6d8c))
+
 ## [0.3.2](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.1...vaultspec-core-v0.3.2) (2026-09-28)
 
 
