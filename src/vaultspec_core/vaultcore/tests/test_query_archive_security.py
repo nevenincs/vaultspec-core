@@ -39,9 +39,10 @@ def _link(target: Path, link: Path, kind: str) -> None:
         if os.name != "nt":
             pytest.skip("junctions are Windows-only")
         subprocess.run(
-            ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+            ["cmd", "/d", "/c", "mklink", "/J", str(link), str(target)],
             check=True,
             capture_output=True,
+            timeout=30,
         )
         assert link.is_junction()
     else:

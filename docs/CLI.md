@@ -3107,8 +3107,9 @@ outputs.
 - `vaultspec-core spec mcps trust [PROVIDER]` (`--scope SCOPE`, `--target PATH`,
   `--source-from-cwd`, `--revoke`) - Approve exact MCP commands after review and
   confirmation at an interactive terminal. `--source-from-cwd` approves definitions from
-  the current working directory for a top-level `vaultspec-core sync` invocation
-  destination. `--revoke` withdraws existing grants; uninstall removes deployed entries.
+  the current working directory for a top-level `vaultspec-core sync` invocation with a
+  `--target` destination. `--revoke` withdraws existing grants; uninstall removes
+  deployed entries.
 - `vaultspec-core spec mcps status [PROVIDER]` (`--scope SCOPE`, `--json`,
   `--target PATH`) - Inspect enrollment and ownership state without starting or probing
   MCP servers.

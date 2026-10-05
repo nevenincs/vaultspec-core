@@ -245,9 +245,10 @@ def test_windows_junction_is_rejected(tmp_path: Path) -> None:
     workspace.mkdir()
     junction = workspace / ".vault"
     subprocess.run(
-        ["cmd", "/c", "mklink", "/J", str(junction), str(outside)],
+        ["cmd", "/d", "/c", "mklink", "/J", str(junction), str(outside)],
         check=True,
         capture_output=True,
+        timeout=30,
     )
     try:
         with pytest.raises(MigrationError, match="linked path"):

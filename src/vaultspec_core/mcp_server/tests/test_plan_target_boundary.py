@@ -167,10 +167,10 @@ async def test_linked_targets_cannot_escape_plan_directory(
         link, destination = vault, external.parent.parent
     if link_kind == "plan_junction":
         subprocess.run(
-            ["cmd", "/c", "mklink", "/J", str(link), str(destination)],
+            ["cmd", "/d", "/c", "mklink", "/J", str(link), str(destination)],
             check=True,
             capture_output=True,
-            timeout=10,
+            timeout=30,
         )
         assert link.is_junction()
     else:
