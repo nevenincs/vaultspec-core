@@ -1,22 +1,23 @@
-name: Windows startup diagnostic
+name: Core Windows Startup Diagnostic
 
 on:
-  push:
-    branches: [diag/windows-startup-20261004]
-    paths: [.github/workflows/windows-startup-diagnostic.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   diagnostic:
-    name: Windows startup and local process timing
+    name: "Check: Startup and local process timing (Windows)"
     runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 5
+    timeout-minutes: 125
+    env:
+      CI_EXEC_BUDGET_MINUTES: 5
     steps:
       - name: Measure local execution
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $first = [DateTime]::UtcNow.ToString('o')
           $total = [Diagnostics.Stopwatch]::StartNew()
           $results = [ordered]@{

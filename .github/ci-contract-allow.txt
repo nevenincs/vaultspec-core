@@ -20,6 +20,9 @@ binaries.yml:Drop the downloaded artifacts
 acquisition.yml:Provision a private Homebrew
 acquisition.yml:Confirm the acquisition starts cold
 acquisition.yml:Clean up
+# Measures runner startup before any checkout or provisioning can warm it.
+# This operates only on the runner's tools and temporary storage, not project code.
+windows-startup-diagnostic.yml:Measure local execution
 
 # --- CI-plane bookkeeping ---------------------------------------------------
 # This scheduled compatibility lane deliberately exposes interpreter install,
