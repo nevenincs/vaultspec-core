@@ -58,9 +58,11 @@ explicitly adopt existing entries; ordinary sync preserves them until adoption.
 Configure your client to launch the server with the project root as its working
 directory, or [set an explicit workspace](#point-the-server-at-a-different-workspace).
 
-Keep the generated `python -m vaultspec_core.mcp_server.app` invocation. On Windows,
+Keep the generated `python -P -m vaultspec_core.mcp_server.app` invocation. On Windows,
 running the `vaultspec-core-mcp` console executable can keep it locked while the client
-is connected, blocking package updates that replace it.
+is connected, blocking package updates that replace it. `-P` keeps the working directory
+off `sys.path`, so a file in the workspace cannot be imported in place of the server
+package or of anything it imports.
 
 In tool mode, the generated entry in Claude's `.mcp.json` and Antigravity's
 `.agents/mcp_config.json` uses this configuration:
@@ -74,6 +76,7 @@ In tool mode, the generated entry in Claude's `.mcp.json` and Antigravity's
         "--from",
         "vaultspec-core",
         "python",
+        "-P",
         "-m",
         "vaultspec_core.mcp_server.app"
       ]
@@ -87,7 +90,7 @@ Codex takes the same invocation as TOML, inside a marked region the installer ow
 ```toml
 # <vaultspec type="mcps">
 [mcp_servers."vaultspec-core"]
-args = ["--from", "vaultspec-core", "python", "-m", "vaultspec_core.mcp_server.app"]
+args = ["--from", "vaultspec-core", "python", "-P", "-m", "vaultspec_core.mcp_server.app"]
 command = "uvx"
 # </vaultspec>
 ```

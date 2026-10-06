@@ -1262,6 +1262,7 @@ class TestInstallSeedsMcps:
                 "--from",
                 "vaultspec-core",
                 "python",
+                "-P",
                 "-m",
                 "vaultspec_core.mcp_server.app",
             ]
@@ -1330,6 +1331,7 @@ class TestProviderNativeMcpEnrollment:
                     "--from",
                     "vaultspec-rag[mcp]",
                     "python",
+                    "-P",
                     "-m",
                     "vaultspec_rag.mcp_server.app",
                 ]

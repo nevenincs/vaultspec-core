@@ -8,7 +8,7 @@ Install Core with Scoop on Windows or Homebrew on macOS and Linux. Both channels
 > `vaultspec-core-mcp`, matching the package it ships in. Upgrading replaces the old
 > name rather than keeping both, so a script that calls `vaultspec-mcp` directly needs
 > updating. Generated MCP enrollment is unaffected: it launches the server as
-> `python -m vaultspec_core.mcp_server.app`, never through the executable, and the
+> `python -P -m vaultspec_core.mcp_server.app`, never through the executable, and the
 > enrolled server entry is still named `vaultspec-core`.
 
 You don't need a separate Python installation on any release, and from v0.1.74 you don't

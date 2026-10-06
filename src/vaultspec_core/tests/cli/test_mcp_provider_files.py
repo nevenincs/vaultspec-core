@@ -29,7 +29,14 @@ pytestmark = [pytest.mark.unit]
 # either the command or a single arg is caught.
 _DEPENDENCY_LAUNCH = {
     "command": "uv",
-    "args": ["run", "--no-sync", "python", "-m", "vaultspec_core.mcp_server.app"],
+    "args": [
+        "run",
+        "--no-sync",
+        "python",
+        "-P",
+        "-m",
+        "vaultspec_core.mcp_server.app",
+    ],
 }
 _TOOL_LAUNCH = {
     "command": "uvx",
@@ -37,6 +44,7 @@ _TOOL_LAUNCH = {
         "--from",
         "vaultspec-core",
         "python",
+        "-P",
         "-m",
         "vaultspec_core.mcp_server.app",
     ],
