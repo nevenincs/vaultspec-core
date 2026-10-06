@@ -17,11 +17,11 @@ configuration.
 
 ## Entry points
 
-| Command                                                    | Purpose                                                          |
-| ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| `vaultspec-core`                                           | Workspace management, vault operations, sync.                    |
-| `vaultspec-core-mcp`                                       | Console script launching the stdio MCP server.                   |
-| `uv run --no-sync python -m vaultspec_core.mcp_server.app` | Module invocation of the MCP server (Windows-safe, never syncs). |
+| Command                                                       | Purpose                                                                                |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `vaultspec-core`                                              | Workspace management, vault operations, sync.                                          |
+| `vaultspec-core-mcp`                                          | Console script launching the stdio MCP server.                                         |
+| `uv run --no-sync python -P -m vaultspec_core.mcp_server.app` | Module invocation of the MCP server (Windows-safe, never syncs, no cwd on `sys.path`). |
 
 ## Global options
 

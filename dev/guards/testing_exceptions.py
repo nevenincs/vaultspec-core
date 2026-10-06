@@ -96,6 +96,16 @@ EXCEPTIONS = (
         "Change real definition bytes during rendering to challenge grant binding.",
     ),
     TestMechanismException(
+        "src/vaultspec_core/core/tests/test_require_executable.py",
+        (
+            "test_program_in_the_working_directory_is_never_returned",
+            "test_relative_path_entry_is_not_searched",
+        ),
+        frozenset({"monkeypatch"}),
+        "Enter a working directory holding real planted executables, and craft "
+        "the search path that used to reach them, to prove neither is resolved.",
+    ),
+    TestMechanismException(
         "src/vaultspec_core/mcp_server/tests/test_catalog_injection.py",
         ("test_poisoned_inventory_rejected_before_spawn",),
         frozenset({"monkeypatch"}),

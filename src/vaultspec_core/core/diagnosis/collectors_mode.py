@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import json
 import logging
+from itertools import combinations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..mcps_mode import MODE_COMMAND_TOKEN
+from ..mcps_mode import MODE_COMMAND_TOKEN, MODE_LAUNCH_GUARD_FLAGS
 from .collectors_config import read_mcp_servers
 from .collectors_precommit import observed_precommit_mode
 from .signals import ModeMismatchSignal, VersionFloorSignal
@@ -31,22 +32,36 @@ def _builtin_server_name(filename: str) -> str:
     return filename.removesuffix(suffix)
 
 
-#: The pre-``--no-sync`` dependency-mode MCP launch shape. Deployed workspaces
-#: seeded before the guard was introduced still carry this exact byte sequence, so
-#: :func:`observed_mcp_mode` recognizes it as a bounded, explicit legacy
-#: candidate rather than silently reporting ``None`` for every not-yet-refreshed
-#: dependency-mode workspace. It is derived from the current renderer's args
-#: with the ``--no-sync`` element removed, so it can never drift into a second
-#: hand-maintained launch copy: only this one historical shape is recognized,
-#: and the mismatch it produces against the current declaration surfaces as
-#: ordinary drift, remediated by ``spec mcps sync --force`` or
-#: ``install --upgrade`` through the existing force-managed seam.
-def _legacy_dependency_args(module: str) -> list[str]:
-    from ..enums import InstallMode
-    from ..mcps import render_launch_for_mode
+def _legacy_launch_args(current_args: list[str]) -> list[list[str]]:
+    """Return the historical launch shapes *current_args* superseded.
 
-    _, current_args = render_launch_for_mode(InstallMode.DEPENDENCY, "", module)
-    return [arg for arg in current_args if arg != "--no-sync"]
+    Every guard flag the renderer emits
+    (:data:`~vaultspec_core.core.mcps_mode.MODE_LAUNCH_GUARD_FLAGS`) was added
+    after workspaces had already been provisioned, so a deployed entry can be
+    missing any combination of them. Each such shape is enumerated by dropping a
+    subset of those flags from the current render, so :func:`observed_mcp_mode`
+    reports a not-yet-refreshed workspace as the mode it is provisioned for
+    instead of silently reporting ``None`` for it.
+
+    The shapes are derived from the renderer's own args rather than written out,
+    so they can never drift into a second hand-maintained launch copy: only
+    these bounded historical shapes are recognized, and the byte difference each
+    carries against the current render still surfaces as ordinary drift -
+    converged by the fingerprint-verified refresh in ``spec mcps sync``, or
+    remediated through the existing force-managed seam by ``--force`` or
+    ``install --upgrade``.
+
+    Args:
+        current_args: The args the renderer produces for a mode today.
+
+    Returns:
+        One args list per superseded shape, never the current shape itself.
+    """
+    shapes: list[list[str]] = []
+    for count in range(1, len(MODE_LAUNCH_GUARD_FLAGS) + 1):
+        for flags in combinations(MODE_LAUNCH_GUARD_FLAGS, count):
+            shapes.append([arg for arg in current_args if arg not in flags])
+    return shapes
 
 
 def _launch_module(args: list[object]) -> str | None:
@@ -81,13 +96,13 @@ def observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode |
     hardcoded copy and works for any package's module without a per-package
     table.
 
-    A deployed entry shaped like the pre-``--no-sync`` legacy dependency launch
-    (``uv run python -m <module>``, no guard) also matches
-    :attr:`~vaultspec_core.core.enums.InstallMode.DEPENDENCY`
-    (:data:`_legacy_dependency_args`), so mode inference and the mode-mismatch
-    signal do not regress to ``None`` on workspaces seeded before the guard was
-    introduced; the byte difference between the legacy and current shapes then
-    reports as ordinary drift with a fix hint pointing at
+    A deployed entry shaped like one of the launches the current render
+    superseded - missing the ``--no-sync`` guard, missing the ``-P`` safe-path
+    flag, or missing both - matches its own mode too
+    (:func:`_legacy_launch_args`), so mode inference and the mode-mismatch
+    signal do not regress to ``None`` on workspaces seeded before a guard was
+    introduced; the byte difference between a superseded shape and the current
+    one then reports as ordinary drift with a fix hint pointing at
     ``spec mcps sync --force`` or ``install --upgrade``.
 
     Companion packages (vaultspec-rag's upgrade inference and mode-flip
@@ -125,13 +140,17 @@ def observed_mcp_mode(target: Path, package: str | None = None) -> InstallMode |
     if module is None:
         return None
 
-    for mode in (InstallMode.TOOL, InstallMode.DEPENDENCY):
-        mode_command, mode_args = render_launch_for_mode(mode, pkg, module)
+    rendered = {
+        mode: render_launch_for_mode(mode, pkg, module)
+        for mode in (InstallMode.TOOL, InstallMode.DEPENDENCY)
+    }
+    for mode, (mode_command, mode_args) in rendered.items():
         if command == mode_command and args == mode_args:
             return mode
 
-    if command == "uv" and args == _legacy_dependency_args(module):
-        return InstallMode.DEPENDENCY
+    for mode, (mode_command, mode_args) in rendered.items():
+        if command == mode_command and args in _legacy_launch_args(mode_args):
+            return mode
 
     return None
 

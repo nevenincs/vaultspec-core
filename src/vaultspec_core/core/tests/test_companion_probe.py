@@ -128,6 +128,7 @@ class TestDeclared:
                         "--from",
                         f"{_NOT_INSTALLED}[mcp]",
                         "python",
+                        "-P",
                         "-m",
                         _MODULE,
                     ],

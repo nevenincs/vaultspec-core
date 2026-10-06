@@ -48,6 +48,7 @@ def test_init_run_scaffolds_antigravity_workspace_layout(tmp_path: Path) -> None
             "--from",
             "vaultspec-core",
             "python",
+            "-P",
             "-m",
             "vaultspec_core.mcp_server.app",
         ]

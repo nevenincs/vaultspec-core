@@ -652,7 +652,7 @@ class TestObservedMcpMode:
             tmp_path,
             "vaultspec-core",
             "uv",
-            ["run", "--no-sync", "python", "-m", self._MODULE],
+            ["run", "--no-sync", "python", "-P", "-m", self._MODULE],
         )
         assert observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
 
@@ -665,7 +665,32 @@ class TestObservedMcpMode:
         )
         assert observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
 
+    def test_legacy_unsafe_path_shape_is_dependency(self, tmp_path: Path) -> None:
+        """The --no-sync-guarded shape that predates -P still maps to DEPENDENCY.
+
+        Every workspace provisioned before the safe-path flag carries this exact
+        argv, so losing it would report an unknown mode for all of them until
+        each is refreshed.
+        """
+        _write_mcp_server_entry(
+            tmp_path,
+            "vaultspec-core",
+            "uv",
+            ["run", "--no-sync", "python", "-m", self._MODULE],
+        )
+        assert observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.DEPENDENCY
+
     def test_tool_shape_is_tool(self, tmp_path: Path) -> None:
+        _write_mcp_server_entry(
+            tmp_path,
+            "vaultspec-core",
+            "uvx",
+            ["--from", "vaultspec-core", "python", "-P", "-m", self._MODULE],
+        )
+        assert observed_mcp_mode(tmp_path, "vaultspec-core") == InstallMode.TOOL
+
+    def test_legacy_unsafe_path_tool_shape_is_tool(self, tmp_path: Path) -> None:
+        """The tool-mode launch that predates -P still maps to TOOL."""
         _write_mcp_server_entry(
             tmp_path,
             "vaultspec-core",
@@ -1185,12 +1210,12 @@ class TestRenderLaunchForMode:
     def test_dependency_shape(self) -> None:
         assert render_launch_for_mode(
             InstallMode.DEPENDENCY, "vaultspec-core", _CORE_MODULE
-        ) == ("uv", ["run", "--no-sync", "python", "-m", _CORE_MODULE])
+        ) == ("uv", ["run", "--no-sync", "python", "-P", "-m", _CORE_MODULE])
 
     def test_tool_shape(self) -> None:
         assert render_launch_for_mode(
             InstallMode.TOOL, "vaultspec-core", _CORE_MODULE
-        ) == ("uvx", ["--from", "vaultspec-core", "python", "-m", _CORE_MODULE])
+        ) == ("uvx", ["--from", "vaultspec-core", "python", "-P", "-m", _CORE_MODULE])
 
     def test_dev_renders_byte_identically_to_dependency(self) -> None:
         assert render_launch_for_mode(
@@ -1206,11 +1231,32 @@ class TestRenderLaunchForMode:
             InstallMode.TOOL, "vaultspec-rag", "vaultspec_rag.server"
         ) == (
             "uvx",
-            ["--from", "vaultspec-rag", "python", "-m", "vaultspec_rag.server"],
+            ["--from", "vaultspec-rag", "python", "-P", "-m", "vaultspec_rag.server"],
         )
         assert render_launch_for_mode(
             InstallMode.DEV, "vaultspec-rag", "vaultspec_rag.server"
-        ) == ("uv", ["run", "--no-sync", "python", "-m", "vaultspec_rag.server"])
+        ) == ("uv", ["run", "--no-sync", "python", "-P", "-m", "vaultspec_rag.server"])
+
+    def test_every_mode_renders_the_interpreter_safe_path_flag(self) -> None:
+        """GUARD: no rendered module launch may admit the working directory.
+
+        An MCP host starts the rendered command with the workspace as its
+        working directory, and a ``-m`` launch without ``-P`` puts that
+        directory first on ``sys.path``: a workspace file named like the served
+        package, or like anything it imports, is then imported in its place. The
+        assertion is positional - the flag has to precede ``-m``, where the
+        interpreter still reads it - and it runs over every member, so a mode
+        added later cannot render an unguarded launch.
+        """
+        for mode in InstallMode:
+            _command, args = render_launch_for_mode(
+                mode, "vaultspec-core", _CORE_MODULE
+            )
+            assert "-m" in args, f"{mode} renders no module launch: {args}"
+            assert args[args.index("-m") - 1] == "-P", (
+                f"{mode} renders a module launch without the interpreter "
+                f"safe-path flag: {args}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -1228,6 +1274,7 @@ class TestRenderMcpDefinitionForMode:
             "--from",
             "vaultspec-core",
             "python",
+            "-P",
             "-m",
             _CORE_MODULE,
         ]
@@ -1237,7 +1284,14 @@ class TestRenderMcpDefinitionForMode:
             self._tokened(), InstallMode.DEPENDENCY
         )
         assert rendered["command"] == "uv"
-        assert rendered["args"] == ["run", "--no-sync", "python", "-m", _CORE_MODULE]
+        assert rendered["args"] == [
+            "run",
+            "--no-sync",
+            "python",
+            "-P",
+            "-m",
+            _CORE_MODULE,
+        ]
 
     def test_dev_renders_byte_identically_to_dependency(self) -> None:
         assert render_mcp_definition_for_mode(
@@ -1259,6 +1313,7 @@ class TestRenderMcpDefinitionForMode:
             "--from",
             "vaultspec-rag",
             "python",
+            "-P",
             "-m",
             "vaultspec_rag.server",
         ]
@@ -1514,7 +1569,14 @@ class TestInstallModeDevEndToEnd:
         mcp = json.loads((tmp_path / ".mcp.json").read_text(encoding="utf-8"))
         core_server = mcp["mcpServers"]["vaultspec-core"]
         assert core_server["command"] == "uv"
-        assert core_server["args"] == ["run", "--no-sync", "python", "-m", _CORE_MODULE]
+        assert core_server["args"] == [
+            "run",
+            "--no-sync",
+            "python",
+            "-P",
+            "-m",
+            _CORE_MODULE,
+        ]
 
         # Dependency-shaped hook entries (uv run --no-sync).
         precommit = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")

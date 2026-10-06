@@ -14,6 +14,7 @@ from .enums import InstallMode, render_mode
 __all__ = [
     "MODE_ARGS_TOKEN",
     "MODE_COMMAND_TOKEN",
+    "MODE_LAUNCH_GUARD_FLAGS",
     "MODE_MCP_LAUNCH",
     "MODE_MODULE_KEY",
     "MODE_PACKAGE_KEY",
@@ -49,6 +50,15 @@ _MODE_TOOL_SPEC_KEY = "_vaultspec_mode_tool_spec"
 _DEFAULT_MCP_PACKAGE = "vaultspec-core"
 _DEFAULT_MCP_MODULE = "vaultspec_core.mcp_server.app"
 
+#: The guard flags :func:`render_launch_for_mode` emits beyond the bare
+#: launcher-plus-module invocation, newest last. Each was added after workspaces
+#: were already provisioned, so a deployed entry can be missing any combination
+#: of them; the mode diagnosis derives the historical launch shapes it still
+#: recognizes by dropping subsets of this tuple from the current render, which
+#: is why the flag names live here next to the renderer that emits them rather
+#: than in a second hand-maintained list.
+MODE_LAUNCH_GUARD_FLAGS = ("--no-sync", "-P")
+
 
 def render_launch_for_mode(
     mode: InstallMode,
@@ -71,13 +81,23 @@ def render_launch_for_mode(
     the dev-scoped bookkeeping member never grows a third launch branch.
 
     Dependency-rendered mode launches the module through the governed project's
-    own venv with the ``--no-sync`` guard (``uv run --no-sync python -m
+    own venv with the ``--no-sync`` guard (``uv run --no-sync python -P -m
     <module>``): a static execution that resolves the existing venv and never
     installs, syncs, or otherwise mutates it, failing honestly when the venv is
     stale or broken instead of self-repairing at connect time. Tool mode
     launches the same module through an ephemeral ``uvx --from <package>``
     invocation so the distribution never enters the governed project's
     dependency set.
+
+    Every mode renders the interpreter's safe-path flag, ``-P``, before ``-m``.
+    A host starts this command with the workspace as its working directory, and
+    ``-m`` otherwise puts that directory first on ``sys.path``, ahead of the
+    installed distributions: a workspace file or directory named like the served
+    package or like anything it imports would then be imported in its place, in
+    the process that holds the server's credentials. Both modes resolve the
+    package from the environment, so nothing legitimate reads from the working
+    directory - an editable install reaches its sources through the
+    environment's own path entries.
 
     Args:
         mode: The provisioning mode whose launch to render.
@@ -92,8 +112,8 @@ def render_launch_for_mode(
         The ``(command, args)`` pair for the rendered mode.
     """
     if render_mode(mode) is InstallMode.DEPENDENCY:
-        return "uv", ["run", "--no-sync", "python", "-m", module]
-    return "uvx", ["--from", tool_spec or package, "python", "-m", module]
+        return "uv", ["run", "--no-sync", "python", "-P", "-m", module]
+    return "uvx", ["--from", tool_spec or package, "python", "-P", "-m", module]
 
 
 #: Core's own concrete MCP-server launch per mode, derived from the generalized

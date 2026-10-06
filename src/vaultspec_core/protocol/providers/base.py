@@ -171,19 +171,28 @@ def resolve_executable(
     asyncio.create_subprocess_exec. This function wraps them with
     ``cmd.exe /c`` so they execute correctly.
 
+    The lookup goes through
+    :func:`~vaultspec_core.core.helpers.which_on_path`, so a provider CLI is
+    resolved out of the absolute ``PATH`` directories and never out of the
+    working directory, which is the workspace this process was pointed at.
+    Unlike :func:`~vaultspec_core.core.helpers.require_executable` an
+    unresolvable name is not an error here: the bare name is returned so the
+    caller's own spawn reports the failure.
+
     Args:
         name: Executable name to resolve (e.g. ``"gemini"``).
-        which_fn: Optional replacement for ``shutil.which`` (injectable for
+        which_fn: Optional replacement for the path lookup (injectable for
             testing).
 
     Returns:
         (executable, prefix_args)  - prepend prefix_args to the command's
         argument list when constructing the subprocess call.
     """
-    import shutil
     import sys
 
-    _which = which_fn or shutil.which
+    from ...core.helpers import which_on_path
+
+    _which = which_fn or which_on_path
     path = _which(name) or name
 
     if sys.platform == "win32" and path.lower().endswith((".cmd", ".bat")):
