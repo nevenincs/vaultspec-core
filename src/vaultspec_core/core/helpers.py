@@ -787,12 +787,61 @@ def collect_md_resources(
     return sources
 
 
+def path_directories() -> list[str]:
+    """Return the absolute directories of ``PATH``, in search order.
+
+    The current directory, empty entries and relative entries are dropped. An
+    empty entry and a relative one both resolve against the working directory,
+    which is the workspace for most of this codebase's subprocesses, and a
+    workspace is content: a program found there is not the program the caller
+    asked for. Only a directory named absolutely can be the operator's own
+    deliberate placement.
+
+    Returns:
+        One absolute directory per usable ``PATH`` entry; possibly empty.
+    """
+    return [entry for entry in os.get_exec_path() if os.path.isabs(entry)]
+
+
+def which_on_path(name: str, directories: list[str] | None = None) -> str | None:
+    """Return *name*'s absolute path, searching *directories* only.
+
+    Looks each directory up as an explicit path-qualified candidate, which is
+    what keeps the working directory out of the search: :func:`shutil.which`
+    inserts ``os.curdir`` ahead of the search path on Windows and checks it
+    first, and it does so whether or not a path was passed, but it skips that
+    insertion entirely for a candidate that already carries a directory part.
+    ``PATHEXT`` still applies, so ``git`` resolves to ``git.exe``.
+
+    A *name* that carries a directory part is a request for that exact file and
+    is looked up as given, as :func:`shutil.which` would.
+
+    Args:
+        name: Program name, e.g. ``"git"``.
+        directories: Absolute directories to search, in order; ``None`` means
+            :func:`path_directories`.
+
+    Returns:
+        The resolved path, or ``None`` when no directory holds *name*.
+    """
+    if os.path.dirname(name):
+        return shutil.which(name)
+    for directory in directories if directories is not None else path_directories():
+        resolved = shutil.which(os.path.join(directory, name))
+        if resolved is not None:
+            return resolved
+    return None
+
+
 def require_executable(name: str, *, windows_system: bool = False) -> str:
     """Return the absolute path of executable *name*.
 
     Launching by absolute path pins the binary that was checked instead of
-    whatever the OS search order picks at spawn time; on Windows
-    :func:`shutil.which` also applies ``PATHEXT`` so ``git`` finds ``git.exe``.
+    whatever the OS search order picks at spawn time, so the lookup itself has
+    to stay on the configured search path: resolution runs through
+    :func:`which_on_path`, which searches the absolute ``PATH`` directories and
+    never the working directory. Without that, a workspace holding a ``git.exe``
+    supplied the ``git`` this helper exists to rule out.
 
     Args:
         name: Program name, e.g. ``"git"``.
@@ -804,14 +853,14 @@ def require_executable(name: str, *, windows_system: bool = False) -> str:
         FileNotFoundError: When *name* cannot be found, matching what
             :func:`subprocess.run` raises for a missing program.
     """
-    search: str | None = None
+    directories: list[str] | None = None
     if windows_system and sys.platform == "win32":
         import ctypes
 
         buffer = ctypes.create_unicode_buffer(260)
         if ctypes.windll.kernel32.GetSystemDirectoryW(buffer, len(buffer)):
-            search = buffer.value
-    path = shutil.which(name, path=search)
+            directories = [buffer.value]
+    path = which_on_path(name, directories)
     if path is None:
         raise FileNotFoundError(
             errno.ENOENT, f"{name} executable not found on PATH", name
