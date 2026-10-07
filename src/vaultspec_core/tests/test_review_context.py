@@ -294,6 +294,11 @@ def test_timeout_does_not_retry_or_block_local_fallback(repository: Path) -> Non
         ) as client,
     ):
         result = rank("contract", snapshot, client, {})
+        # The client gives up after 10 ms, which can be before the provider's
+        # handler thread has run at all.
+        arrival = time.monotonic() + 10
+        while not provider.received and time.monotonic() < arrival:
+            time.sleep(0.005)
     assert result.status == "unavailable" and result.scores == {}
     assert len(provider.received) == 1
 
