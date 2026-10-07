@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.4](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.3...vaultspec-core-v0.3.4) (2026-10-07)
+
+
+### Bug Fixes
+
+* **ci:** finish runner diagnostic and dependency lock work ([#589](https://github.com/nevenincs/vaultspec-core/issues/589)) ([8c7685d](https://github.com/nevenincs/vaultspec-core/commit/8c7685da9d66e31094915021916bec15531612fb))
+* **ci:** look up the release where a draft can be seen ([#593](https://github.com/nevenincs/vaultspec-core/issues/593)) ([2f3281d](https://github.com/nevenincs/vaultspec-core/commit/2f3281df53ad6f874215dfd44f51813cac7a8105))
+* **ci:** stabilize junction fixtures and clarify MCP trust docs ([#588](https://github.com/nevenincs/vaultspec-core/issues/588)) ([6f33b93](https://github.com/nevenincs/vaultspec-core/commit/6f33b933c6f9ac82b2084f4898e2bac3534ee4bb))
+* **ci:** verify a published wheel against the branch that signs it ([#594](https://github.com/nevenincs/vaultspec-core/issues/594)) ([6af911a](https://github.com/nevenincs/vaultspec-core/commit/6af911a72deccb28bf6dbb200bd26b7995717743))
+* **security:** keep the workspace out of the MCP launch's import path and out of executable lookup ([#592](https://github.com/nevenincs/vaultspec-core/issues/592)) ([57258a8](https://github.com/nevenincs/vaultspec-core/commit/57258a86f7cc7c21d214bb95bd392d76c80b7d2e))
+* **tests:** count the timed-out request once the provider has seen it ([#596](https://github.com/nevenincs/vaultspec-core/issues/596)) ([b924275](https://github.com/nevenincs/vaultspec-core/commit/b9242758dc5d5697b470ef40a3f467c7554bd89e))
+
 ## [0.3.3](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.2...vaultspec-core-v0.3.3) (2026-10-04)
 
 
