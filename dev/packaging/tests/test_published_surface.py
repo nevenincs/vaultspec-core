@@ -106,6 +106,20 @@ def test_asset_names_cannot_change_url_or_container_mount_syntax(name: str) -> N
         parse_latest_release(_payload(assets=[{"name": name}]), VAULTSPEC_CORE)
 
 
+def _verified(*signed: object) -> str:
+    """Return verifier output for attestations signed from the given commits."""
+    return json.dumps(
+        [
+            {
+                "verificationResult": {
+                    "signature": {"certificate": {"sourceRepositoryDigest": commit}}
+                }
+            }
+            for commit in signed
+        ]
+    )
+
+
 @pytest.fixture
 def release_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     wheel = tmp_path / WHEEL
@@ -178,12 +192,12 @@ def test_verified_bytes_execute_only_after_full_identity_verification(
     document = json.dumps({"version": "0.2.6"})
     run = Mock(
         side_effect=[
-            subprocess.CompletedProcess([], 0, "", ""),
+            subprocess.CompletedProcess([], 0, _verified("a" * 40), ""),
             subprocess.CompletedProcess([], 0, document, ""),
         ]
     )
     monkeypatch.setattr(subprocess, "run", run)
-    release, actual = reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    _release, actual = reader.read_published_surface(VAULTSPEC_CORE, release_files)
     assert actual == document
     verify, execute = [call.args[0] for call in run.call_args_list]
     assert verify == [
@@ -196,11 +210,62 @@ def test_verified_bytes_execute_only_after_full_identity_verification(
         "--signer-workflow",
         "nevenincs/vaultspec-core/.github/workflows/publish.yml",
         "--source-ref",
-        f"refs/tags/{release.tag}",
-        "--source-digest",
-        "a" * 40,
+        "refs/heads/main",
+        "--format",
+        "json",
     ]
     assert execute[5] == verify[3]
+
+
+def test_a_wheel_signed_from_a_later_main_commit_carries_its_release(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path
+) -> None:
+    """Publication is dispatched from main's head, which may have moved on."""
+    document = json.dumps({"version": "0.2.6"})
+    run = Mock(
+        side_effect=[
+            subprocess.CompletedProcess([], 0, _verified("c" * 40), ""),
+            subprocess.CompletedProcess([], 0, document, ""),
+        ]
+    )
+    monkeypatch.setattr(subprocess, "run", run)
+    compare = Mock(return_value=io.BytesIO(json.dumps({"status": "ahead"}).encode()))
+    monkeypatch.setattr(urllib.request, "urlopen", compare)
+    _release, actual = reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    assert actual == document
+    assert compare.call_args.args[0].endswith(f"/compare/{'a' * 40}...{'c' * 40}")
+
+
+@pytest.mark.parametrize("status", ["behind", "diverged", "identical", None])
+def test_a_wheel_signed_before_its_release_commit_never_executes(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path, status: str | None
+) -> None:
+    """An earlier release's wheel verifies as this repository's, and is not this one."""
+    run = Mock(return_value=subprocess.CompletedProcess([], 0, _verified("c" * 40), ""))
+    monkeypatch.setattr(subprocess, "run", run)
+    compare = Mock(return_value=io.BytesIO(json.dumps({"status": status}).encode()))
+    monkeypatch.setattr(urllib.request, "urlopen", compare)
+    with pytest.raises(PublishedSurfaceError, match="provenance did not verify"):
+        reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    assert run.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "verified",
+    ["", "not json", "[]", "{}", _verified("main"), _verified(None), "[{}]"],
+    ids=["empty", "malformed", "none", "object", "ref", "null", "bare"],
+)
+def test_verifier_output_naming_no_signing_commit_never_executes_the_wheel(
+    monkeypatch: pytest.MonkeyPatch, release_files: Path, verified: str
+) -> None:
+    run = Mock(return_value=subprocess.CompletedProcess([], 0, verified, ""))
+    monkeypatch.setattr(subprocess, "run", run)
+    compare = Mock()
+    monkeypatch.setattr(urllib.request, "urlopen", compare)
+    with pytest.raises(PublishedSurfaceError, match="provenance did not verify"):
+        reader.read_published_surface(VAULTSPEC_CORE, release_files)
+    assert run.call_count == 1
+    compare.assert_not_called()
 
 
 def test_conflicting_checksum_spellings_never_reach_execution(
