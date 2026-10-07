@@ -152,6 +152,11 @@ def download_wheel(release: PublishedRelease, product: Product, into: Path) -> P
     if hashlib.sha256(wheel.read_bytes()).hexdigest() != expected:
         raise PublishedSurfaceError(f"{release.wheel} does not match SHA256SUMS")
     commit = _release_commit(release, product)
+    # Publication runs `publish.yml` from main with the tag as its input, so a
+    # wheel's provenance names main and the head it was dispatched at, never
+    # the tag or its commit. What binds the wheel to this release is that the
+    # head already carried the release commit: a wheel attested for an earlier
+    # release was signed before that commit existed.
     try:
         result = subprocess.run(
             [
@@ -164,9 +169,9 @@ def download_wheel(release: PublishedRelease, product: Product, into: Path) -> P
                 "--signer-workflow",
                 f"{repository(product)}/.github/workflows/publish.yml",
                 "--source-ref",
-                f"refs/tags/{release.tag}",
-                "--source-digest",
-                commit,
+                "refs/heads/main",
+                "--format",
+                "json",
             ],
             capture_output=True,
             text=True,
@@ -181,7 +186,69 @@ def download_wheel(release: PublishedRelease, product: Product, into: Path) -> P
         raise PublishedSurfaceError(
             f"{release.wheel} provenance did not verify: {result.stderr.strip()}"
         )
+    if not any(
+        _carries_release(product, commit, signed)
+        for signed in _attested_commits(release, result.stdout)
+    ):
+        raise PublishedSurfaceError(
+            f"{release.wheel} provenance did not verify: no attestation was "
+            f"signed from a commit that carries {release.tag} ({commit})"
+        )
     return wheel
+
+
+def _attested_commits(release: PublishedRelease, verified: str) -> list[str]:
+    """Return the workflow commits the verified attestations were signed from."""
+    try:
+        attestations: object = json.loads(verified)
+    except json.JSONDecodeError as exc:
+        raise PublishedSurfaceError(
+            f"{release.wheel} provenance did not verify: unreadable verifier "
+            f"output: {exc}"
+        ) from exc
+    entries = (
+        cast("list[object]", attestations) if isinstance(attestations, list) else []
+    )
+    commits: list[str] = []
+    for entry in entries:
+        node: object = entry
+        for key in (
+            "verificationResult",
+            "signature",
+            "certificate",
+            "sourceRepositoryDigest",
+        ):
+            node = (
+                cast("Mapping[str, object]", node).get(key)
+                if isinstance(node, dict)
+                else None
+            )
+        if isinstance(node, str) and re.fullmatch(r"[0-9a-f]{40}", node):
+            commits.append(node)
+    return commits
+
+
+def _carries_release(product: Product, commit: str, signed: str) -> bool:
+    """Say whether the signing commit is the release commit or descends from it."""
+    if signed == commit:
+        return True
+    url = (
+        f"https://api.github.com/repos/{repository(product)}/compare/"
+        f"{commit}...{signed}"
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            payload: object = json.loads(response.read())
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        raise PublishedSurfaceError(
+            f"could not compare {signed} with the release commit: {exc}"
+        ) from exc
+    status = (
+        cast("Mapping[str, object]", payload).get("status")
+        if isinstance(payload, dict)
+        else None
+    )
+    return status == "ahead"
 
 
 def _release_commit(release: PublishedRelease, product: Product) -> str:

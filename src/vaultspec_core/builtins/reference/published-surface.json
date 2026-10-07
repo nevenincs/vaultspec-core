@@ -192,6 +192,13 @@
       "--scope",
       "--target"
     ],
+    "spec mcps trust": [
+      "--json",
+      "--revoke",
+      "--scope",
+      "--source-from-cwd",
+      "--target"
+    ],
     "spec mcps uninstall": [
       "--dry-run",
       "--force",
@@ -218,6 +225,7 @@
       "--json"
     ],
     "spec reference snapshot": [
+      "--development",
       "--emit",
       "--json",
       "--record",
@@ -1011,5 +1019,5 @@
     "status"
   ],
   "schema": 1,
-  "version": "0.3.2"
+  "version": "0.3.3"
 }

@@ -587,9 +587,9 @@ release-verify-surface wheel_dir='dist':
 # The only writer of the published-surface record the references are measured
 # against. It asks GitHub which release is latest - never a draft, never a
 # prerelease - downloads that release's own wheel, verifies checksums and
-# tag-bound publication provenance before installing it, records the surface
-# it reports, and re-renders the references. It needs the network and an
-# authenticated GitHub CLI for attestation lookup.
+# publication provenance that carries the release commit before installing it,
+# records the surface it reports, and re-renders the references. It needs the
+# network and an authenticated GitHub CLI for attestation lookup.
 
 # Record the latest published release's surface and re-render what cites it.
 [group('release')]
