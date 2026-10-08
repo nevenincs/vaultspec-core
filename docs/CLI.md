@@ -523,6 +523,15 @@ history. Only supplied keys replace existing values. Installation, adoption, upg
 them. Existing installations still require `--upgrade` or `--force`. Dry runs report
 names and planned outcomes without writing. Outputs never show imported values.
 
+Values already present in the process environment affect this invocation but are not
+saved to the project unless you import them explicitly. Core validates `--env` and
+`--env-file` before provisioning. After a real install or upgrade returns without
+errors, Core merges supplied values into `.vaultspec/.env`; a dry run reports outcomes
+without writing. An import does not change the current process environment or the
+target, provider, or launch mode already selected for this command; stored values are
+available to later Core commands. The final report can already reflect imported
+`VAULTSPEC_JSON_PRETTY` and `VAULTSPEC_NO_HINTS` settings.
+
 Values are stored in `.vaultspec/.env`, outside the vault. The installer establishes
 mandatory ignore rules, refuses tracked or redirected storage paths, and writes
 atomically with owner-only permissions (a restricted DACL on Windows). Ignore protection
@@ -537,16 +546,17 @@ imports support comments, `export`, and single-line quoted or unquoted values, w
 variable interpolation or shell evaluation. Double-quoted backslashes and quotes may be
 escaped.
 
-The store is the third rung of the [settings resolution](#settings-resolution) order:
-after explicit command options and the process environment, before the trusted root
-`.env` credential fallback and the defaults. A blank value is unset in the store as
-everywhere else, and falls through. Both CLI and MCP use this resolver, scoped to the
-selected workspace; file and environment changes refresh its cache. Local settings work
-in all install modes, while the root `.env` fallback keeps the trust restrictions
-described under settings resolution. Provisioning does not copy secrets into generated
-MCP configuration or change the parent shell's environment. A running MCP server keeps
-its inherited process environment until restarted, and that environment continues to
-override local file edits.
+For persistable settings, `.vaultspec/.env` is the third rung of the
+[settings resolution](#settings-resolution) order: after explicit command options and
+the process environment, before the trusted workspace-root `.env` credential fallback,
+persisted configuration, derived and external defaults, and shipped defaults. A blank
+value is unset in the store as everywhere else, and falls through. Both CLI and MCP use
+this resolver, scoped to the selected workspace; file and environment changes refresh
+its cache. Local settings work in all install modes, while the root `.env` fallback
+keeps the trust restrictions described under settings resolution. Provisioning does not
+copy secrets into generated MCP configuration or change the parent shell's environment.
+A running MCP server keeps its inherited process environment until restarted, and that
+environment continues to override local file edits.
 
 #### Examples
 
@@ -3611,8 +3621,9 @@ the working directory or from where the package is installed, and no variant
 `VAULTSPEC_CORE_TYPESAFE_API_KEY` - one name at a time, and only when both hold: the
 running interpreter lives inside the workspace (its project virtual environment), and
 the owning package's own resolved install mode for that workspace is `dependency` or
-`dev`. A globally installed tool (a uv tool, a pipx install, a release binary) pointed
-at a freshly cloned repository never reads that repository's `.env`.
+`dev`. A `uvx` invocation or a globally installed tool (such as a uv tool, a pipx
+install, or a release binary) pointed at a fresh clone never reads that repository's
+`.env`.
 
 No `.env` file is ever committed, this one or any other: dotenv files hold secrets. The
 managed `.gitignore` block ignores every `.env` and `.env.*` file at any depth, leaving

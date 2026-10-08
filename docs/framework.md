@@ -302,8 +302,9 @@ With `VAULTSPEC_CORE_TYPESAFE_API_KEY` configured, the backend sends at most twe
 shortlisted summaries in one TypeSafe request with a five-second budget. It sends no
 file contents or issue bodies. Without a key, or on service failure, ordering uses local
 signals and lexical objective overlap. `--no-hosted` disables hosted ranking. The normal
-credential precedence applies, including a workspace `.env` only when core runs from
-that workspace's own declared development or dependency environment.
+credential precedence applies, including a workspace `.env` only when Core's running
+interpreter lives inside that workspace and Core's resolved install mode there is
+`dependency` or `dev`.
 
 Save `--json` output when continuity is useful and supply it as
 `--previous result.json`. The backend refreshes observations and reuses matching

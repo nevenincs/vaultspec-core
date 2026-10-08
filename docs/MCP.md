@@ -210,10 +210,11 @@ each with a `blob_hash` ready for a later `edit` call.
 
 ## Environment
 
-The MCP server resolves its settings through the same order every vaultspec-core surface
-shares - the invocation, then the session environment, then the workspace `.env` for a
-credential, then persisted configuration, then a shipped default. See
-[Settings resolution](./CLI.md#settings-resolution) for the full order and vocabulary.
+The MCP server uses Core's shared settings order: invocation, process environment,
+project store `.vaultspec/.env` for persistable settings, workspace-root `.env` for an
+eligible credential, persisted configuration, derived and external defaults, then the
+shipped default. See [Settings resolution](./CLI.md#settings-resolution) for the full
+order and vocabulary.
 
 | Variable                          | Default       | Controls                                                                                                                                |
 | --------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -430,14 +431,15 @@ environment. If neither source supplies the variable, the server reads that one 
 from the workspace-root `.env` instead, but only when both hold: the server runs from
 the workspace's own environment (its Python interpreter lives inside the workspace, as a
 project virtual environment does), and vaultspec-core's resolved install mode for the
-workspace is `dependency` or `dev`. A globally installed vaultspec-core, such as a uv
-tool, a pipx install, or a release binary, never reads the workspace `.env`, so a cloned
-repository cannot supply the key. No other variable enables search: `TYPESAFE_API_KEY`
-and vaultspec-rag's own variables do not. With a key set, every search sends the
-question and vault text to the TypeSafe API at `api.typesafe.ai`. Setting the key is the
-consent to that data flow, and it applies in read-only mode too. Without a key, nothing
-leaves the machine. The key never appears in a response, a log, or an error. `status`
-reports only whether a key is configured and where it was found.
+workspace is `dependency` or `dev`. An invocation through `uvx` or a globally installed
+vaultspec-core (such as a uv tool, a pipx install, or a release binary) never reads the
+workspace `.env`, so a cloned repository cannot supply the key. No other variable
+enables search: `TYPESAFE_API_KEY` and vaultspec-rag's own variables do not. With a key
+set, every search sends the question and vault text to the TypeSafe API at
+`api.typesafe.ai`. Setting the key is the consent to that data flow, and it applies in
+read-only mode too. Without a key, nothing leaves the machine. The key never appears in
+a response, a log, or an error. `status` reports only whether a key is configured and
+where it was found.
 
 **Outcomes.** The `status` field is one of three values:
 
