@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -31,6 +30,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, cast
 from urllib.parse import quote
 
+from dev.environment import child_environment
 from dev.packaging.checksums import ChecksumError, read_checksums, require
 from dev.packaging.products import VAULTSPEC_CORE, Product
 
@@ -376,7 +376,7 @@ def emit_surface(wheel: Path, *, container: bool = False) -> str:
         if container
         else {
             name: value
-            for name, value in os.environ.items()
+            for name, value in child_environment().items()
             if name.upper() in RELEASE_ENVIRONMENT
         }
     )
