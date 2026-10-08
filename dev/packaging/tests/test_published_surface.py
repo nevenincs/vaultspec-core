@@ -319,6 +319,7 @@ def test_release_code_is_started_without_the_callers_credentials(
     ):
         monkeypatch.setenv(name, "never-passed")
     monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("LD_LIBRARY_PATH", str(tmp_path / "lib"))
     run = Mock(return_value=subprocess.CompletedProcess([], 0, "{}", ""))
     monkeypatch.setattr(subprocess, "run", run)
     reader.emit_surface(tmp_path / WHEEL)
@@ -326,6 +327,8 @@ def test_release_code_is_started_without_the_callers_credentials(
     assert "never-passed" not in environment.values()
     assert {name.upper() for name in environment} <= reader.RELEASE_ENVIRONMENT
     assert environment["UV_CACHE_DIR"] == str(tmp_path / "cache")
+    # An interpreter built against a shared libpython cannot start without it.
+    assert environment["LD_LIBRARY_PATH"] == str(tmp_path / "lib")
     assert any(name.upper() == "PATH" for name in environment)
 
 

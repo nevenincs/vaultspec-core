@@ -44,18 +44,21 @@ SURFACE_IMAGE = (
 )
 
 # What release code is started with when no container stands between it and
-# the caller: enough for `uv` to find itself, its interpreters, its cache and
-# a certificate store, and nothing that names a credential.
+# the caller: enough for `uv` to find itself, its interpreters and the
+# libraries they load, its cache and a certificate store, and nothing that
+# names a credential.
 RELEASE_ENVIRONMENT = frozenset(
     {
         "APPDATA",
         "COMSPEC",
+        "DYLD_LIBRARY_PATH",
         "HOME",
         "HOMEDRIVE",
         "HOMEPATH",
         "LANG",
         "LC_ALL",
         "LC_CTYPE",
+        "LD_LIBRARY_PATH",
         "LOCALAPPDATA",
         "PATH",
         "PATHEXT",
