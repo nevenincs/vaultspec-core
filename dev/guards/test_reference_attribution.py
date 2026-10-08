@@ -444,7 +444,7 @@ def test_the_surface_is_recorded_only_after_publication() -> None:
 
 
 def test_release_execution_is_separated_from_surface_write_permissions() -> None:
-    """Release code receives neither write credentials nor persistent host access."""
+    """Release code receives no credential, and its job can write nothing."""
     jobs = cast("dict[str, dict[str, object]]", _workflow("surface.yml")["jobs"])
     collect = jobs["collect"]
     record = jobs["record"]
@@ -457,9 +457,16 @@ def test_release_execution_is_separated_from_surface_write_permissions() -> None
         if "actions/checkout@" in str(step.get("uses", ""))
     )
     assert cast("dict[str, object]", checkout["with"])["persist-credentials"] is False
-    assert any(
-        "published_surface emit --container" in run
+    collected = [
+        run
         for run in _job_runs("surface.yml", "collect")
+        if "published_surface emit" in run
+    ]
+    assert collected, "the collect job no longer asks the release for its surface"
+    assert not any("--container" in run for run in collected), (
+        "no fleet host exposes a container runtime to a job, so a collection "
+        "that needs one records nothing; release code is isolated by the "
+        "environment `emit` starts it with"
     )
     assert record["needs"] == "collect"
     runs = _job_runs("surface.yml", "record")

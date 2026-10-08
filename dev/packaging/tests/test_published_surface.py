@@ -304,7 +304,40 @@ def test_container_receives_only_readonly_wheel_and_no_host_credentials(
     assert command.count("--env") == 1
     assert command[command.index("--env") + 1] == "UV_CACHE_DIR=/tmp/uv-cache"
     assert not any("TOKEN" in arg or "docker.sock" in arg for arg in command)
-    assert "env" not in run.call_args.kwargs
+    assert run.call_args.kwargs["env"] is None
+
+
+def test_release_code_is_started_without_the_callers_credentials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The caller needs a token to look provenance up; the release never sees it."""
+    for name in (
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "ACTIONS_RUNTIME_TOKEN",
+        "UV_PUBLISH_TOKEN",
+    ):
+        monkeypatch.setenv(name, "never-passed")
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("LD_LIBRARY_PATH", str(tmp_path / "lib"))
+    run = Mock(return_value=subprocess.CompletedProcess([], 0, "{}", ""))
+    monkeypatch.setattr(subprocess, "run", run)
+    reader.emit_surface(tmp_path / WHEEL)
+    environment = run.call_args.kwargs["env"]
+    assert "never-passed" not in environment.values()
+    assert {name.upper() for name in environment} <= reader.RELEASE_ENVIRONMENT
+    assert environment["UV_CACHE_DIR"] == str(tmp_path / "cache")
+    # An interpreter built against a shared libpython cannot start without it.
+    assert environment["LD_LIBRARY_PATH"] == str(tmp_path / "lib")
+    assert any(name.upper() == "PATH" for name in environment)
+
+
+def test_a_release_that_cannot_be_started_is_reported_not_raised(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(subprocess, "run", Mock(side_effect=FileNotFoundError("uv")))
+    with pytest.raises(PublishedSurfaceError, match="could not run uv"):
+        reader.emit_surface(tmp_path / WHEEL)
 
 
 def test_recording_collected_data_does_not_download_or_execute_release_code(
