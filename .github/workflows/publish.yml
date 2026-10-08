@@ -470,6 +470,17 @@ jobs:
           TAG: ${{ needs.authorize.outputs.tag }}
         run: gh release edit "${TAG}" --repo "$GITHUB_REPOSITORY" --draft=false
 
+      # Keep the cross-repository credential in a lane without PyPI OIDC.
+      - name: Ask marketing to refresh this release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.authorize.outputs.tag }}
+        shell: bash
+        run: |
+          if ! gh workflow run notify-marketing.yml --repo "$GITHUB_REPOSITORY" --ref main -f "tag=${TAG}"; then
+            echo "::warning::could not notify marketing; retry Notify Marketing for ${TAG}"
+          fi
+
       # The package-manager pointers, now that there is something for them to
       # point at. A Scoop manifest and a Homebrew formula address assets by
       # release download URL, so they advertise the release rather than form

@@ -1,0 +1,53 @@
+name: Notify Marketing
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag to announce
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify-marketing-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: "Build: Notify marketing (Linux)"
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    steps:
+      - name: Signal the complete release to marketing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MARKETING_DISPATCH_TOKEN: ${{ secrets.MARKETING_DISPATCH_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REPOSITORY" in
+            nevenincs/vaultspec-core) prefix=vaultspec-core-v ;;
+            nevenincs/vaultspec-rag) prefix=vaultspec-rag-v ;;
+            *) echo '::error::unrecognized upstream repository'; exit 1 ;;
+          esac
+          if ! [[ "$TAG" =~ ^${prefix}[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$ ]]; then
+            echo '::error::invalid release tag'; exit 1
+          fi
+          complete=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" \
+            --jq '(.draft == false) and (.prerelease == false)')
+          if [ "$complete" != true ]; then
+            echo '::notice::drafts and prereleases do not refresh marketing'
+            exit 0
+          fi
+          if [ -z "$MARKETING_DISPATCH_TOKEN" ]; then
+            echo '::error::set MARKETING_DISPATCH_TOKEN, then retry Notify Marketing for this tag'
+            exit 1
+          fi
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg tag "$TAG" \
+            '{event_type: "upstream-release", client_payload: {repository: $repository, tag: $tag}}' | \
+            GH_TOKEN="$MARKETING_DISPATCH_TOKEN" gh api --method POST \
+              repos/nevenincs/vaultspec-marketing/dispatches --input -
