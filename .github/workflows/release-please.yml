@@ -205,6 +205,41 @@ jobs:
       pull-requests: write
       actions: write
     steps:
+      # A push by the workflow token leaves the pull request's own merge-gate
+      # run held for approval, and the ruleset accepts no verdict but that
+      # run's: the proposal's dispatched gate passes, a second one passes
+      # after it, and the pull request stays blocked. The gate has just proven
+      # this exact commit, so the cut releases the held run and waits for its
+      # verdict. That run executes no suite; it reports the ones that already
+      # passed on this commit.
+      #
+      # BOUNDED, because the released run needs a fleet runner of its own and
+      # this job is holding one.
+      - name: Release the held merge gate of the release pull request
+        run: |
+          set -euo pipefail
+          if [ "${MERGED}" = "true" ]; then
+            exit 0
+          fi
+          held=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/merge-gate.yml/runs?event=pull_request&head_sha=${SHA}&status=action_required&per_page=100" \
+            --jq '.workflow_runs[].id')
+          for run in ${held}; do
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/${run}/approve" --silent
+            echo "released held merge-gate run ${run}"
+          done
+          for _ in $(seq 1 60); do
+            state=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" --json mergeStateStatus --jq .mergeStateStatus)
+            case "${state}" in
+              CLEAN | UNSTABLE | HAS_HOOKS)
+                echo "release pull request #${NUMBER} is mergeable (${state})"
+                exit 0
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::release pull request #${NUMBER} is still '${state}' ten minutes after its held merge gate was released. If no second Linux runner was free to report the verdict, dispatch the cut again."
+          exit 1
+
       # A squash of a head that is not behind main is exactly the proven tree;
       # the comparison below refuses to tag anything else.
       - name: Merge the proven release pull request

@@ -41,6 +41,7 @@ code-health.yml:Smoke test the built wheel on Python 3.14
 merge-gate.yml:Judge the merge readiness
 release-please.yml:Regenerate and push uv.lock onto the release branch
 release-please.yml:Find the release pull request and the commit to prove
+release-please.yml:Release the held merge gate of the release pull request
 release-please.yml:Merge the proven release pull request
 release-please.yml:Name a release this token cannot tag
 release-please.yml:Require the tag on the proven commit

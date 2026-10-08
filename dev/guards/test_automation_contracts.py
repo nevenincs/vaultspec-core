@@ -1554,6 +1554,43 @@ def test_the_release_is_proven_before_anything_is_tagged() -> None:
     )
 
 
+def test_the_cut_releases_the_held_merge_gate_before_it_merges() -> None:
+    """The release pull request is mergeable only once its held gate run reports.
+
+    A push by the workflow token leaves the pull request's merge-gate run
+    waiting for approval, and the ruleset counts no other verdict: the
+    proposal's dispatched gate passes and the pull request stays blocked. A cut
+    that only merged would stop there. The cut releases the runs held for the
+    commit it proved, and no others, from the one job that already holds the
+    write scope, and does it before the merge.
+
+    Mutation proof: removing the release step makes this fail on the missing
+    job; restoring it makes this pass.
+    """
+    jobs = _release_please_jobs()
+    releasing = sorted(
+        job_id
+        for job_id, job in jobs.items()
+        for step in _steps(job)
+        if "/approve" in str(step.get("run", ""))
+    )
+    assert releasing == ["cut"], (
+        f"exactly the cut releases a held merge-gate run; these jobs do: {releasing}"
+    )
+
+    cut = jobs["cut"]
+    steps = _steps(cut)
+    names = [str(step.get("name")) for step in steps]
+    release = names.index("Release the held merge gate of the release pull request")
+    merge = names.index("Merge the proven release pull request")
+    assert release < merge, "the held gate must report before the cut merges"
+    run = str(steps[release]["run"])
+    assert "head_sha=${SHA}" in run and "status=action_required" in run, (
+        "the cut may release only the runs held for the commit it proved"
+    )
+    assert cast("dict[str, str]", cut["permissions"])["actions"] == "write"
+
+
 def _job_bodies(workflow: str) -> str:
     """Return a workflow's job definitions as text, for credential greps."""
     parsed = cast("dict[str, object]", yaml.safe_load(workflow))

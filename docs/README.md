@@ -40,6 +40,10 @@ provenance; only once all of them are there does the wheel and sdist build, smok
 and publish to PyPI using OIDC trusted publishing. A release pull request merged by hand
 is released by the next dispatched cut.
 
+Until the cut runs, the release pull request shows a merge-gate run awaiting approval
+and cannot be merged, even when its checks are green. That is expected: the cut releases
+that run itself, after it has proven the commit.
+
 Publishing the draft is the last step, and the Scoop and Homebrew pointers are updated
 immediately after it, never before. A release that is visible is therefore a release
 that carries everything it claims to, and a failure anywhere in the lane leaves a draft
