@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,6 +41,40 @@ GITHUB = "https://github.com/"
 SURFACE_IMAGE = (
     "ghcr.io/astral-sh/uv:python3.13-bookworm-slim"
     "@sha256:531f855bda2c73cd6ef67d56b733b357cea384185b3022bd09f05e002cd144ca"
+)
+
+# What release code is started with when no container stands between it and
+# the caller: enough for `uv` to find itself, its interpreters, its cache and
+# a certificate store, and nothing that names a credential.
+RELEASE_ENVIRONMENT = frozenset(
+    {
+        "APPDATA",
+        "COMSPEC",
+        "HOME",
+        "HOMEDRIVE",
+        "HOMEPATH",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "LOCALAPPDATA",
+        "PATH",
+        "PATHEXT",
+        "PROGRAMDATA",
+        "SSL_CERT_DIR",
+        "SSL_CERT_FILE",
+        "SYSTEMDRIVE",
+        "SYSTEMROOT",
+        "TEMP",
+        "TMP",
+        "TMPDIR",
+        "USERPROFILE",
+        "UV_CACHE_DIR",
+        "UV_PYTHON_INSTALL_DIR",
+        "WINDIR",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+    }
 )
 
 
@@ -333,13 +368,29 @@ def emit_surface(wheel: Path, *, container: bool = False) -> str:
             SURFACE_IMAGE,
             *command,
         ]
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=False,
+    # The caller holds a token for the provenance lookup; the release's own
+    # code is not handed it, or anything else the job was given. A container
+    # starts from its image's environment, so there is nothing to withhold.
+    environment = (
+        None
+        if container
+        else {
+            name: value
+            for name, value in os.environ.items()
+            if name.upper() in RELEASE_ENVIRONMENT
+        }
     )
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+            env=environment,
+        )
+    except OSError as exc:
+        raise PublishedSurfaceError(f"could not run {command[0]}: {exc}") from exc
     if result.returncode != 0:
         raise PublishedSurfaceError(
             f"{wheel.name} did not emit its surface (exit {result.returncode}):\n"

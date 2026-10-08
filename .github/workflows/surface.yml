@@ -11,8 +11,9 @@ name: Core Published Surface
 #
 # So the record moves only here, only after publication, and only from the
 # published artifact: collect verifies the latest release's wheel, then runs
-# it in a disposable, credential-free container. Only its JSON
-# surface reaches the write-capable record job. main is
+# it with an environment that carries no credential. No fleet host exposes a
+# container runtime to a job, so there is no container to run it in. Only its
+# JSON surface reaches the write-capable record job. main is
 # ruleset-protected, so the result lands by pull request, the way the lockfile
 # reconciliation in release-please.yml does.
 #
@@ -61,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${RUNNER_TEMP}/surface-data"
-          uv run --isolated --no-project --python 3.13 python -m dev.packaging.published_surface emit --container > "${RUNNER_TEMP}/surface-data/surface.json"
+          uv run --isolated --no-project --python 3.13 python -m dev.packaging.published_surface emit > "${RUNNER_TEMP}/surface-data/surface.json"
 
       - name: Upload only the surface data
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
