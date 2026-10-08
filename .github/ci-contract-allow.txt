@@ -51,6 +51,12 @@ publish.yml:Authorize the release commit
 publish.yml:Require the authorized tag and release to remain present
 publish.yml:Ask the acquisition check to try this release
 surface.yml:Open a pull request recording the published surface
+# Dispatches the marketing signal and only warns when it cannot: the release
+# is already published, and this job has no checkout to run a recipe from.
+publish.yml:Ask marketing to refresh this release
+# Runs with no checkout so the cross-repository token never shares a job with
+# project code; it validates the tag and the release before using that token.
+notify-marketing.yml:Signal the complete release to marketing
 # Compares the attached wheel with the built one byte for byte. It runs in the
 # job that holds `id-token: write` and has no checkout, so it must not run a
 # recipe: a recipe there is project code from whatever the runner left behind.
