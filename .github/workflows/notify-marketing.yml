@@ -1,4 +1,4 @@
-name: Notify Marketing
+name: Core Notify Marketing
 
 on:
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
             exit 0
           fi
           if [ -z "$MARKETING_DISPATCH_TOKEN" ]; then
-            echo '::error::set MARKETING_DISPATCH_TOKEN, then retry Notify Marketing for this tag'
+            echo '::error::set MARKETING_DISPATCH_TOKEN, then retry Core Notify Marketing for this tag'
             exit 1
           fi
           jq -n --arg repository "$GITHUB_REPOSITORY" --arg tag "$TAG" \
