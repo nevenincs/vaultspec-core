@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.5](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.4...vaultspec-core-v0.3.5) (2026-10-09)
+
+
+### Features
+
+* signal complete releases to marketing ([6fd0650](https://github.com/nevenincs/vaultspec-core/commit/6fd0650f628442a705c3087aabd72897088cf7b8))
+
+
+### Bug Fixes
+
+* **ci:** bring the marketing signal inside the workflow contract ([#598](https://github.com/nevenincs/vaultspec-core/issues/598)) ([9140098](https://github.com/nevenincs/vaultspec-core/commit/9140098e88423f6d124d679babd04973da479770))
+* **ci:** collect the published surface without a container runtime ([#599](https://github.com/nevenincs/vaultspec-core/issues/599)) ([f997f2a](https://github.com/nevenincs/vaultspec-core/commit/f997f2a0da18fb2802f7774c6bfb98d7899f926c))
+* **ci:** let the cut release the held merge gate before it merges ([#601](https://github.com/nevenincs/vaultspec-core/issues/601)) ([3f6fbb0](https://github.com/nevenincs/vaultspec-core/commit/3f6fbb0b8260d6e20aac7b85f97364775a714b77))
+* **ci:** run the published wheel in namespaces of its own ([#602](https://github.com/nevenincs/vaultspec-core/issues/602)) ([63121fc](https://github.com/nevenincs/vaultspec-core/commit/63121fcc2eb3fed84066fbcc8404a51aa6e2dd3f))
+* **ci:** tag a release whose pull request merged under the cut ([#603](https://github.com/nevenincs/vaultspec-core/issues/603)) ([f852875](https://github.com/nevenincs/vaultspec-core/commit/f85287525212ab7dabec27663eb15deabfaed21a))
+
 ## [0.3.4](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.3...vaultspec-core-v0.3.4) (2026-10-07)
 
 
