@@ -11,8 +11,11 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import shutil
 import subprocess
+import sys
 import urllib.request
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
@@ -330,6 +333,84 @@ def test_release_code_is_started_without_the_callers_credentials(
     # An interpreter built against a shared libpython cannot start without it.
     assert environment["LD_LIBRARY_PATH"] == str(tmp_path / "lib")
     assert any(name.upper() == "PATH" for name in environment)
+
+
+def test_namespaced_release_code_gets_an_empty_home_and_its_own_processes() -> None:
+    command = reader.namespace_command(
+        ["/usr/local/bin/uv", "run"],
+        PurePosixPath("/home/runner"),
+        [
+            PurePosixPath("/home/runner/.shared/python/3.13"),
+            PurePosixPath("/usr/local/bin"),
+            PurePosixPath("/home/runner/.shared"),
+            PurePosixPath("/usr/local/bin"),
+        ],
+    )
+    assert command[:7] == [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--mount",
+        "--pid",
+        "--fork",
+        "--mount-proc",
+    ]
+    assert command[7:11] == ["sh", "-c", reader.NAMESPACE_SETUP, "sh"]
+    separator = command.index("--")
+    # The home first, then each kept path once, a parent before its child.
+    assert command[11:separator] == [
+        "/home/runner",
+        "/home/runner/.shared",
+        "/usr/local/bin",
+        "/home/runner/.shared/python/3.13",
+    ]
+    assert command[separator + 1 :] == ["/usr/local/bin/uv", "run"]
+
+
+@pytest.mark.parametrize("kept", ["/home/runner", "/home", "/"])
+def test_a_kept_path_that_holds_the_home_is_refused(kept: str) -> None:
+    with pytest.raises(PublishedSurfaceError, match="would hide nothing"):
+        reader.namespace_command(
+            ["uv"], PurePosixPath("/home/runner"), [PurePosixPath(kept)]
+        )
+
+
+def test_namespaces_are_refused_where_they_do_not_exist(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    run = Mock()
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(PublishedSurfaceError, match="needs Linux"):
+        reader.emit_surface(tmp_path / WHEEL, namespace=True)
+    with pytest.raises(PublishedSurfaceError, match="not both"):
+        reader.emit_surface(tmp_path / WHEEL, container=True, namespace=True)
+    run.assert_not_called()
+
+
+def test_namespaced_release_code_is_started_without_the_callers_credentials(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(shutil, "which", Mock(return_value="/usr/local/bin/uv"))
+    monkeypatch.setenv("HOME", "/home/runner")
+    monkeypatch.setenv("GH_TOKEN", "never-passed")
+    run = Mock(return_value=subprocess.CompletedProcess([], 0, "{}", ""))
+    monkeypatch.setattr(subprocess, "run", run)
+    reader.emit_surface(tmp_path / WHEEL, namespace=True)
+    command = run.call_args.args[0]
+    assert command[0] == "unshare"
+    released = command[command.index("--") + 1 :]
+    # Discovery would look in the home that is about to be emptied.
+    assert "--python" in released
+    assert released[-5:] == [
+        "vaultspec-core",
+        "spec",
+        "reference",
+        "snapshot",
+        "--emit",
+    ]
+    assert "never-passed" not in run.call_args.kwargs["env"].values()
 
 
 def test_a_release_that_cannot_be_started_is_reported_not_raised(

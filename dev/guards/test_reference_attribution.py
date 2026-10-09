@@ -444,7 +444,7 @@ def test_the_surface_is_recorded_only_after_publication() -> None:
 
 
 def test_release_execution_is_separated_from_surface_write_permissions() -> None:
-    """Release code receives no credential, and its job can write nothing."""
+    """Release code gets no credential and no home; its job can write nothing."""
     jobs = cast("dict[str, dict[str, object]]", _workflow("surface.yml")["jobs"])
     collect = jobs["collect"]
     record = jobs["record"]
@@ -463,6 +463,10 @@ def test_release_execution_is_separated_from_surface_write_permissions() -> None
         if "published_surface emit" in run
     ]
     assert collected, "the collect job no longer asks the release for its surface"
+    assert all("--namespace" in run for run in collected), (
+        "release code must run behind an empty home, in namespaces of its own: "
+        "without them it runs as the runner's user, beside that user's credentials"
+    )
     assert not any("--container" in run for run in collected), (
         "no fleet host exposes a container runtime to a job, so a collection "
         "that needs one records nothing; release code is isolated by the "

@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -35,7 +36,7 @@ from dev.packaging.checksums import ChecksumError, read_checksums, require
 from dev.packaging.products import VAULTSPEC_CORE, Product
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping, Sequence
 
 GITHUB = "https://github.com/"
 SURFACE_IMAGE = (
@@ -79,6 +80,48 @@ RELEASE_ENVIRONMENT = frozenset(
         "XDG_DATA_HOME",
     }
 )
+
+# Builds the place release code runs in when it is given namespaces of its own.
+# It starts as that user namespace's root, with the home directory, the paths
+# to keep, `--`, and the command. The home is replaced by an empty one, which
+# takes the runner's credentials, every checkout and every other job's files
+# out of reach; the kept paths come back read-only.
+#
+# Staged through the tmpfs that becomes the new home, because a runner's
+# temporary directory can sit under the home being replaced. `-n`, because a
+# runner's mount table is not always writable, and `mount` reports that as a
+# failure after the mount itself has succeeded.
+NAMESPACE_SETUP = """\
+set -eu
+home=$1
+shift
+stage=$(mktemp -d)
+mount -n -t tmpfs -o mode=0700 tmpfs "$stage"
+mkdir "$stage/.kept"
+index=0
+for kept in "$@"; do
+  [ "$kept" = "--" ] && break
+  mkdir "$stage/.kept/$index"
+  mount -n --bind "$kept" "$stage/.kept/$index"
+  index=$((index + 1))
+done
+mount -n --move "$stage" "$home"
+index=0
+while [ "$1" != "--" ]; do
+  mkdir -p "$1"
+  mount -n --move "$home/.kept/$index" "$1"
+  mount -n -o remount,bind,ro "$1"
+  rmdir "$home/.kept/$index"
+  index=$((index + 1))
+  shift
+done
+rmdir "$home/.kept"
+shift
+mkdir "$home/.tmp"
+unset XDG_CACHE_HOME XDG_CONFIG_HOME XDG_DATA_HOME UV_PYTHON_INSTALL_DIR
+export HOME="$home" TMPDIR="$home/.tmp" UV_CACHE_DIR="$home/.cache/uv"
+exec "$@"
+"""
 
 
 class PublishedSurfaceError(RuntimeError):
@@ -331,13 +374,54 @@ def _download_asset(
     return target
 
 
-def emit_surface(wheel: Path, *, container: bool = False) -> str:
+def namespace_command(
+    command: Sequence[str], home: PurePosixPath, kept: Iterable[PurePosixPath]
+) -> list[str]:
+    """Wrap *command* to run behind an empty home, in namespaces of its own.
+
+    A new pid namespace with its own ``/proc`` matters as much as the home:
+    the caller's environment, token included, is readable from ``/proc`` by
+    any process of the same user that can see the caller.
+
+    Parents are restored before the paths beneath them, so a kept directory
+    is never covered by a kept ancestor.
+    """
+    ordered = sorted(set(kept), key=lambda path: (len(path.parts), str(path)))
+    for path in ordered:
+        if path == home or path in home.parents:
+            raise PublishedSurfaceError(
+                f"{path} holds the home directory, so keeping it would hide nothing"
+            )
+    return [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--mount",
+        "--pid",
+        "--fork",
+        "--mount-proc",
+        "sh",
+        "-c",
+        NAMESPACE_SETUP,
+        "sh",
+        str(home),
+        *(str(path) for path in ordered),
+        "--",
+        *command,
+    ]
+
+
+def emit_surface(
+    wheel: Path, *, container: bool = False, namespace: bool = False
+) -> str:
     """Return the surface document the wheel reports for itself.
 
     ``--isolated --no-project``: a project environment would answer with the
     working tree's surface instead of the wheel's, which is the one answer this
     must never give.
     """
+    if container and namespace:
+        raise PublishedSurfaceError("choose a container or namespaces, not both")
     command = [
         "uv",
         "run",
@@ -371,6 +455,40 @@ def emit_surface(wheel: Path, *, container: bool = False) -> str:
             SURFACE_IMAGE,
             *command,
         ]
+    if namespace:
+        # Linux only: the fleet's Linux runners expose no container runtime
+        # to a job, and unprivileged namespaces are what they do allow.
+        if sys.platform != "linux":
+            raise PublishedSurfaceError("namespace isolation needs Linux")
+        home = child_environment().get("HOME")
+        uv = shutil.which("uv")
+        if not home or uv is None:
+            raise PublishedSurfaceError(
+                "namespace isolation needs HOME, and uv on PATH"
+            )
+        # The interpreter is named outright, because discovery would look in
+        # the home that is about to be emptied.
+        base = Path(sys.base_prefix).resolve()
+        interpreter = (
+            base / "bin" / f"python{sys.version_info[0]}.{sys.version_info[1]}"
+        )
+        command = namespace_command(
+            [
+                str(Path(uv).resolve()),
+                *command[1:4],
+                "--python",
+                str(interpreter),
+                "--with",
+                str(wheel.resolve()),
+                *command[6:],
+            ],
+            PurePosixPath(Path(home).resolve()),
+            [
+                PurePosixPath(Path(uv).resolve().parent),
+                PurePosixPath(base),
+                PurePosixPath(wheel.resolve().parent),
+            ],
+        )
     # The caller holds a token for the provenance lookup; the release's own
     # code is not handed it, or anything else the job was given. A container
     # starts from its image's environment, so there is nothing to withhold.
@@ -403,7 +521,11 @@ def emit_surface(wheel: Path, *, container: bool = False) -> str:
 
 
 def read_published_surface(
-    product: Product, workdir: Path, *, container: bool = False
+    product: Product,
+    workdir: Path,
+    *,
+    container: bool = False,
+    namespace: bool = False,
 ) -> tuple[PublishedRelease, str]:
     """Return the latest published release and the surface its wheel emits.
 
@@ -413,7 +535,9 @@ def read_published_surface(
     """
     release = fetch_latest_release(product)
     document = emit_surface(
-        download_wheel(release, product, workdir), container=container
+        download_wheel(release, product, workdir),
+        container=container,
+        namespace=namespace,
     )
     validate_document(release, document)
     return release, document
@@ -454,13 +578,23 @@ def main(argv: list[str] | None = None) -> int:
         help="execute the verified wheel in a credential-free Docker container",
     )
     parser.add_argument(
+        "--namespace",
+        action="store_true",
+        help=(
+            "execute the verified wheel in Linux namespaces of its own, behind "
+            "an empty home directory"
+        ),
+    )
+    parser.add_argument(
         "--from-file",
         type=Path,
         help="record previously collected JSON data without executing release code",
     )
     args = parser.parse_args(argv)
-    if args.from_file and (args.action != "record" or args.container):
-        parser.error("--from-file is only valid for record without --container")
+    if args.container and args.namespace:
+        parser.error("--container and --namespace are alternatives")
+    if args.from_file and (args.action != "record" or args.container or args.namespace):
+        parser.error("--from-file is only valid for record, with no isolation flag")
 
     with tempfile.TemporaryDirectory(prefix="published-surface-") as scratch:
         workdir = Path(scratch)
@@ -471,7 +605,10 @@ def main(argv: list[str] | None = None) -> int:
                 validate_document(release, document)
             else:
                 release, document = read_published_surface(
-                    VAULTSPEC_CORE, workdir, container=args.container
+                    VAULTSPEC_CORE,
+                    workdir,
+                    container=args.container,
+                    namespace=args.namespace,
                 )
         except PublishedSurfaceError as exc:
             print(f"error: {exc}", file=sys.stderr)

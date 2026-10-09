@@ -40,6 +40,8 @@ EXCEPTIONS = (
             "test_container_receives_only_readonly_wheel_and_no_host_credentials",
             "test_release_code_is_started_without_the_callers_credentials",
             "test_a_release_that_cannot_be_started_is_reported_not_raised",
+            "test_namespaces_are_refused_where_they_do_not_exist",
+            "test_namespaced_release_code_is_started_without_the_callers_credentials",
             "test_recording_collected_data_does_not_download_or_execute_release_code",
             "test_recording_refuses_data_for_a_superseded_release",
             "test_release_commit_resolution_requires_a_full_commit_digest",
