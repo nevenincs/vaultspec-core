@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#release-standard'
 date: '2026-09-30'
-modified: '2026-09-30'
+modified: '2026-10-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:f5f9afd73b490de37ad27fb41c0d968c29586c71165b044de08a5bbd74db5cf6'
+body_hash: 'sha256:8d2b00a13321e3d43f113331cdd680ee0bc624b96a60a135642894ce66e5537c'
 related:
   - "[[2026-09-30-release-standard-research]]"
   - "[[2026-09-18-release-publication-ordering-adr]]"
@@ -67,6 +67,13 @@ release pipeline across all vaultspec repositories.
   the fleet's queue.
 
 ## Constraints
+
+Core exception authorized 2026-10-09: `2026-10-09-release-standard-merge-trigger-adr`
+governs core release initiation and failure reporting. In core, merging a release
+proposal starts the proven cut automatically; dispatch remains a retry and optional
+prove-and-merge entry point. The dispatch-only constraints below remain binding for the
+other four repositories. The tagging, credential, proof, and publication commitments
+still apply to core.
 
 - Scope: vaultspec-core, vaultspec-rag, vaultspec-a2a, vaultspec-dashboard and
   vaultspec-marketing. Core is the lead implementation; each other repository converges

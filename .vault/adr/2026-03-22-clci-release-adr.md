@@ -3,8 +3,8 @@ tags:
   - '#adr'
   - '#clci-release'
 date: '2026-03-22'
-modified: '2026-09-30'
-body_hash: 'sha256:7c069aacf62b7e9ce0029c7fef5f54629f3f0f74bf25955a016a789d789c3bec'
+modified: '2026-10-09'
+body_hash: 'sha256:8f4c12eddcdbba44cc706afba5cecf62bf4b54ad6f2ace04249f74da0fa219d9'
 related:
   - '[[2026-03-22-clci-release-research]]'
   - '[[2026-03-21-cli-release-readiness-audit]]'
@@ -89,8 +89,9 @@ so a dedicated binary is cleaner than subcommand routing.
   Creates/updates the Release PR. When the Release PR merges,
   release-please creates a GitHub Release with a git tag. Amended
   2026-09-30 by `2026-09-30-release-standard-adr`: the release is
-  created when a maintainer dispatches the cut, not when the Release PR
-  merges.
+  created by a proven cut. Amended 2026-10-09 by
+  `2026-10-09-release-standard-merge-trigger-adr`: merging the core Release PR
+  automatically starts the cut; manual dispatch remains available for retries.
 - `publish.yml` (replace existing) - triggers on
   `workflow_dispatch` with a required `tag` input. `release-please.yml`
   dispatches it explicitly via `gh api .../actions/workflows/publish.yml/dispatches`

@@ -1,23 +1,23 @@
 name: Core Release Please
 
-# THE PROPOSAL KEEPS UP; THE RELEASE WAITS TO BE ASKED FOR.
+# THE PROPOSAL KEEPS UP; MERGING IT STARTS THE RELEASE.
 #
 # - PROPOSAL. Every commit that lands on main refreshes the release pull
 #   request. `always-update` in the config rebuilds its branch on main's newest
 #   head every time, so the proposal is never behind main. This path never
-#   creates a release, a tag or a publication, and merging the proposal by hand
-#   does not release it either.
-# - CUT. A maintainer dispatches this workflow when a release is wanted. It
-#   proves the proposal's head with the full merge gate, squash-merges it, and
+#   creates a release, a tag or a publication.
+# - CUT. The push from merging a proposal starts the cut automatically. It
+#   proves the merged commit with the full merge gate and
 #   has Release Please force the tag and create the draft release seconds
 #   later, then starts the binaries lane. The draft is published last, by the
 #   publication lane, once everything it claims is attached.
 #
-# The proof comes before the merge because the release tag ruleset forbids
+# A manual dispatch can also prove and merge an open proposal or retry a cut.
+# The proof comes before the tag because the release tag ruleset forbids
 # deleting a tag: a release commit that fails its gate after its tag exists
 # stays a permanent tag of a commit nobody can ship.
 #
-# The tag follows the merge with nothing in between because the default token
+# Tagging follows proof immediately because the default token
 # cannot create a tag on a commit whose `.github/workflows` differ from main's
 # head. A workflow change that lands between a merge and its tag leaves the
 # release untaggable by any later run.
@@ -31,17 +31,15 @@ permissions:
   contents: read
 
 concurrency:
-  # One group per path. A proposal refresh still waiting for a runner is
-  # superseded by the next push: Release Please reads main's head, so the
-  # newest refresh does the work of every one it replaces. A cut never waits
-  # behind a proposal, and a second cut queues behind the first.
-  group: release-please-${{ github.event_name }}
+  # Automatic cuts and manual retries must not tag the same proposal in parallel.
+  group: release-please
   cancel-in-progress: false
 
 jobs:
   release-please:
     name: "Build: Release proposal (Linux)"
-    if: github.event_name == 'push'
+    needs: candidate
+    if: github.event_name == 'push' && !needs.candidate.outputs.sha
     timeout-minutes: 150
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -59,8 +57,24 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          # Releases are cut on dispatch only.
+          # Only the cut job creates releases.
           skip-github-release: true
+
+      # Release Please exits successfully when an untagged merged proposal
+      # blocks it. Surface that state before the rest of the job skips.
+      - name: Reject a blocked release proposal
+        if: ${{ !steps.release.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          pending=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main \
+            --state merged --label "autorelease: pending" --limit 100 \
+            --json number --jq 'map(.number | tostring) | join(", ")')
+          if [ -n "${pending}" ]; then
+            echo "::error::Release Please is blocked by untagged merged release pull request(s): ${pending}. Dispatch Core Release Please to prove and cut the pending release before refreshing the proposal."
+            exit 1
+          fi
 
       - name: Check out the release branch
         if: steps.release.outputs.pr
@@ -110,7 +124,6 @@ jobs:
 
   candidate:
     name: "Check: Release candidate (Linux)"
-    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 130
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -131,21 +144,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PENDING: "autorelease: pending"
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state merged \
             --label "$PENDING" --json number,mergeCommit \
             --jq '.[] | "\(.number) \(.mergeCommit.oid)"')
-          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
-            --label "$PENDING" --json number,headRefOid \
-            --jq '.[] | "\(.number) \(.headRefOid)"')
           if [ -n "${merged}" ]; then
             [ "$(printf '%s\n' "${merged}" | wc -l)" -eq 1 ] || {
               echo "::error::more than one merged release pull request awaits a tag: ${merged}"; exit 1;
             }
             read -r number sha <<<"${merged}"
             state=true
-          elif [ -n "${open}" ]; then
+          elif [ "${EVENT_NAME}" = "push" ]; then
+            echo "No merged release is pending; refresh the proposal."
+            exit 0
+          else
+            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
+              --label "$PENDING" --json number,headRefOid \
+              --jq '.[] | "\(.number) \(.headRefOid)"')
+            if [ -z "${open}" ]; then
+              echo "::error::there is no release pull request to cut"
+              exit 1
+            fi
             [ "$(printf '%s\n' "${open}" | wc -l)" -eq 1 ] || {
               echo "::error::more than one open release pull request: ${open}"; exit 1;
             }
@@ -156,9 +177,6 @@ jobs:
               echo "::error::release pull request #${number} is ${behind} commit(s) behind main. Release Please rebuilds it on main's next push; dispatch again after that."
               exit 1
             fi
-          else
-            echo "::error::there is no release pull request to cut"
-            exit 1
           fi
           if ! [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::release pull request #${number} resolved to no commit"
@@ -175,6 +193,7 @@ jobs:
   prove-gate:
     name: "Test: Release gate (Linux, Windows)"
     needs: candidate
+    if: needs.candidate.outputs.sha != ''
     uses: ./.github/workflows/merge-gate.yml
     permissions:
       contents: read
@@ -373,3 +392,35 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag_name }}
         run: gh workflow run binaries.yml --repo "${GITHUB_REPOSITORY}" --ref main -f "tag=${TAG}"
+
+  result:
+    name: "Check: Release workflow result (Linux)"
+    needs: [candidate, release-please, prove-gate, cut]
+    if: ${{ !cancelled() }}
+    timeout-minutes: 130
+    runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 10
+    steps:
+      - name: Require every job on the selected path to succeed
+        env:
+          CANDIDATE_RESULT: ${{ needs.candidate.result }}
+          RELEASE_SHA: ${{ needs.candidate.outputs.sha }}
+          PROPOSAL_RESULT: ${{ needs.release-please.result }}
+          GATE_RESULT: ${{ needs.prove-gate.result }}
+          CUT_RESULT: ${{ needs.cut.result }}
+        run: |
+          set -euo pipefail
+          if [ "${CANDIDATE_RESULT}" != "success" ]; then
+            echo "::error::Release candidate selection ${CANDIDATE_RESULT}"
+            exit 1
+          fi
+          if [ -n "${RELEASE_SHA}" ]; then
+            if [ "${GATE_RESULT}" != "success" ] || [ "${CUT_RESULT}" != "success" ]; then
+              echo "::error::Release failed: gate=${GATE_RESULT}, cut=${CUT_RESULT}"
+              exit 1
+            fi
+          elif [ "${PROPOSAL_RESULT}" != "success" ]; then
+            echo "::error::Release proposal ${PROPOSAL_RESULT}"
+            exit 1
+          fi

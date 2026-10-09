@@ -45,6 +45,9 @@ release-please.yml:Release the held merge gate of the release pull request
 release-please.yml:Merge the proven release pull request
 release-please.yml:Name a release this token cannot tag
 release-please.yml:Require the tag on the proven commit
+# These steps judge GitHub state and job results before any checkout exists.
+release-please.yml:Reject a blocked release proposal
+release-please.yml:Require every job on the selected path to succeed
 # Publication authorization runs before checkout; using a recipe would execute
 # the proposed release's code before deciding whether that code is authorized.
 # The publication job also has no checkout and must recheck before OIDC use.

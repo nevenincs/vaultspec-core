@@ -1421,10 +1421,10 @@ def _steps(job: dict[str, object]) -> list[dict[str, object]]:
 
 
 def test_release_please_is_the_single_release_authority() -> None:
-    """Only the dispatched cut creates a release, and it starts exactly one lane.
+    """Only the proven cut creates a release, and it starts exactly one lane.
 
     The proposal path refreshes the release pull request and never releases. A
-    maintainer dispatches the cut, which proves, merges and tags, then
+    merged proposal starts the cut, which proves and tags, then
     dispatches the binaries build, which dispatches the publication in turn. If
     a lane also listened for the tag push, or the proposal path could release,
     the same release could race an unproven run through publication.
@@ -1458,7 +1458,7 @@ def test_release_please_is_the_single_release_authority() -> None:
         != "true"
     )
     assert creators == ["cut"], (
-        "only the dispatched cut may create a release; the proposal path must "
+        "only the proven cut may create a release; the proposal path must "
         f"run with `skip-github-release`, but these jobs can release: {creators}"
     )
 

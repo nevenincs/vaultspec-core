@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#release-publication-ordering'
 date: '2026-09-18'
-modified: '2026-09-30'
+modified: '2026-10-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:2a6b9226359aa0136b5aeb334d3c26623b1d7e989b6230b56a97fdb7850053c4'
+body_hash: 'sha256:f16a1476f573550e1017912f3e32145fdd86923759234af2e47a5eacb5e22dea'
 related:
   - "[[2026-09-18-release-publication-ordering-release-object-lifecycle-research]]"
   - "[[2026-03-22-clci-release-adr]]"
@@ -96,7 +96,9 @@ produces a tag and an unpublished release rather than a public one. Nothing down
 changes shape: every job still checks out the tag for its source, and both consumer
 workflows stay dispatched rather than called. Amended 2026-09-30 by
 `2026-09-30-release-standard-adr`: the tag and the draft are produced by the
-maintainer-dispatched cut rather than by the merge; the publication order is unchanged.
+proven cut; the publication order is unchanged. Amended 2026-10-09 by
+`2026-10-09-release-standard-merge-trigger-adr`: in core, merging the release proposal
+automatically starts that cut; an additional maintainer dispatch is no longer required.
 
 The lanes attach to the draft exactly as they attach today. The release-proven gate in
 the binaries workflow keeps its existing judgment - every declared target present, its

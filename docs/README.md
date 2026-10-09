@@ -31,18 +31,19 @@ forks are refused; re-open an outside change from a branch in this repository.
 
 Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
 maintains a release pull request with the next version and changelog, rebuilt on every
-commit that lands on `main`. Merging it does not release anything. To release, dispatch
-`Core Release Please`: the cut proves the pull request's head with the full merge gate,
-squash-merges it, and seconds later creates the tag and an unpublished draft release,
-then starts the lane that fills it: the binaries are built for every supported target,
-proved to start with no network, and attached to the draft with their checksums and
-provenance; only once all of them are there does the wheel and sdist build, smoke-test,
-and publish to PyPI using OIDC trusted publishing. A release pull request merged by hand
-is released by the next dispatched cut.
+commit that lands on `main`. Merge the release pull request to start the release
+automatically: `Core Release Please` proves the merged commit with the full merge gate,
+then creates the tag and an unpublished draft release, then starts the lane that fills
+it: the binaries are built for every supported target, proved to start with no network,
+and attached to the draft with their checksums and provenance; only once all of them are
+there does the wheel and sdist build, smoke-test, and publish to PyPI using OIDC trusted
+publishing. No extra dispatch is needed after merging. A failed candidate selection,
+proposal refresh, verification gate, or cut fails the workflow; expected skips on the
+other path do not count as release success.
 
-Until the cut runs, the release pull request shows a merge-gate run awaiting approval
-and cannot be merged, even when its checks are green. That is expected: the cut releases
-that run itself, after it has proven the commit.
+Dispatch `Core Release Please` to retry a pending merged release or to prove and merge
+an open release proposal. For an open proposal whose merge-gate run awaits approval, the
+dispatched cut releases that run after proving the commit.
 
 Publishing the draft is the last step, and the Scoop and Homebrew pointers are updated
 immediately after it, never before. A release that is visible is therefore a release
@@ -65,10 +66,10 @@ A cut can also stop before that lane starts: it fails in
 step names the tag. The workflow token never holds the `workflows` permission, and
 without it GitHub refuses any tag or release that targets a commit whose workflow files
 differ from `main`, even once the tag exists. A workflow change that landed between the
-release commit's merge and its tag, as when a pull request merged by hand waits for its
-cut, therefore blocks the release for good: no rerun or later cut can finish it. Finish
-it with your own credentials, as the cut would have, relabelling the release pull
-request first so the next cut does not pick it up again:
+release commit's merge and its tag, while the automatic cut waits for its proof,
+therefore blocks the release for good: no rerun or later cut can finish it. Finish it
+with your own credentials, as the cut would have, relabelling the release pull request
+first so the next cut does not pick it up again:
 
 ```sh
 REPO=nevenincs/vaultspec-core
