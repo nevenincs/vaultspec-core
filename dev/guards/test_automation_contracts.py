@@ -775,8 +775,10 @@ def test_the_running_interpreter_matches_the_pin() -> None:
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
     gate = _load_workflow(".github/workflows/merge-gate.yml")
     jobs = gate["jobs"]
-    required_jobs = {"lint", "test-linux", "test-windows", "gate"}
-    assert set(jobs) == required_jobs, "the merge gate must contain exactly four jobs"
+    required_jobs = {"lint", "test-linux", "test-windows", "gate", "release-pr-ready"}
+    assert set(jobs) == required_jobs, (
+        "the merge gate must contain the proof jobs and automatic release PR readiness"
+    )
 
     expected_runs = {
         # The four dimensions below `markdown` are pinned for the same reason

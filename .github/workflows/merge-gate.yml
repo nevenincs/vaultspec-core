@@ -40,9 +40,9 @@ name: Core Merge Gate
 # commit reaching it passed this gate on its pull request; a direct push is an
 # administrator override and is not re-litigated here. The release cut in
 # release-please.yml calls this workflow on the proposal's exact head before
-# it merges or tags anything, and the proposal path dispatches it on the
-# release branch, whose pull request the default token cannot trigger a run
-# for.
+# it tags anything, and the proposal path dispatches it on the release branch.
+# Once that dispatch passes, release-pr-ready approves the bot PR's held run
+# so its required check reports without another maintainer action.
 
 on:
   pull_request:
@@ -362,3 +362,44 @@ jobs:
           esac
           echo "::error::the full suites have not run on ${HEAD_SHA}; mark the pull request ready for review to run them, or add the ci:full label to prove it while it stays a draft"
           exit 1
+
+  release-pr-ready:
+    name: "Check: Release PR ready (Linux)"
+    needs: gate
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref_name, 'release-please--branches--main') && (inputs.ref == '' || inputs.ref == github.ref_name || inputs.ref == github.sha)
+    timeout-minutes: 130
+    runs-on: [self-hosted, Linux, X64, build]
+    env:
+      CI_EXEC_BUDGET_MINUTES: 10
+      CI_RESOURCE_CLASS: verdict
+    permissions:
+      actions: write
+      pull-requests: read
+    steps:
+      - name: Approve the proven release proposal checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          proposal=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
+            --head "$BRANCH" --label "autorelease: pending" \
+            --json number,headRefOid,author --jq \
+            '.[] | select(.author.is_bot and .author.login == "app/github-actions") | "\(.number) \(.headRefOid)"')
+          if [ -z "$proposal" ]; then
+            echo "No open bot release proposal remains on ${BRANCH}."
+            exit 0
+          fi
+          read -r number head <<< "$proposal"
+          if [ "$head" != "$SHA" ]; then
+            echo "Proposal #${number} moved after this gate; its next gate will release its checks."
+            exit 0
+          fi
+          held=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/merge-gate.yml/runs?event=pull_request&head_sha=${SHA}&status=action_required&per_page=100" \
+            --jq '.workflow_runs[].id')
+          for run in $held; do
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/${run}/approve" --silent
+            echo "Approved merge-gate run ${run} for proven proposal #${number} at ${SHA}."
+          done

@@ -31,19 +31,21 @@ forks are refused; re-open an outside change from a branch in this repository.
 
 Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
 maintains a release pull request with the next version and changelog, rebuilt on every
-commit that lands on `main`. Merge the release pull request to start the release
-automatically: `Core Release Please` proves the merged commit with the full merge gate,
-then creates the tag and an unpublished draft release, then starts the lane that fills
-it: the binaries are built for every supported target, proved to start with no network,
-and attached to the draft with their checksums and provenance; only once all of them are
-there does the wheel and sdist build, smoke-test, and publish to PyPI using OIDC trusted
-publishing. No extra dispatch is needed after merging. A failed candidate selection,
-proposal refresh, verification gate, or cut fails the workflow; expected skips on the
-other path do not count as release success.
+commit that lands on `main`. The full merge gate runs automatically on the proposal's
+final head, then releases the bot PR's held checks without a separate approval click.
+Merge the release pull request to start the release automatically: `Core Release Please`
+proves the merged commit with the full merge gate, then creates the tag and an
+unpublished draft release, then starts the lane that fills it: the binaries are built
+for every supported target, proved to start with no network, and attached to the draft
+with their checksums and provenance; only once all of them are there does the wheel and
+sdist build, smoke-test, and publish to PyPI using OIDC trusted publishing. No extra
+dispatch is needed after merging. A failed candidate selection, proposal refresh,
+verification gate, or cut fails the workflow; expected skips on the other path do not
+count as release success.
 
-Dispatch `Core Release Please` to retry a pending merged release or to prove and merge
-an open release proposal. For an open proposal whose merge-gate run awaits approval, the
-dispatched cut releases that run after proving the commit.
+The Merge button is the only routine manual action. Dispatch `Core Release Please` only
+for recovery of a failed release; the optional dispatch can also prove and merge an open
+proposal.
 
 Publishing the draft is the last step, and the Scoop and Homebrew pointers are updated
 immediately after it, never before. A release that is visible is therefore a release

@@ -250,3 +250,94 @@ def test_push_routes_pending_release_through_proof_and_cut() -> None:
     result = _job("result")
     assert result["if"] == "${{ !cancelled() }}"
     assert set(result["needs"]) == {"candidate", "release-please", "prove-gate", "cut"}
+
+
+def test_proposal_checks_become_mergeable_without_manual_dispatch() -> None:
+    """A bot proposal must release its required PR verdict after the full proof."""
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/merge-gate.yml").read_text(encoding="utf-8")
+    )
+    ready = workflow["jobs"]["release-pr-ready"]
+    assert ready["needs"] == "gate"
+    assert "always()" not in ready["if"] and "!cancelled()" not in ready["if"]
+    assert "github.event_name == 'workflow_dispatch'" in ready["if"]
+    assert "inputs.ref == github.sha" in ready["if"]
+    assert (
+        "startsWith(github.ref_name, 'release-please--branches--main')" in ready["if"]
+    )
+    assert ready["permissions"] == {"actions": "write", "pull-requests": "read"}
+    script = ready["steps"][0]["run"]
+    assert '.author.is_bot and .author.login == "app/github-actions"' in script
+    assert '--head "$BRANCH" --label "autorelease: pending"' in script
+    assert 'if [ "$head" != "$SHA" ]' in script
+    assert "head_sha=${SHA}&status=action_required" in script
+    assert "actions/runs/${run}/approve" in script
+    assert "gh pr merge" not in script
+
+
+APPROVAL_TRANSPORT = r"""
+gh() {
+  [ "$MOCK_FAIL" != true ] || return 1
+  if [ "$1 $2" = 'pr list' ]; then
+    printf '%s' "$MOCK_PROPOSALS" | jq -r "${*: -1}"
+  elif [ "$1 $2" = 'api --paginate' ]; then
+    printf '%s' '{"workflow_runs":[{"id":123}]}' | jq -r "${*: -1}"
+  elif [ "$1 $2 $3" = 'api --method POST' ]; then
+    printf '%s\n' "$4" >> "$APPROVALS"
+  else
+    return 99
+  fi
+}
+"""
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("login", "is_bot", "head", "api_failure", "expected_approvals"),
+    [
+        ("app/github-actions", True, "a" * 40, False, 1),
+        ("app/github-actions", True, "b" * 40, False, 0),
+        ("app/dependabot", True, "a" * 40, False, 0),
+        ("app/github-actions", False, "a" * 40, False, 0),
+        ("app/github-actions", True, "a" * 40, True, 0),
+    ],
+)
+def test_approval_requires_the_proven_bot_head(
+    tmp_path: Path,
+    login: str,
+    is_bot: bool,
+    head: str,
+    api_failure: bool,
+    expected_approvals: int,
+) -> None:
+    """Isolate the approval policy from GitHub's transport."""
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/merge-gate.yml").read_text(encoding="utf-8")
+    )
+    script = workflow["jobs"]["release-pr-ready"]["steps"][0]["run"]
+    approvals = tmp_path / "approvals"
+    result = _run_script(
+        tmp_path,
+        APPROVAL_TRANSPORT + script,
+        {
+            "GITHUB_REPOSITORY": "nevenincs/vaultspec-core",
+            "SHA": "a" * 40,
+            "BRANCH": "release-please--branches--main--components--vaultspec-core",
+            "MOCK_FAIL": str(api_failure).lower(),
+            "APPROVALS": approvals.as_posix(),
+            "MOCK_PROPOSALS": json.dumps(
+                [
+                    {
+                        "number": 600,
+                        "headRefOid": head,
+                        "author": {"login": login, "is_bot": is_bot},
+                    }
+                ]
+            ),
+        },
+    )
+    assert result.returncode == int(api_failure), result.stderr
+    requests = approvals.read_text().splitlines() if approvals.exists() else []
+    assert len(requests) == expected_approvals
+    if expected_approvals:
+        assert requests == ["repos/nevenincs/vaultspec-core/actions/runs/123/approve"]

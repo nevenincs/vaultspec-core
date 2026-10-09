@@ -5,7 +5,7 @@ tags:
 date: '2026-10-09'
 modified: '2026-10-09'
 body_schema: 'body-v2'
-body_hash: 'sha256:a0c100dbe8652229ae1c37e739f7a491493e563a3338fc54a5f0c7208de73ea4'
+body_hash: 'sha256:5951f5a8658cffc47fb9e5107c7e39e818600d112160bc4dafd57107674f0d7f'
 related:
   - "[[2026-09-30-release-standard-research]]"
   - "[[2026-09-18-release-publication-ordering-release-object-lifecycle-research]]"
@@ -19,16 +19,16 @@ related:
 ## Problem Statement
 
 The dispatch-only core workflow reported success after release proposal 600 merged,
-although Release Please refused to refresh while that untagged release was pending.
-The maintainer expected the ready proposal's Merge button to initiate the release and
+although Release Please refused to refresh while that untagged release was pending. The
+maintainer expected the ready proposal's Merge button to initiate the release and
 explicitly authorized restoring that behavior on 2026-10-09 in this session.
 
 ## Considerations
 
 The workflow-token tagging limitation remains established in
 `2026-09-30-release-standard-research`. Draft-first publication remains established in
-`2026-09-18-release-publication-ordering-release-object-lifecycle-research`.
-The maintainer requires failure reporting even when downstream jobs are skipped.
+`2026-09-18-release-publication-ordering-release-object-lifecycle-research`. The
+maintainer requires failure reporting even when downstream jobs are skipped.
 
 ## Considered options
 
@@ -39,25 +39,31 @@ The maintainer requires failure reporting even when downstream jobs are skipped.
 
 ## Constraints
 
-This is an authorized core-only exception to `2026-09-30-release-standard-adr`.
-Other repositories retain that decision. Core starts the cut from a push to main when
-an untagged merged Release Please proposal exists. Ordinary pushes refresh the proposal
-and never merge an open proposal automatically. Manual dispatch remains a retry and
-optional prove-and-merge entry point.
+This is an authorized core-only exception to `2026-09-30-release-standard-adr`. Other
+repositories retain that decision. Core starts the cut from a push to main when an
+untagged merged Release Please proposal exists. Ordinary pushes refresh the proposal and
+never merge an open proposal automatically. Manual dispatch remains a retry and optional
+prove-and-merge entry point. The routine release requires only the human Merge button;
+neither workflow dispatch nor approval of bot-created check runs is a release
+prerequisite.
 
-The exact merged commit passes the full merge gate before any tag is created.
-Release Please owns version, changelog, forced tag, and draft release. Binaries precede
-PyPI, publication remains last, and channel pointers follow publication. Existing
-credentials, fleet restrictions, and downstream dispatch boundaries remain binding.
-Failed candidate selection, a blocked proposal refresh, failed proof, or failed cut
-must fail the originating workflow; skipped required jobs must not become success.
+The exact merged commit passes the full merge gate before any tag is created. Release
+Please owns version, changelog, forced tag, and draft release. Binaries precede PyPI,
+publication remains last, and channel pointers follow publication. Existing credentials,
+fleet restrictions, and downstream dispatch boundaries remain binding. Failed candidate
+selection, a blocked proposal refresh, failed proof, or failed cut must fail the
+originating workflow; skipped required jobs must not become success.
 
 ## Implementation
 
 We will select a pending merged release on both push and dispatch, route it through
-proof and cut, and refresh proposals only when a push has no merged release to finish.
-A final result job validates the selected path. Automatic and manual cuts share one
-concurrency group. The core runbook describes Merge as the release signal.
+proof and cut, and refresh proposals only when a push has no merged release to finish. A
+final result job validates the selected path. Automatic and manual cuts share one
+concurrency group. The core runbook describes Merge as the release signal. A successful
+proposal gate automatically approves held merge-gate PR runs for the exact proven head
+of the open GitHub Actions bot proposal. It runs in a separate job after the verdict
+completes, so held runs can reuse that successful verdict. Failed proofs and moved
+proposal heads never release checks.
 
 The older release standard receives a core scope exception. The implementation wording
 in `2026-03-22-clci-release-adr` and `2026-09-18-release-publication-ordering-adr` is

@@ -107,11 +107,9 @@ jobs:
             git push
           fi
 
-      # The default token's pushes and pull requests start no workflow runs,
-      # so the release pull request would never report the required merge
-      # gate. A dispatch is exempt from that rule, and its check run lands on
-      # the branch head the pull request is waiting on. Last, so it validates
-      # the lockfile commit pushed above.
+      # Bot PR events create approval-held runs. The dispatch proves the final
+      # lockfile commit and then approves its held gate automatically, so the
+      # maintainer only has to merge the ready proposal.
       - name: Dispatch the merge gate for the release pull request
         if: steps.release.outputs.pr
         env:
@@ -199,6 +197,7 @@ jobs:
       contents: read
       checks: read
       pull-requests: write
+      actions: write
     with:
       ref: ${{ needs.candidate.outputs.sha }}
     secrets:

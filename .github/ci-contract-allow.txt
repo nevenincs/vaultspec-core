@@ -39,6 +39,7 @@ code-health.yml:Smoke test the built wheel on Python 3.14
 # the jobs it needs and the check runs already recorded on the commit, neither
 # of which exists outside a workflow run.
 merge-gate.yml:Judge the merge readiness
+merge-gate.yml:Approve the proven release proposal checks
 release-please.yml:Regenerate and push uv.lock onto the release branch
 release-please.yml:Find the release pull request and the commit to prove
 release-please.yml:Release the held merge gate of the release pull request

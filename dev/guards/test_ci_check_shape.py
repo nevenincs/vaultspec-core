@@ -58,6 +58,7 @@ EXPECTED_NAMES = {
     LINUX_JOB: "Test: Full suite (Linux)",
     WINDOWS_JOB: "Test: Library suite (Windows)",
     GATE_JOB: "Check: Merge gate (Linux)",
+    "release-pr-ready": "Check: Release PR ready (Linux)",
 }
 
 #: The label that asks for one full run.
@@ -299,7 +300,7 @@ def _leaf_commands(recipe: str) -> set[tuple[str, ...]]:
 
 
 def test_the_gate_has_exactly_its_tiered_jobs() -> None:
-    """Lint, two full suites, and the gate - nothing more, nothing hidden."""
+    """Lint, both suites, the verdict, and automatic release PR readiness."""
     jobs = _jobs()
     assert set(jobs) == set(EXPECTED_NAMES), (
         f"merge-gate.yml must contain exactly {sorted(EXPECTED_NAMES)}; "
