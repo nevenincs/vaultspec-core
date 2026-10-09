@@ -228,10 +228,15 @@ jobs:
             echo "released held merge-gate run ${run}"
           done
           for _ in $(seq 1 60); do
-            state=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" --json mergeStateStatus --jq .mergeStateStatus)
+            state=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" --json state,mergeStateStatus \
+              --jq 'if .state == "MERGED" then "MERGED" else .mergeStateStatus end')
             case "${state}" in
               CLEAN | UNSTABLE | HAS_HOOKS)
                 echo "release pull request #${NUMBER} is mergeable (${state})"
+                exit 0
+                ;;
+              MERGED)
+                echo "release pull request #${NUMBER} merged as soon as its gate reported"
                 exit 0
                 ;;
             esac
@@ -242,6 +247,13 @@ jobs:
 
       # A squash of a head that is not behind main is exactly the proven tree;
       # the comparison below refuses to tag anything else.
+      #
+      # Auto-merge left on the pull request fires the moment the step above
+      # releases its gate, and can land the squash before this step does. That
+      # commit is accepted on the same terms as this step's own - the proven
+      # head, the proven tree - because refusing it would leave a release
+      # commit on main with no tag, waiting for a second cut while workflow
+      # files are free to move.
       - name: Merge the proven release pull request
         id: merge
         run: |
@@ -251,21 +263,28 @@ jobs:
             echo "#${NUMBER} was merged by hand at ${SHA}"
             exit 0
           fi
-          head=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" \
-            --json state,headRefOid --jq '"\(.state) \(.headRefOid)"')
-          if [ "${head}" != "OPEN ${SHA}" ]; then
+          current() {
+            gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" \
+              --json state,headRefOid --jq '"\(.state) \(.headRefOid)"'
+          }
+          head=$(current)
+          if [ "${head}" = "OPEN ${SHA}" ]; then
+            behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...${SHA}" --jq '.behind_by')
+            if [ "${behind}" != "0" ]; then
+              echo "::error::main moved while ${SHA} was proven; dispatch again once Release Please has rebuilt the proposal"
+              exit 1
+            fi
+            if ! gh pr merge "${NUMBER}" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "${SHA}"; then
+              head=$(current)
+              if [ "${head}" != "MERGED ${SHA}" ]; then
+                echo "::error::could not merge #${NUMBER}. Merge it by hand and dispatch again: the cut then tags the merged commit."
+                exit 1
+              fi
+            fi
+          elif [ "${head}" != "MERGED ${SHA}" ]; then
             echo "::error::release pull request #${NUMBER} is now '${head}', not the proven ${SHA}; dispatch again"
             exit 1
           fi
-          behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...${SHA}" --jq '.behind_by')
-          if [ "${behind}" != "0" ]; then
-            echo "::error::main moved while ${SHA} was proven; dispatch again once Release Please has rebuilt the proposal"
-            exit 1
-          fi
-          gh pr merge "${NUMBER}" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "${SHA}" || {
-            echo "::error::could not merge #${NUMBER}. Merge it by hand and dispatch again: the cut then tags the merged commit."
-            exit 1
-          }
           commit=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid')
           proven=$(gh api "repos/$GITHUB_REPOSITORY/commits/${SHA}" --jq '.commit.tree.sha')
           landed=$(gh api "repos/$GITHUB_REPOSITORY/commits/${commit}" --jq '.commit.tree.sha')
