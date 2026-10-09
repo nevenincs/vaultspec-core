@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.6](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.5...vaultspec-core-v0.3.6) (2026-10-09)
+
+
+### Bug Fixes
+
+* **ci:** make release proposal checks ready without manual approval ([2e8e4aa](https://github.com/nevenincs/vaultspec-core/commit/2e8e4aa0a729115dda250762359963c106de6870))
+* **ci:** start the proven release when its proposal merges ([bfdd7ce](https://github.com/nevenincs/vaultspec-core/commit/bfdd7ceaa011b84c16294687b1443639cdc25841))
+
 ## [0.3.5](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.4...vaultspec-core-v0.3.5) (2026-10-09)
 
 
