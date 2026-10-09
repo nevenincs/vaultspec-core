@@ -458,11 +458,13 @@ def emit_surface(
     if namespace:
         # Linux only: the fleet's Linux runners expose no container runtime
         # to a job, and unprivileged namespaces are what they do allow.
+        if sys.platform != "linux":
+            raise PublishedSurfaceError("namespace isolation needs Linux")
         home = child_environment().get("HOME")
         uv = shutil.which("uv")
-        if sys.platform != "linux" or not home or uv is None:
+        if not home or uv is None:
             raise PublishedSurfaceError(
-                "namespace isolation needs Linux, HOME, and uv on PATH"
+                "namespace isolation needs HOME, and uv on PATH"
             )
         # The interpreter is named outright, because discovery would look in
         # the home that is about to be emptied.
