@@ -26,12 +26,13 @@ def measure(root: Path, *, use_cache: bool) -> dict[str, Any]:
     from vaultspec_core.graph import VaultGraph
 
     process = psutil.Process()
+    handle_count = process.num_handles if sys.platform == "win32" else process.num_fds
     samples: list[tuple[int, int]] = []
     done = threading.Event()
 
     def sample() -> None:
         while True:
-            samples.append((process.memory_info().rss, process.num_handles()))
+            samples.append((process.memory_info().rss, handle_count()))
             if done.wait(0.05):
                 return
 
@@ -40,7 +41,7 @@ def measure(root: Path, *, use_cache: bool) -> dict[str, Any]:
     cpu_before = process.cpu_times()
     disk_before = psutil.disk_io_counters()
     rss_before = process.memory_info().rss
-    handles_before = process.num_handles()
+    handles_before = handle_count()
     sampler = threading.Thread(target=sample, name="resource-sampler", daemon=True)
     sampler.start()
     started = time.perf_counter()
@@ -58,7 +59,7 @@ def measure(root: Path, *, use_cache: bool) -> dict[str, Any]:
         raise RuntimeError("resource sampler did not stop")
     del sampler
     gc.collect()
-    handles_after = process.num_handles()
+    handles_after = handle_count()
     return {
         "seconds": elapsed,
         "nodes": len(graph.nodes),

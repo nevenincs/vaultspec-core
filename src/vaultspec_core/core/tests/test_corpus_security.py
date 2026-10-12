@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -373,6 +374,7 @@ def test_read_scope_rejects_redirect_even_when_file_identity_matches(
 def test_scoped_reads_release_handles_on_success_and_refusal(tmp_path: Path) -> None:
     import psutil
 
+    assert sys.platform == "win32"
     root = tmp_path / "project"
     path = root / ".vault/adr/safe.md"
     raw = _write(path)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import sys
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
 def _final_path_function() -> Callable[
     [int, ctypes.Array[ctypes.c_wchar], int, int], int
 ]:
+    if sys.platform != "win32":
+        raise OSError("Windows file handles require Windows")
     from ctypes import wintypes
 
     function = ctypes.WinDLL("kernel32", use_last_error=True).GetFinalPathNameByHandleW
@@ -33,6 +36,8 @@ def _final_path_function() -> Callable[
 
 def _handle_path(handle: int) -> Path:
     """Read a normalized DOS/UNC path from a borrowed Win32 handle."""
+    if sys.platform != "win32":
+        raise OSError("Windows file handles require Windows")
     function = _final_path_function()
     for capacity in (512, 32768):
         buffer = ctypes.create_unicode_buffer(capacity)
@@ -55,6 +60,8 @@ def normalise_path(value: str) -> Path:
 
 def opened_file_path(descriptor: int) -> Path:
     """Resolve the file already owned by this CRT descriptor, without reopening."""
+    if sys.platform != "win32":
+        raise OSError("Windows file handles require Windows")
     import msvcrt
 
     return _handle_path(msvcrt.get_osfhandle(descriptor))
@@ -63,6 +70,8 @@ def opened_file_path(descriptor: int) -> Path:
 @cache
 def _file_functions() -> tuple[Any, Any]:
     """Bind the Win32 foreign-function boundary once."""
+    if sys.platform != "win32":
+        raise OSError("Windows file handles require Windows")
     from ctypes import wintypes
 
     library = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -89,6 +98,8 @@ def open_file_nofollow(path: Path) -> int:
     Share reads and writes, as the CRT reader does, but not deletion. The caller
     owns the resulting descriptor and must verify type, identity, and rooted path.
     """
+    if sys.platform != "win32":
+        raise OSError("Windows file handles require Windows")
     import msvcrt
 
     create, close = _file_functions()
@@ -111,6 +122,8 @@ def resolved_path(path: Path) -> Path:
     Path.resolve(), no second open verifies a prefix-stripped spelling which
     the caller will reject if it differs from the required rooted spelling.
     """
+    if sys.platform != "win32":
+        raise OSError("Windows file handles require Windows")
     create, close = _file_functions()
     # No data access; share read/write/delete; allow directory handles.
     handle = cast("int", create(str(path), 0, 7, None, 3, 0x02000000, None))
