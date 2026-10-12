@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 import stat
 from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -15,6 +17,39 @@ if TYPE_CHECKING:
 
 class UnsafeDocumentError(OSError):
     """A document path is redirected, outside its vault, or not a regular file."""
+
+
+@dataclass(frozen=True)
+class _CorpusRoot:
+    root: Path
+    docs: str
+    resolved_anchor: Path
+
+
+_CORPUS_ROOT: ContextVar[_CorpusRoot | None] = ContextVar(
+    "corpus_read_root", default=None
+)
+
+
+@contextmanager
+def corpus_read_scope(root_dir: Path) -> Generator[None]:
+    """Resolve corpus configuration once; keep validating every file access."""
+    from ..config import get_config
+
+    root = root_dir.absolute()
+    active = _CORPUS_ROOT.get()
+    if active is not None and active.root == root:
+        yield
+        return
+    configured_docs = get_config(root=root).docs_dir
+    docs = root / configured_docs
+    external = os.path.isabs(configured_docs) and not docs.is_relative_to(root)
+    anchor = docs.parent if external else root
+    token = _CORPUS_ROOT.set(_CorpusRoot(root, configured_docs, anchor.resolve()))
+    try:
+        yield
+    finally:
+        _CORPUS_ROOT.reset(token)
 
 
 def _is_redirected(info: os.stat_result) -> bool:
@@ -37,7 +72,10 @@ def corpus_path_info(
     from ..config import get_config
 
     root = root_dir.absolute()
-    configured_docs = get_config().docs_dir
+    active = _CORPUS_ROOT.get()
+    if active is not None and active.root != root:
+        active = None
+    configured_docs = active.docs if active is not None else get_config().docs_dir
     docs = root / configured_docs
     external = os.path.isabs(configured_docs) and not docs.is_relative_to(root)
     anchor = docs.parent if external else root
@@ -49,6 +87,22 @@ def corpus_path_info(
             raise ValueError("invalid corpus path")
     except ValueError as exc:
         raise UnsafeDocumentError(f"Document path escapes vault: {path}") from exc
+
+    if active is not None:
+        # Resolving to the exact rooted spelling detects redirected ancestors,
+        # including links back inside the corpus. Rechecking each ancestor with
+        # lstat separately adds one filesystem round trip per depth per access.
+        info = candidate.lstat()
+        expected_type = stat.S_ISDIR if directory else stat.S_ISREG
+        if _is_redirected(info) or not expected_type(info.st_mode):
+            raise UnsafeDocumentError(f"Invalid or redirected corpus entry: {path}")
+        resolved = candidate.resolve(strict=True)
+        expected = active.resolved_anchor.joinpath(
+            *docs_relative.parts, *relative.parts
+        )
+        if resolved != expected:
+            raise UnsafeDocumentError(f"Resolved document path escapes vault: {path}")
+        return resolved, info
 
     current = anchor
     info = anchor.lstat()
@@ -63,8 +117,9 @@ def corpus_path_info(
     if not expected_type(info.st_mode):
         raise UnsafeDocumentError(f"Invalid corpus entry type: {path}")
     resolved_docs = docs.resolve(strict=True)
+    resolved_anchor = anchor.resolve(strict=True)
     resolved = candidate.resolve(strict=True)
-    if not resolved_docs.is_relative_to(anchor.resolve(strict=True)) or (
+    if not resolved_docs.is_relative_to(resolved_anchor) or (
         not resolved.is_relative_to(resolved_docs)
     ):
         raise UnsafeDocumentError(f"Resolved document path escapes vault: {path}")

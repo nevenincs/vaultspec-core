@@ -46,6 +46,7 @@ from .conftest import stem_index_of
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from types import FrameType
 
 pytestmark = [pytest.mark.unit]
 
@@ -744,6 +745,14 @@ class TestEncodingIssuesSurviveCache:
         assert cold == standalone == 1
         assert warm == 1, "check_encoding went blind on a warm cache"
 
+    def test_partial_refresh_retries_failed_document(self, tmp_path: Path) -> None:
+        broken = self._vault_with_undecodable_document(tmp_path)
+        VaultGraph(tmp_path)
+        (broken.parent / "new.md").write_text("# New document\n", encoding="utf-8")
+        refreshed = VaultGraph(tmp_path)
+        assert [issue.path for issue in refreshed.encoding_issues] == [broken]
+        assert [issue.kind for issue in refreshed.encoding_issues] == ["decode"]
+
 
 class TestUnreadableDocumentsExcludedFromGraphDerivedQueries:
     """The graph-backed query path must drop what the disk path drops.
@@ -1186,3 +1195,132 @@ class TestFrontmatterTypesSurviveTheCache:
         assert any(
             "stringified an unserialisable" in r.getMessage() for r in caplog.records
         )
+
+
+def test_graph_configuration_work_is_bounded(tmp_path: Path) -> None:
+    """Count real configuration resolutions; corpus size must not multiply them."""
+    import sys
+
+    from ...config.config import get_config
+
+    directory = tmp_path / ".vault/adr"
+    directory.mkdir(parents=True)
+    for i in range(40):
+        (directory / f"record-{i}.md").write_text(
+            "---\ntags: ['#adr', '#sample']\n---\n# Decision\n", encoding="utf-8"
+        )
+    calls = 0
+
+    def count(frame: FrameType, event: str, _arg: object) -> None:
+        nonlocal calls
+        if event == "call" and frame.f_code is get_config.__code__:
+            calls += 1
+
+    previous = sys.getprofile()
+    sys.setprofile(count)
+    try:
+        graph = VaultGraph(tmp_path, use_cache=False)
+    finally:
+        sys.setprofile(previous)
+    assert len(graph.nodes) == 40
+    assert calls < 20, f"configuration resolved {calls} times for 40 documents"
+
+
+@pytest.mark.parametrize("deep", [False, True])
+def test_scan_metadata_keeps_content_verification_for_racy_or_deep_reads(
+    tmp_path: Path, deep: bool
+) -> None:
+    from ...vaultcore.scanner import scan_vault
+
+    directory = tmp_path / ".vault/adr"
+    directory.mkdir(parents=True)
+    path = directory / "record.md"
+    path.write_text("before", encoding="utf-8")
+    manifest = cache_mod.fingerprint_vault([path], tmp_path)
+    file_info: dict[Path, os.stat_result] = {}
+    paths = list(scan_vault(tmp_path, file_info=file_info))
+    assert set(file_info) == {path}
+    path.write_text("after!", encoding="utf-8")
+    assert not cache_mod.validate(
+        manifest,
+        paths,
+        tmp_path,
+        cache_mtime_ns=2**63 if deep else None,
+        deep=deep,
+        file_info=file_info,
+    )
+
+
+def test_changed_document_reuses_only_verified_text_and_rebuilds_all_edges(
+    tmp_path: Path,
+) -> None:
+    import sys
+
+    directory = tmp_path / ".vault/adr"
+    directory.mkdir(parents=True)
+    for name, link in (("a", "b"), ("b", "c"), ("c", "a")):
+        (directory / f"{name}.md").write_text(
+            f"---\ntags: ['#adr', '#sample']\nrelated: ['[[{link}]]']\n---\n# {name}\n",
+            encoding="utf-8",
+        )
+    VaultGraph(tmp_path)
+    changed = directory / "b.md"
+    changed.write_text(
+        "---\ntags: ['#adr', '#sample']\n---\n# Replaced\n", encoding="utf-8"
+    )
+    ingested: list[Path] = []
+
+    def count(frame: FrameType, event: str, _arg: object) -> None:
+        if event == "call" and frame.f_code is VaultGraph._ingest_document.__code__:
+            ingested.append(frame.f_locals["path"])
+
+    previous = sys.getprofile()
+    sys.setprofile(count)
+    try:
+        updated = VaultGraph(tmp_path)
+    finally:
+        sys.setprofile(previous)
+    assert ingested == [changed]
+    cold = VaultGraph(tmp_path, use_cache=False)
+    assert updated.to_dict() == cold.to_dict()
+    assert not updated.digraph.has_edge("b", "c")
+    assert updated.digraph.has_edge("a", "b")
+
+
+def test_snapshot_fingerprint_does_not_certify_a_later_edit(tmp_path: Path) -> None:
+    import hashlib
+
+    from ...vaultcore.scanner import scan_vault
+
+    directory = tmp_path / ".vault/adr"
+    directory.mkdir(parents=True)
+    path = directory / "record.md"
+    path.write_bytes(b"before")
+    file_info: dict[Path, os.stat_result] = {}
+    paths = list(scan_vault(tmp_path, file_info=file_info))
+    path.write_bytes(b"changed after discovery")
+    manifest = cache_mod.fingerprint_vault(
+        paths,
+        tmp_path,
+        content_hashes={path: hashlib.sha256(b"before").hexdigest()},
+        file_info=file_info,
+    )
+    assert manifest[".vault/adr/record.md"][0] == len(b"before")
+    assert not cache_mod.validate(manifest, paths, tmp_path, cache_mtime_ns=2**63)
+
+
+def test_partial_refresh_ignores_malformed_cached_graph(tmp_path: Path) -> None:
+    directory = tmp_path / ".vault/adr"
+    directory.mkdir(parents=True)
+    path = directory / "record.md"
+    path.write_text("# Original\n", encoding="utf-8")
+    VaultGraph(tmp_path)
+    cache_file = cache_mod.cache_path(tmp_path)
+    payload = json.loads(cache_file.read_text(encoding="utf-8"))
+    payload["graph"] = {}
+    cache_file.write_text(json.dumps(payload), encoding="utf-8")
+    path.write_text("# Changed document\n", encoding="utf-8")
+    assert (
+        VaultGraph(tmp_path).to_dict()
+        == VaultGraph(tmp_path, use_cache=False).to_dict()
+    )

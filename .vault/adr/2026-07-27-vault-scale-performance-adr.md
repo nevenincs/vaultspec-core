@@ -3,9 +3,9 @@ tags:
   - '#adr'
   - '#vault-scale-performance'
 date: '2026-07-27'
-modified: '2026-07-27'
+modified: '2026-10-12'
 body_schema: 'body-v1'
-body_hash: 'sha256:9f5b9a2f97d96f2f85444c1d003f60fe3964c4c2eee643aa4f775002324d4324'
+body_hash: 'sha256:c1cc0049b3238ba0c683bdebeddb69783943ab967bcced7f5971691941579943'
 related:
   - "[[2026-07-27-vault-scale-performance-audit]]"
   - '[[2026-06-10-graph-backend-adr]]'
@@ -298,3 +298,23 @@ plus two explicitly versioned surface changes.
 - **Rule slug:** `analysis-is-opt-in`. **Rule:** Render and orientation paths
   may consume only descriptive-count surfaces; graph-theoretic analysis is
   invoked only by an explicit analysis request.
+
+## Graph ingress refinement, 2026-10-12
+
+Authorized by the user's request to optimize graph calculation separately after fixing
+RAG search blocking. D1 continues to require reconstruction of the entire graph after a
+fingerprint mismatch; its inputs may reuse cached document text only when that document
+passes the same canonical size, mtime, and racily-clean hash checks. Changed and new
+files are read, deleted files are absent, and all node identities, collisions, links,
+phantoms, and attributes are recalculated by the existing implementation. This does not
+permit trusting an invalidated graph or introducing a second graph parser.
+
+D3 and D4 apply to graph discovery as well: validated file metadata from the one scan
+is the snapshot against which cache fingerprints are checked and saved. Saving must not
+combine a later edit's timestamps with earlier document text. Configuration and trusted
+root resolution are fixed for the read operation. Every actual file open still rechecks
+file type, canonical rooted path, and opened-descriptor identity; ancestor redirects,
+including redirects inside the vault, remain refused. Direct validation without a
+supplied scan snapshot continues to revalidate every path, and deep or racily-clean
+hash checks always perform contained reads. No persisted schema or public result shape
+changes. Forced cache-off builds still read every document.

@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import os
 import subprocess
+from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 from vaultspec_core.config import get_config, reset_config
-from vaultspec_core.core.corpus_io import UnsafeDocumentError, is_corpus_path
+from vaultspec_core.core.corpus_io import (
+    UnsafeDocumentError,
+    corpus_read_scope,
+    is_corpus_path,
+)
 from vaultspec_core.core.document_io import read_document_bytes, read_document_text
 from vaultspec_core.crossref._corpus import _read, load_adrs
 from vaultspec_core.graph import VaultGraph
@@ -136,8 +141,9 @@ def test_cached_corpus_paths_follow_the_current_workspace_alias(
 
 
 @pytest.mark.parametrize("replacement", ["file", "parent"])
+@pytest.mark.parametrize("scoped", [False, True])
 def test_reader_rejects_replacement_between_validation_and_open(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement: str, scoped: bool
 ) -> None:
     root = tmp_path / "project"
     path = root / ".vault/adr/safe.md"
@@ -169,7 +175,10 @@ def test_reader_rejects_replacement_between_validation_and_open(
         return descriptor
 
     monkeypatch.setattr(os, "open", swap_before_open)
-    with pytest.raises(OSError):
+    with (
+        corpus_read_scope(root) if scoped else nullcontext(),
+        pytest.raises(OSError),
+    ):
         read_document_bytes(path, root_dir=root)
     assert intercepted
     for descriptor in descriptors:
@@ -247,3 +256,62 @@ def test_reader_preserves_bytes_and_newlines_with_custom_docs_and_aliases(
     )
     assert [record.path for record in load_records(alias)] == [alias_path]
     assert [record.stem for record in load_adrs(alias)] == ["safe"]
+
+
+@pytest.mark.parametrize("replacement", ["file", "parent"])
+@pytest.mark.parametrize("target_kind", ["inside", "outside"])
+def test_read_scope_revalidates_each_access(
+    tmp_path: Path, replacement: str, target_kind: str
+) -> None:
+    root = tmp_path / "project"
+    path = root / ".vault/adr/safe.md"
+    raw = _write(path)
+    outside = (
+        root / ".vault/alternate" if target_kind == "inside" else tmp_path / "outside"
+    )
+    _write(outside / "safe.md", "secret")
+    with corpus_read_scope(root):
+        assert read_document_bytes(path, root_dir=root) == raw
+        if replacement == "file":
+            path.unlink()
+            path.symlink_to(outside / "safe.md")
+        else:
+            path.parent.rename(path.parent.with_name("original"))
+            path.parent.symlink_to(outside, target_is_directory=True)
+        with pytest.raises(UnsafeDocumentError):
+            read_document_bytes(path, root_dir=root)
+
+
+def test_read_scope_pins_workspace_alias(tmp_path: Path) -> None:
+    first, second = tmp_path / "first", tmp_path / "second"
+    raw = _write(first / ".vault/adr/safe.md")
+    _write(second / ".vault/adr/safe.md", "secret")
+    alias = tmp_path / "alias"
+    alias.symlink_to(first, target_is_directory=True)
+    path = alias / ".vault/adr/safe.md"
+    with corpus_read_scope(alias):
+        assert read_document_bytes(path, root_dir=alias) == raw
+        alias.unlink()
+        alias.symlink_to(second, target_is_directory=True)
+        with pytest.raises(UnsafeDocumentError, match="escapes vault"):
+            read_document_bytes(path, root_dir=alias)
+
+
+def test_read_scope_restores_nested_roots_and_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first, second = tmp_path / "first", tmp_path / "second"
+    a = first / ".vault/adr/a.md"
+    b = second / ".vault/adr/b.md"
+    raw_a, raw_b = _write(a), _write(b)
+    with corpus_read_scope(first):
+        with corpus_read_scope(second):
+            assert read_document_bytes(b, root_dir=second) == raw_b
+        assert read_document_bytes(a, root_dir=first) == raw_a
+    custom = first / "documents/adr/c.md"
+    raw_c = _write(custom)
+    monkeypatch.setenv("VAULTSPEC_DOCS_DIR", "documents")
+    with corpus_read_scope(first):
+        assert read_document_bytes(custom, root_dir=first) == raw_c
+        with pytest.raises(UnsafeDocumentError):
+            read_document_bytes(a, root_dir=first)
