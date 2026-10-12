@@ -298,7 +298,7 @@ def test_read_scope_pins_workspace_alias(tmp_path: Path) -> None:
 
 
 def test_read_scope_restores_nested_roots_and_configuration(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     first, second = tmp_path / "first", tmp_path / "second"
     a = first / ".vault/adr/a.md"
@@ -310,8 +310,15 @@ def test_read_scope_restores_nested_roots_and_configuration(
         assert read_document_bytes(a, root_dir=first) == raw_a
     custom = first / "documents/adr/c.md"
     raw_c = _write(custom)
-    monkeypatch.setenv("VAULTSPEC_DOCS_DIR", "documents")
-    with corpus_read_scope(first):
-        assert read_document_bytes(custom, root_dir=first) == raw_c
-        with pytest.raises(UnsafeDocumentError):
-            read_document_bytes(a, root_dir=first)
+    previous_docs = os.environ.get("VAULTSPEC_DOCS_DIR")
+    os.environ["VAULTSPEC_DOCS_DIR"] = "documents"
+    try:
+        with corpus_read_scope(first):
+            assert read_document_bytes(custom, root_dir=first) == raw_c
+            with pytest.raises(UnsafeDocumentError):
+                read_document_bytes(a, root_dir=first)
+    finally:
+        if previous_docs is None:
+            os.environ.pop("VAULTSPEC_DOCS_DIR", None)
+        else:
+            os.environ["VAULTSPEC_DOCS_DIR"] = previous_docs
