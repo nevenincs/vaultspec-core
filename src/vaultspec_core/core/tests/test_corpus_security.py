@@ -174,7 +174,33 @@ def test_reader_rejects_replacement_between_validation_and_open(
         descriptors.append(descriptor)
         return descriptor
 
-    monkeypatch.setattr(os, "open", swap_before_open)
+    if scoped and os.name == "nt":
+        from vaultspec_core.core import windows_paths
+
+        native_open = windows_paths.open_file_nofollow
+
+        def native_adapter(
+            file: str | os.PathLike[str],
+            _flags: int,
+            _mode: int = 0o777,
+            *,
+            dir_fd: int | None = None,
+        ) -> int:
+            assert dir_fd is None
+            return native_open(Path(file))
+
+        original_open = native_adapter
+
+        def swap_native(file: Path) -> int:
+            return swap_before_open(file, os.O_RDONLY)
+
+        monkeypatch.setattr(
+            windows_paths,
+            "open_file_nofollow",
+            swap_native,
+        )
+    else:
+        monkeypatch.setattr(os, "open", swap_before_open)
     with (
         corpus_read_scope(root) if scoped else nullcontext(),
         pytest.raises(OSError),
@@ -271,6 +297,7 @@ def test_read_scope_revalidates_each_access(
     )
     _write(outside / "safe.md", "secret")
     with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
         assert read_document_bytes(path, root_dir=root) == raw
         if replacement == "file":
             path.unlink()
@@ -322,3 +349,74 @@ def test_read_scope_restores_nested_roots_and_configuration(
             os.environ.pop("VAULTSPEC_DOCS_DIR", None)
         else:
             os.environ["VAULTSPEC_DOCS_DIR"] = previous_docs
+
+
+def test_read_scope_rejects_redirect_even_when_file_identity_matches(
+    tmp_path: Path,
+) -> None:
+    """Removing the opened-handle path comparison lets this hard-link case pass."""
+    root = tmp_path / "project"
+    path = root / ".vault/adr/safe.md"
+    _write(path)
+    alternate = tmp_path / "alternate"
+    alternate.mkdir()
+    (alternate / path.name).hardlink_to(path)
+    with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
+        path.parent.rename(path.parent.with_name("original"))
+        path.parent.symlink_to(alternate, target_is_directory=True)
+        with pytest.raises(UnsafeDocumentError, match="escapes vault"):
+            read_document_bytes(path, root_dir=root)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows handle accounting")
+def test_scoped_reads_release_handles_on_success_and_refusal(tmp_path: Path) -> None:
+    import psutil
+
+    root = tmp_path / "project"
+    path = root / ".vault/adr/safe.md"
+    raw = _write(path)
+    process = psutil.Process()
+    with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
+        assert read_document_bytes(path, root_dir=root) == raw
+        before = process.num_handles()
+        for _ in range(40):
+            assert path in list(scan_vault(root))
+            assert read_document_bytes(path, root_dir=root) == raw
+        assert process.num_handles() == before
+        target = tmp_path / "target.md"
+        _write(target)
+        path.unlink()
+        path.symlink_to(target)
+        for _ in range(40):
+            with pytest.raises(UnsafeDocumentError):
+                read_document_bytes(path, root_dir=root)
+        assert process.num_handles() == before
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows namespace and native handles")
+@pytest.mark.parametrize("extended", [False, True])
+def test_scoped_native_reads_preserve_long_unicode_paths(
+    tmp_path: Path,
+    extended: bool,
+) -> None:
+    from vaultspec_core.core.windows_paths import open_file_nofollow
+
+    root = tmp_path / "project"
+    relative = Path(".vault/adr")
+    for i in range(8):
+        relative /= f"directory-{i}-" + "a" * 55
+    relative /= "café-世界.md"
+    raw = _write(root / relative)
+    if extended:
+        root = Path("\\\\?\\" + str(root))
+    path = root / relative
+    with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
+        assert read_document_bytes(path, root_dir=root) == raw
+    descriptor = open_file_nofollow(path)
+    try:
+        assert not os.get_inheritable(descriptor)
+    finally:
+        os.close(descriptor)

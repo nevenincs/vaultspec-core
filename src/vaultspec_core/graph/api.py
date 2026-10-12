@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from collections import Counter
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
@@ -60,7 +61,6 @@ from .networkx_runtime import (
 from .networkx_runtime import density as graph_density
 
 if TYPE_CHECKING:
-    import os
     import pathlib
 
     from vaultspec_core.cli.rendering import TreeLine
@@ -657,42 +657,27 @@ class VaultGraph:
             self._digraph.nodes[name]["in_degree"] = in_degree.get(name, 0)
 
     @cached_property
-    def _archive_dir(self) -> pathlib.Path:
-        """Resolve this build's archive root once, not once per missing link."""
+    def _archive_links(self) -> dict[str, list[str]]:
+        """Snapshot archive names once; link calculation performs no disk queries."""
         from ..config import get_config
 
-        return self.root_dir / get_config().docs_dir / "_archive"
+        archive = self.root_dir / get_config().docs_dir / "_archive"
+        links: dict[str, list[str]] = {}
+        for path in sorted(archive.rglob("*.md")):
+            key = path.relative_to(archive).with_suffix("").as_posix()
+            links.setdefault(os.path.normcase(key), []).append(key)
+            if key != path.stem:
+                links.setdefault(os.path.normcase(path.stem), []).append(key)
+        return links
 
     def _is_archived(self, target: str) -> bool:
-        """Check if target exists under .vault/_archive/."""
-        archive_dir = self._archive_dir
-        if not archive_dir.exists():
-            return False
-        target_norm = target.replace("\\", "/")
-        if "/" in target_norm:
-            return (archive_dir / f"{target_norm}.md").exists()
-        else:
-            return len(list(archive_dir.rglob(f"{target_norm}.md"))) > 0
+        """Check archive membership against this graph's snapshot."""
+        return os.path.normcase(target.replace("\\", "/")) in self._archive_links
 
     def _resolve_link(self, target: str) -> list[str]:
-        """Resolve a wiki-link target to one or more node keys.
-
-        Resolution order:
-
-        1. Exact match against an existing node key (handles both bare
-           stems and already-qualified ``type/stem`` references).
-        2. Stem index lookup  - if the bare stem maps to multiple
-           qualified keys, all are returned and a warning is logged.
-        3. Match in .vault/_archive/ - returns the resolved archived key
-           so it can be resolved without being flagged as dangling.
-        4. No match  - returns the original target so it is recorded as
-           a dangling link.
-        """
-        # Exact key match (unique stem or qualified reference)
+        """Resolve an exact node, a colliding stem, or an archived document."""
         if target in self.nodes:
             return [target]
-
-        # Stem index lookup (handles collisions)
         keys = self._stem_index.get(target, [])
         if keys:
             if len(keys) > 1:
@@ -703,26 +688,9 @@ class VaultGraph:
                     keys,
                 )
             return keys
-
-        # Try to resolve against .vault/_archive/
-        archive_dir = self._archive_dir
-        if archive_dir.exists():
-            target_norm = target.replace("\\", "/")
-            if "/" in target_norm:
-                if (archive_dir / f"{target_norm}.md").exists():
-                    return [target_norm]
-            else:
-                matches = list(archive_dir.rglob(f"{target_norm}.md"))
-                if matches:
-                    resolved: list[str] = []
-                    for match in matches:
-                        rel = match.relative_to(archive_dir)
-                        key = str(rel.with_suffix("")).replace("\\", "/")
-                        resolved.append(key)
-                    return resolved
-
-        # No match  - treat as dangling link
-        return [target]
+        return self._archive_links.get(
+            os.path.normcase(target.replace("\\", "/")), [target]
+        )
 
     # -- Direct networkx access ----------------------------------------------
 

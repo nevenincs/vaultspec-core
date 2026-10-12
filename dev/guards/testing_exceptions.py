@@ -70,6 +70,16 @@ EXCEPTIONS = (
     ),
     TestMechanismException(
         "src/vaultspec_core/core/tests/test_corpus_security.py",
+        (
+            "test_scoped_reads_release_handles_on_success_and_refusal",
+            "test_scoped_native_reads_preserve_long_unicode_paths",
+        ),
+        frozenset({"pytest.mark.skipif"}),
+        "Native Windows handle accounting and extended path namespaces require "
+        "Windows; the Windows suite exercises both real operating-system APIs.",
+    ),
+    TestMechanismException(
+        "src/vaultspec_core/core/tests/test_corpus_security.py",
         ("test_reader_rejects_replacement_between_validation_and_open",),
         frozenset({"monkeypatch"}),
         "Replace a real file at the validation/open transition to prove the "

@@ -5,7 +5,7 @@ tags:
 date: '2026-07-27'
 modified: '2026-10-12'
 body_schema: 'body-v1'
-body_hash: 'sha256:1450d8813a57f33d8e61686c715a49ed7840219f14fc7ace08b992425aee306e'
+body_hash: 'sha256:547e8e93595e46a9e3a8eb05fefe369908f91c9cf6b2bd46604a4f4a04f298f3'
 related: []
 ---
 
@@ -257,3 +257,50 @@ passed on the resulting source. Live installed-service checks returned the TUI v
 query in 2.11 seconds cold and 1.49 seconds warm, versus 2.82 seconds for code;
 graph ranking took 1.07 milliseconds and 0.16 milliseconds respectively. These
 are individual measurements, not latency guarantees under every workload.
+
+### cold-graph-resource-profile | low | PASS for S03
+
+Reviewed the complete working-tree change against 5cab80da: canonical corpus ingress,
+configuration scope, archive lookup, PageRank, and the reusable graph_profile.py
+instrument. No outstanding high or critical finding in this scope. The existing
+snapshot decisions cover these changes; no duplicate parser or index implementation.
+
+Controlled service-stopped runs on 4,481 documents and 8,081 edges, using service
+Python 3.14.6 and current source, gave cold construction medians 9.086 -> 5.519 seconds
+(39% less); median CPU 8.266 -> 4.953 seconds (40% less). Repeated process metadata/
+control I/O fell 320,715 -> 137,473 operations (57%). Required document reads remain
+8,964 calls and 41.71 MB per repeat. Sampled peak RSS rose from about 217.7 to 224.5 MB.
+Handles stabilized at 161 after native binding initialization, with no growth over
+repeated builds. Three warm graph loads took 2.472, 2.173, 2.539 seconds and four
+process read calls per repeat. PageRank medians 0.182 -> 0.082 seconds, with all 4,481
+scores bit-identical to the committed implementation.
+
+The earlier 51-second observation is not a controlled baseline. Cold here disables
+the graph cache; it does not flush OS caches. Process read bytes include cached reads.
+System disk counters were captured but include other workloads: no physical-disk
+reduction is claimed. py-spy 0.4.2 Python sampling succeeded before and after. The
+final 5 Hz capture contains 85 main-thread samples over three builds (17 sampled
+seconds); graph rebuilding and scanning dominate. Initial native/high-frequency
+sampling perturbed execution and was discarded. Sampled profiles identify hot paths;
+unprofiled resource runs establish latency. The final sampled corpus had 4,482 files
+because another session added a document; it is not used for the controlled comparison.
+
+Artifacts remain in the existing RAG .vault/data/engine-data directory:
+graph-profile-controlled-before.resources.json, graph-profile-controlled-after.resources.json,
+graph-profile-after-warm.resources.json, graph-profile-before-python.speedscope.json,
+graph-profile-after-python.speedscope.json, graph-profile-after-sampled.resources.json.
+The instrument records CPU, process I/O, system disk I/O, RSS and handles at 50 ms.
+
+Verification: 523 config, corpus-security, graph and scanner tests passed, with four
+default external-capability deselections. Package Ruff, all 11 changed Python files'
+format, ty and basedpyright checks, and six production modules' Pylint checks passed.
+Long Unicode paths, extended Windows namespaces, nested configuration scopes,
+same-inode ancestor redirects, read failures and handle closure are exercised.
+
+Five mutations failed their intended guard and passed after restoration: removing
+opened-handle canonical comparison admitted the same-inode redirect; removing native
+metadata-handle closure increased handles 161 -> 281; disabling scoped configuration
+broke identity reuse; archive rescanning produced 82 enumerations instead of one;
+PageRank edge-view rereads produced 231 calls instead of at most three. No mutation
+remains. Review traced descriptor ownership through transfer, failures and normal
+closure, and preserved the portable reader fallback.

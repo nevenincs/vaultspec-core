@@ -138,13 +138,19 @@ def pagerank(
     rank: dict[str, float] = dict.fromkeys(nodes, 1.0 / n)
     teleport = (1.0 - alpha) / n
 
-    # Pre-compute weighted out-degree so dangling nodes are detected once.
+    # Materialize edge weights once, preserving their reduction order. Repeated
+    # NetworkX view construction and attribute conversion dominate the iteration.
     out_weight: dict[str, float] = {}
+    adjacency: dict[str, list[tuple[str, float]]] = {}
     for node in nodes:
         total = 0.0
-        for _, _, data in g.out_edges(node, data=True):
-            total += float(data.get("weight", 1.0))
+        edges: list[tuple[str, float]] = []
+        for _, target, data in g.out_edges(node, data=True):
+            weight = float(data.get("weight", 1.0))
+            total += weight
+            edges.append((target, weight))
         out_weight[node] = total
+        adjacency[node] = edges
 
     err = 0.0
     for _ in range(max_iter):
@@ -158,8 +164,8 @@ def pagerank(
             if out_weight[node] == 0.0:
                 continue
             share = alpha * prev[node] / out_weight[node]
-            for _, target, data in g.out_edges(node, data=True):
-                nxt[target] += share * float(data.get("weight", 1.0))
+            for target, weight in adjacency[node]:
+                nxt[target] += share * weight
         err = sum(abs(nxt[node] - prev[node]) for node in nodes)
         rank = nxt
         # networkx scales the tolerance by the node count.
