@@ -25,6 +25,7 @@ from .models import EncodingIssue
 from .networkx_runtime import node_link_data, node_link_graph
 
 if TYPE_CHECKING:
+    import os
     import pathlib
     from collections.abc import Iterable
 
@@ -136,7 +137,16 @@ def restore_graph(
     nodes: dict[str, DocNode] = {}
     raw_texts: dict[pathlib.Path, tuple[str, bool]] = {}
     by_stem: dict[str, list[str]] = {}
-    current_paths = {_path_key(path): path for path in document_paths}
+    current_paths = {path: path for path in document_paths}
+    resolved_paths: dict[pathlib.Path, pathlib.Path] | None = None
+
+    def rebase(path: pathlib.Path) -> pathlib.Path:
+        nonlocal resolved_paths
+        if path in current_paths:
+            return current_paths[path]
+        if resolved_paths is None:
+            resolved_paths = {_path_key(p): p for p in current_paths}
+        return resolved_paths.get(_path_key(path), path)
 
     for key in digraph.nodes():
         attrs = digraph.nodes[key]
@@ -148,7 +158,7 @@ def restore_graph(
         crlf = cast("bool", attrs.pop("crlf", False))
         node_path = nodes[key].path
         if node_path is not None:
-            node_path = current_paths.get(_path_key(node_path), node_path)
+            node_path = rebase(node_path)
             nodes[key].path = node_path
             attrs["path"] = str(node_path)
             raw_texts[node_path] = (raw, crlf)
@@ -166,9 +176,7 @@ def restore_graph(
     # encoding findings identical to a cold one's.
     encoding_issues = [
         EncodingIssue(
-            current_paths.get(
-                _path_key(pathlib.Path(raw_path)), pathlib.Path(raw_path)
-            ),
+            rebase(pathlib.Path(raw_path)),
             kind,
             detail,
             start,
@@ -188,3 +196,37 @@ def restore_graph(
         dangling_links=[(pair[0], pair[1]) for pair in payload.dangling_links],
         encoding_issues=encoding_issues,
     )
+
+
+def verified_cached_documents(
+    root_dir: pathlib.Path,
+    payload: cache.GraphCachePayload,
+    scanned_files: list[pathlib.Path],
+    file_info: dict[pathlib.Path, os.stat_result],
+    cache_mtime_ns: int | None,
+) -> dict[pathlib.Path, tuple[str, bool, str]]:
+    """Reuse only document text proved current by the canonical fingerprint rule."""
+    from . import cache as cache_mod
+
+    try:
+        restored = restore_graph(payload, document_paths=scanned_files)
+    except (KeyError, TypeError, ValueError):
+        logger.warning("Cannot reuse malformed graph cache; reading documents")
+        return {}
+    failed_paths = {issue.path for issue in restored.encoding_issues}
+    documents: dict[pathlib.Path, tuple[str, bool, str]] = {}
+    for path in scanned_files:
+        key = cache_mod.manifest_key(path, root_dir)
+        entry = payload.manifest.get(key)
+        raw = restored.raw_texts.get(path)
+        if entry is None or raw is None or path in failed_paths:
+            continue
+        if cache_mod.validate(
+            {key: entry},
+            [path],
+            root_dir,
+            cache_mtime_ns=cache_mtime_ns,
+            file_info=file_info,
+        ):
+            documents[path] = (raw[0], raw[1], entry[2])
+    return documents

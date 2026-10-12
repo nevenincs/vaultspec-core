@@ -742,6 +742,39 @@ class TestVaultGraphArchiveResolution:
     traversal is exercised end-to-end.
     """
 
+    def test_archive_is_enumerated_once_for_many_unresolved_links(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        import sys
+        from types import FrameType
+
+        root, source, _ = _make_vault_with_archive(tmp_path)
+        source.write_text(
+            source.read_text(encoding="utf-8")
+            + "\n".join(f"[[missing-{i}]]" for i in range(40)),
+            encoding="utf-8",
+        )
+        enumerations: dict[int, FrameType] = {}
+
+        def count(frame: FrameType, event: str, _arg: object) -> None:
+            if (
+                event == "call"
+                and frame.f_code is Path.rglob.__code__
+                and frame.f_locals["self"].name == "_archive"
+            ):
+                enumerations[id(frame)] = frame
+
+        previous = sys.getprofile()
+        sys.setprofile(count)
+        try:
+            graph = VaultGraph(root, use_cache=False)
+        finally:
+            sys.setprofile(previous)
+        assert graph.digraph.has_edge("source-doc", "adr/archived-doc")
+        assert len(graph.get_dangling_links()) == 40
+        assert len(enumerations) == 1, "archive must be enumerated once per build"
+
     def test_archived_link_does_not_appear_in_dangling(self, tmp_path: Path) -> None:
         """A link to an archived doc must not be counted as dangling."""
         root, _src, _arch = _make_vault_with_archive(tmp_path)

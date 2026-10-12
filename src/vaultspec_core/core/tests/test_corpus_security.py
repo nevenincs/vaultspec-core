@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
+from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 from vaultspec_core.config import get_config, reset_config
-from vaultspec_core.core.corpus_io import UnsafeDocumentError, is_corpus_path
+from vaultspec_core.core.corpus_io import (
+    UnsafeDocumentError,
+    corpus_read_scope,
+    is_corpus_path,
+)
 from vaultspec_core.core.document_io import read_document_bytes, read_document_text
 from vaultspec_core.crossref._corpus import _read, load_adrs
 from vaultspec_core.graph import VaultGraph
@@ -136,8 +142,9 @@ def test_cached_corpus_paths_follow_the_current_workspace_alias(
 
 
 @pytest.mark.parametrize("replacement", ["file", "parent"])
+@pytest.mark.parametrize("scoped", [False, True])
 def test_reader_rejects_replacement_between_validation_and_open(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement: str, scoped: bool
 ) -> None:
     root = tmp_path / "project"
     path = root / ".vault/adr/safe.md"
@@ -168,8 +175,37 @@ def test_reader_rejects_replacement_between_validation_and_open(
         descriptors.append(descriptor)
         return descriptor
 
-    monkeypatch.setattr(os, "open", swap_before_open)
-    with pytest.raises(OSError):
+    if scoped and os.name == "nt":
+        from vaultspec_core.core import windows_paths
+
+        native_open = windows_paths.open_file_nofollow
+
+        def native_adapter(
+            file: str | os.PathLike[str],
+            _flags: int,
+            _mode: int = 0o777,
+            *,
+            dir_fd: int | None = None,
+        ) -> int:
+            assert dir_fd is None
+            return native_open(Path(file))
+
+        original_open = native_adapter
+
+        def swap_native(file: Path) -> int:
+            return swap_before_open(file, os.O_RDONLY)
+
+        monkeypatch.setattr(
+            windows_paths,
+            "open_file_nofollow",
+            swap_native,
+        )
+    else:
+        monkeypatch.setattr(os, "open", swap_before_open)
+    with (
+        corpus_read_scope(root) if scoped else nullcontext(),
+        pytest.raises(OSError),
+    ):
         read_document_bytes(path, root_dir=root)
     assert intercepted
     for descriptor in descriptors:
@@ -247,3 +283,142 @@ def test_reader_preserves_bytes_and_newlines_with_custom_docs_and_aliases(
     )
     assert [record.path for record in load_records(alias)] == [alias_path]
     assert [record.stem for record in load_adrs(alias)] == ["safe"]
+
+
+@pytest.mark.parametrize("replacement", ["file", "parent"])
+@pytest.mark.parametrize("target_kind", ["inside", "outside"])
+def test_read_scope_revalidates_each_access(
+    tmp_path: Path, replacement: str, target_kind: str
+) -> None:
+    root = tmp_path / "project"
+    path = root / ".vault/adr/safe.md"
+    raw = _write(path)
+    outside = (
+        root / ".vault/alternate" if target_kind == "inside" else tmp_path / "outside"
+    )
+    _write(outside / "safe.md", "secret")
+    with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
+        assert read_document_bytes(path, root_dir=root) == raw
+        if replacement == "file":
+            path.unlink()
+            path.symlink_to(outside / "safe.md")
+        else:
+            path.parent.rename(path.parent.with_name("original"))
+            path.parent.symlink_to(outside, target_is_directory=True)
+        with pytest.raises(UnsafeDocumentError):
+            read_document_bytes(path, root_dir=root)
+
+
+def test_read_scope_pins_workspace_alias(tmp_path: Path) -> None:
+    first, second = tmp_path / "first", tmp_path / "second"
+    raw = _write(first / ".vault/adr/safe.md")
+    _write(second / ".vault/adr/safe.md", "secret")
+    alias = tmp_path / "alias"
+    alias.symlink_to(first, target_is_directory=True)
+    path = alias / ".vault/adr/safe.md"
+    with corpus_read_scope(alias):
+        assert read_document_bytes(path, root_dir=alias) == raw
+        alias.unlink()
+        alias.symlink_to(second, target_is_directory=True)
+        with pytest.raises(UnsafeDocumentError, match="escapes vault"):
+            read_document_bytes(path, root_dir=alias)
+
+
+def test_read_scope_restores_nested_roots_and_configuration(
+    tmp_path: Path,
+) -> None:
+    first, second = tmp_path / "first", tmp_path / "second"
+    a = first / ".vault/adr/a.md"
+    b = second / ".vault/adr/b.md"
+    raw_a, raw_b = _write(a), _write(b)
+    with corpus_read_scope(first):
+        with corpus_read_scope(second):
+            assert read_document_bytes(b, root_dir=second) == raw_b
+        assert read_document_bytes(a, root_dir=first) == raw_a
+    custom = first / "documents/adr/c.md"
+    raw_c = _write(custom)
+    previous_docs = os.environ.get("VAULTSPEC_DOCS_DIR")
+    os.environ["VAULTSPEC_DOCS_DIR"] = "documents"
+    try:
+        with corpus_read_scope(first):
+            assert read_document_bytes(custom, root_dir=first) == raw_c
+            with pytest.raises(UnsafeDocumentError):
+                read_document_bytes(a, root_dir=first)
+    finally:
+        if previous_docs is None:
+            os.environ.pop("VAULTSPEC_DOCS_DIR", None)
+        else:
+            os.environ["VAULTSPEC_DOCS_DIR"] = previous_docs
+
+
+def test_read_scope_rejects_redirect_even_when_file_identity_matches(
+    tmp_path: Path,
+) -> None:
+    """Removing the opened-handle path comparison lets this hard-link case pass."""
+    root = tmp_path / "project"
+    path = root / ".vault/adr/safe.md"
+    _write(path)
+    alternate = tmp_path / "alternate"
+    alternate.mkdir()
+    (alternate / path.name).hardlink_to(path)
+    with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
+        path.parent.rename(path.parent.with_name("original"))
+        path.parent.symlink_to(alternate, target_is_directory=True)
+        with pytest.raises(UnsafeDocumentError, match="escapes vault"):
+            read_document_bytes(path, root_dir=root)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows handle accounting")
+def test_scoped_reads_release_handles_on_success_and_refusal(tmp_path: Path) -> None:
+    import psutil
+
+    assert sys.platform == "win32"
+    root = tmp_path / "project"
+    path = root / ".vault/adr/safe.md"
+    raw = _write(path)
+    process = psutil.Process()
+    with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
+        assert read_document_bytes(path, root_dir=root) == raw
+        before = process.num_handles()
+        for _ in range(40):
+            assert path in list(scan_vault(root))
+            assert read_document_bytes(path, root_dir=root) == raw
+        assert process.num_handles() == before
+        target = tmp_path / "target.md"
+        _write(target)
+        path.unlink()
+        path.symlink_to(target)
+        for _ in range(40):
+            with pytest.raises(UnsafeDocumentError):
+                read_document_bytes(path, root_dir=root)
+        assert process.num_handles() == before
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows namespace and native handles")
+@pytest.mark.parametrize("extended", [False, True])
+def test_scoped_native_reads_preserve_long_unicode_paths(
+    tmp_path: Path,
+    extended: bool,
+) -> None:
+    from vaultspec_core.core.windows_paths import open_file_nofollow
+
+    root = tmp_path / "project"
+    relative = Path(".vault/adr")
+    for i in range(8):
+        relative /= f"directory-{i}-" + "a" * 55
+    relative /= "café-世界.md"
+    raw = _write(root / relative)
+    if extended:
+        root = Path("\\\\?\\" + str(root))
+    path = root / relative
+    with corpus_read_scope(root):
+        assert path in list(scan_vault(root))
+        assert read_document_bytes(path, root_dir=root) == raw
+    descriptor = open_file_nofollow(path)
+    try:
+        assert not os.get_inheritable(descriptor)
+    finally:
+        os.close(descriptor)

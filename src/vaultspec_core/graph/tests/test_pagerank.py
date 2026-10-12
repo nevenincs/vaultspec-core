@@ -16,10 +16,15 @@ threshold.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from ...graph.algorithms import pagerank
 from ...graph.networkx_runtime import NetworkXGraph, directed_graph
+
+if TYPE_CHECKING:
+    from types import FrameType
 
 pytestmark = [pytest.mark.unit]
 
@@ -27,6 +32,30 @@ pytestmark = [pytest.mark.unit]
 def test_empty_graph_yields_empty_mapping() -> None:
     """An empty graph has no nodes to rank."""
     assert pagerank(directed_graph()) == {}
+
+
+def test_edge_views_are_materialized_once() -> None:
+    """Moving edge lookup back into power iteration breaks this operation budget."""
+    import sys
+
+    graph = directed_graph()
+    graph.add_edges_from([("a", "hub"), ("b", "hub"), ("hub", "a")])
+    edge_view_call = type(graph.out_edges).__call__.__code__
+    calls = 0
+
+    def count(frame: FrameType, event: str, _arg: object) -> None:
+        nonlocal calls
+        if event == "call" and frame.f_code is edge_view_call:
+            calls += 1
+
+    previous = sys.getprofile()
+    sys.setprofile(count)
+    try:
+        scores = pagerank(graph)
+    finally:
+        sys.setprofile(previous)
+    assert scores["hub"] > scores["a"] > scores["b"]
+    assert calls <= len(graph), "edge views must not be rebuilt each iteration"
 
 
 class TestSymmetricCycle:

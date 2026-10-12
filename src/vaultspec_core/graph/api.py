@@ -24,17 +24,19 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from collections import Counter
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
 import networkx as nx
 
+from ..core.corpus_io import corpus_read_scope
 from ..core.document_io import document_budget_active, read_document_bytes
 from ..vaultcore import (
     DocType,
     extract_related_links,
     extract_wiki_links,
-    get_doc_type,
     parse_frontmatter,
     parse_vault_metadata,
     scan_vault,
@@ -148,7 +150,8 @@ class VaultGraph:
         #: read so the cache manifest need not read the corpus a second time.
         self._content_hashes: dict[pathlib.Path, str] = {}
         self._encoding_issues: list[EncodingIssue] = []
-        self._build_graph(use_cache=use_cache and not document_budget_active())
+        with corpus_read_scope(root_dir):
+            self._build_graph(use_cache=use_cache and not document_budget_active())
 
     @classmethod
     def from_ref(cls, root_dir: pathlib.Path, ref: str) -> VaultGraph:
@@ -207,27 +210,28 @@ class VaultGraph:
         hash for any file whose mtime is not older than the cache file's own
         mtime), the serialised canonical graph is loaded and the full parse is
         skipped.  On any divergence - a changed, added, or removed file, an
-        absent cache, or a corrupt cache - the graph is rebuilt from the
-        scanned files and the cache (manifest hashes included) is rewritten.
+        absent cache, or a corrupt cache - the graph is reconstructed for the
+        scanned file set and the cache is rewritten. Unchanged document text may
+        be reused only after passing the same fingerprint checks; changed files
+        are read, and every node and edge is recalculated.
 
-        Validation is stat-first: full content hashing happens only on the
-        save path after a rebuild, never on the warm read, so the cache's own
-        upkeep stays cheap relative to the parse it avoids.  A corrupt cache
-        degrades silently to a full rebuild rather than crashing or serving
-        stale data.
+        Validation is stat-first; racy timestamps require contained content
+        hashing. Invalid caches fall back to rebuilding from the documents.
 
         Args:
-            use_cache: When ``True`` (default), attempt a cache load before
-                rebuilding and rewrite the cache after a rebuild.  When
-                ``False``, ignore and do not write the cache (a forced fresh
-                build).
+            use_cache: When ``True`` (default), load or refresh the cache.
+                When ``False``, read every document without using or writing
+                the cache.
         """
         from . import cache as cache_mod
+        from .cache_io import to_cache_graph, verified_cached_documents
 
         logger.info("Building vault graph from %s", self.root_dir)
 
-        scanned_files = list(scan_vault(self.root_dir))
+        file_info: dict[pathlib.Path, os.stat_result] = {}
+        scanned_files = list(scan_vault(self.root_dir, file_info=file_info))
         path = cache_mod.cache_path(self.root_dir)
+        cached_documents: dict[pathlib.Path, tuple[str, bool, str]] = {}
 
         if use_cache:
             payload = cache_mod.load(path)
@@ -241,13 +245,17 @@ class VaultGraph:
                     scanned_files,
                     self.root_dir,
                     cache_mtime_ns=cache_mtime_ns,
+                    file_info=file_info,
                 ):
                     logger.info("Graph cache hit at %s; skipping re-parse", path)
                     self._load_from_cache(payload, scanned_files)
                     return
+                cached_documents = verified_cached_documents(
+                    self.root_dir, payload, scanned_files, file_info, cache_mtime_ns
+                )
             logger.info("Graph cache miss at %s; rebuilding", path)
 
-        self._rebuild_from_files(scanned_files)
+        self._rebuild_from_files(scanned_files, cached_documents=cached_documents)
 
         if use_cache:
             cache_mod.save(
@@ -256,24 +264,15 @@ class VaultGraph:
                     scanned_files,
                     self.root_dir,
                     content_hashes=self._content_hashes,
+                    file_info=file_info,
                 ),
-                self._to_cache_graph(),
+                to_cache_graph(self._digraph, self.nodes, self._raw_texts),
                 self._dangling_links,
                 [
                     (str(issue.path), issue.kind, issue.detail, issue.start)
                     for issue in self._encoding_issues
                 ],
             )
-
-    def _to_cache_graph(self) -> dict[str, Any]:
-        """Serialise the canonical graph for caching.
-
-        Delegates to :func:`~vaultspec_core.graph.cache_io.to_cache_graph`,
-        which owns the cached node-link shape.
-        """
-        from .cache_io import to_cache_graph
-
-        return to_cache_graph(self._digraph, self.nodes, self._raw_texts)
 
     def _load_from_cache(
         self, payload: cache.GraphCachePayload, scanned_files: list[pathlib.Path]
@@ -298,7 +297,12 @@ class VaultGraph:
         self._dangling_links = restored.dangling_links
         self._encoding_issues = restored.encoding_issues
 
-    def _rebuild_from_files(self, scanned_files: list[pathlib.Path]) -> None:
+    def _rebuild_from_files(
+        self,
+        scanned_files: list[pathlib.Path],
+        *,
+        cached_documents: dict[pathlib.Path, tuple[str, bool, str]] | None = None,
+    ) -> None:
         """Rebuild the graph by parsing every scanned file.
 
         Uses a two-pass strategy:
@@ -326,14 +330,26 @@ class VaultGraph:
         # Pass 1a: collect all DocNodes keyed by stem, detecting collisions
         by_stem: dict[str, list[DocNode]] = {}
 
+        from ..vaultcore.scanner import doc_type_resolver
+
+        resolve_type = doc_type_resolver(self.root_dir)
+
         for path in scanned_files:
             logger.debug("Graph pass 1: reading %s", path)
             stem = path.stem
-            doc_type = get_doc_type(path, self.root_dir)
+            doc_type = resolve_type(path)
 
             node = DocNode(path=path, name=stem, doc_type=doc_type)
 
-            content = self._ingest_document(path)
+            cached = (
+                cached_documents.get(path) if cached_documents is not None else None
+            )
+            if cached is None:
+                content = self._ingest_document(path)
+            else:
+                content, crlf, digest = cached
+                self._raw_texts[path] = (content, crlf)
+                self._content_hashes[path] = digest
             if content is not None:
                 self._populate_node_from_content(node, content)
 
@@ -640,39 +656,28 @@ class VaultGraph:
             self._digraph.nodes[name]["pagerank"] = pagerank_scores.get(name, 0.0)
             self._digraph.nodes[name]["in_degree"] = in_degree.get(name, 0)
 
-    def _is_archived(self, target: str) -> bool:
-        """Check if target exists under .vault/_archive/."""
+    @cached_property
+    def _archive_links(self) -> dict[str, list[str]]:
+        """Snapshot archive names once; link calculation performs no disk queries."""
         from ..config import get_config
 
-        cfg = get_config()
-        archive_dir = self.root_dir / cfg.docs_dir / "_archive"
-        if not archive_dir.exists():
-            return False
-        target_norm = target.replace("\\", "/")
-        if "/" in target_norm:
-            return (archive_dir / f"{target_norm}.md").exists()
-        else:
-            return len(list(archive_dir.rglob(f"{target_norm}.md"))) > 0
+        archive = self.root_dir / get_config().docs_dir / "_archive"
+        links: dict[str, list[str]] = {}
+        for path in sorted(archive.rglob("*.md")):
+            key = path.relative_to(archive).with_suffix("").as_posix()
+            links.setdefault(os.path.normcase(key), []).append(key)
+            if key != path.stem:
+                links.setdefault(os.path.normcase(path.stem), []).append(key)
+        return links
+
+    def _is_archived(self, target: str) -> bool:
+        """Check archive membership against this graph's snapshot."""
+        return os.path.normcase(target.replace("\\", "/")) in self._archive_links
 
     def _resolve_link(self, target: str) -> list[str]:
-        """Resolve a wiki-link target to one or more node keys.
-
-        Resolution order:
-
-        1. Exact match against an existing node key (handles both bare
-           stems and already-qualified ``type/stem`` references).
-        2. Stem index lookup  - if the bare stem maps to multiple
-           qualified keys, all are returned and a warning is logged.
-        3. Match in .vault/_archive/ - returns the resolved archived key
-           so it can be resolved without being flagged as dangling.
-        4. No match  - returns the original target so it is recorded as
-           a dangling link.
-        """
-        # Exact key match (unique stem or qualified reference)
+        """Resolve an exact node, a colliding stem, or an archived document."""
         if target in self.nodes:
             return [target]
-
-        # Stem index lookup (handles collisions)
         keys = self._stem_index.get(target, [])
         if keys:
             if len(keys) > 1:
@@ -683,29 +688,9 @@ class VaultGraph:
                     keys,
                 )
             return keys
-
-        # Try to resolve against .vault/_archive/
-        from ..config import get_config
-
-        cfg = get_config()
-        archive_dir = self.root_dir / cfg.docs_dir / "_archive"
-        if archive_dir.exists():
-            target_norm = target.replace("\\", "/")
-            if "/" in target_norm:
-                if (archive_dir / f"{target_norm}.md").exists():
-                    return [target_norm]
-            else:
-                matches = list(archive_dir.rglob(f"{target_norm}.md"))
-                if matches:
-                    resolved: list[str] = []
-                    for match in matches:
-                        rel = match.relative_to(archive_dir)
-                        key = str(rel.with_suffix("")).replace("\\", "/")
-                        resolved.append(key)
-                    return resolved
-
-        # No match  - treat as dangling link
-        return [target]
+        return self._archive_links.get(
+            os.path.normcase(target.replace("\\", "/")), [target]
+        )
 
     # -- Direct networkx access ----------------------------------------------
 

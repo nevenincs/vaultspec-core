@@ -69,7 +69,8 @@ from typing import TYPE_CHECKING, Any, cast
 from ..core.corpus_io import UnsafeDocumentError, corpus_path_info, open_document
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    import os
+    from collections.abc import Iterable, Mapping
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -169,7 +170,7 @@ def hash_file(path: Path, *, root_dir: Path | None = None) -> str:
     return digest.hexdigest()
 
 
-def _manifest_key(path: Path, root_dir: Path) -> str:
+def manifest_key(path: Path, root_dir: Path) -> str:
     """Return the stable vault-relative POSIX manifest key for *path*."""
     try:
         return path.relative_to(root_dir).as_posix()
@@ -182,6 +183,7 @@ def fingerprint_vault(
     root_dir: Path,
     *,
     content_hashes: dict[Path, str] | None = None,
+    file_info: Mapping[Path, os.stat_result] | None = None,
 ) -> dict[str, Fingerprint]:
     """Compute the fingerprint manifest for the documents the graph consumes.
 
@@ -209,6 +211,8 @@ def fingerprint_vault(
         root_dir: Project root, used to derive stable vault-relative keys.
         content_hashes: Digests already computed for these paths, keyed by
             path, as recorded by the graph build's single ingress read.
+        file_info: Discovery metadata associated with the consumed snapshot.
+            Reusing it prevents a later edit's timestamps from certifying old text.
 
     Returns:
         Mapping of vault-relative POSIX path to :data:`Fingerprint`.
@@ -217,7 +221,7 @@ def fingerprint_vault(
     manifest: dict[str, Fingerprint] = {}
     for path in scanned_files:
         try:
-            _, stat = corpus_path_info(path, root_dir)
+            stat = _observed_stat(path, root_dir, file_info)
         except OSError:
             continue
         content_hash = known.get(path)
@@ -226,12 +230,20 @@ def fingerprint_vault(
                 content_hash = hash_file(path, root_dir=root_dir)
             except OSError:
                 continue
-        manifest[_manifest_key(path, root_dir)] = (
+        manifest[manifest_key(path, root_dir)] = (
             stat.st_size,
             stat.st_mtime_ns,
             content_hash,
         )
     return manifest
+
+
+def _observed_stat(
+    path: Path, root_dir: Path, file_info: Mapping[Path, os.stat_result] | None
+) -> os.stat_result:
+    if file_info is not None and path in file_info:
+        return file_info[path]
+    return corpus_path_info(path, root_dir)[1]
 
 
 def validate(
@@ -241,6 +253,7 @@ def validate(
     *,
     cache_mtime_ns: int | None,
     deep: bool = False,
+    file_info: Mapping[Path, os.stat_result] | None = None,
 ) -> bool:
     """Return ``True`` only when the corpus on disk still matches *manifest*.
 
@@ -261,6 +274,9 @@ def validate(
             degrading to full hash validation - sound, never unsound.
         deep: When ``True``, content-hash every file regardless of mtime -
             the explicit deep-verification path.
+        file_info: Validated metadata from this operation's discovery snapshot.
+            Without it every path is revalidated. Racy or deep checks always
+            open and revalidate the file, even when scan metadata is supplied.
 
     Returns:
         ``True`` when every guard passes for every file, ``False``
@@ -269,14 +285,14 @@ def validate(
     seen: set[str] = set()
     for path in scanned_files:
         try:
-            _, stat = corpus_path_info(path, root_dir)
+            stat = _observed_stat(path, root_dir, file_info)
         except UnsafeDocumentError:
             return False
         except OSError:
             # A vanished file is absent from the seen set; the final
             # file-set equality check reports the divergence.
             continue
-        key = _manifest_key(path, root_dir)
+        key = manifest_key(path, root_dir)
         seen.add(key)
         entry = manifest.get(key)
         if entry is None:

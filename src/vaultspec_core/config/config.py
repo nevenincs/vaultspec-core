@@ -1194,6 +1194,16 @@ def get_config(
     """
     global _cached_config, _cached_inputs
 
+    from .read_scope import active_config
+
+    pinned = active_config.get()
+    if (
+        overrides is None
+        and pinned is not None
+        and (root is None or root.absolute() == pinned[0])
+    ):
+        return pinned[1]
+
     from .local_env import read_local_environment, store_root
     from .workspace import validate_managed_roots
 

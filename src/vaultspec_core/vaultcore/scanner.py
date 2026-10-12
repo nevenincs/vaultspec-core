@@ -17,7 +17,7 @@ import os
 import pathlib
 from typing import TYPE_CHECKING, cast
 
-from ..core.corpus_io import is_corpus_path
+from ..core.corpus_io import corpus_path_info, is_corpus_path
 from ..core.document_io import read_document_text
 from .exclusions import EXCLUDED_VAULT_DIR_NAMES
 from .models import DocType
@@ -39,7 +39,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
 
-def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
+def scan_vault(
+    root_dir: pathlib.Path,
+    *,
+    file_info: dict[pathlib.Path, os.stat_result] | None = None,
+) -> Iterator[pathlib.Path]:
     """Yield all markdown files under the configured docs directory.
 
     Skips the non-corpus subtrees named by
@@ -64,6 +68,8 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
 
     Args:
         root_dir: Project root that contains the docs directory.
+        file_info: Optional destination for the validated discovery metadata,
+            allowing a consumer to check fingerprints against this same scan.
 
     Yields:
         Absolute paths to each ``.md`` file found.
@@ -107,8 +113,13 @@ def scan_vault(root_dir: pathlib.Path) -> Iterator[pathlib.Path]:
         for name in filenames:
             if name.endswith(".md"):
                 path = pathlib.Path(dirpath, name)
-                if is_corpus_path(path, root_dir):
-                    paths.append(path)
+                try:
+                    _, info = corpus_path_info(path, root_dir)
+                except OSError:
+                    continue
+                paths.append(path)
+                if file_info is not None:
+                    file_info[path] = info
 
     # Sorted rather than left in walk order. Neither rglob nor os.walk
     # promises an order, and the two disagree, so the corpus is reported in a
@@ -175,6 +186,11 @@ def get_doc_type(path: pathlib.Path, root_dir: pathlib.Path) -> DocType | None:
 
     cfg = get_config()
     docs_dir = root_dir / cfg.docs_dir
+    return _doc_type_under(path, docs_dir)
+
+
+def _doc_type_under(path: pathlib.Path, docs_dir: pathlib.Path) -> DocType | None:
+    """Classify against the docs root already resolved for this operation."""
     try:
         rel_path = path.relative_to(docs_dir)
         if len(rel_path.parts) < 2:
@@ -274,10 +290,10 @@ def doc_type_resolver(
         parent = path.parent
         if parent == docs_dir:
             # Classification here depends on the filename, not the directory.
-            return get_doc_type(path, root_dir)
+            return _doc_type_under(path, docs_dir)
         cached = by_parent.get(parent, _UNRESOLVED)
         if cached is _UNRESOLVED:
-            cached = get_doc_type(path, root_dir)
+            cached = _doc_type_under(path, docs_dir)
             by_parent[parent] = cached
         return cast("DocType | None", cached)
 

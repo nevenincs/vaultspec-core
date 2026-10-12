@@ -3,9 +3,9 @@ tags:
   - '#audit'
   - '#vault-scale-performance'
 date: '2026-07-27'
-modified: '2026-07-27'
+modified: '2026-10-12'
 body_schema: 'body-v1'
-body_hash: 'sha256:f53d269dfd601d8309a3c331340e5459c904413db35e4017ea8e53fae143b0ee'
+body_hash: 'sha256:547e8e93595e46a9e3a8eb05fefe369908f91c9cf6b2bd46604a4f4a04f298f3'
 related: []
 ---
 
@@ -194,3 +194,113 @@ conflated with the performance work.
   intent of `2026-06-12-vault-orientation-adr`.
 - Route the `--target` routing defect (finding target-flag-ignored-by-doctor) as
   an ordinary bug fix outside the performance feature.
+
+## Graph performance follow-up, 2026-10-12
+
+Status: PASS for the scoped graph calculation and ingress changes. The user authorized
+this separately after the RAG search blocking fix. Work is on
+`feature/graph-calculation-performance` in the existing core checkout; RAG's
+`2026-10-12-service-graph-plan` tracks S02 across the two canonical owners.
+
+The real TUI vault has 4,477 graph nodes and 8,071 edges. The prior service query
+spent 118.47 seconds constructing its graph. Profiling found repeated configuration,
+root resolution and path validation, rather than expensive graph mathematics.
+
+The implementation resolves configuration and the trusted anchor per operation,
+reuses validated discovery metadata for fingerprints, avoids resolving already
+matching cache paths, and reuses only individually verified cached text on a graph
+cache miss. Every node and edge is still reconstructed through the canonical parser.
+Failed reads are retried; corrupt cached graph data cannot prevent the partial-refresh
+fallback. Snapshot timestamps cannot certify text from a later filesystem edit.
+
+Measured with the service Python and current core source on the same real vault:
+
+- Complete cached construction: 2.69 seconds in one run, 3.17 seconds in the final
+  unprofiled run. Instrumented run: discovery 3.22 seconds, validation 0.52 seconds,
+  cache restore 0.68 seconds, total 5.34 seconds (profiling adds overhead).
+- Controlled single-entry invalidation: 6.01 seconds; exactly one document read,
+  all 4,477 nodes and 8,071 edges reconstructed. The experiment changed the manifest
+  only in memory and suppressed cache persistence; no source document was edited.
+- Full graph assembly in that experiment: 0.73 seconds, including PageRank.
+  Standalone PageRank: 0.44 seconds; betweenness centrality: 0.21 seconds.
+- Forced cache-off construction still reads all documents and measured 51.24 seconds
+  under this machine's filesystem load. This is an explicit cold-I/O cost, not a
+  remaining synchronous search cost. The optimization does not claim all cold reads
+  are subsecond or waive containment checks.
+
+Verification: 236 covering graph, scanner, and corpus-security tests passed;
+4 tests were deselected by the repository's default external-capability markers.
+Package Ruff, seven changed files' format checks, ty, and basedpyright passed.
+The changed-document test compares the entire result to a forced cold build and
+asserts only the changed document was read. Existing alias, external-root, graph
+contract, collision, cache invalidation and encoding tests remain passing.
+
+Mutation proof (each restored immediately, then the same isolated test passed):
+replacing exact rooted-path equality with mere containment lets an internal ancestor
+redirect through and fails the refusal assertion; fingerprinting with later disk
+metadata fails the snapshot-size assertion; moving the read scope off the requested
+root fails the bounded configuration-operation assertion. Tests use real files and
+real configuration operations. No relaxed assertions or skipped gates.
+
+Decision placement: one hosted cross-reference pass on the amendment returned the
+existing graph-backend and graph-ref decisions plus check-engine-perf as relevant.
+The last shares the single-snapshot commitment and requires no change. The bounded
+pass clipped source/candidate text and is not treated as complete coverage; the
+performance and governing graph decisions were read directly. No broader decision
+changes are inferred from weak-link suggestions.
+
+Final structural review kept the cache-text restoration helper with the existing
+cache-I/O owner and removed its redundant serialization wrapper from VaultGraph,
+preserving the 1,251-line module ceiling. The 64 cache tests passed after that move;
+package lint, changed-file formatting, both type checks and production-file Pylint
+passed on the resulting source. Live installed-service checks returned the TUI vault
+query in 2.11 seconds cold and 1.49 seconds warm, versus 2.82 seconds for code;
+graph ranking took 1.07 milliseconds and 0.16 milliseconds respectively. These
+are individual measurements, not latency guarantees under every workload.
+
+### cold-graph-resource-profile | low | PASS for S03
+
+Reviewed the complete working-tree change against 5cab80da: canonical corpus ingress,
+configuration scope, archive lookup, PageRank, and the reusable graph_profile.py
+instrument. No outstanding high or critical finding in this scope. The existing
+snapshot decisions cover these changes; no duplicate parser or index implementation.
+
+Controlled service-stopped runs on 4,481 documents and 8,081 edges, using service
+Python 3.14.6 and current source, gave cold construction medians 9.086 -> 5.519 seconds
+(39% less); median CPU 8.266 -> 4.953 seconds (40% less). Repeated process metadata/
+control I/O fell 320,715 -> 137,473 operations (57%). Required document reads remain
+8,964 calls and 41.71 MB per repeat. Sampled peak RSS rose from about 217.7 to 224.5 MB.
+Handles stabilized at 161 after native binding initialization, with no growth over
+repeated builds. Three warm graph loads took 2.472, 2.173, 2.539 seconds and four
+process read calls per repeat. PageRank medians 0.182 -> 0.082 seconds, with all 4,481
+scores bit-identical to the committed implementation.
+
+The earlier 51-second observation is not a controlled baseline. Cold here disables
+the graph cache; it does not flush OS caches. Process read bytes include cached reads.
+System disk counters were captured but include other workloads: no physical-disk
+reduction is claimed. py-spy 0.4.2 Python sampling succeeded before and after. The
+final 5 Hz capture contains 85 main-thread samples over three builds (17 sampled
+seconds); graph rebuilding and scanning dominate. Initial native/high-frequency
+sampling perturbed execution and was discarded. Sampled profiles identify hot paths;
+unprofiled resource runs establish latency. The final sampled corpus had 4,482 files
+because another session added a document; it is not used for the controlled comparison.
+
+Artifacts remain in the existing RAG .vault/data/engine-data directory:
+graph-profile-controlled-before.resources.json, graph-profile-controlled-after.resources.json,
+graph-profile-after-warm.resources.json, graph-profile-before-python.speedscope.json,
+graph-profile-after-python.speedscope.json, graph-profile-after-sampled.resources.json.
+The instrument records CPU, process I/O, system disk I/O, RSS and handles at 50 ms.
+
+Verification: 523 config, corpus-security, graph and scanner tests passed, with four
+default external-capability deselections. Package Ruff, all 11 changed Python files'
+format, ty and basedpyright checks, and six production modules' Pylint checks passed.
+Long Unicode paths, extended Windows namespaces, nested configuration scopes,
+same-inode ancestor redirects, read failures and handle closure are exercised.
+
+Five mutations failed their intended guard and passed after restoration: removing
+opened-handle canonical comparison admitted the same-inode redirect; removing native
+metadata-handle closure increased handles 161 -> 281; disabling scoped configuration
+broke identity reuse; archive rescanning produced 82 enumerations instead of one;
+PageRank edge-view rereads produced 231 calls instead of at most three. No mutation
+remains. Review traced descriptor ownership through transfer, failures and normal
+closure, and preserved the portable reader fallback.

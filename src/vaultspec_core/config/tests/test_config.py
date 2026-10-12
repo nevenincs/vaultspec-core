@@ -23,6 +23,39 @@ from vaultspec_core.core.exceptions import ConfigurationError
 pytestmark = [pytest.mark.unit]
 
 
+def test_read_scope_pins_configuration_and_restores_nested_roots(
+    tmp_path: Path,
+) -> None:
+    from vaultspec_core.config.read_scope import config_read_scope
+
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    reset_config()
+    previous_docs = os.environ.get("VAULTSPEC_DOCS_DIR")
+    os.environ["VAULTSPEC_DOCS_DIR"] = "documents"
+    try:
+        with config_read_scope(first) as initial:
+            assert get_config() is initial
+            os.environ["VAULTSPEC_DOCS_DIR"] = "changed"
+            assert get_config(root=first) is initial
+            assert get_config().docs_dir == "documents"
+            with config_read_scope(second):
+                assert get_config().docs_dir == "changed"
+            assert get_config() is initial
+            assert (
+                get_config(overrides={"docs_dir": "override"}, root=first).docs_dir
+                == "override"
+            )
+        assert get_config(root=first).docs_dir == "changed"
+    finally:
+        if previous_docs is None:
+            os.environ.pop("VAULTSPEC_DOCS_DIR", None)
+        else:
+            os.environ["VAULTSPEC_DOCS_DIR"] = previous_docs
+        reset_config()
+
+
 class TestConfigParsing:
     """Test individual type parsing helper functions."""
 
