@@ -5,7 +5,7 @@ tags:
 date: '2026-07-27'
 modified: '2026-10-12'
 body_schema: 'body-v1'
-body_hash: 'sha256:c1cc0049b3238ba0c683bdebeddb69783943ab967bcced7f5971691941579943'
+body_hash: 'sha256:cb5578a891706a7a798cdda989280650eee5798c00e0de6620be8bc45a2525bb'
 related:
   - "[[2026-07-27-vault-scale-performance-audit]]"
   - '[[2026-06-10-graph-backend-adr]]'
@@ -318,3 +318,14 @@ including redirects inside the vault, remain refused. Direct validation without 
 supplied scan snapshot continues to revalidate every path, and deep or racily-clean
 hash checks always perform contained reads. No persisted schema or public result shape
 changes. Forced cache-off builds still read every document.
+
+## Measured graph ingress implementation, 2026-10-12
+
+The same D3/D4 operation scope pins configuration, scanned file identity, and the
+canonical expected path. On Windows, canonical validation uses one metadata handle;
+actual reads validate the already-open handle rather than resolving the pathname
+again. Final reparse points, changed identities, and redirected ancestors remain
+refused. Native handles are closed or transferred to the existing descriptor owner;
+no open-handle cache is introduced. Archive names are enumerated once per graph and
+PageRank materializes weighted adjacency once per calculation. These implement the
+existing snapshot and bounded-operation decisions without changing persisted schemas.
