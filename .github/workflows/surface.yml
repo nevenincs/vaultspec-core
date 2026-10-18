@@ -42,7 +42,9 @@ jobs:
   collect:
     name: "Build: Verified surface collection (Linux)"
     runs-on: [self-hosted, Linux, X64, build]
-    timeout-minutes: 30
+    timeout-minutes: 150
+    env:
+      CI_EXEC_BUDGET_MINUTES: 30
     permissions:
       contents: read
       attestations: read
