@@ -775,9 +775,9 @@ def test_the_running_interpreter_matches_the_pin() -> None:
 def test_ci_workflow_calls_just_for_quality_gates() -> None:
     gate = _load_workflow(".github/workflows/merge-gate.yml")
     jobs = gate["jobs"]
-    required_jobs = {"lint", "test-linux", "test-windows", "gate", "release-pr-ready"}
+    required_jobs = {"lint", "test-linux", "test-windows", "gate"}
     assert set(jobs) == required_jobs, (
-        "the merge gate must contain the proof jobs and automatic release PR readiness"
+        "the merge gate must contain exactly the proof jobs and their verdict"
     )
 
     expected_runs = {
@@ -1516,13 +1516,12 @@ def test_nothing_starts_from_a_tag_push_or_a_release_event() -> None:
 
 
 def test_the_release_is_proven_before_anything_is_tagged() -> None:
-    """The cut merges and tags only the head the full merge gate passed.
+    """The cut tags only the merged commit the full merge gate passed.
 
     A release tag cannot be deleted under the tag ruleset, so the proof comes
     before it. The cut waits on the merge gate called on the candidate's exact
-    head, carries no condition that could override that success, merges only
-    that head, and refuses a merged tree that differs from the proven one
-    before Release Please creates anything.
+    commit, carries no condition that could override that success, and
+    refuses a tag on any other commit.
 
     Mutation proof: removing `prove-gate` from the cut's `needs` makes this
     fail on the gate dependency; restoring it makes this pass.
@@ -1542,55 +1541,17 @@ def test_the_release_is_proven_before_anything_is_tagged() -> None:
         "a condition on the cut would override the default success check and "
         "let a failed gate tag a release"
     )
+    assert cast("dict[str, str]", cut["env"])["SHA"] == (
+        "${{ needs.candidate.outputs.sha }}"
+    ), "the cut must judge the tag against the commit the gate proved"
     steps = _steps(cut)
     names = [str(step.get("name")) for step in steps]
-    merge = names.index("Merge the proven release pull request")
     create = names.index("Create the release for the merged proposal")
-    assert merge < create, "the cut must merge before it creates the release"
-    merge_run = str(steps[merge]["run"])
-    assert '--match-head-commit "${SHA}"' in merge_run, (
-        "the cut must merge only the head the gate proved"
+    require = names.index("Require the tag on the proven commit")
+    assert create < require, "the tag is judged once Release Please created it"
+    assert 'if [ "${tagged}" != "${SHA}" ]' in str(steps[require]["run"]), (
+        "the cut must refuse a tag on any commit but the proven one"
     )
-    assert "tree.sha" in merge_run, (
-        "the cut must refuse a merged tree that differs from the proven tree"
-    )
-
-
-def test_the_cut_releases_the_held_merge_gate_before_it_merges() -> None:
-    """The release pull request is mergeable only once its held gate run reports.
-
-    A push by the workflow token leaves the pull request's merge-gate run
-    waiting for approval, and the ruleset counts no other verdict: the
-    proposal's dispatched gate passes and the pull request stays blocked. A cut
-    that only merged would stop there. The cut releases the runs held for the
-    commit it proved, and no others, from the one job that already holds the
-    write scope, and does it before the merge.
-
-    Mutation proof: removing the release step makes this fail on the missing
-    job; restoring it makes this pass.
-    """
-    jobs = _release_please_jobs()
-    releasing = sorted(
-        job_id
-        for job_id, job in jobs.items()
-        for step in _steps(job)
-        if "/approve" in str(step.get("run", ""))
-    )
-    assert releasing == ["cut"], (
-        f"exactly the cut releases a held merge-gate run; these jobs do: {releasing}"
-    )
-
-    cut = jobs["cut"]
-    steps = _steps(cut)
-    names = [str(step.get("name")) for step in steps]
-    release = names.index("Release the held merge gate of the release pull request")
-    merge = names.index("Merge the proven release pull request")
-    assert release < merge, "the held gate must report before the cut merges"
-    run = str(steps[release]["run"])
-    assert "head_sha=${SHA}" in run and "status=action_required" in run, (
-        "the cut may release only the runs held for the commit it proved"
-    )
-    assert cast("dict[str, str]", cut["permissions"])["actions"] == "write"
 
 
 def _job_bodies(workflow: str) -> str:

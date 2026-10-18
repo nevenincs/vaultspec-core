@@ -7,12 +7,7 @@
 
 # --- runner-plane -----------------------------------------------------------
 # Acts on the MACHINE, not the product, so there is no local recipe it could be
-# hiding. `Every matrix selector has an online runner` is the one that matters:
-# the runner fleet owns that check and renders it into consumers, which carry
-# the rendered copy between its BEGIN/END markers, and this is the last
-# hand-written re-implementation of it. Replacing it with the render is a
-# one-commit change and is the next thing to do here.
-binaries.yml:Every matrix selector has an online runner
+# hiding.
 binaries.yml:Clear evidence left by an earlier run on this machine
 binaries.yml:Restore the execute bit
 binaries.yml:Start from an empty artifact directory
@@ -20,9 +15,6 @@ binaries.yml:Drop the downloaded artifacts
 acquisition.yml:Provision a private Homebrew
 acquisition.yml:Confirm the acquisition starts cold
 acquisition.yml:Clean up
-# Measures runner startup before any checkout or provisioning can warm it.
-# This operates only on the runner's tools and temporary storage, not project code.
-windows-startup-diagnostic.yml:Measure local execution
 
 # --- CI-plane bookkeeping ---------------------------------------------------
 # This scheduled compatibility lane deliberately exposes interpreter install,
@@ -39,11 +31,7 @@ code-health.yml:Smoke test the built wheel on Python 3.14
 # the jobs it needs and the check runs already recorded on the commit, neither
 # of which exists outside a workflow run.
 merge-gate.yml:Judge the merge readiness
-merge-gate.yml:Approve the proven release proposal checks
-release-please.yml:Regenerate and push uv.lock onto the release branch
 release-please.yml:Find the release pull request and the commit to prove
-release-please.yml:Release the held merge gate of the release pull request
-release-please.yml:Merge the proven release pull request
 release-please.yml:Name a release this token cannot tag
 release-please.yml:Require the tag on the proven commit
 # These steps judge GitHub state and job results before any checkout exists.

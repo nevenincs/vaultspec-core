@@ -12,7 +12,7 @@ name: Core Merge Gate
 #   the `ci:full` label            the lint, plus both full suites, on demand -
 #                                  the one way to prove a draft without
 #                                  marking it ready.
-#   a call or a dispatch           the lint, plus both full suites, always.
+#   a call                         the lint, plus both full suites, always.
 #
 # The tier is chosen by the pull request's own state rather than by a label a
 # contributor has to know to apply. A label the checks list never mentions is
@@ -26,23 +26,28 @@ name: Core Merge Gate
 # request therefore re-proves the commit it produced, and a commit is never
 # merged on a verdict earned by a different tree.
 #
-# ONLY TRUSTED AUTHORS REACH THE FLEET. A pull request runs its jobs on the
-# self-hosted fleet only when its author is the owner or a collaborator, or
-# once a user - never a bot - has applied `ci:full` to it, which takes triage
-# rights. Everyone else, Dependabot included, runs nothing here until a
-# collaborator has read the change, and the gate refuses the commit until
-# then. A fork's pull request runs the fork's own copy of this file, so for
-# forks these conditions only back up the repository's requirement that an
-# outside contributor's runs be approved; for every other author they are the
-# control itself.
+# ONLY TRUSTED AUTHORS REACH THE FLEET. A pull request runs jobs on the
+# self-hosted fleet only when its branch lives in this repository AND its
+# author is the owner, a collaborator, or the fleet release App that writes
+# the release pull request. A `ci:full` label additionally needs a user - never
+# a bot - to have applied it. Everyone else, Dependabot included, runs nothing
+# here, whoever labels the pull request; a collaborator re-opens an outside
+# change from a branch of their own. A fork's pull request runs the fork's own
+# copy of this file, so for forks these conditions only back up the
+# repository's requirement that an outside contributor's runs be approved; for
+# every other author they are the control itself.
+#
+# The verdict job carries the same condition, and is then skipped. GitHub
+# counts a skipped required check as passed, so a withheld verdict reports
+# under a different name and the required check stays expected: the commit
+# cannot merge.
 #
 # `push: main` is deliberately absent. main is ruleset-protected, so every
 # commit reaching it passed this gate on its pull request; a direct push is an
 # administrator override and is not re-litigated here. The release cut in
 # release-please.yml calls this workflow on the proposal's exact head before
-# it tags anything, and the proposal path dispatches it on the release branch.
-# Once that dispatch passes, release-pr-ready approves the bot PR's held run
-# so its required check reports without another maintainer action.
+# it tags anything. The release pull request itself is proven by its own
+# pull-request events, like any trusted author's.
 
 on:
   pull_request:
@@ -60,19 +65,13 @@ on:
       VAULTSPEC_CORE_TYPESAFE_API_KEY:
         description: TypeSafe API key for the live hosted-search tests
         required: true
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: Git ref to validate (defaults to the dispatched ref)
-        required: false
-        type: string
 
 permissions:
   contents: read
 
 # One group per pull request AND per trigger. Adding an unrelated label must
 # not cancel a full run in flight, and a new push must supersede the lint of
-# the push before it. A call or a dispatch never cancels: it is a release.
+# the push before it. A call never cancels: it is a release.
 concurrency:
   group: merge-gate-${{ github.event.pull_request.number || inputs.ref || github.ref }}-${{ github.event.label.name || github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -83,10 +82,10 @@ env:
 
 jobs:
   # Fork pull requests and untrusted authors never reach the self-hosted fleet:
-  # every job below is skipped for them, and the gate then refuses the commit.
+  # every job below is skipped for them, the verdict included.
   lint:
     name: "Check: Lint (Linux)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action != 'labeled' && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR')) || (github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User'))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR' || github.event.pull_request.user.login == 'nevenincs-release[bot]') && (github.event.action != 'labeled' || (github.event.label.name == 'ci:full' && github.event.sender.type == 'User'))) }}
     timeout-minutes: 150
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -157,7 +156,7 @@ jobs:
 
   test-linux:
     name: "Test: Full suite (Linux)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User') || (github.event.action != 'labeled' && github.event.pull_request.draft == false && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR')))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR' || github.event.pull_request.user.login == 'nevenincs-release[bot]') && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
     timeout-minutes: 240
     runs-on: [self-hosted, Linux, X64, build]
     env:
@@ -252,7 +251,7 @@ jobs:
   # Independent of the Linux suite: it must start even when that one fails.
   test-windows:
     name: "Test: Library suite (Windows)"
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User') || (github.event.action != 'labeled' && github.event.pull_request.draft == false && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR')))) }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR' || github.event.pull_request.user.login == 'nevenincs-release[bot]') && ((github.event.action == 'labeled' && github.event.label.name == 'ci:full' && github.event.sender.type == 'User') || (github.event.action != 'labeled' && github.event.pull_request.draft == false))) }}
     timeout-minutes: 166
     runs-on: [self-hosted, Windows, X64]
     env:
@@ -291,12 +290,15 @@ jobs:
         shell: bash
         run: just test-broad
 
-  # Never skipped: a required check whose job is skipped counts as PASSED, so
-  # every run - an unrelated label included - must end in a real verdict.
+  # Never skipped for a trusted pull request: a required check whose job is
+  # skipped counts as PASSED, so every such run - an unrelated label included -
+  # must end in a real verdict. For anyone else the job is withheld from the
+  # fleet like every other job here, under a name the ruleset does not
+  # require, so the required check stays expected and the commit cannot merge.
   gate:
-    name: "Check: Merge gate (Linux)"
+    name: "${{ (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR' || github.event.pull_request.user.login == 'nevenincs-release[bot]'))) && 'Check: Merge gate (Linux)' || 'Check: Merge gate withheld (Linux)' }}"
     needs: [lint, test-linux, test-windows]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'COLLABORATOR' || github.event.pull_request.user.login == 'nevenincs-release[bot]'))) }}
     timeout-minutes: 125
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
@@ -310,9 +312,6 @@ jobs:
       DRAFT: ${{ github.event.pull_request.draft }}
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-      AUTHOR: ${{ github.event.pull_request.user.login }}
-      ASSOCIATION: ${{ github.event.pull_request.author_association }}
       LINT: ${{ needs.lint.result }}
       LINUX: ${{ needs.test-linux.result }}
       WINDOWS: ${{ needs.test-windows.result }}
@@ -328,11 +327,6 @@ jobs:
       - name: Judge the merge readiness
         run: |
           set -euo pipefail
-          # Fork pull requests are refused outright, whatever ran before.
-          if [ "${EVENT}" = "pull_request" ] && [ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]; then
-            echo "::error::pull requests from forks are refused; re-open the change from a branch of ${GITHUB_REPOSITORY}"
-            exit 1
-          fi
           echo "lint=${LINT} linux=${LINUX} windows=${WINDOWS} draft=${DRAFT:-n/a}"
           if [ "${LINT}" = "success" ] && [ "${LINUX}" = "success" ] && [ "${WINDOWS}" = "success" ]; then
             echo "lint and both full suites passed"
@@ -354,52 +348,6 @@ jobs:
             echo "the full suites already passed on ${HEAD_SHA}"
             exit 0
           fi
-          # An untrusted author's commit ran nothing, so no earlier verdict can
-          # exist unless a collaborator's ci:full proved it; refuse it by name.
-          case "${ASSOCIATION}" in OWNER | COLLABORATOR) ;; *)
-            echo "::error::pull requests by ${AUTHOR} (${ASSOCIATION}) run nothing on the self-hosted fleet; a collaborator reviews the change and applies the ci:full label to run it"
-            exit 1 ;;
-          esac
           echo "::error::the full suites have not run on ${HEAD_SHA}; mark the pull request ready for review to run them, or add the ci:full label to prove it while it stays a draft"
           exit 1
 
-  release-pr-ready:
-    name: "Check: Release PR ready (Linux)"
-    needs: gate
-    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref_name, 'release-please--branches--main') && (inputs.ref == '' || inputs.ref == github.ref_name || inputs.ref == github.sha)
-    timeout-minutes: 130
-    runs-on: [self-hosted, Linux, X64, build]
-    env:
-      CI_EXEC_BUDGET_MINUTES: 10
-      CI_RESOURCE_CLASS: verdict
-    permissions:
-      actions: write
-      pull-requests: read
-    steps:
-      - name: Approve the proven release proposal checks
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          proposal=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
-            --head "$BRANCH" --label "autorelease: pending" \
-            --json number,headRefOid,author --jq \
-            '.[] | select(.author.is_bot and .author.login == "app/github-actions") | "\(.number) \(.headRefOid)"')
-          if [ -z "$proposal" ]; then
-            echo "No open bot release proposal remains on ${BRANCH}."
-            exit 0
-          fi
-          read -r number head <<< "$proposal"
-          if [ "$head" != "$SHA" ]; then
-            echo "Proposal #${number} moved after this gate; its next gate will release its checks."
-            exit 0
-          fi
-          held=$(gh api --paginate \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/merge-gate.yml/runs?event=pull_request&head_sha=${SHA}&status=action_required&per_page=100" \
-            --jq '.workflow_runs[].id')
-          for run in $held; do
-            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/${run}/approve" --silent
-            echo "Approved merge-gate run ${run} for proven proposal #${number} at ${SHA}."
-          done

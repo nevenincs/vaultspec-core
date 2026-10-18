@@ -67,9 +67,9 @@ def buildable_targets(repo_root: Path) -> tuple[str, ...]:
     is broken in production. A checker that would approve the artifact its own
     repository is in the middle of withdrawing is not checking much.
 
-    So it is derived, like the release guard's target list and the preflight's
-    selectors before it. Three hand-kept lists in one repository drifted from
-    this same matrix; the answer each time was to stop keeping a second copy.
+    So it is derived, like the release guard's target list. Three hand-kept
+    lists in one repository drifted from this same matrix; the answer each time
+    was to stop keeping a second copy.
     """
     try:
         text = (repo_root / _WORKFLOW).read_text(encoding="utf-8")

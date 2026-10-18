@@ -4,15 +4,20 @@ name: Core Release Please
 #
 # - PROPOSAL. Every commit that lands on main refreshes the release pull
 #   request. `always-update` in the config rebuilds its branch on main's newest
-#   head every time, so the proposal is never behind main. This path never
-#   creates a release, a tag or a publication.
+#   head every time, so the proposal is never behind main. Release Please
+#   writes it as the fleet release App, so the pull request's own events run
+#   the full merge gate like any trusted author's, and its required check
+#   reports on the head that merges. The lockfile's version bump rides in
+#   Release Please's own commit (`extra-files` in the config), so the proposal
+#   is one head with one verdict. This path never creates a release, a tag or
+#   a publication.
 # - CUT. The push from merging a proposal starts the cut automatically. It
 #   proves the merged commit with the full merge gate and
 #   has Release Please force the tag and create the draft release seconds
 #   later, then starts the binaries lane. The draft is published last, by the
 #   publication lane, once everything it claims is attached.
 #
-# A manual dispatch can also prove and merge an open proposal or retry a cut.
+# A manual dispatch retries the cut of a merged proposal that carries no tag.
 # The proof comes before the tag because the release tag ruleset forbids
 # deleting a tag: a release commit that fails its gate after its tag exists
 # stays a permanent tag of a commit nobody can ship.
@@ -44,24 +49,39 @@ jobs:
     runs-on: [self-hosted, Linux, X64, build]
     env:
       CI_EXEC_BUDGET_MINUTES: 30
-    # Opens and rewrites the release pull request, pushes its lock refresh and
-    # dispatches its gate.
+    # The release pull request is written with the App's token; the workflow
+    # token only reads the merged proposals.
     permissions:
-      contents: write
-      pull-requests: write
-      actions: write
+      contents: read
+      pull-requests: read
     steps:
+      # A pull request the workflow token writes is authored by
+      # github-actions[bot]: its merge-gate runs wait for an approval nothing
+      # gives, and its required check never reports. The App is a trusted
+      # author the merge gate runs for. There is no fallback to the workflow
+      # token: without the App the proposal fails here rather than coming back
+      # as a pull request that cannot merge.
+      - name: Mint the release App token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Run release-please
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
+          token: ${{ steps.app.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           # Only the cut job creates releases.
           skip-github-release: true
 
       # Release Please exits successfully when an untagged merged proposal
-      # blocks it. Surface that state before the rest of the job skips.
+      # blocks it. Surface that state instead of a green run.
       - name: Reject a blocked release proposal
         if: ${{ !steps.release.outputs.pr }}
         env:
@@ -76,50 +96,6 @@ jobs:
             exit 1
           fi
 
-      - name: Check out the release branch
-        if: steps.release.outputs.pr
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the lockfile commit to the release branch
-        with:
-          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
-
-      - name: Set up uv for the release branch
-        if: steps.release.outputs.pr
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-        with:
-          # A release lane must not restore a cache any branch could have written.
-          prune-cache: false
-          enable-cache: false
-
-      - name: Regenerate and push uv.lock onto the release branch
-        if: steps.release.outputs.pr
-        run: |
-          uv lock
-          if git diff --quiet uv.lock; then
-            echo "uv.lock is already up to date"
-          else
-            git add uv.lock
-            # Scoped to the commit, never written to the checkout's config,
-            # so the bot identity never outlives this commit.
-            git \
-              -c user.name="github-actions[bot]" \
-              -c user.email="github-actions[bot]@users.noreply.github.com" \
-              commit -m "chore: update uv.lock for release"
-            git push
-          fi
-
-      # Bot PR events create approval-held runs. The dispatch proves the final
-      # lockfile commit and then approves its held gate automatically, so the
-      # maintainer only has to merge the ready proposal.
-      - name: Dispatch the merge gate for the release pull request
-        if: steps.release.outputs.pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Guarded, because a step's `env` is prepared before its `if` is
-          # weighed, and a bare `fromJSON('')` fails the step the condition
-          # was about to skip.
-          HEAD_BRANCH: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
-        run: gh workflow run merge-gate.yml --repo "${GITHUB_REPOSITORY}" --ref "${HEAD_BRANCH}" -f "ref=${HEAD_BRANCH}"
-
   candidate:
     name: "Check: Release candidate (Linux)"
     timeout-minutes: 130
@@ -130,13 +106,12 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      number: ${{ steps.find.outputs.number }}
       sha: ${{ steps.find.outputs.sha }}
-      merged: ${{ steps.find.outputs.merged }}
     steps:
-      # A proposal merged by hand and not yet tagged is finished first: Release
-      # Please opens no new proposal while one is pending, so it is the only
-      # candidate there can be.
+      # A merged proposal not yet tagged is finished first: Release Please
+      # opens no new proposal while one is pending, so it is the only candidate
+      # there can be. An open proposal is never a candidate; it merges like any
+      # pull request, once its own merge gate has passed.
       - name: Find the release pull request and the commit to prove
         id: find
         env:
@@ -148,46 +123,26 @@ jobs:
           merged=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state merged \
             --label "$PENDING" --json number,mergeCommit \
             --jq '.[] | "\(.number) \(.mergeCommit.oid)"')
-          if [ -n "${merged}" ]; then
-            [ "$(printf '%s\n' "${merged}" | wc -l)" -eq 1 ] || {
-              echo "::error::more than one merged release pull request awaits a tag: ${merged}"; exit 1;
-            }
-            read -r number sha <<<"${merged}"
-            state=true
-          elif [ "${EVENT_NAME}" = "push" ]; then
-            echo "No merged release is pending; refresh the proposal."
-            exit 0
-          else
-            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
-              --label "$PENDING" --json number,headRefOid \
-              --jq '.[] | "\(.number) \(.headRefOid)"')
-            if [ -z "${open}" ]; then
-              echo "::error::there is no release pull request to cut"
-              exit 1
+          if [ -z "${merged}" ]; then
+            if [ "${EVENT_NAME}" = "push" ]; then
+              echo "No merged release is pending; refresh the proposal."
+              exit 0
             fi
-            [ "$(printf '%s\n' "${open}" | wc -l)" -eq 1 ] || {
-              echo "::error::more than one open release pull request: ${open}"; exit 1;
-            }
-            read -r number sha <<<"${open}"
-            state=false
-            behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...${sha}" --jq '.behind_by')
-            if [ "${behind}" != "0" ]; then
-              echo "::error::release pull request #${number} is ${behind} commit(s) behind main. Release Please rebuilds it on main's next push; dispatch again after that."
-              exit 1
-            fi
+            echo "::error::no merged release pull request awaits a tag; merge the release pull request to start a release"
+            exit 1
           fi
+          [ "$(printf '%s\n' "${merged}" | wc -l)" -eq 1 ] || {
+            echo "::error::more than one merged release pull request awaits a tag: ${merged}"; exit 1;
+          }
+          read -r number sha <<<"${merged}"
           if ! [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::release pull request #${number} resolved to no commit"
             exit 1
           fi
-          {
-            echo "number=${number}"
-            echo "sha=${sha}"
-            echo "merged=${state}"
-          } >> "$GITHUB_OUTPUT"
-          echo "cutting #${number} at ${sha} (merged=${state})"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "cutting #${number} at ${sha}"
 
-  # The full merge gate, on the exact head that will merge.
+  # The full merge gate, on the exact commit that will be tagged.
   prove-gate:
     name: "Test: Release gate (Linux, Windows)"
     needs: candidate
@@ -197,7 +152,6 @@ jobs:
       contents: read
       checks: read
       pull-requests: write
-      actions: write
     with:
       ref: ${{ needs.candidate.outputs.sha }}
     secrets:
@@ -213,106 +167,14 @@ jobs:
     env:
       CI_EXEC_BUDGET_MINUTES: 10
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      NUMBER: ${{ needs.candidate.outputs.number }}
       SHA: ${{ needs.candidate.outputs.sha }}
-      MERGED: ${{ needs.candidate.outputs.merged }}
-    # Merges the proposal, creates the tag and draft, and dispatches the
-    # binaries lane.
+    # Creates the tag and draft with the workflow token, so no tag or release
+    # event wakes another workflow, and dispatches the binaries lane.
     permissions:
       contents: write
       pull-requests: write
       actions: write
     steps:
-      # A push by the workflow token leaves the pull request's own merge-gate
-      # run held for approval, and the ruleset accepts no verdict but that
-      # run's: the proposal's dispatched gate passes, a second one passes
-      # after it, and the pull request stays blocked. The gate has just proven
-      # this exact commit, so the cut releases the held run and waits for its
-      # verdict. That run executes no suite; it reports the ones that already
-      # passed on this commit.
-      #
-      # BOUNDED, because the released run needs a fleet runner of its own and
-      # this job is holding one.
-      - name: Release the held merge gate of the release pull request
-        run: |
-          set -euo pipefail
-          if [ "${MERGED}" = "true" ]; then
-            exit 0
-          fi
-          held=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/merge-gate.yml/runs?event=pull_request&head_sha=${SHA}&status=action_required&per_page=100" \
-            --jq '.workflow_runs[].id')
-          for run in ${held}; do
-            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/${run}/approve" --silent
-            echo "released held merge-gate run ${run}"
-          done
-          for _ in $(seq 1 60); do
-            state=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" --json state,mergeStateStatus \
-              --jq 'if .state == "MERGED" then "MERGED" else .mergeStateStatus end')
-            case "${state}" in
-              CLEAN | UNSTABLE | HAS_HOOKS)
-                echo "release pull request #${NUMBER} is mergeable (${state})"
-                exit 0
-                ;;
-              MERGED)
-                echo "release pull request #${NUMBER} merged as soon as its gate reported"
-                exit 0
-                ;;
-            esac
-            sleep 10
-          done
-          echo "::error::release pull request #${NUMBER} is still '${state}' ten minutes after its held merge gate was released. If no second Linux runner was free to report the verdict, dispatch the cut again."
-          exit 1
-
-      # A squash of a head that is not behind main is exactly the proven tree;
-      # the comparison below refuses to tag anything else.
-      #
-      # Auto-merge left on the pull request fires the moment the step above
-      # releases its gate, and can land the squash before this step does. That
-      # commit is accepted on the same terms as this step's own - the proven
-      # head, the proven tree - because refusing it would leave a release
-      # commit on main with no tag, waiting for a second cut while workflow
-      # files are free to move.
-      - name: Merge the proven release pull request
-        id: merge
-        run: |
-          set -euo pipefail
-          if [ "${MERGED}" = "true" ]; then
-            echo "commit=${SHA}" >> "$GITHUB_OUTPUT"
-            echo "#${NUMBER} was merged by hand at ${SHA}"
-            exit 0
-          fi
-          current() {
-            gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" \
-              --json state,headRefOid --jq '"\(.state) \(.headRefOid)"'
-          }
-          head=$(current)
-          if [ "${head}" = "OPEN ${SHA}" ]; then
-            behind=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...${SHA}" --jq '.behind_by')
-            if [ "${behind}" != "0" ]; then
-              echo "::error::main moved while ${SHA} was proven; dispatch again once Release Please has rebuilt the proposal"
-              exit 1
-            fi
-            if ! gh pr merge "${NUMBER}" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "${SHA}"; then
-              head=$(current)
-              if [ "${head}" != "MERGED ${SHA}" ]; then
-                echo "::error::could not merge #${NUMBER}. Merge it by hand and dispatch again: the cut then tags the merged commit."
-                exit 1
-              fi
-            fi
-          elif [ "${head}" != "MERGED ${SHA}" ]; then
-            echo "::error::release pull request #${NUMBER} is now '${head}', not the proven ${SHA}; dispatch again"
-            exit 1
-          fi
-          commit=$(gh pr view "${NUMBER}" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid')
-          proven=$(gh api "repos/$GITHUB_REPOSITORY/commits/${SHA}" --jq '.commit.tree.sha')
-          landed=$(gh api "repos/$GITHUB_REPOSITORY/commits/${commit}" --jq '.commit.tree.sha')
-          if [ "${proven}" != "${landed}" ]; then
-            echo "::error::merged commit ${commit} does not carry the proven tree of ${SHA}; dispatch again to prove and tag ${commit}"
-            exit 1
-          fi
-          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
-          echo "merged #${NUMBER} as ${commit}"
-
       - name: Create the release for the merged proposal
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -357,23 +219,22 @@ jobs:
             done
 
       # The draft creates no tag of its own; `force-tag-creation` does, and the
-      # whole lane builds from it. Refuse a tag on anything but the proven tree.
+      # whole lane builds from it. Refuse a tag on anything but the proven commit.
       - name: Require the tag on the proven commit
         env:
           CREATED: ${{ steps.release.outputs.release_created }}
           TAG: ${{ steps.release.outputs.tag_name }}
-          COMMIT: ${{ steps.merge.outputs.commit }}
         run: |
           set -euo pipefail
           if [ "${CREATED}" != "true" ] || [ -z "${TAG}" ]; then
-            echo "::error::Release Please created no release for ${COMMIT}"
+            echo "::error::Release Please created no release for ${SHA}"
             exit 1
           fi
           refs=$(git ls-remote --tags "https://github.com/${GITHUB_REPOSITORY}.git" "${TAG}")
           tagged=$(awk -v ref="refs/tags/${TAG}" '$2 == ref "^{}" { print $1; exit }' <<<"${refs}")
           [ -n "${tagged}" ] || tagged=$(awk -v ref="refs/tags/${TAG}" '$2 == ref { print $1; exit }' <<<"${refs}")
-          if [ "${tagged}" != "${COMMIT}" ]; then
-            echo "::error::${TAG} points at ${tagged}, not the proven ${COMMIT}"
+          if [ "${tagged}" != "${SHA}" ]; then
+            echo "::error::${TAG} points at ${tagged}, not the proven ${SHA}"
             exit 1
           fi
           echo "tag=${TAG}" >> "$GITHUB_ENV"

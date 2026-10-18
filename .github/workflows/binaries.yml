@@ -11,11 +11,6 @@ on:
         description: "Release tag to build binaries for (e.g. vaultspec-core-v0.1.48)"
         required: true
         type: string
-      allow_queue:
-        description: "Build even if a leg's runner is offline (the job will queue, not fail)."
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -25,124 +20,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Refuse to start a build whose runners cannot serve it.
-  #
-  # A job whose `runs-on` matches no ONLINE runner does not fail - it QUEUES,
-  # and a queued job is not bounded by `timeout-minutes`, so nothing in this
-  # file can rescue it. v0.1.57, v0.1.58 and v0.1.59 ran 19h53m, 24h00m03s and
-  # 24h00m03s before failing, and all three shipped no binaries.
-  #
-  # TWO of this matrix's four legs land on the power-gated MacBook - macOS and
-  # linux-aarch64 both - and it serves runners only on AC. That is correct
-  # behaviour and this job does not fight it; it just refuses to spend a day
-  # discovering it. Dispatch again once the host is on AC, or set
-  # `allow_queue` to wait deliberately.
-  #
-  # Runs on the fleet, like every job in this repository. That costs this
-  # preflight its independence - if the
-  # Linux/X64 runner is itself down, this job QUEUES rather than reporting the
-  # outage, and the guard is silent exactly when the fleet is worst. It still
-  # catches the common case it was built for, a fleet that is up but missing
-  # the selector a build leg asks for. Set `allow_queue` to wait deliberately.
-  preflight:
-    timeout-minutes: 135
-    name: "Check: Preflight runners (Linux)"
-    runs-on: [self-hosted, Linux, X64, build]
-    env:
-      CI_EXEC_BUDGET_MINUTES: 15
-    steps:
-      # Only this commit: the step below reads the matrix out of this file to
-      # learn which selectors it must check. Deliberately NOT sparse. The
-      # workspace is shared with every other job on this runner, and
-      # actions/checkout leaves `core.sparseCheckout=true` behind in it: its
-      # later `sparse-checkout disable` writes the override to config.worktree
-      # and then unsets `extensions.worktreeConfig`, so the override is never
-      # read. Every subsequent job then checks out `.github/` alone and dies.
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-          fetch-depth: 1
-
-      # NOT `set -e`. An unobservable preflight must not refuse a build: the
-      # `gh api` below returns 403 under the default GITHUB_TOKEN, and under
-      # `set -e` that aborts the step and skips everything downstream. It
-      # blocked vaultspec-dashboard v0.1.6 exactly that way. A check that
-      # cannot tell "no runner" from "cannot see runners" must not speak for
-      # the first.
-      #
-      # UNOBSERVABLE IS A FAILURE, not a skip. GITHUB_TOKEN can NEVER read
-      # actions/runners - that endpoint needs Administration:read, which no
-      # `permissions:` value grants it - so the old fallback guaranteed a 403
-      # and the skip guaranteed a green job. A check that cannot observe its
-      # subject must fail, or it is not a check.
-      #
-      # The selectors this matrix actually requires are DERIVED from the
-      # matrix rather than hand-listed. The hand-kept list outlived its matrix:
-      # it still named `self-hosted,linux,arm64` after #356 removed that leg.
-      # That is the same defect #361/#364 fixed one job below, where a stale
-      # target made v0.1.62 report a false partial. Now that
-      # FLEET_PREFLIGHT_TOKEN exists, the list is load-bearing and must derive
-      # from the matrix rather than drift beside it.
-      - name: Every matrix selector has an online runner
-        shell: bash
-        env:
-          # A PAT with `administration: read` if configured; the default token
-          # otherwise. The default GITHUB_TOKEN CANNOT read `actions/runners` -
-          # that endpoint needs admin - so without the PAT this check is blind
-          # and says so rather than guessing.
-          # NO FALLBACK. See the block below for why.
-          GH_TOKEN: ${{ secrets.FLEET_PREFLIGHT_TOKEN }}
-          ALLOW_QUEUE: ${{ inputs.allow_queue }}
-        run: |
-          set -uo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::FLEET_PREFLIGHT_TOKEN is not set. This check needs a PAT with Administration:read."
-            exit 1
-          fi
-          if ! runners=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runners" --jq '.runners[] | [.status, ([.labels[].name] | map(ascii_downcase) | join(","))] | @tsv' 2>&1); then
-            echo "::error::preflight cannot read the runner list: ${runners}"
-            exit 1
-          fi
-          [ -n "${runners}" ] || { echo "::error::no self-hosted runners are registered"; exit 1; }
-
-          workflow=".github/workflows/binaries.yml"
-          [ -f "${workflow}" ] || { echo "::error::${workflow} not checked out; cannot derive selectors" >&2; exit 1; }
-          mapfile -t selectors < <(awk -F'[][]' '/^[[:space:]]*runner:/ && NF > 2 {print $2}' "${workflow}" | tr -d ' ' | tr '[:upper:]' '[:lower:]' | sort -u)
-          if [ "${#selectors[@]}" -eq 0 ]; then
-            echo "::error::derived no runner selector from ${workflow}; refusing to pass vacuously" >&2
-            exit 1
-          fi
-          printf 'derived selector: %s\n' "${selectors[@]}"
-
-          failed=0
-          for want in "${selectors[@]}"; do
-            online=0; registered=0
-            while IFS=$'	' read -r status labels; do
-              missing=0
-              IFS=',' read -ra parts <<< "${want}"
-              for part in "${parts[@]}"; do
-                case ",${labels}," in *",${part},"*) ;; *) missing=1; break ;; esac
-              done
-              [ "${missing}" -eq 0 ] || continue
-              registered=$((registered + 1))
-              [ "${status}" = "online" ] && online=$((online + 1))
-            done <<< "${runners}"
-
-            if [ "${online}" -gt 0 ]; then
-              echo "ok        [${want}] -> ${online} online"
-            elif [ "${ALLOW_QUEUE}" = "true" ]; then
-              echo "::warning::[${want}] has no online runner; continuing because allow_queue is set."
-            elif [ "${registered}" -eq 0 ]; then
-              echo "::error::[${want}] is carried by no registered runner." >&2
-              failed=1
-            else
-              echo "::error::[${want}] matches ${registered} runner(s), none online - usually the power-gated host on battery. Dispatch again on AC." >&2
-              failed=1
-            fi
-          done
-
-          [ "${failed}" -eq 0 ] || { echo "::error::preflight refused a build that would queue rather than run" >&2; exit 1; }
-
   # THE WHEEL COMES FIRST, and that is the reordering this file exists to
   # record. Until now every binary installed `vaultspec-core==<version>` from
   # PyPI on the user's machine at first launch, so publication was a
@@ -216,7 +93,7 @@ jobs:
 
   build:
     timeout-minutes: 210
-    needs: [preflight, wheel]
+    needs: wheel
     name: "Build: Binaries (${{ matrix.os }})"
     strategy:
       fail-fast: false
@@ -291,8 +168,8 @@ jobs:
           # now stop by itself; if it does not, the asset name and the formula
           # disagree and that is a real defect, not a leftover.
     # Every artifact build runs on the shared self-hosted fleet. A leg whose
-    # selector no online runner serves is refused by `preflight`; the remedy
-    # is bringing that host up.
+    # host is down waits for it; admitting work to that host is the fleet's
+    # job, not this workflow's.
     runs-on: ${{ matrix.runner }}
     env:
       CI_EXEC_BUDGET_MINUTES: 90
@@ -377,8 +254,8 @@ jobs:
   # partial - the same handling a leg that failed to compile already gets.
   #
   # The matrix repeats the build matrix's `name`/`runner`/`target`, which this
-  # repository has been bitten by twice (#361/#364, and the preflight selector
-  # list). A repository guard asserts on every full merge gate that the two agree, so a target
+  # repository has been bitten by before (#361/#364). A repository guard
+  # asserts on every full merge gate that the two agree, so a target
   # added to one and not the other goes red on the branch that adds it rather
   # than at release time.
   offline:
@@ -395,10 +272,9 @@ jobs:
     #
     # AND NOT WHEN THERE WAS NO BUILD AT ALL. `needs.build.result != 'skipped'`
     # is the difference between a leg that FAILED and a matrix that never ran.
-    # When preflight gates the matrix, this job's macOS leg QUEUES on the very
-    # runner preflight just declared offline - unbounded, because a queued job
-    # is not bounded by `timeout-minutes`. That is the pathology preflight
-    # exists to refuse, re-entering one job below it.
+    # When the wheel fails, no leg builds, and this job's macOS leg would still
+    # QUEUE for the power-gated host - unbounded, because a queued job is not
+    # bounded by `timeout-minutes` - to check nothing.
     #
     # The cost is not just a hung run. The run keeps `binaries-<tag>` held, and
     # this workflow never cancels its own group, so the REPAIR dispatch for that
@@ -1298,7 +1174,9 @@ jobs:
       # The guard derives its expectation from the matrix in this file, so
       # it needs the file. Checked out explicitly rather than relying on
       # whatever tree a previous job happened to leave on this runner. Not
-      # sparse, for the reason given on the preflight's checkout.
+      # sparse: actions/checkout leaves `core.sparseCheckout=true` behind in
+      # the runner's shared workspace, and every later job there would then
+      # check out `.github/` alone.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false

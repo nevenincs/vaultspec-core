@@ -15,9 +15,10 @@ name: Core Published Surface
 # the runner's credentials and every checkout are out of reach; it sees no
 # process but its own; its environment carries no credential. No fleet host
 # exposes a container runtime to a job, and namespaces are what they do allow.
-# Only its JSON surface reaches the write-capable record job. main is
-# ruleset-protected, so the result lands by pull request, the way the lockfile
-# reconciliation in release-please.yml does.
+# Only its JSON surface reaches the record job. main is ruleset-protected, so
+# the result lands by pull request, written as the fleet release App: a trusted
+# author whose pull request runs the merge gate on its own events, as the
+# release pull request does.
 #
 # publish.yml dispatches this after it publishes. Dispatching it by hand is the
 # repair when that dispatch failed, and it is a no-op when main already records
@@ -81,18 +82,17 @@ jobs:
     runs-on: [self-hosted, Linux, X64, build]
     env:
       CI_EXEC_BUDGET_MINUTES: 30
+    # The recording branch and its pull request are written with the App's
+    # token, minted only after the project code below has run, and never
+    # handed to the project's environment.
     permissions:
-      # Push the recording branch and open its pull request.
-      contents: write
-      pull-requests: write
-      # Dispatch the merge gate for that pull request, which the default
-      # token's own pull request cannot trigger.
-      actions: write
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # zizmor: ignore[artipacked] pushes the recording branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: main
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -119,13 +119,25 @@ jobs:
       - name: Record the latest published release's surface
         run: uv run --no-sync python -m dev.packaging.published_surface record --from-file "${RUNNER_TEMP}/surface-data/surface.json"
 
-      # The default token's pull request starts no workflow run, so the merge
-      # gate is dispatched onto the branch head, as release-please.yml does for
-      # the release pull request. Force-pushed: the branch is this workflow's
-      # alone, and an older recording on it is superseded, not merged.
+      # The workflow token's pull request would be authored by
+      # github-actions[bot], whose merge-gate runs wait for an approval nothing
+      # gives. No fallback to it.
+      - name: Mint the release App token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # Force-pushed: the branch is this workflow's alone, and an older
+      # recording on it is superseded, not merged. The token reaches git for
+      # the one push only, never the checkout's config.
       - name: Open a pull request recording the published surface
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
           set -euo pipefail
           if git diff --quiet; then
@@ -133,20 +145,20 @@ jobs:
             exit 0
           fi
           snapshot="src/vaultspec_core/builtins/reference/published-surface.json"
-          version="$(uv run --no-sync python -c "import json, sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['version'])" "${snapshot}")"
+          version="$(uv run --isolated --no-project --python 3.13 python -I -c "import json, sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['version'])" "${snapshot}")"
           branch="chore/record-published-surface"
           title="chore: record the published surface of ${version}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          bot="${APP_SLUG}[bot]"
+          bot_id=$(gh api "users/${bot}" --jq .id)
           git checkout -B "${branch}"
           git add src/vaultspec_core/builtins/reference/published-surface.json src/vaultspec_core/builtins/reference/cli.md docs/CLI.md docs/MCP.md
-          git commit -m "${title}"
-          git push --force origin "${branch}"
+          git -c user.name="${bot}" -c user.email="${bot_id}+${bot}@users.noreply.github.com" commit -m "${title}"
+          basic=$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${basic}" push --force origin "${branch}"
           body="GitHub now reports \`${version}\` as the latest published release. This records the surface its published wheel reports and re-renders the references measured against it. Until this merges, main's references are measured against an earlier release, and the repository guard comparing the two is red."
           if [ -z "$(gh pr list --head "${branch}" --state open --json number --jq '.[].number')" ]; then
             gh pr create --base main --head "${branch}" --title "${title}" --body "${body}"
           else
             gh pr edit "${branch}" --title "${title}" --body "${body}"
           fi
-          gh workflow run merge-gate.yml --repo "${GITHUB_REPOSITORY}" --ref "${branch}" -f "ref=${branch}"
           echo "Recorded the published surface of ${version} on ${branch}" >> "$GITHUB_STEP_SUMMARY"

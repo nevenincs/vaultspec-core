@@ -5,7 +5,7 @@ its ``offline`` job, and RUN FROM THE PUBLISHED RELEASE by ``acquisition.yml``.
 The three lists are separate matrices in two files, and GitHub has no way to
 share one matrix between two jobs, so each has to be kept in step with the
 others by hand. This repository has already shipped two defects whose whole
-cause was exactly that - the preflight's hand-kept runner selectors, and the
+cause was exactly that - a hand-kept list of runner selectors, and the
 release's hand-kept target expectations - and both were fixed by deriving one
 list from another.
 
