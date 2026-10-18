@@ -26,7 +26,7 @@ concurrency:
 jobs:
   authorize:
     name: "Check: Release authorization (Linux)"
-    timeout-minutes: 130
+    timeout-minutes: 180
     runs-on: [self-hosted, Linux, X64, build]
     permissions:
       contents: read
