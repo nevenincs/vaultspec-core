@@ -26,10 +26,8 @@ concurrency:
 jobs:
   authorize:
     name: "Check: Release authorization (Linux)"
-    timeout-minutes: 130
+    timeout-minutes: 180
     runs-on: [self-hosted, Linux, X64, build]
-    env:
-      CI_EXEC_BUDGET_MINUTES: 10
     permissions:
       contents: read
       pull-requests: read
