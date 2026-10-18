@@ -23,29 +23,30 @@ Start with [the framework workflow](../README.md#start-a-feature), then
 
 ## For maintainers
 
-CI runs on self-hosted machines, so a pull request runs its checks there only when you
-or a collaborator wrote it. A pull request from anyone else, Dependabot included, runs
-nothing and its merge gate stays red until you have read the change and applied the
-`ci:full` label, which runs the full checks once on that commit. Pull requests from
-forks are refused; re-open an outside change from a branch in this repository.
+CI runs on self-hosted machines, so a pull request runs its checks there only when its
+branch lives in this repository and you, a collaborator, or the release App wrote it. A
+pull request from anyone else, Dependabot included, runs nothing, whoever labels it, and
+its required merge gate never reports, so it cannot merge. Pull requests from forks are
+refused the same way. To take an outside change, read it and re-open it from a branch of
+your own. On your own draft pull request, the `ci:full` label runs the full checks once
+without marking it ready.
 
 Use conventional commit messages such as `feat:`, `fix:`, and `feat!:`. release-please
 maintains a release pull request with the next version and changelog, rebuilt on every
-commit that lands on `main`. The full merge gate runs automatically on the proposal's
-final head, then releases the bot PR's held checks without a separate approval click.
-Merge the release pull request to start the release automatically: `Core Release Please`
-proves the merged commit with the full merge gate, then creates the tag and an
-unpublished draft release, then starts the lane that fills it: the binaries are built
-for every supported target, proved to start with no network, and attached to the draft
-with their checksums and provenance; only once all of them are there does the wheel and
-sdist build, smoke-test, and publish to PyPI using OIDC trusted publishing. No extra
-dispatch is needed after merging. A failed candidate selection, proposal refresh,
-verification gate, or cut fails the workflow; expected skips on the other path do not
-count as release success.
+commit that lands on `main`. The `nevenincs-release` GitHub App writes it, version bump
+of `uv.lock` included, so the full merge gate runs on its own pull-request events like
+on any trusted author's. Merge the release pull request once that gate has passed to
+start the release automatically: `Core Release Please` proves the merged commit with the
+full merge gate, then creates the tag and an unpublished draft release, then starts the
+lane that fills it: the binaries are built for every supported target, proved to start
+with no network, and attached to the draft with their checksums and provenance; only
+once all of them are there does the wheel and sdist build, smoke-test, and publish to
+PyPI using OIDC trusted publishing. No extra dispatch is needed after merging. A failed
+candidate selection, proposal refresh, verification gate, or cut fails the workflow;
+expected skips on the other path do not count as release success.
 
 The Merge button is the only routine manual action. Dispatch `Core Release Please` only
-for recovery of a failed release; the optional dispatch can also prove and merge an open
-proposal.
+to retry the cut of a release pull request that merged without a tag.
 
 Publishing the draft is the last step, and the Scoop and Homebrew pointers are updated
 immediately after it, never before. A release that is visible is therefore a release

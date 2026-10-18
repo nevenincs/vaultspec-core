@@ -42,7 +42,6 @@ jobs:
       contents: read
       checks: read
       pull-requests: write
-      actions: write
     with:
       ref: main
     secrets:

@@ -4,11 +4,11 @@ The self-hosted fleet has one Linux runner and one Windows runner, so the pull
 request path is tiered, and DRAFT STATE chooses the tier. ``Check: Lint
 (Linux)`` runs on every push; the two full suites run on every push to a
 pull request that is ready for review, on the ``ci:full`` label that proves a
-draft without marking it ready, and whenever the workflow is called or
-dispatched; ``Check: Merge gate (Linux)`` is the sole required check and always
-reaches a verdict. This guard pins that topology, every recipe each tier runs,
-and the failure semantics that keep independent diagnostics visible after an
-earlier gate fails.
+draft without marking it ready, and whenever the workflow is called;
+``Check: Merge gate (Linux)`` is the sole required check and reaches a verdict
+for every pull request allowed onto the fleet. This guard pins that topology,
+every recipe each tier runs, and the failure semantics that keep independent
+diagnostics visible after an earlier gate fails.
 
 The tiering is pinned to the pull request's own state on purpose. A tier that
 only a label can reach is invisible in the checks list, and a contributor who
@@ -33,6 +33,7 @@ from typing import Any, cast
 import pytest
 import yaml
 
+from dev.guards.test_runner_containment import SAME_REPOSITORY, TRUSTED_AUTHOR
 from dev.runner import Cmd, Ref
 from dev.toolchain import find_verb
 
@@ -58,21 +59,10 @@ EXPECTED_NAMES = {
     LINUX_JOB: "Test: Full suite (Linux)",
     WINDOWS_JOB: "Test: Library suite (Windows)",
     GATE_JOB: "Check: Merge gate (Linux)",
-    "release-pr-ready": "Check: Release PR ready (Linux)",
 }
 
 #: The label that asks for one full run.
 FULL_LABEL = "ci:full"
-
-#: The pull request authors whose code may reach the fleet unreviewed. This is a
-#: personal account, so there are no organisation members.
-TRUSTED_AUTHOR = (
-    "(github.event.pull_request.author_association == 'OWNER' || "
-    "github.event.pull_request.author_association == 'COLLABORATOR')"
-)
-
-#: Applying a label takes triage rights; a bot applying `ci:full` does not count.
-LABEL_BY_USER = "github.event.sender.type == 'User'"
 
 #: The only workflow a push to main may start. main is ruleset-protected, so a
 #: commit reaching it already passed the gate; release-please is the one lane
@@ -114,6 +104,12 @@ _JOB_NAME = re.compile(
     r"(, [A-Za-z0-9._:-]+(?: [A-Za-z0-9._:-]+)?)*\)$"
 )
 _WORKFLOW_NAME = re.compile(r"^Core [A-Z][A-Za-z0-9 ]*$")
+#: A job whose name depends on a condition, `${{ cond && 'A' || 'B' }}`. The
+#: merge-gate verdict is one: withheld from an untrusted pull request, it
+#: reports under a name the ruleset does not require.
+_CONDITIONAL_NAME = re.compile(
+    r"^\$\{\{ .+ && '(?P<granted>[^']+)' \|\| '(?P<withheld>[^']+)' \}\}$"
+)
 _MATRIX_REF = re.compile(r"\$\{\{\s*matrix\.(?P<key>[\w-]+)\s*\}\}")
 
 #: How the registry dispatches into itself. The ``ci`` pipeline composes the
@@ -220,6 +216,9 @@ def _check_names(job: dict[str, Any], job_id: str) -> list[str]:
     unexpanded expression would sail through the pattern on the literal.
     """
     name = str(job.get("name", job_id))
+    conditional = _CONDITIONAL_NAME.fullmatch(name)
+    if conditional:
+        return [conditional.group("granted"), conditional.group("withheld")]
     keys = {match.group("key") for match in _MATRIX_REF.finditer(name)}
     if not keys:
         return [name]
@@ -300,14 +299,14 @@ def _leaf_commands(recipe: str) -> set[tuple[str, ...]]:
 
 
 def test_the_gate_has_exactly_its_tiered_jobs() -> None:
-    """Lint, both suites, the verdict, and automatic release PR readiness."""
+    """Lint, both suites, and the verdict."""
     jobs = _jobs()
     assert set(jobs) == set(EXPECTED_NAMES), (
         f"merge-gate.yml must contain exactly {sorted(EXPECTED_NAMES)}; "
         f"found {sorted(jobs)}"
     )
     for job_id, name in EXPECTED_NAMES.items():
-        assert jobs[job_id]["name"] == name
+        assert _check_names(jobs[job_id], job_id)[0] == name
         # A matrix would make the status set dynamic and let one platform
         # disappear behind another.
         assert "strategy" not in jobs[job_id], f"`{job_id}` must not be a matrix job"
@@ -318,10 +317,15 @@ def test_the_gate_has_exactly_its_tiered_jobs() -> None:
         assert "needs" not in jobs[job_id], f"`{job_id}` must start independently"
 
 
-def test_the_gate_runs_on_pull_requests_calls_and_dispatches_only() -> None:
-    """Every push to a pull request is seen; main pushes are not."""
+def test_the_gate_runs_on_pull_requests_and_calls_only() -> None:
+    """Every push to a pull request is seen; main pushes are not.
+
+    A dispatched run is linked to no pull request, so it can never satisfy the
+    ruleset; the trigger only ever served to work around a pull request whose
+    own runs did not reach the fleet.
+    """
     events = _events(_gate())
-    assert set(events) == {"pull_request", "workflow_call", "workflow_dispatch"}
+    assert set(events) == {"pull_request", "workflow_call"}
     pull_request = cast("dict[str, Any]", events["pull_request"])
     assert set(pull_request.get("types", [])) == {
         "opened",
@@ -353,7 +357,7 @@ def test_only_release_please_runs_when_main_moves() -> None:
 
 
 def test_the_full_suites_run_on_a_ready_pull_request_or_on_demand() -> None:
-    """A draft runs the lint; ready, the label, a call or a dispatch run both.
+    """A draft runs the lint; ready, the label or a call run both.
 
     The draft clause is what keeps a green branch from stranding: a pull
     request that is ready to merge proves itself on every push, so the
@@ -382,41 +386,22 @@ def test_the_full_suites_run_on_a_ready_pull_request_or_on_demand() -> None:
     )
 
 
-def test_only_a_trusted_author_or_a_users_label_reaches_the_fleet() -> None:
-    """A pull request runs fleet jobs only for a trusted author or a user's label.
-
-    Dependabot and every other author who is neither the owner nor a
-    collaborator push branches of this repository, so the fork clause never
-    stops them, and the approval requirement for outside contributors does not
-    cover them. Their code reaches the self-hosted fleet only after a user with
-    triage rights applies `ci:full`; a bot applying it does not count.
-
-    Mutation proof: dropping the author clause from `test-linux`'s condition
-    makes this fail on that job; restoring it makes this pass.
-    """
-    jobs = _jobs()
-    for job_id in (LINT_JOB, LINUX_JOB, WINDOWS_JOB):
-        condition = str(jobs[job_id].get("if", ""))
-        assert TRUSTED_AUTHOR in condition, (
-            f"`{job_id}` would run a pull request by any author on the "
-            "self-hosted fleet, Dependabot included"
-        )
-        assert LABEL_BY_USER in condition, (
-            f"`{job_id}` would let a bot's `{FULL_LABEL}` label start it"
-        )
-
-
 def test_the_gate_always_reaches_a_verdict() -> None:
-    """The required check is never skipped, and it weighs every tier.
+    """The required check is never skipped on the fleet, and it weighs every tier.
 
     A required check whose job is skipped counts as passed, so a gate with a
-    narrower condition would let an unrelated label merge an unproven commit.
+    narrower condition than the fleet's trust clause would let an unrelated
+    label merge an unproven commit. Beyond that clause, which withholds it from
+    untrusted pull requests under another name, it runs whatever its tiers did.
 
-    Mutation proof: deleting the untrusted-author refusal from the judgement
-    makes this fail on that refusal; restoring it makes this pass.
+    Mutation proof: replacing `!cancelled()` with `success()` in the verdict's
+    condition makes this fail on that condition; restoring it makes this pass.
     """
     gate = _jobs()[GATE_JOB]
-    assert gate.get("if") == "${{ !cancelled() }}"
+    trusted = f"({SAME_REPOSITORY} && {TRUSTED_AUTHOR})"
+    assert gate.get("if") == (
+        f"${{{{ !cancelled() && (github.event_name != 'pull_request' || {trusted}) }}}}"
+    ), "the verdict must run after every tier, failed ones included"
     assert set(gate.get("needs", [])) == {LINT_JOB, LINUX_JOB, WINDOWS_JOB}
 
     env = cast("dict[str, str]", gate.get("env", {}))
@@ -434,30 +419,9 @@ def test_the_gate_always_reaches_a_verdict() -> None:
         "required check's exact name"
     )
     assert "HEAD_SHA" in script, "the earlier verdict must be on the same commit"
-    assert (
-        env.get("HEAD_REPO") == "${{ github.event.pull_request.head.repo.full_name }}"
-    )
-    refusal = script.index('[ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]')
-    assert refusal < script.index("exit 0"), (
-        "a fork pull request must be refused before any path can pass the gate"
-    )
-    assert (
-        env.get("ASSOCIATION") == "${{ github.event.pull_request.author_association }}"
-    ), "the gate no longer reads the pull request author's association"
-    marker = 'case "${ASSOCIATION}" in OWNER | COLLABORATOR) ;;'
-    assert marker in script, (
-        "the gate no longer refuses a commit by an author who is neither the "
-        "owner nor a collaborator"
-    )
-    untrusted = script.index(marker)
-    assert script.index("check_name=Check:%20Merge%20gate") < untrusted, (
-        "an untrusted author's commit a collaborator's ci:full already proved "
-        "must keep its verdict"
-    )
-    assert untrusted < script.index("the full suites have not run"), (
-        "an untrusted author's commit must be refused by name, not told to mark "
-        "the pull request ready"
-    )
+    assert script.index("check_name=Check:%20Merge%20gate") < script.index(
+        "the full suites have not run"
+    ), "a commit the full suites already proved must keep its verdict"
 
     release = steps["Release the ci:full label"]
     assert "|| true" in str(release["run"]), (

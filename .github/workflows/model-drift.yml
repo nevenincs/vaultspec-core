@@ -26,10 +26,12 @@ name: Core Model Drift
 #   1. Add an `ANTHROPIC_API_KEY` repository secret. Without it the agent
 #      step fails immediately - this is the only hard prerequisite, and the
 #      only thing that costs money.
-#   2. Point `github_token` below at a PAT (`DEV_RUNNER_PAT` already exists)
-#      instead of the default `GITHUB_TOKEN`. PRs opened by the default token
-#      do not trigger CI - the same rule that leaves release-please PRs
-#      unchecked - so a drift PR would otherwise arrive with no test results.
+#   2. Point `github_token` below at a token minted from the fleet release
+#      App (`actions/create-github-app-token` with `RELEASE_APP_CLIENT_ID` and
+#      `RELEASE_APP_PRIVATE_KEY`, as release-please.yml does) instead of the
+#      default `GITHUB_TOKEN`. A PR the default token opens is authored by
+#      github-actions[bot], and the merge gate never reaches the fleet for it,
+#      so a drift PR would otherwise arrive with no test results.
 #   3. Uncomment the `schedule:` block below.
 #
 # Step 1 alone is enough to trial it manually before committing to a cadence;
