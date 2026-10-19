@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.8](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.7...vaultspec-core-v0.3.8) (2026-10-18)
+
+
+### Bug Fixes
+
+* **ci:** write release pull requests as the release App and contain the fleet to trusted authors ([#610](https://github.com/nevenincs/vaultspec-core/issues/610)) ([d8823a1](https://github.com/nevenincs/vaultspec-core/commit/d8823a1f1f17da2fd9aee77bd777c1f3a526ed1b))
+
 ## [0.3.7](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.5...vaultspec-core-v0.3.7) (2026-10-12)
 
 
