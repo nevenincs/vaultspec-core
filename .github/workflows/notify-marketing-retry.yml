@@ -1,0 +1,47 @@
+name: Core Notify Marketing Retry
+
+# Core Notify Marketing is the only path from a published release to the
+# marketing site, and publish.yml dispatches it without waiting for the result.
+# A run that failed or was cancelled - a job no runner took before its timeout,
+# a dispatch the network dropped - left the site on the previous release, and a
+# cancelled run is grey, not red. This lane reruns it twice, then fails in its
+# own name, because a failure that survives two reruns is not transient.
+#
+# A rerun repeats the run with its original tag, and the signal is idempotent:
+# marketing refreshes from the releases themselves, so a second delivery of the
+# same tag changes nothing.
+
+on:
+  workflow_run:
+    workflows: ["Core Notify Marketing"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  retry:
+    name: "Build: Retry marketing notification (Linux)"
+    if: ${{ github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.conclusion != 'skipped' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 125
+    env:
+      CI_EXEC_BUDGET_MINUTES: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Rerun the marketing notification
+        if: ${{ github.event.workflow_run.run_attempt < 3 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: gh run rerun "$RUN_ID" --repo "$GITHUB_REPOSITORY"
+
+      # The run title names the tag; --exit-status turns its failure into this
+      # job's, so the undelivered release is red where runs are read.
+      - name: Fail with the undelivered marketing notification
+        if: ${{ github.event.workflow_run.run_attempt >= 3 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --exit-status

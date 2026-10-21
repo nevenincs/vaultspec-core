@@ -1,4 +1,6 @@
 name: Core Notify Marketing
+# The tag in the run title is what the retry lane names in its report.
+run-name: Core Notify Marketing ${{ inputs.tag }}
 
 on:
   workflow_dispatch:
