@@ -124,7 +124,7 @@ the markers.
 
 <!-- vaultspec:generated:begin unreleased-surface -->
 
-Measured against `0.3.7`, the latest published release when this reference was
+Measured against `0.3.9`, the latest published release when this reference was
 generated: every command, flag, and tool documented here is in it.
 
 <!-- vaultspec:generated:end unreleased-surface -->
