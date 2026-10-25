@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/logo.png" width="119" alt="Vaultspec logo">
+<img src="https://raw.githubusercontent.com/nevenincs/vaultspec-core/main/docs/assets/vaultspec-core-landing-light-horizontal.png" width="720" alt="vaultspec-core: decision-driven harness for coding agents, and humans. Research, decide, plan, code, and review around the Vaultspec mark.">
 
 # vaultspec-core: Decision-driven harness for coding agents, and humans
 
