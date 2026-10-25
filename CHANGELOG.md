@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.9](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.8...vaultspec-core-v0.3.9) (2026-10-25)
+
+
+### Bug Fixes
+
+* **ci:** rerun an undelivered marketing notification ([#614](https://github.com/nevenincs/vaultspec-core/issues/614)) ([d9c350b](https://github.com/nevenincs/vaultspec-core/commit/d9c350bcd92e08299d9b840778881f64ddec65e3))
+* **deps:** take certifi 2026.10.19 for the compromised emSign intermediates ([#615](https://github.com/nevenincs/vaultspec-core/issues/615)) ([ac33a22](https://github.com/nevenincs/vaultspec-core/commit/ac33a22dde2bcf0231255bc75807f6974435fd31))
+* **deps:** take filelock 4.2.4 and opentelemetry-api 1.45.1 for new advisories ([#618](https://github.com/nevenincs/vaultspec-core/issues/618)) ([e8ba0ee](https://github.com/nevenincs/vaultspec-core/commit/e8ba0ee5f9a159d492417b4519416d9573b6e392))
+
 ## [0.3.8](https://github.com/nevenincs/vaultspec-core/compare/vaultspec-core-v0.3.7...vaultspec-core-v0.3.8) (2026-10-18)
 
 
